@@ -6257,9 +6257,9 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 window.SUPA_ANON = SUPA_ANON;
 window._supa_anon = SUPA_ANON;
 const db = window._porraDb || (window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
-window.db = db;
   auth: { storageKey: 'porra_auth', persistSession: false, autoRefreshToken: true }
 }));
+window.db = db;
 
 let currentUser = null; // { id, email, nombre }
 window.currentUser = currentUser;
