@@ -1993,7 +1993,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
   <!-- ââ PANEL DE LIGAS — overlay dentro del hero, visible tras login ââ -->
   <div id="league-panel" class="league-hero-panel" style="display:none">
     <div class="league-hero-inner">
-      <div class="league-hero-title">ð Elige tu porra</div>
+      <div class="league-hero-title">🏆 Elige tu porra</div>
 
       <!-- Lista de ligas del usuario (se rellena por JS) -->
       <div id="my-leagues-list"></div>
@@ -2053,13 +2053,13 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     <!-- Sistema de Puntos — ancho completo -->
     <div style="max-width:900px;margin:0 auto;padding:0 24px;margin-bottom:20px">
       <div class="wc-card">
-        <div class="wc-card-icon">ð¯</div>
+        <div class="wc-card-icon">🎯</div>
         <div class="wc-card-title">Sistema de Puntos</div>
         <div style="display:flex;gap:24px;align-items:start;flex-wrap:wrap">
           <div style="flex:1;min-width:220px">
             <div class="wc-card-sub" style="margin-bottom:10px">Fase de Grupos + Eliminatorias</div>
             <div class="wc-row"><span class="wc-row-icon">â</span><div class="wc-pts-badge">+1 pt</div><span class="wc-row-text">Aciertas el signo (1 · X · 2)</span></div>
-            <div class="wc-row"><span class="wc-row-icon">ð¯</span><div class="wc-pts-badge">+3 pts</div><span class="wc-row-text">Marcador exacto</span></div>
+            <div class="wc-row"><span class="wc-row-icon">🎯</span><div class="wc-pts-badge">+3 pts</div><span class="wc-row-text">Marcador exacto</span></div>
             <div class="wc-row"><span class="wc-row-icon">â½</span><div class="wc-pts-badge">+2 pts</div><span class="wc-row-text">Aciertas cualquier goleador del partido</span></div>
             <div class="wc-row"><span class="wc-row-icon">ð¤</span><div class="wc-pts-badge">+1 pt</div><span class="wc-row-text">Tu signo va contra el pronóstico de la IA</span></div>
             <div class="wc-max-row"><span class="wc-max-label">Máximo por partido</span><span class="wc-max-val" style="margin-right:48px">7 pts</span></div>
@@ -2098,7 +2098,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
       </div>
       <div style="flex:1;min-width:280px;display:flex;flex-direction:column">
         <div class="wc-card" style="height:100%">
-          <div class="wc-card-icon">ð</div>
+          <div class="wc-card-icon">🏆</div>
           <div class="wc-card-title">Premios Individuales</div>
           <div class="wc-card-sub">Bonus especiales</div>
           <div class="wc-row">
@@ -2205,7 +2205,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
                color:#4b5563;padding:6px 14px;border-radius:10px;
                border:1px solid #27272a;background:#1c1c1e;cursor:not-allowed;
                transition:all .3s;opacity:.5;font-family:'Inter',sans-serif">
-        <span id="btn-elim-icon">ð</span>
+        <span id="btn-elim-icon">🔒</span>
         <span id="btn-elim-text">Eliminatorias</span>
         <span id="btn-elim-count" style="font-size:10px;color:#6b7280">0/72</span>
       </button>
@@ -2216,7 +2216,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
                transition:all .15s;font-family:'Inter',sans-serif"
         onmouseover="this.style.borderColor='#f59e0b';this.style.background='#292010'"
         onmouseout="this.style.borderColor='#78350f';this.style.background='#1c1008'">
-        ð Clasificación
+        🏆 Clasificación
       </button>
       <div style="background:#111318;border:1px solid #27272a;padding:6px 14px;border-radius:24px;display:flex;align-items:center;gap:8px;">
         <span style="color:#6b7280;font-size:11px;">Puntos:</span>
@@ -2246,7 +2246,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     <div style="position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:120px;opacity:.04;pointer-events:none;line-height:1">â½</div>
     <!-- Estado: incompleto -->
     <div id="cta-locked-msg">
-      <div style="font-size:32px;margin-bottom:12px">ð</div>
+      <div style="font-size:32px;margin-bottom:12px">🔒</div>
       <div style="font-family:'Inter Tight',sans-serif;font-size:20px;font-weight:900;color:#9ca3af;margin-bottom:6px">Completa los pronósticos de grupos</div>
       <div style="font-size:13px;color:#6b7280;margin-bottom:20px">Pronostica los 72 partidos para acceder a la fase eliminatoria</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
@@ -2262,7 +2262,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     </div>
     <!-- Estado: completo -->
     <div id="cta-ready-msg" style="display:none">
-      <div style="font-size:40px;margin-bottom:12px">ð</div>
+      <div style="font-size:40px;margin-bottom:12px">🏆</div>
       <div style="font-family:'Inter Tight',sans-serif;font-size:24px;font-weight:900;color:#4ade80;margin-bottom:6px">Â¡Fase de grupos completada!</div>
       <div style="font-size:13px;color:#9ca3af;margin-bottom:24px">El motor ha calculado los 32 clasificados. Accede al cuadro eliminatorio.</div>
       <button onclick="goToEliminatoria()" style="
@@ -2301,7 +2301,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     <a class="gh-back" href="#" onclick="showPage('grupos');return false;">â Fase de Grupos</a>
     <a class="gh-back" href="#" onclick="showPage('score');return false;"
        style="color:#fbbf24;border-color:#78350f;background:#1c1008"
-       onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#78350f'">ð Clasificación</a>
+       onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#78350f'">🏆 Clasificación</a>
     <div class="gh-title">â½ Porra <span>Eliminatorias</span></div>
   </div>
   <div class="gh-pts">
@@ -2337,7 +2337,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 
     <!-- Locked screen (grupos incompletos) -->
     <div id="locked-screen" class="locked-page" style="display:none">
-      <div class="locked-page-icon">ð</div>
+      <div class="locked-page-icon">🔒</div>
       <div class="locked-page-title">Completa la fase de grupos primero</div>
       <div class="locked-page-desc">Necesitas pronosticar todos los partidos de la fase de grupos para que el motor calcule los 32 clasificados y genere el cuadro eliminatorio.</div>
       <div class="locked-progress">
@@ -2353,7 +2353,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 
       <!-- Hero página -->
       <div class="ko-page-hero">
-        <div class="ko-watermark">ð</div>
+        <div class="ko-watermark">🏆</div>
         <div class="ko-hero-badge">â¡ Mundial 2026 · Fase Eliminatoria</div>
         <div class="ko-hero-title">Cuadro <em>Final</em></div>
         <div class="ko-hero-sub">32 partidos · 6 rondas · hasta 7 pts por partido + bonus por equipos que avanzan</div>
@@ -2406,12 +2406,12 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
           <div><div class="fin-check-text">Eliminatorias</div><div class="fin-check-count" id="fincheck-ko-count">0 / 32 partidos</div></div>
         </div>
         <div class="fin-check" id="fincheck-awards">
-          <div class="fin-check-icon">ð</div>
+          <div class="fin-check-icon">🏆</div>
           <div><div class="fin-check-text">Premios individuales</div><div class="fin-check-count" id="fincheck-awards-count">0 / 4 premios</div></div>
         </div>
       </div>
       <button class="finalizar-btn" id="finalizar-btn" disabled onclick="finalizarPorra()">
-        <span id="finalizar-btn-icon">ð</span>
+        <span id="finalizar-btn-icon">🔒</span>
         <span id="finalizar-btn-text">Completa todos los pronósticos para continuar</span>
       </button>
     </div>
@@ -3167,7 +3167,7 @@ function createMatchCard(match, idx) {
         '</div>',
         '<div class="pts-row">',
           '<div class="ptc sign" id="ptc-sign-'+idx+'">ðµ +1pt signo</div>',
-          '<div class="ptc exact" id="ptc-exact-'+idx+'">ð¯ +3pts exacto</div>',
+          '<div class="ptc exact" id="ptc-exact-'+idx+'">🎯 +3pts exacto</div>',
           '<div class="ptc scorer" id="ptc-scorer-'+idx+'">â½ +2pts goleador</div>',
           '<div class="ptc ia" id="ptc-ia-'+idx+'">ð¤ +1pt vs IA</div>',
         '</div>',
@@ -3190,7 +3190,7 @@ function createMatchCard(match, idx) {
         '<div class="pred-sub">Tu pronóstico:<span id="pred-val-'+idx+'">—</span></div>',
         '<div class="pts-row">',
           '<div class="ptc sign" id="ptc-sign-l-'+idx+'">ðµ +1pt signo</div>',
-          '<div class="ptc exact" id="ptc-exact-l-'+idx+'">ð¯ +3pts exacto</div>',
+          '<div class="ptc exact" id="ptc-exact-l-'+idx+'">🎯 +3pts exacto</div>',
           '<div class="ptc scorer" id="ptc-scorer-l-'+idx+'">â½ +2pts goleador</div>',
           '<div class="ptc ia" id="ptc-ia-l-'+idx+'">ð¤ +1pt vs IA</div>',
         '</div>',
@@ -3411,7 +3411,7 @@ function updateCardUI(idx, match) {
     if(hasScore){
       // Sistema ACUMULATIVO: signo + exacto + goleador + vsIA
       // ðµ signo siempre encendido (sólido) cuando hay marcador
-      // ð¯ exacto siempre encendido (potential = aspiracional) cuando hay marcador
+      // 🎯 exacto siempre encendido (potential = aspiracional) cuando hay marcador
       cs.classList.add('show'); cs.classList.remove('potential');
       ce.classList.add('show'); ce.classList.remove('potential'); // exacto siempre encendido
     } else {
@@ -3467,7 +3467,7 @@ function updateCardUI(idx, match) {
       if(gselSaved) gselSaved.disabled=true;
       document.querySelectorAll(`#pred-${idx} .sbn`).forEach(b=>b.disabled=true);
       const undoVisible = window._porraCerrada ? 'display:none' : '';
-      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">â Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">â© Deshacer</button></div>`;
+      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">✓ Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">â© Deshacer</button></div>`;
       btnRow.querySelector('.btn-undo').onclick=()=>{
         if (window._porraCerrada) return; // porra cerrada — no se puede deshacer
         // Deshacer SOLO esta tarjeta — no afecta a las demás
@@ -3488,7 +3488,7 @@ function updateCardUI(idx, match) {
   } else {
     document.querySelectorAll(`#pred-${idx} .sbn`).forEach(b=>b.style.visibility='hidden');
     document.getElementById(`gsel-${idx}`).disabled=true;
-    document.getElementById(`btn-row-${idx}`).innerHTML=`<div class="locked-badge">ð Cerrado</div>`;
+    document.getElementById(`btn-row-${idx}`).innerHTML=`<div class="locked-badge">🔒 Cerrado</div>`;
   }
 }
 
@@ -3717,7 +3717,7 @@ let currentAward=null;
 function openPicker(award) {
   currentAward = award;
   const sets = {
-    golden_ball:  { title:'ð Balón de Oro — MVP',            list: AW_PLAYERS },
+    golden_ball:  { title:'🏆 Balón de Oro — MVP',            list: AW_PLAYERS },
     golden_boot:  { title:'ð Bota de Oro — Máx. goleador',   list: AW_PLAYERS.filter(p=>p.role!=='gk') },
     golden_glove: { title:'ð§¤ Guante de Oro — Mejor portero', list: AW_PLAYERS.filter(p=>p.role==='gk') },
     young_player: { title:'â­ Mejor Joven â¤21',                list: YOUNG_PLAYERS_NXGN },
@@ -3770,7 +3770,7 @@ function renderAwardsCard(){
     <div class="aw-grid">
       <div class="aw-slot" data-award="golden_ball" onclick="openPicker('golden_ball')">
         <img class="aw-player-bg" id="bg-golden_ball" src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/MVP/MVP-maradona-1986.png" alt="MVP"/>
-        <div class="aw-top"><div class="aw-icon">ð</div><div class="aw-name">Balón de Oro</div><div class="aw-pts">15 pts</div></div>
+        <div class="aw-top"><div class="aw-icon">🏆</div><div class="aw-name">Balón de Oro</div><div class="aw-pts">15 pts</div></div>
         <div class="aw-bottom">
           <div class="aw-empty"><div class="aw-empty-ring">ð¤</div><div class="aw-empty-label">Seleccionar</div></div>
           <div class="aw-selected-info">
@@ -3897,7 +3897,7 @@ function checkGroupsComplete() {
     } else {
       btn.disabled = true;
       btn.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#4b5563;padding:6px 14px;border-radius:10px;border:1px solid #27272a;background:#1c1c1e;cursor:not-allowed;transition:all .3s;opacity:.6;font-family:Inter,sans-serif';
-      icon.textContent = 'ð';
+      icon.textContent = '🔒';
       text.textContent = 'Eliminatorias';
       count.style.display = 'inline';
     }
@@ -4057,7 +4057,7 @@ const ROUND_CONFIG = [
   {key:'qf',   num:'4',  name:'Cuartos de Final',       sub:'4 partidos · 9–11 jul',         pts:'+88 pts posibles',  gridCls:'r8'},
   {key:'sf',   num:'2',  name:'Semifinales',             sub:'2 partidos · 14–15 jul',        pts:'+104 pts posibles', gridCls:'r4'},
   {key:'third',num:'ð¥', name:'3er y 4Âº Puesto',        sub:'Final de consolación · 18 jul · Miami',    pts:'+7 pts + (premio 3er y 4Âº puesto)',  gridCls:'r1'},
-  {key:'final',num:'ð', name:'Gran Final',              sub:'19 jul · MetLife Stadium, NY',  pts:'+7 pts + (premio 1er y 2Âº puesto)', gridCls:'r1'},
+  {key:'final',num:'🏆', name:'Gran Final',              sub:'19 jul · MetLife Stadium, NY',  pts:'+7 pts + (premio 1er y 2Âº puesto)', gridCls:'r1'},
 ];
 
   // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -4274,13 +4274,13 @@ function buildKOCard(match, size='normal') {
       else                       winner = pred.classifier; // empate â equipo elegido
     }
     if(winner) {
-      statusTxt = 'â ' + (winner.length > 11 ? winner.substring(0,10)+'.' : winner);
+      statusTxt = '✓ ' + (winner.length > 11 ? winner.substring(0,10)+'.' : winner);
     } else {
-      statusTxt = 'â Guardado';
+      statusTxt = '✓ Guardado';
     }
   }
   else if(estado==='open'){ statusCls='open'; statusTxt='Pronosticar â'; }
-  else if(estado==='closed'){ statusCls='locked'; statusTxt='ð Cerrado'; }
+  else if(estado==='closed'){ statusCls='locked'; statusTxt='🔒 Cerrado'; }
   else if(estado==='live'){ statusCls='live'; statusTxt='ð´ En vivo'; }
   else if(estado==='done'){ statusCls='done'; statusTxt='Finalizado'; }
 
@@ -4304,7 +4304,7 @@ function buildKOCard(match, size='normal') {
         <div class="ko-vign"></div>
       </div>`:''}
       ${isLocked?`<div class="ko-locked-overlay">
-        <div class="ko-locked-icon">ð</div>
+        <div class="ko-locked-icon">🔒</div>
         <div class="ko-locked-label">Completa los grupos para desbloquear este cruce</div>
       </div>`:`<div class="ko-fade"></div>`}
       <div class="ko-team home">
@@ -4386,7 +4386,7 @@ function buildCinematicView() {
       finalHdr.className = 'round-section';
       finalHdr.innerHTML = `
         <div class="round-header">
-          <div class="round-num">ð</div>
+          <div class="round-num">🏆</div>
           <div class="round-info">
             <div class="round-name">Campeón · 2Âº Clasificado</div>
             <div class="round-meta">Gran Final · 19 jul · MetLife Stadium, Nueva York</div>
@@ -4516,7 +4516,7 @@ function buildChampionCard(winnerTeam) {
   const badge = getBadgeUrl(winnerTeam.slug);
   const badgeEl = badge
     ? `<img src="${badge}" alt="" style="width:120px;height:120px;object-fit:contain;filter:drop-shadow(0 6px 24px rgba(0,0,0,.7));position:relative;z-index:1" onerror="this.style.display='none'">`
-    : `<div style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;font-size:56px">ð</div>`;
+    : `<div style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;font-size:56px">🏆</div>`;
 
   return `
     <div id="champion-card" style="
@@ -4558,7 +4558,7 @@ function buildChampionCard(winnerTeam) {
       <!-- Texto derecha -->
       <div style="flex:1;min-width:0">
         <div style="font-size:9px;font-weight:800;color:rgba(250,204,21,.65);text-transform:uppercase;letter-spacing:.18em;margin-bottom:10px">
-          ð Campeón del Mundo
+          🏆 Campeón del Mundo
         </div>
         <div style="font-family:'Inter Tight',sans-serif;font-size:32px;font-weight:900;color:#fef9c3;letter-spacing:-.02em;line-height:1;text-shadow:0 2px 16px rgba(0,0,0,.8);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${winnerTeam.name}
@@ -4664,7 +4664,7 @@ function buildFinalSection(match) {
         <img src="${imgSrc}" style="width:80px;height:80px;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,.6))" onerror="this.src='${flag}'">
       </div>` : ''}
       <div style="flex:1;min-width:0">
-        <div style="font-size:8px;font-weight:800;color:rgba(250,204,21,.6);text-transform:uppercase;letter-spacing:.16em;margin-bottom:6px">ð Campeón del Mundo</div>
+        <div style="font-size:8px;font-weight:800;color:rgba(250,204,21,.6);text-transform:uppercase;letter-spacing:.16em;margin-bottom:6px">🏆 Campeón del Mundo</div>
         <div style="font-family:'Inter Tight',sans-serif;font-size:26px;font-weight:900;color:#fef9c3;letter-spacing:-.02em;line-height:1;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${champName}</div>
         <div style="font-size:10px;color:rgba(250,204,21,.4);font-style:italic">FIFA World Cup 2026</div>
         <div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:2px">19 jul · MetLife Stadium, Nueva York</div>
@@ -4736,7 +4736,7 @@ function buildFinalSection(match) {
     const btnHtml = awFilled === 4
       ? (awSaved
           ? `<div style="display:flex;align-items:center;gap:6px">
-               <div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#4ade80;display:flex;align-items:center;gap:5px">â Guardado</div>
+               <div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#4ade80;display:flex;align-items:center;gap:5px">✓ Guardado</div>
                <button id="aw-undo-btn" style="background:transparent;color:#6b7280;border:1px solid #3a3a3e;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">â© Deshacer</button>
              </div>`
           : `<button id="aw-save-btn" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">Guardar</button>`)
@@ -4874,7 +4874,7 @@ function buildBracketView() {
       if(isFinal) {
         card.innerHTML=`
           <div class="br-hero" style="background:#120d00;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px">
-            <div style="font-size:26px">ð</div>
+            <div style="font-size:26px">🏆</div>
             <div style="font-size:7px;color:${'\x23'}fcd34d;font-weight:700">GRAN FINAL</div>
           </div>
           <div class="br-footer"><span class="br-date">19 jul · NY</span><span class="br-st gold">Final</span></div>`;
@@ -4896,7 +4896,7 @@ function buildBracketView() {
           </div>
           <div class="br-footer">
             <span class="br-date">${new Date(m.date).toLocaleDateString('es',{day:'numeric',month:'short'})}</span>
-            <span class="br-st ${isLocked?'locked':pred.saved?'open':'locked'}">${isLocked?'ð':pred.saved?'â':'Abrir'}</span>
+            <span class="br-st ${isLocked?'locked':pred.saved?'open':'locked'}">${isLocked?'🔒':pred.saved?'✓':'Abrir'}</span>
           </div>`;
       }
       col.appendChild(card);
@@ -4941,7 +4941,7 @@ function buildStadiumView() {
   const trophy=document.createElement('div');
   trophy.innerHTML=`
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
-      <div class="st-trophy-big">ð</div>
+      <div class="st-trophy-big">🏆</div>
       <div style="font-family:'Inter Tight',sans-serif;font-size:14px;font-weight:900;color:var(--gold);text-align:center">Gran Final</div>
       <div style="font-size:10px;color:var(--text-3);text-align:center">19 jul · Nueva York</div>
     </div>`;
@@ -4949,7 +4949,7 @@ function buildStadiumView() {
 
   // Final card
   const finalMatch=BRACKET.final[0];
-  const fCard=buildStadiumCompactCard(finalMatch,'gold','ð');
+  const fCard=buildStadiumCompactCard(finalMatch,'gold','🏆');
   center.appendChild(fCard);
 
   // Semis
@@ -5028,7 +5028,7 @@ function buildStadiumCompactCard(match, style, icon) {
     <span class="st-vs">vs</span>
     ${aTeam?`<div class="st-flag"><img src="${SB}/flags/${aTeam.flag}.png" alt=""/></div>`:'<div class="st-flag" style="background:#333"></div>'}
     <span class="st-name${!aTeam?' tbd':''}" style="font-size:11px">${aName.substring(0,10)}</span>
-    ${pred.saved?'<span style="margin-left:auto;font-size:9px;color:var(--green)">â</span>':''}
+    ${pred.saved?'<span style="margin-left:auto;font-size:9px;color:var(--green)">✓</span>':''}
   `;
   return card;
 }
@@ -5215,7 +5215,7 @@ function openModal(match) {
         <!-- Chips -->
         <div style="display:flex;justify-content:center;gap:5px;min-height:22px;margin-bottom:10px;flex-wrap:wrap">
           <div class="ptc sign"   id="modal-ptc-s">ðµ +1 signo</div>
-          <div class="ptc exact"  id="modal-ptc-e">ð¯ +3 exacto</div>
+          <div class="ptc exact"  id="modal-ptc-e">🎯 +3 exacto</div>
           <div class="ptc scorer" id="modal-ptc-g">â½ +2 goleador</div>
           <div class="ptc ia"     id="modal-ptc-i">ð¤ +1 vs IA</div>
         </div>
@@ -5365,7 +5365,7 @@ function openModal(match) {
       // Estado guardado: mostrar badge + deshacer
       btnRow2.innerHTML = `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:600;color:#4ade80">â Guardado</div>
+          <div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:600;color:#4ade80">✓ Guardado</div>
           ${!window._porraCerrada ? `<button onclick="window.undoKO(${matchId})" style="background:transparent;border:1px solid #3a3a3e;border-radius:8px;padding:6px 9px;font-size:10px;color:#6b7280;cursor:pointer;font-family:'Inter',sans-serif">â© Deshacer</button>` : ''}
           <button onclick="closeModalBtn()" style="background:transparent;border:1px solid #3a3a3e;border-radius:8px;padding:6px 11px;font-size:10px;color:#9ca3af;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:3px">â Volver</button>
         </div>`;
@@ -5664,7 +5664,7 @@ function renderPickerList(list, selected) {
             ${teamName}
           </div>
         </div>
-        <div class="aw-player-check">â</div>
+        <div class="aw-player-check">✓</div>
       </div>`;
     }).join('');
     return `<div class="aw-picker-group">${teamName}</div>${rows}`;
@@ -6006,7 +6006,7 @@ function leagueUpdateNavPill() {
     header.insertBefore(pill, header.firstChild);
   }
   pill.style.display = 'inline-flex';
-  pill.innerHTML = `<span class="lnp-dot"></span>ð ${escapeHtml(_activeLeague.nombre)}<span class="lnp-label">· cambiar</span>`;
+  pill.innerHTML = `<span class="lnp-dot"></span>🏆 ${escapeHtml(_activeLeague.nombre)}<span class="lnp-label">· cambiar</span>`;
 
   // Sincronizar también en barra de eliminatorias
   let elimPill = document.getElementById('elim-league-pill');
@@ -6023,7 +6023,7 @@ function leagueUpdateNavPill() {
   }
   if (elimPill) {
     elimPill.style.display = 'inline-flex';
-    elimPill.innerHTML = `<span class="lnp-dot"></span>ð ${escapeHtml(_activeLeague.nombre)}<span class="lnp-label">· cambiar</span>`;
+    elimPill.innerHTML = `<span class="lnp-dot"></span>🏆 ${escapeHtml(_activeLeague.nombre)}<span class="lnp-label">· cambiar</span>`;
   }
 }
 
@@ -6051,11 +6051,11 @@ async function leagueRenderPanel() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div>
             <div style="font-size:16px;font-weight:800;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.8)">${escapeHtml(lg.nombre)}</div>
-            <div style="font-size:11px;color:#9ca3af;margin-top:2px">${lg.porra_cerrada ? 'ð Porra cerrada' : 'âï¸ Pronósticos abiertos'}</div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px">${lg.porra_cerrada ? '🔒 Porra cerrada' : 'âï¸ Pronósticos abiertos'}</div>
           </div>
           <div style="display:flex;align-items:center;gap:5px">
             <div style="background:rgba(99,82,199,.25);border:1px solid rgba(99,82,199,.4);border-radius:6px;padding:3px 9px;font-family:'Inter Tight',monospace;font-size:12px;font-weight:700;color:#a5b4fc;letter-spacing:.1em">${escapeHtml(lg.codigo)}</div>
-            <button onclick="event.stopPropagation();navigator.clipboard.writeText('${lg.codigo}').then(()=>{this.textContent='â';setTimeout(()=>this.textContent='ð',1500)}).catch(()=>{})"
+            <button onclick="event.stopPropagation();navigator.clipboard.writeText('${lg.codigo}').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='ð',1500)}).catch(()=>{})"
               style="background:rgba(99,82,199,.15);border:1px solid rgba(99,82,199,.25);border-radius:5px;padding:3px 7px;font-size:11px;color:#a5b4fc;cursor:pointer"
               title="Copiar código">ð</button>
           </div>
@@ -6124,13 +6124,13 @@ async function leagueDoCreate() {
         <div style="font-family:'Inter Tight',monospace;font-size:32px;font-weight:900;color:#a5b4fc;letter-spacing:.2em">${escapeHtml(codigo)}</div>
         <div style="font-size:12px;color:#9ca3af;margin-top:6px">${escapeHtml(ligaNombre)}</div>
       </div>
-      <button onclick="navigator.clipboard.writeText('${codigo}').then(()=>{this.textContent='â Copiado';this.style.background='#166534'}).catch(()=>{})" 
+      <button onclick="navigator.clipboard.writeText('${codigo}').then(()=>{this.textContent='✓ Copiado';this.style.background='#166534'}).catch(()=>{})" 
         style="width:100%;padding:10px;background:#1e1b4b;border:1px solid #6652c9;border-radius:8px;color:#a5b4fc;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;transition:all .15s">
         ð Copiar código
       </button>
       <button onclick="document.getElementById('league-modal-create').style.display='none'; leagueSelectById('${data.data.id}');"
         style="width:100%;padding:10px;background:#16a34a;border:none;border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">
-        â Entrar a mi porra â
+        ✓ Entrar a mi porra â
       </button>
     `;
   } catch(err) {
@@ -6182,7 +6182,7 @@ async function leagueDoJoin() {
       .insert({ league_id: league.id, user_id: currentUser.id });
     if (joinErr) throw new Error('Error al unirse: ' + joinErr.message);
 
-    msgEl.textContent = `â Te has unido a "${league.nombre}"`;
+    msgEl.textContent = `✓ Te has unido a "${league.nombre}"`;
     msgEl.className = 'league-modal-msg ok';
 
     setTimeout(() => {
@@ -6891,7 +6891,7 @@ async function _checkFinalizarReadyDB(execId) {
         if (el) el.classList.toggle('done', filled >= total);
         if (ct) ct.textContent = filled + ' / ' + total + (total === 4 ? ' premios' : ' partidos');
         const icon = el?.querySelector('.fin-check-icon');
-        if (icon) icon.textContent = filled >= total ? 'â' : (id === 'fincheck-grupos' ? 'â½' : id === 'fincheck-ko' ? 'â¡' : 'ð');
+        if (icon) icon.textContent = filled >= total ? 'â' : (id === 'fincheck-grupos' ? 'â½' : id === 'fincheck-ko' ? 'â¡' : '🏆');
       }
       setCheckClosed('fincheck-grupos', 'fincheck-grupos-count', gF, 72);
       setCheckClosed('fincheck-ko',     'fincheck-ko-count',     kF, 32);
@@ -6942,7 +6942,7 @@ async function _checkFinalizarReadyDB(execId) {
     if (el) el.classList.toggle('done', done);
     if (ct) ct.textContent = filled + ' / ' + total + (total === 4 ? ' premios' : ' partidos');
     const icon = el?.querySelector('.fin-check-icon');
-    if (icon) icon.textContent = done ? 'â' : (id === 'fincheck-grupos' ? 'â½' : id === 'fincheck-ko' ? 'â¡' : 'ð');
+    if (icon) icon.textContent = done ? 'â' : (id === 'fincheck-grupos' ? 'â½' : id === 'fincheck-ko' ? 'â¡' : '🏆');
   }
 
   try {
@@ -6988,7 +6988,7 @@ async function _checkFinalizarReadyDB(execId) {
       if (card) card.classList.add('ready');
     } else {
       if (btn) { btn.disabled = true; btn.className = 'finalizar-btn'; }
-      if (btnIcon) btnIcon.textContent = 'ð';
+      if (btnIcon) btnIcon.textContent = '🔒';
       const missing = [];
       if (!gruposDone) missing.push((72 - gruposFilled) + ' partidos de grupos sin guardar en BD');
       if (!koDone)     missing.push((32 - koFilled)     + ' partidos de KO sin guardar en BD');
@@ -7333,14 +7333,14 @@ async function admSaveOverride(key) {
   const v = parseInt(vEl?.value, 10);
   if (isNaN(l) || isNaN(v)) { admToast('Introduce marcador válido (números)', 'err'); return; }
   const r = await admCall('set_override', { match_key: key, l, v });
-  if (r.ok) { admToast(`â Override guardado: ${l}-${v}`); await admLoadResults(); }
+  if (r.ok) { admToast(`✓ Override guardado: ${l}-${v}`); await admLoadResults(); }
   else admToast('Error: ' + r.error, 'err');
 }
 
 async function admClearOverride(key) {
   if (!confirm(`Â¿Revertir "${key}" a los datos de la API?`)) return;
   const r = await admCall('clear_override', { match_key: key });
-  if (r.ok) { admToast('â Override eliminado'); await admLoadResults(); }
+  if (r.ok) { admToast('✓ Override eliminado'); await admLoadResults(); }
   else admToast('Error: ' + r.error, 'err');
 }
 
@@ -7473,7 +7473,7 @@ async function admViewUser(uid, nombre) {
     html += '</table>';
   } else { html += '<div style="color:#4b5563;font-size:11px;margin-bottom:12px">Ninguno</div>'; }
 
-  html += `<div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">ð Eliminatorias (${koPreds.length})</div>`;
+  html += `<div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🏆 Eliminatorias (${koPreds.length})</div>`;
   if (koPreds.length) {
     html += '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:12px">';
     html += '<tr><th style="text-align:left;color:#4b5563;padding:2px 8px 4px 0;font-weight:500">Partido</th><th style="color:#4b5563;padding:2px 8px;font-weight:500">Resultado</th><th style="color:#4b5563;padding:2px 8px;font-weight:500">Clasifica</th><th style="color:#4b5563;padding:2px 0;font-weight:500">Acción</th></tr>';
@@ -7515,7 +7515,7 @@ async function admResetPorraCerrada(uid, nombre) {
       if(diceBar) diceBar.style.display = 'flex';
       checkFinalizarReady();
     }
-    admToast('â Porra reabierta. Si es otro usuario debe recargar la página.');
+    admToast('✓ Porra reabierta. Si es otro usuario debe recargar la página.');
     _admUsersCache = null;
     admLoadUsers(true);
   } else admToast('Error: ' + (r.error || 'desconocido'), 'err');
@@ -7543,7 +7543,7 @@ async function admReopenDirect(uid, type, matchId) {
       if (typeof renderGroupTableCard === 'function') GRUPOS.forEach(g => renderGroupTableCard(g.letra));
       checkFinalizarReady();
     }
-    admToast('â Reabierto. Si es otro usuario debe recargar la página.');
+    admToast('✓ Reabierto. Si es otro usuario debe recargar la página.');
     _admUsersCache = null; admLoadUsers(true);
   } else admToast('Error: ' + (r.error || 'desconocido'), 'err');
 }
@@ -7572,7 +7572,7 @@ async function admSaveAwards() {
     if (v) winners[k] = v;
   });
   const r = await admCall('set_award_winners', { winners });
-  if (r.ok) admToast('â Premios guardados');
+  if (r.ok) admToast('✓ Premios guardados');
   else admToast('Error: ' + r.error, 'err');
 }
 
@@ -7596,7 +7596,7 @@ async function admLoadSistema() {
   // Log
   const logEl = document.getElementById('adm-sync-log');
   if (logEl && d.last_sync) {
-    logEl.innerHTML = `<span class="lg-ok">â Ãltima actualización: ${new Date(d.last_sync).toLocaleString('es-ES')}</span><br><span class="lg-info">â¹ Resultados en DB: ${d.results_count}</span>`;
+    logEl.innerHTML = `<span class="lg-ok">✓ Ãltima actualización: ${new Date(d.last_sync).toLocaleString('es-ES')}</span><br><span class="lg-info">â¹ Resultados en DB: ${d.results_count}</span>`;
   }
 }
 
@@ -7605,10 +7605,10 @@ async function admForceSync() {
   const r = await admCall('force_sync');
   if (r.ok && r.data?.ok) {
     const log = (r.data.log ?? []).join('\n');
-    admToast('â Sync completada');
+    admToast('✓ Sync completada');
     const logEl = document.getElementById('adm-sync-log');
     if (logEl) logEl.innerHTML = (r.data.log ?? []).map(l =>
-      `<span class="${l.startsWith('â')||l.startsWith('â')?'lg-ok':l.startsWith('â ')?'lg-warn':l.startsWith('â')?'lg-err':'lg-info'}">${l}</span>`
+      `<span class="${l.startsWith('â')||l.startsWith('✓')?'lg-ok':l.startsWith('â ')?'lg-warn':l.startsWith('â')?'lg-err':'lg-info'}">${l}</span>`
     ).join('<br>');
     await admInit();
   } else {
@@ -7619,7 +7619,7 @@ async function admForceSync() {
 async function admCronPause() {
   if (!confirm('Â¿Pausar el pg_cron? Los resultados dejarán de actualizarse automáticamente.')) return;
   const r = await admCall('cron_pause');
-  if (r.ok) admToast('â pg_cron pausado');
+  if (r.ok) admToast('✓ pg_cron pausado');
   else admToast('Error: ' + r.error, 'err');
   admLoadSistema();
 }
@@ -7627,7 +7627,7 @@ async function admCronPause() {
 async function admCronResume() {
   if (!confirm('Â¿Activar el pg_cron? Actualizará resultados cada 5 minutos.')) return;
   const r = await admCall('cron_resume');
-  if (r.ok) admToast('â pg_cron activado (cada 5 min)');
+  if (r.ok) admToast('✓ pg_cron activado (cada 5 min)');
   else admToast('Error: ' + r.error, 'err');
   admLoadSistema();
 }
@@ -7635,7 +7635,7 @@ async function admCronResume() {
 async function admClearAllOverrides() {
   if (!confirm('Â¿Limpiar TODOS los overrides manuales? Los resultados volverán a los datos de la API.')) return;
   const r = await admCall('clear_all_overrides');
-  if (r.ok) { admToast('â Overrides eliminados'); await admInit(); }
+  if (r.ok) { admToast('✓ Overrides eliminados'); await admInit(); }
   else admToast('Error: ' + r.error, 'err');
 }
 
