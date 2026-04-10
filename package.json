@@ -1,0 +1,31 @@
+{
+  "name": "porramundial2026",
+  "version": "1.0.0",
+  "description": "App de pronósticos para el Mundial 2026. Permite a grupos de amigos crear ligas privadas, hacer predicciones de partidos (fase de grupos + eliminatorias + premios individuales), y competir en un scoreboard en tiempo real.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview"
+},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cicloste88-max/PorraMundial2026.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cicloste88-max/PorraMundial2026/issues"
+  },
+  "homepage": "https://github.com/cicloste88-max/PorraMundial2026#readme",
+  "devDependencies": {
+    "vite": "^8.0.8"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.0"
+  }
+}
