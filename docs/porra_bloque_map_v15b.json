@@ -1,0 +1,583 @@
+{
+  "proyecto": "Porra Mundial 2026",
+  "checkpoint": "v15b",
+  "total_lineas": 7743,
+  "bloques": [
+    {
+      "id": "css-b1",
+      "tipo": "CSS",
+      "archivo_destino": "base.css",
+      "nombre": "CSS B1 - Reset, vars, layout",
+      "lineas": [
+        1,
+        462
+      ],
+      "lineas_count": 462,
+      "usa": [],
+      "expone": [
+        "vars CSS",
+        "reset",
+        "layout"
+      ],
+      "deps": [],
+      "notas": "Raiz. Sin deps."
+    },
+    {
+      "id": "css-b2",
+      "tipo": "CSS",
+      "archivo_destino": "cards.css",
+      "nombre": "CSS B2 - Match cards, scoreboard",
+      "lineas": [
+        463,
+        567
+      ],
+      "lineas_count": 105,
+      "usa": [
+        "vars css-b1"
+      ],
+      "expone": [
+        ".match-card",
+        ".sbox",
+        ".scoreboard"
+      ],
+      "deps": [
+        "css-b1"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "css-b3",
+      "tipo": "CSS",
+      "archivo_destino": "ko.css",
+      "nombre": "CSS B3 - KO bracket, modal, awards",
+      "lineas": [
+        568,
+        1276
+      ],
+      "lineas_count": 709,
+      "usa": [
+        "vars css-b1"
+      ],
+      "expone": [
+        ".ko-bracket",
+        ".modal",
+        ".aw-*"
+      ],
+      "deps": [
+        "css-b1"
+      ],
+      "notas": "GRANDE - candidato a dividir en ko.css + awards.css"
+    },
+    {
+      "id": "css-b4",
+      "tipo": "CSS",
+      "archivo_destino": "admin.css",
+      "nombre": "CSS B4 - Responsive, admin, dado",
+      "lineas": [
+        1277,
+        1820
+      ],
+      "lineas_count": 544,
+      "usa": [
+        "vars css-b1"
+      ],
+      "expone": [
+        ".adm-*",
+        "media queries",
+        ".dice-*"
+      ],
+      "deps": [
+        "css-b1"
+      ],
+      "notas": "body/.container duplicados - limpiar al extraer"
+    },
+    {
+      "id": "html-auth",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Auth bar + modal",
+      "lineas": [
+        1231,
+        1825
+      ],
+      "lineas_count": 595,
+      "usa": [
+        "openAuthModal",
+        "switchAuthTab",
+        "doLogin",
+        "doRegister"
+      ],
+      "expone": [
+        "#auth-bar",
+        "#auth-modal"
+      ],
+      "deps": [
+        "js-auth"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "html-score",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Page scoreboard",
+      "lineas": [
+        1826,
+        1900
+      ],
+      "lineas_count": 75,
+      "usa": [],
+      "expone": [
+        "#page-score"
+      ],
+      "deps": [
+        "js-scoreboard"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "html-welcome",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Page welcome + ligas",
+      "lineas": [
+        1901,
+        2125
+      ],
+      "lineas_count": 225,
+      "usa": [
+        "leagueShowCreate",
+        "leagueShowJoin",
+        "showPage"
+      ],
+      "expone": [
+        "#page-welcome",
+        "#panel-ligas"
+      ],
+      "deps": [
+        "js-ligas"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "html-grupos",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Page fase grupos",
+      "lineas": [
+        2126,
+        2229
+      ],
+      "lineas_count": 104,
+      "usa": [
+        "showPage"
+      ],
+      "expone": [
+        "#page-grupos"
+      ],
+      "deps": [
+        "js-main"
+      ],
+      "notas": "Tarjetas generadas dinamicamente"
+    },
+    {
+      "id": "html-elim",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Page eliminatorias",
+      "lineas": [
+        2230,
+        2364
+      ],
+      "lineas_count": 135,
+      "usa": [
+        "showPage"
+      ],
+      "expone": [
+        "#page-elim",
+        "#awards-box4"
+      ],
+      "deps": [
+        "js-main"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "html-awards",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Awards overlay",
+      "lineas": [
+        5572,
+        5585
+      ],
+      "lineas_count": 14,
+      "usa": [],
+      "expone": [
+        "#aw-overlay"
+      ],
+      "deps": [
+        "js-main"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "html-admin",
+      "tipo": "HTML",
+      "archivo_destino": "index.html",
+      "nombre": "HTML - Page admin",
+      "lineas": [
+        5586,
+        5748
+      ],
+      "lineas_count": 163,
+      "usa": [
+        "admTab",
+        "admInit",
+        "admFilterGroup"
+      ],
+      "expone": [
+        "#page-admin",
+        "#adm-toast"
+      ],
+      "deps": [
+        "js-admin"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "js-utils",
+      "tipo": "JS",
+      "archivo_destino": "utils.js",
+      "nombre": "JS - Utils inline",
+      "lineas": [
+        1231,
+        1238
+      ],
+      "lineas_count": 8,
+      "usa": [],
+      "expone": [
+        "handleCTA",
+        "openAuthModal (stub)"
+      ],
+      "deps": [],
+      "notas": "Solo 8 lineas - absorber en auth.js"
+    },
+    {
+      "id": "js-main",
+      "tipo": "JS",
+      "archivo_destino": "main.js",
+      "nombre": "JS - Modulo principal",
+      "lineas": [
+        2365,
+        5749
+      ],
+      "lineas_count": 3385,
+      "usa": [
+        "db",
+        "currentUser",
+        "window._porraToken"
+      ],
+      "expone": [
+        "PARTIDOS",
+        "BRACKET",
+        "EQUIPOS",
+        "GRUPOS",
+        "AW_PLAYERS",
+        "AWARDS_CFG",
+        "predictions",
+        "koPredictions",
+        "awPicks",
+        "resolvedSlots",
+        "showPage",
+        "renderAwardsCard",
+        "savePredictions",
+        "calcScore",
+        "updateCardUI",
+        "openModal",
+        "openPicker",
+        "refreshAllViews",
+        "refreshGroupTables"
+      ],
+      "deps": [
+        "js-auth",
+        "js-supabase"
+      ],
+      "notas": "EL MAS GRANDE (3385 lineas). Subdividir en: data.js + scoring.js + awards.js + ko.js + ui.js"
+    },
+    {
+      "id": "js-supabase",
+      "tipo": "JS",
+      "archivo_destino": "(CDN)",
+      "nombre": "JS - Supabase CDN",
+      "lineas": [
+        5749,
+        5759
+      ],
+      "lineas_count": 11,
+      "usa": [],
+      "expone": [
+        "window.supabase"
+      ],
+      "deps": [],
+      "notas": "Solo script src - mantener o pasar a npm"
+    },
+    {
+      "id": "js-ligas",
+      "tipo": "JS",
+      "archivo_destino": "leagues.js",
+      "nombre": "JS - Modulo ligas",
+      "lineas": [
+        5760,
+        6098
+      ],
+      "lineas_count": 338,
+      "usa": [
+        "db",
+        "currentUser",
+        "predictions",
+        "koPredictions",
+        "awPicks",
+        "window._porraToken"
+      ],
+      "expone": [
+        "getActiveLeagueId",
+        "leagueSelect",
+        "leagueSelectById",
+        "leagueRenderPanel",
+        "leagueShowCreate",
+        "leagueShowJoin",
+        "leagueDoCreate",
+        "leagueDoJoin",
+        "leagueCloseModals",
+        "requireLeagueId",
+        "window.getActiveLeagueId",
+        "window._activeLeague"
+      ],
+      "deps": [
+        "js-auth",
+        "js-main"
+      ],
+      "notas": "Bien delimitado. Buen candidato para empezar extraccion."
+    },
+    {
+      "id": "js-auth",
+      "tipo": "JS",
+      "archivo_destino": "auth.js",
+      "nombre": "JS - Modulo auth + sesion",
+      "lineas": [
+        6105,
+        6397
+      ],
+      "lineas_count": 292,
+      "usa": [
+        "PARTIDOS",
+        "AW_PLAYERS",
+        "window.PARTIDOS"
+      ],
+      "expone": [
+        "db",
+        "SUPA_URL",
+        "SUPA_ANON",
+        "currentUser",
+        "loadUserData",
+        "saveAwPicks",
+        "renderAuthBar",
+        "doLogin",
+        "doLogout",
+        "doRegister",
+        "openAuthModal",
+        "closeAuthModal",
+        "switchAuthTab",
+        "window._porraDb",
+        "window._porraToken"
+      ],
+      "deps": [
+        "js-supabase",
+        "js-main"
+      ],
+      "notas": "Inicializa cliente Supabase. Debe cargarse antes que ligas, scoreboard y cerrar."
+    },
+    {
+      "id": "js-scoreboard",
+      "tipo": "JS",
+      "archivo_destino": "scoreboard.js",
+      "nombre": "JS - Modulo scoreboard",
+      "lineas": [
+        6403,
+        6668
+      ],
+      "lineas_count": 265,
+      "usa": [
+        "PARTIDOS",
+        "BRACKET",
+        "currentUser",
+        "db",
+        "window.getActiveLeagueId"
+      ],
+      "expone": [
+        "sbLoad",
+        "sbRender"
+      ],
+      "deps": [
+        "js-auth",
+        "js-ligas",
+        "js-main"
+      ],
+      "notas": "Modulo limpio y bien aislado."
+    },
+    {
+      "id": "js-cerrar",
+      "tipo": "JS",
+      "archivo_destino": "close-porra.js",
+      "nombre": "JS - Modulo cerrar porra",
+      "lineas": [
+        6675,
+        6914
+      ],
+      "lineas_count": 239,
+      "usa": [
+        "PARTIDOS",
+        "currentUser",
+        "predictions",
+        "db",
+        "window.getActiveLeagueId"
+      ],
+      "expone": [
+        "checkFinalizarReady",
+        "finalizarPorra",
+        "setCheck",
+        "setCheckClosed",
+        "window._porraCerrada"
+      ],
+      "deps": [
+        "js-auth",
+        "js-ligas",
+        "js-main"
+      ],
+      "notas": ""
+    },
+    {
+      "id": "js-misc",
+      "tipo": "JS",
+      "archivo_destino": "misc.js",
+      "nombre": "JS - Modulo misc",
+      "lineas": [
+        6917,
+        6953
+      ],
+      "lineas_count": 37,
+      "usa": [],
+      "expone": [
+        "toggleRoundPopover",
+        "applyFinalSectionMobile"
+      ],
+      "deps": [],
+      "notas": "El mas pequeno. Sin deps. Empezar aqui."
+    },
+    {
+      "id": "js-admin",
+      "tipo": "JS",
+      "archivo_destino": "admin.js",
+      "nombre": "JS - Admin panel",
+      "lineas": [
+        6963,
+        7483
+      ],
+      "lineas_count": 520,
+      "usa": [
+        "PARTIDOS",
+        "BRACKET",
+        "GRUPOS",
+        "SUPA_ANON",
+        "currentUser",
+        "db",
+        "predictions",
+        "koPredictions",
+        "resolvedSlots",
+        "window._porraToken",
+        "getActiveLeagueId",
+        "escapeHtml"
+      ],
+      "expone": [
+        "admInit",
+        "admTab",
+        "admLoadResults",
+        "admLoadUsers",
+        "admViewUser",
+        "admResetPorraCerrada",
+        "admReopenDirect",
+        "admForceSync",
+        "admSaveAwards",
+        "admLoadSistema"
+      ],
+      "deps": [
+        "js-auth",
+        "js-ligas",
+        "js-main",
+        "js-misc"
+      ],
+      "notas": "Ya refactorizado. Bien aislado."
+    },
+    {
+      "id": "js-dado",
+      "tipo": "JS",
+      "archivo_destino": "dice.js",
+      "nombre": "JS - Dado aleatorio",
+      "lineas": [
+        7484,
+        7742
+      ],
+      "lineas_count": 258,
+      "usa": [
+        "PARTIDOS",
+        "BRACKET",
+        "GRUPOS",
+        "predictions",
+        "koPredictions",
+        "resolvedSlots",
+        "window._porraCerrada",
+        "window.getActiveLeagueId"
+      ],
+      "expone": [
+        "dicePickScore",
+        "diceSimulateMatch",
+        "diceSimulateGroup",
+        "diceSimulateAllGroups",
+        "diceSimulateAllKO",
+        "lockAllCardsIfCerrada",
+        "window._diceKOAndRefresh"
+      ],
+      "deps": [
+        "js-main",
+        "js-ligas",
+        "js-cerrar"
+      ],
+      "notas": "Bajo riesgo para extraccion."
+    }
+  ],
+  "orden_extraccion": [
+    "F1 - Sin deps entre si: css-b1, css-b2, css-b3, css-b4, js-misc, js-supabase",
+    "F2 - Dependen de F1: js-auth",
+    "F3 - Dependen de auth: js-ligas, js-scoreboard",
+    "F4 - Dependen de ligas: js-cerrar, js-admin, js-dado",
+    "F5 - El grande, dividir primero: js-main en data.js + scoring.js + awards.js + ko.js"
+  ],
+  "globales_a_window": [
+    "PARTIDOS",
+    "BRACKET",
+    "EQUIPOS",
+    "GRUPOS",
+    "AW_PLAYERS",
+    "YOUNG_PLAYERS_NXGN",
+    "AWARDS_CFG",
+    "predictions",
+    "koPredictions",
+    "awPicks",
+    "resolvedSlots",
+    "currentUser",
+    "db",
+    "SUPA_URL",
+    "SUPA_ANON"
+  ]
+}

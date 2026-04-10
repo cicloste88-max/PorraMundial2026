@@ -1,0 +1,106 @@
+/* ══════════════════════════════════════════════
+   welcome.css — Porra Mundial 2026
+   ──────────────────────────────────────────────
+   Usa    : variables de base.css
+   Expone : .wc-*, .auth-*, #page-welcome
+   Deps   : base.css
+   Notas  : Welcome screen + auth modal.
+   ══════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════
+   WELCOME SCREEN (page-welcome)
+════════════════════════════════════════════════ */
+#page-welcome{background:#06060a;color:#fff;font-family:'Inter',sans-serif;overflow-x:hidden}
+.wc-hero{position:relative;height:100vh;min-height:700px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.wc-mosaic{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(3,1fr);gap:3px;opacity:.28;filter:saturate(1.2)}
+.wc-mosaic img{width:100%;height:100%;object-fit:cover}
+.wc-hero-overlay{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(6,6,10,.3) 0%,rgba(6,6,10,.85) 70%),linear-gradient(180deg,rgba(6,6,10,.2) 0%,rgba(6,6,10,.95) 100%)}
+.wc-hero-content{position:relative;z-index:2;text-align:center;padding:0 24px}
+.wc-country-logos{display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:32px}
+.wc-country-logos img{height:128px;width:auto;opacity:.9;transition:opacity .2s}
+.wc-country-logos img:hover{opacity:1}
+.wc-divider{width:1px;height:32px;background:rgba(255,255,255,.15)}
+.wc-eyebrow{font-size:11px;font-weight:700;color:rgba(250,204,21,.7);text-transform:uppercase;letter-spacing:.22em;margin-bottom:14px}
+.wc-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,10vw,128px);line-height:.9;letter-spacing:.02em;margin-bottom:20px;color:#fff}
+.wc-title .wc-year{color:#4ade80}
+.wc-subtitle{font-size:15px;color:rgba(255,255,255,.5);letter-spacing:.04em;margin-bottom:48px}
+.wc-cta-btn{display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:50px;padding:16px 52px;font-family:'Inter',sans-serif;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:all .25s;box-shadow:0 0 40px rgba(74,222,128,.2)}
+.wc-cta-btn:hover{transform:translateY(-3px);box-shadow:0 8px 40px rgba(74,222,128,.35)}
+.wc-scroll-cue{display:flex;flex-direction:column;align-items:center;gap:10px;opacity:1;cursor:pointer;transition:opacity .2s;margin-top:-72px;padding-bottom:32px;position:relative;z-index:10}
+.wc-scroll-cue:hover{opacity:.8}
+.wc-scroll-cue span{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.wc-scroll-arrow{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;animation:wcArrowBounce 2s ease-in-out infinite;background:rgba(255,255,255,.04)}
+@keyframes wcArrowBounce{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(6px);opacity:1}}
+.wc-rules{padding:80px 0;background:#06060a}
+.wc-section-label{font-size:11px;font-weight:700;color:rgba(250,204,21,.6);text-transform:uppercase;letter-spacing:.2em;text-align:center;padding:0 40px;margin-bottom:48px}
+.wc-card{background:#0f0f14;border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:36px;transition:border-color .2s}
+.wc-card:hover{border-color:rgba(255,255,255,.14)}
+.wc-card-icon{font-size:36px;margin-bottom:18px}
+.wc-card-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.05em;margin-bottom:6px;color:#fff}
+.wc-card-sub{font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-bottom:20px}
+.wc-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.wc-row:last-child{border:none}
+.wc-row-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center;display:flex;align-items:center;justify-content:center}
+.wc-pts-badge{background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.25);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;color:#4ade80;white-space:nowrap;flex-shrink:0}
+.wc-pts-badge.gold{background:rgba(250,204,21,.1);border-color:rgba(250,204,21,.2);color:#fbbf24}
+.wc-pts-badge.silver{background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.15);color:#94a3b8}
+.wc-row-text{font-size:13px;color:rgba(255,255,255,.6);line-height:1.5}
+.wc-max-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+.wc-max-label{font-size:11px;color:rgba(255,255,255,.3)}
+.wc-max-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.05em;color:#4ade80}
+.wc-max-val.gold{color:#fbbf24}
+.wc-rule-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.wc-rule-item:last-child{border:none}
+.wc-rule-ico{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.wc-rule-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px}
+.wc-rule-desc{font-size:12px;color:rgba(255,255,255,.5);line-height:1.6}
+.wc-venues{overflow:hidden;padding:0 0 80px;background:#06060a}
+.wc-venues-label{font-family:'Bebas Neue',sans-serif;font-size:24px;color:rgba(255,255,255,.7);letter-spacing:.08em;text-align:center;padding:0 40px;margin-bottom:28px}
+.wc-venues-grid-row{display:flex;flex-wrap:nowrap;gap:6px;padding:0 40px;margin-bottom:6px}
+.wc-vp-card{flex:1;min-width:0;position:relative;border-radius:10px;overflow:hidden;cursor:pointer;aspect-ratio:3/4;transition:transform .35s cubic-bezier(.34,1.3,.64,1),box-shadow .35s}
+.wc-vp-card:hover{transform:translateY(-8px) scale(1.02);box-shadow:0 20px 40px rgba(0,0,0,.6);z-index:2}
+.wc-vp-card img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .35s;filter:saturate(.85) brightness(.9)}
+.wc-vp-card:hover img{filter:saturate(1.05) brightness(.95)}
+.wc-vp-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 50%,rgba(0,0,0,.85) 100%);transition:opacity .3s}
+.wc-vp-card:hover .wc-vp-overlay{opacity:.7}
+.wc-vp-info{position:absolute;bottom:0;left:0;right:0;padding:20px 10px 10px}
+.wc-vp-city{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.06em;color:#fff;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.wc-vp-country{font-size:8px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+.wc-vp-flag{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);border-radius:4px;padding:2px 6px;font-size:8px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.08em}
+.wc-bottom-cta{text-align:center;padding:80px 24px 100px;background:#06060a}
+@media(max-width:768px){
+  .wc-country-logos img{height:80px}
+  .wc-venues-grid-row{gap:4px;padding:0 16px}
+  .wc-card{padding:24px}
+}
+/* ── AUTH MODAL ── */
+.auth-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.auth-overlay.open{opacity:1;pointer-events:all}
+.auth-modal{background:#111318;border:1px solid #27272a;border-radius:20px;padding:36px 32px 28px;width:100%;max-width:400px;position:relative;transform:translateY(16px) scale(.97);transition:transform .3s cubic-bezier(.34,1.2,.64,1)}
+.auth-overlay.open .auth-modal{transform:none}
+.auth-modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:#27272a;border:none;color:#9ca3af;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.auth-modal-close:hover{background:#3a3a3e}
+.auth-logo{font-size:28px;text-align:center;margin-bottom:6px}
+.auth-title{font-family:'Inter Tight',sans-serif;font-size:20px;font-weight:900;color:#fff;text-align:center;margin-bottom:4px}
+.auth-sub{font-size:12px;color:#6b7280;text-align:center;margin-bottom:24px}
+.auth-tabs{display:flex;background:#1c1c1e;border-radius:10px;padding:3px;gap:2px;margin-bottom:24px}
+.auth-tab{flex:1;padding:7px;border-radius:8px;border:none;background:transparent;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif}
+.auth-tab.active{background:#27272a;color:#fff}
+.auth-field{margin-bottom:14px}
+.auth-field label{display:block;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.auth-field input{width:100%;background:#1c1c1e;border:1.5px solid #27272a;border-radius:10px;padding:11px 14px;font-family:'Inter',sans-serif;font-size:14px;color:#f0fdf4;outline:none;transition:border-color .15s}
+.auth-field input:focus{border-color:#4ade80}
+.auth-field input::placeholder{color:#4b5563}
+.auth-submit{width:100%;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:10px;padding:13px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:6px;box-shadow:0 0 24px rgba(74,222,128,.15)}
+.auth-submit:hover{transform:translateY(-1px);box-shadow:0 4px 24px rgba(74,222,128,.3)}
+.auth-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.auth-msg{font-size:12px;text-align:center;margin-top:12px;min-height:18px;transition:all .2s}
+.auth-msg.error{color:#f87171}
+.auth-msg.ok{color:#4ade80}
+.wc-auth-bar{position:fixed;top:16px;right:20px;z-index:200;display:flex;align-items:center;gap:8px}
+.wc-user-badge{display:flex;align-items:center;gap:8px;background:rgba(17,19,24,.9);border:1px solid #27272a;border-radius:24px;padding:6px 14px 6px 8px;backdrop-filter:blur(8px)}
+.wc-user-avatar{width:28px;height:28px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.wc-user-name{font-size:12px;font-weight:600;color:#f0fdf4;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc-logout-btn{background:transparent;border:1px solid #3a3a3e;border-radius:8px;color:#6b7280;font-size:11px;cursor:pointer;padding:4px 8px;transition:color .15s;font-family:'Inter',sans-serif}
+.wc-logout-btn:hover{color:#f87171;border-color:#f87171}
+.wc-login-btn-bar{background:rgba(17,19,24,.9);border:1px solid #27272a;border-radius:24px;padding:7px 16px;font-size:12px;font-weight:600;color:#f0fdf4;cursor:pointer;backdrop-filter:blur(8px);transition:all .15s;font-family:'Inter',sans-serif}
+.wc-login-btn-bar:hover{background:rgba(22,163,74,.15);border-color:rgba(74,222,128,.3);color:#4ade80}
