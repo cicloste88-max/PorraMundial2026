@@ -1,5 +1,181 @@
 # Porra Mundial 2026
 
+App de pronósticos para el Mundial 2026. Grupos de amigos crean ligas privadas, predicen partidos (fase de grupos + eliminatorias + premios individuales) y compiten en un scoreboard en tiempo real.
+
+**Producción:** [tumundial.netlify.app](https://tumundial.netlify.app)
+
+---
+
+## Stack
+
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | HTML + CSS + JS vanilla (sin build step) |
+| Backend | Supabase (Postgres + Auth + RLS + Edge Functions) |
+| Deploy | Netlify (auto-deploy desde GitHub en cada commit) |
+| Agentes | Claude Haiku via Anthropic API + porra-orchestrator EF |
+
+---
+
+## Estructura del proyecto
+
+```
+porra-mundial-2026/
+├── index.html          ← App completa (SPA, checkpoint v15c)
+├── main.js             ← Módulo principal: data + scoring + ui-groups + ko + ui-nav
+├── auth.js             ← Autenticación y sesión Supabase
+├── leagues.js          ← Sistema de ligas (crear / unirse / seleccionar)
+├── scoreboard.js       ← Clasificación multi-usuario
+├── close-porra.js      ← Cierre y finalización de pronósticos
+├── admin.js            ← Panel de administración
+├── misc.js             ← Utilidades UI (popovers, responsive)
+├── utils.js            ← Stubs pre-Supabase
+├── base.css            ← Reset, variables, layout principal
+├── welcome.css         ← Welcome screen + auth modal
+├── ko.css              ← Bracket KO + modal de partido + awards
+└── admin.css           ← Responsive + panel admin + dado
+```
+
+---
+
+## Base de datos (Supabase)
+
+**Proyecto:** `cmyfyswystjgzdwbqyyb`
+
+| Tabla | Descripción |
+|-------|-------------|
+| `profiles` | Usuarios registrados (`is_admin`, `nombre`) |
+| `leagues` | Ligas creadas (`nombre`, `codigo`, `created_by`) |
+| `league_members` | Membresías (`porra_cerrada`, `cerrada_at`) |
+| `predictions` | Pronósticos de grupos por `(user_id, league_id, match_id)` |
+| `ko_predictions` | Pronósticos KO por `(user_id, league_id, match_id)` |
+| `award_picks` | Premios individuales por `(user_id, league_id)` |
+| `results` | Resultados reales del torneo + overrides manuales (id=1) |
+| `orchestrator_jobs` | Historial de ejecuciones de agentes |
+
+RLS habilitado en todas las tablas.
+
+---
+
+## Edge Functions (6)
+
+| Función | Versión | Descripción |
+|---------|---------|-------------|
+| `admin-actions` | v7 | Gestión admin: resultados, overrides, usuarios, ligas, reabrir pronósticos, cron. Requiere JWT de admin. |
+| `update-results` | v2 | Sync desde football-data.org → tabla `results`. Activar pg_cron el 11 jun 2026. |
+| `porra-orchestrator` | v3 | Lanza N agentes Claude Haiku en paralelo. Guarda resultados en `orchestrator_jobs`. |
+| `porra-patch-deploy` | v4 | Lee fichero GitHub, aplica patches search/replace y hace commit automático. Pipeline principal. |
+| `porra-fix-encoding` | v1 | Restaura UTF-8 correcto en index.html desde URL externa limpia. |
+| `porra-github-pusher` | v6 | PLACEHOLDER — no usar. |
+
+---
+
+## Motor de puntuación
+
+### Por partido (máximo 7 pts)
+| Concepto | Puntos |
+|----------|--------|
+| Signo correcto (1/X/2) | +1 |
+| Resultado exacto (incluye signo, no acumula con +1) | +3 |
+| Goleador correcto | +2 |
+| Bonus vs IA (pronóstico opuesto a IA y aciertas) | +1 |
+
+### Por equipos que avanzan en KO
+| Ronda | Puntos |
+|-------|--------|
+| Grupos → R32 | +5 por equipo |
+| R32 → R16 | +5 por equipo |
+| R16 → QF | +10 por equipo |
+| QF → SF | +15 por equipo |
+| SF → Final | +20 por equipo |
+| Campeón | +25 |
+
+### Clasificación final
+| Posición | Puntos |
+|----------|--------|
+| Campeón | +30 |
+| Subcampeón | +20 |
+| 3.º puesto | +15 |
+| 4.º puesto | +10 |
+
+### Premios individuales
+Balón de Oro, Bota de Oro, Guante de Oro, Mejor Joven ≤21 — puntos definidos en `AWARDS_CFG`.
+
+---
+
+## Estructura del torneo
+
+- 48 equipos · 12 grupos (A-L) de 4 equipos · 72 partidos de grupos
+- Clasifican: 2 primeros de cada grupo + 8 mejores terceros = 32 equipos
+- Rondas KO: R32 → R16 → QF → SF → 3er puesto → Final
+- Total: 104 partidos
+
+---
+
+## Pipeline de deploy (automatizado)
+
+El flujo no requiere intervención manual:
+
+```
+1. San describe el bug o mejora en el chat
+2. Claude analiza y genera el fix
+3. porra-patch-deploy aplica el patch y hace commit a GitHub
+4. Netlify detecta el commit y despliega (~30s)
+5. Claude in Chrome verifica en tumundial.netlify.app
+6. Claude da resumen ejecutivo
+```
+
+---
+
+## Variables de entorno (Supabase Vault)
+
+| Secret | Descripción |
+|--------|-------------|
+| `SUPABASE_URL` | Auto-inyectado |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-inyectado |
+| `SUPABASE_ANON_KEY` | Auto-inyectado |
+| `ANTHROPIC_API_KEY` | API key Anthropic para agentes Haiku |
+| `GITHUB_TOKEN` | Token acceso repo para porra-patch-deploy |
+| `GITHUB_REPO` | Nombre del repo (usuario/repo) |
+| `FOOTBALL_DATA_API_KEY` | API key football-data.org para update-results |
+
+---
+
+## Activar resultados en tiempo real (11 jun 2026)
+
+Desde panel admin → Sistema, o via `admin-actions`:
+```json
+{ "action": "cron_resume" }
+```
+Sincroniza resultados cada 5 minutos durante el torneo.
+
+---
+
+## Roadmap
+
+### Completado ✓
+- Sistema de ligas multijugador con códigos de invitación
+- Panel admin completo (resultados, overrides, usuarios, ligas)
+- Flujo cierre / reapertura de porra
+- Bracket KO con predicciones y predicción IA
+- Scoreboard en tiempo real
+- Pipeline de deploy automatizado (EF + GitHub + Netlify)
+
+### Antes del 11 jun 2026
+- [ ] Seguridad auth: autoconfirm off, pwd mínimo 8 chars, enable_signup false
+- [ ] Email de confirmación al cerrar porra (Resend + EF)
+- [ ] Activar pg_cron para update-results
+
+### Post-torneo
+- [ ] Migración a Vite (módulos ya preparados)
+- [ ] CDN Supabase → npm
+- [ ] Netlify CI/CD con build pipeline
+- [ ] Notificaciones email con resumen de pronósticos
+
+---
+
+*Proyecto personal · Mundial 2026 · cicloste88*
+
 App de pronósticos para el Mundial 2026. Permite a grupos de amigos crear ligas privadas, hacer predicciones de partidos (fase de grupos + eliminatorias + premios individuales), y competir en un scoreboard en tiempo real.
 
 **Demo:** [porrafutbol2026.netlify.app](https://porrafutbol2026.netlify.app)
