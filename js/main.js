@@ -3241,6 +3241,7 @@ function updateAwardsFooter() {
   if(badge) { badge.textContent='+'+pts+' pts'; badge.classList.toggle('show',pts>0); }
   // Re-render box4 dinámico (vista eliminatorias)
   if (typeof window._renderBox4 === 'function') window._renderBox4();
+}
 // ── Exports para Vite (añadir al final de main.js) ──────────────
 // Expone todas las variables/funciones que auth.js y el HTML
 // necesitan encontrar en window cuando main.js sea un módulo ES.

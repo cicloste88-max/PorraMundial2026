@@ -67,3 +67,11 @@ Para retomar desde aquí:
   git pull origin vite-migration
   Revisar CLAUDE.md § "Tarea actual" para posibles próximos pasos.
 ═════════════════════════════════════════════════════════════════════
+
+[20:45] VERIFICAR: js/main.js UTF-8 correcto (64 emojis intactos) vs bloque inline index.html (también UTF-8) — encoding OK en ambos
+[20:46] ELIMINAR: bloque inline main.js (lineas 2435-5684, ~3250 lineas) de index.html — index.html
+[20:46] AÑADIR: <script src="/js/main.js"></script> en su lugar — index.html línea 2435
+[20:48] FIX: cerrar función updateAwardsFooter con `}` faltante antes de bloque Exports para Vite — js/main.js línea 3244 (bug pre-existente, fichero nunca se cargaba)
+[20:49] VERIFICAR: node --check js/main.js = OK; dev server sirve /js/main.js con 200 y 64 emojis UTF-8 intactos
+[20:50] COMMIT: fix: eliminar main.js inline — usar fichero externo UTF-8
+
