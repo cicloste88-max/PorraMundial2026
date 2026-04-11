@@ -22,6 +22,10 @@ function loadScript(src) {
   })
 }
 
+// misc.js es autonomo (sin deps) → se carga en paralelo
+loadScript('/js/misc.js')
+  .catch(e => console.error('Error cargando misc.js:', e))
+
 // Orden: leagues primero (auth depende de getActiveLeagueId)
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/auth.js'))
