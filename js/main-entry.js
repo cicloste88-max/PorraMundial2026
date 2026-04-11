@@ -26,10 +26,12 @@ function loadScript(src) {
 loadScript('/js/misc.js')
   .catch(e => console.error('Error cargando misc.js:', e))
 
-// Orden: leagues → auth → scoreboard → close-porra
-// (scoreboard y close-porra dependen de currentUser y getActiveLeagueId)
+// Orden: leagues → auth → scoreboard → close-porra → admin
+// admin se carga el último porque depende de PARTIDOS/BRACKET/GRUPOS (main inline)
+// y de currentUser/db/getActiveLeagueId (auth, leagues)
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
+  .then(() => loadScript('/js/admin.js'))
   .catch(e => console.error('Error cargando modulos:', e))

@@ -25,4 +25,9 @@ Formato: `[HH:MM] ACCIÓN: descripción — ficheros`
 [12:21] COMMIT: fix: exponer _myLeagues en window desde leagues.js
 [12:25] PUSH: vite-migration → origin (cb333ea..1dfc402) — 3 commits (scoreboard, close-porra, _myLeagues)
 [12:30] MODIFICAR: window._myLeagues ahora usa Object.defineProperty getter dinámico para reflejar reasignaciones — js/leagues.js
-[12:31] COMMIT: fix: window._myLeagues con getter dinámico para reflejar reasignaciones
+[12:31] COMMIT: fix: window._myLeagues con getter dinámico para reflejar reasignaciones (057b922)
+[12:32] PUSH: vite-migration → origin (1dfc402..057b922)
+[12:40] INICIAR: migración admin.js (793 líneas) — el último módulo pendiente
+[12:45] ELIMINAR: bloque inline admin panel del index.html (líneas 5896-6693, ~798 líneas incluyendo dado/lockAllCardsIfCerrada y _admTabOrig) — index.html
+[12:46] AÑADIR: loadScript('/js/admin.js') al final de la cadena en main-entry.js — js/main-entry.js
+[12:47] COMMIT: feat: migrar admin.js — eliminar inline, carga dinámica
