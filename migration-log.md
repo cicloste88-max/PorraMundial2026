@@ -74,4 +74,25 @@ Para retomar desde aquí:
 [20:48] FIX: cerrar función updateAwardsFooter con `}` faltante antes de bloque Exports para Vite — js/main.js línea 3244 (bug pre-existente, fichero nunca se cargaba)
 [20:49] VERIFICAR: node --check js/main.js = OK; dev server sirve /js/main.js con 200 y 64 emojis UTF-8 intactos
 [20:50] COMMIT: fix: eliminar main.js inline — usar fichero externo UTF-8
+[21:05] COMMIT: fix: restaurar vite.config.js con defineConfig valido (revertir contenido vercel.json erroneo)
+
+═════════════════════════════════════════════════════════════════════
+  MERGE vite-migration → main (2026-04-11, push a Vercel)
+═════════════════════════════════════════════════════════════════════
+[21:30] CHECKOUT: main (limpio, solo untracked pre-existentes)
+[21:32] MERGE: git merge vite-migration — conflicto en index.html
+[21:33] ANALISIS: main tenia 5 commits "fix emoji/encoding" que eran MOJIBAKE destructivo
+         (═→âââ, Ó→Ã, ▼→â¼). vite-migration tenia UTF-8 limpio.
+[21:34] RESOLVER: git checkout --theirs index.html — tomar version vite-migration entera
+[21:35] VERIFICAR: index.html 0 mojibake, 65 emojis limpios, 0 conflict markers,
+         script /js/main.js y /js/main-entry.js presentes
+[21:37] COMMIT: merge: vite-migration → main — Vite migration completa (8e70ef2)
+[21:40] BUG: npm run build genera dist/ sin js/*.js — Vite solo bundlea modulos ES,
+         los scripts clasicos no se copian. En prod los /js/*.js darian 404.
+[21:42] FIX: git mv js/*.js → public/js/* (7 ficheros, excepto main-entry.js).
+         public/ es copiado por Vite a dist/ automaticamente.
+[21:44] VERIFICAR: npm run build OK → dist/js/ + dist/assets/index-*.js;
+         dev server sigue sirviendo /js/*.js desde public/
+[21:45] COMMIT: fix: mover js/*.js a public/js/ para build de Vercel (3f95d68)
+[21:47] PUSH: git push origin main — dispara auto-deploy Vercel
 
