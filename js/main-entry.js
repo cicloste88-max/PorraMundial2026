@@ -26,20 +26,22 @@ function loadScript(src) {
 loadScript('/js/misc.js')
   .catch(e => console.error('Error cargando misc.js:', e))
 
-// Orden: leagues → data → scoring → ui-groups → main → auth → scoreboard → close-porra → admin
-// - leagues PRIMERO: los classic scripts extraidos de main.js (ui-groups/main/etc)
-//   pueden llamar leagueLoadMyLeagues/_myLeagues en top-level
-// - data → scoring → ui-groups → main: classic scripts extraidos de main.js,
-//   definen PARTIDOS, EQUIPOS, predictions, getMatchKey, etc.
-//   Se cargan antes que auth para que onAuthStateChange callback encuentre
-//   los simbolos cuando fire
+// Orden: leagues → data → scoring → ui-groups → ko → ui-nav → auth → scoreboard → close-porra → admin
+// main.js eliminado tras extraccion completa en 5 sub-bloques (data, scoring,
+// ui-groups, ko, ui-nav). Cada sub-bloque es un classic script independiente.
+//
+// - leagues PRIMERO: los classic scripts extraidos pueden llamar
+//   leagueLoadMyLeagues/_myLeagues en top-level
+// - data → scoring → ui-groups → ko → ui-nav: los 5 sub-bloques de lo que
+//   antes era main.js (PARTIDOS, EQUIPOS, predictions, BRACKET, showPage,
+//   initWelcome, etc.). Se cargan antes que auth
 // - auth → scoreboard → close-porra → admin: orden original preservado
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/data.js'))
   .then(() => loadScript('/js/scoring.js'))
   .then(() => loadScript('/js/ui-groups.js'))
   .then(() => loadScript('/js/ko.js'))
-  .then(() => loadScript('/js/main.js'))
+  .then(() => loadScript('/js/ui-nav.js'))
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))

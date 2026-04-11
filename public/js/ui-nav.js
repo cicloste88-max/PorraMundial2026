@@ -1,6 +1,9 @@
-// main.js - Porra Mundial 2026 (modulo principal reducido tras extraccion)
-// Sub-bloques pendientes de extraer: ui-nav
-// Deps: data.js, scoring.js, ui-groups.js, ko.js (deben cargarse antes)
+// ui-nav.js - Porra Mundial 2026 / sub-bloque js-ui-nav
+// Navegacion SPA (showPage, goToEliminatoria, updateKOPts, initWelcome),
+// modal de partido (openModal, closeModal, undoKO, setView, refreshAllViews),
+// koInit, fetchIAforKO, updateAwardsFooter, renderPickerList.
+// Deps: data.js, scoring.js, ui-groups.js, ko.js, auth.js, leagues.js
+// Ultimo sub-bloque extraido de main.js — main.js se elimina tras esta extraccion.
 
 /*
      js-ui-nav — Navegacion SPA, renderBox4, init, welcome
