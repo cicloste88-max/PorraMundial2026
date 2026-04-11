@@ -23,3 +23,6 @@ Formato: `[HH:MM] ACCIÓN: descripción — ficheros`
 [12:10] INVESTIGACIÓN INCOMPLETA: sin datos de runtime (consola del navegador) no puedo confirmar causa raíz — pendiente info del usuario
 [12:20] AÑADIR: window._myLeagues = _myLeagues al final de leagues.js — js/leagues.js línea 345
 [12:21] COMMIT: fix: exponer _myLeagues en window desde leagues.js
+[12:25] PUSH: vite-migration → origin (cb333ea..1dfc402) — 3 commits (scoreboard, close-porra, _myLeagues)
+[12:30] MODIFICAR: window._myLeagues ahora usa Object.defineProperty getter dinámico para reflejar reasignaciones — js/leagues.js
+[12:31] COMMIT: fix: window._myLeagues con getter dinámico para reflejar reasignaciones
