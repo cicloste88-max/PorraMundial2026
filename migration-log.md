@@ -35,4 +35,35 @@ Formato: `[HH:MM] ACCIÓN: descripción — ficheros`
 [12:55] QA: admin.js validado en localhost:5173 — admInit, tabs, lockAllCardsIfCerrada OK
 [12:56] PUSH: vite-migration → origin — feat: migrar admin.js
 [13:00] MODIFICAR: CLAUDE.md actualizado — estado "Migración Vite COMPLETA", estructura JS y main-entry.js sincronizados, "Tarea actual" actualizada con próximos pasos posibles — CLAUDE.md
-[13:01] COMMIT: docs: CLAUDE.md refleja estado final migración Vite completa
+[13:01] COMMIT: docs: CLAUDE.md refleja estado final migración Vite completa (b31dd7b)
+[13:02] PUSH: vite-migration → origin (741dbd6..b31dd7b)
+
+═════════════════════════════════════════════════════════════════════
+[13:05] ✅ CHECKPOINT — MIGRACIÓN VITE COMPLETA
+─────────────────────────────────────────────────────────────────────
+Rama: vite-migration (sincronizada con origin, 0 ahead / 0 behind)
+HEAD: b31dd7b
+Commits de esta sesión (orden cronológico):
+  cb333ea  feat: migrar misc.js
+  b6de6d0  feat: migrar scoreboard.js
+  e25a707  feat: migrar close-porra.js
+  1dfc402  fix: exponer _myLeagues en window
+  057b922  fix: window._myLeagues con getter dinámico
+  ecb26c2  feat: migrar admin.js
+  741dbd6  docs: registrar QA validado admin.js
+  b31dd7b  docs: CLAUDE.md refleja estado final
+
+QA: validado por el usuario en localhost:5173 — todos los módulos OK.
+
+Estado pendiente NO relacionado con esta migración (ignorar salvo
+petición explícita del usuario):
+  - main-entry.js (root) — eliminado, sin commit
+  - vite.config.js — modificado, sin commit
+  - index.html.bak, js/*.bak, *.ps1, *.py — untracked desde sesión
+    anterior
+
+Para retomar desde aquí:
+  git checkout vite-migration
+  git pull origin vite-migration
+  Revisar CLAUDE.md § "Tarea actual" para posibles próximos pasos.
+═════════════════════════════════════════════════════════════════════
