@@ -30,4 +30,7 @@ Formato: `[HH:MM] ACCIÓN: descripción — ficheros`
 [12:40] INICIAR: migración admin.js (793 líneas) — el último módulo pendiente
 [12:45] ELIMINAR: bloque inline admin panel del index.html (líneas 5896-6693, ~798 líneas incluyendo dado/lockAllCardsIfCerrada y _admTabOrig) — index.html
 [12:46] AÑADIR: loadScript('/js/admin.js') al final de la cadena en main-entry.js — js/main-entry.js
-[12:47] COMMIT: feat: migrar admin.js — eliminar inline, carga dinámica
+[12:47] COMMIT: feat: migrar admin.js — eliminar inline, carga dinámica (ecb26c2)
+[12:48] PUSH: vite-migration → origin (057b922..ecb26c2) — migración Vite completa: todos los módulos JS fuera del HTML
+[12:55] QA: admin.js validado en localhost:5173 — admInit, tabs, lockAllCardsIfCerrada OK
+[12:56] PUSH: vite-migration → origin — feat: migrar admin.js
