@@ -61,7 +61,7 @@ async function loadUserData(userId) {
           if (slEl) { slEl.textContent = pred.l; slEl.className = 'sbox on'; }
           if (svEl) { svEl.textContent = pred.v; svEl.className = 'sbox on'; }
           if (gselEl && pred.gol) gselEl.value = pred.gol;
-          if (typeof updateCardUI === 'function') updateCardUI(idx, match);
+          if (typeof updateCardUI === 'function' && document.getElementById('spill-' + idx)) updateCardUI(idx, match);
         }
       });
       // Re-renderizar todas las tablas de clasificación de grupos

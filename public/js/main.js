@@ -961,6 +961,7 @@ function updateCardUI(idx, match) {
 
   const pill = document.getElementById(`spill-${idx}`);
   const stxt = document.getElementById(`stxt-${idx}`);
+  if (!pill || !stxt) return;
   if(estado === 'open'){ pill.className='status-pill open'; const ms=new Date(match.date)-4*24*3600*1000-new Date(); stxt.textContent=`Abierta · ${fmtMs(ms)}`; }
   else if(estado === 'closing'){ pill.className='status-pill closing'; const ms=new Date(match.date)-2*24*3600*1000-new Date(); stxt.textContent=`¡Cierra en ${fmtMs(ms)}!`; }
   else if(estado === 'closed'){ pill.className='status-pill closed'; stxt.textContent=fmtDate(match.date); }
