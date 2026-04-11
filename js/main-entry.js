@@ -26,10 +26,19 @@ function loadScript(src) {
 loadScript('/js/misc.js')
   .catch(e => console.error('Error cargando misc.js:', e))
 
-// Orden: leagues → auth → scoreboard → close-porra → admin
-// admin se carga el último porque depende de PARTIDOS/BRACKET/GRUPOS (main inline)
-// y de currentUser/db/getActiveLeagueId (auth, leagues)
+// Orden: leagues → data → scoring → ui-groups → main → auth → scoreboard → close-porra → admin
+// - leagues PRIMERO: los classic scripts extraidos de main.js (ui-groups/main/etc)
+//   pueden llamar leagueLoadMyLeagues/_myLeagues en top-level
+// - data → scoring → ui-groups → main: classic scripts extraidos de main.js,
+//   definen PARTIDOS, EQUIPOS, predictions, getMatchKey, etc.
+//   Se cargan antes que auth para que onAuthStateChange callback encuentre
+//   los simbolos cuando fire
+// - auth → scoreboard → close-porra → admin: orden original preservado
 loadScript('/js/leagues.js')
+  .then(() => loadScript('/js/data.js'))
+  .then(() => loadScript('/js/scoring.js'))
+  .then(() => loadScript('/js/ui-groups.js'))
+  .then(() => loadScript('/js/main.js'))
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
