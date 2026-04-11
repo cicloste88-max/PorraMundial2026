@@ -1,12 +1,12 @@
-import { defineConfig } from 'vite'
-
-export default defineConfig({
-  root: '.',
-  build: {
-    outDir: 'dist'
-  },
-  server: {
-    port: 5173,
-    open: true
-  }
-})
+{
+  "headers": [
+    {
+      "source": "/(.*).html",
+      "headers": [{ "key": "Content-Type", "value": "text/html; charset=utf-8" }]
+    },
+    {
+      "source": "/js/(.*).js",
+      "headers": [{ "key": "Content-Type", "value": "application/javascript; charset=utf-8" }]
+    }
+  ]
+}
