@@ -34,3 +34,5 @@ Formato: `[HH:MM] ACCIÓN: descripción — ficheros`
 [12:48] PUSH: vite-migration → origin (057b922..ecb26c2) — migración Vite completa: todos los módulos JS fuera del HTML
 [12:55] QA: admin.js validado en localhost:5173 — admInit, tabs, lockAllCardsIfCerrada OK
 [12:56] PUSH: vite-migration → origin — feat: migrar admin.js
+[13:00] MODIFICAR: CLAUDE.md actualizado — estado "Migración Vite COMPLETA", estructura JS y main-entry.js sincronizados, "Tarea actual" actualizada con próximos pasos posibles — CLAUDE.md
+[13:01] COMMIT: docs: CLAUDE.md refleja estado final migración Vite completa
