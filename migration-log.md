@@ -111,3 +111,86 @@ Para retomar desde aquí:
 [22:14] COMMIT: fix: eliminar vercel.json — rompia MIME de modulos JS
 [22:15] PUSH: git push origin main — dispara redeploy Vercel
 
+═════════════════════════════════════════════════════════════════════
+  EXTRACCION DE main.js EN 5 SUB-MODULOS (2026-04-12)
+═════════════════════════════════════════════════════════════════════
+Objetivo: dividir public/js/main.js (3278 lineas, 110 decls top-level)
+en 5 classic scripts independientes, uno por sub-bloque documentado.
+Metodo: 5 commits incrementales en rama extract-main-modules + 2 fixes
+intermedios, validacion manual en localhost entre iteraciones.
+
+[00:10] CHECKOUT: nueva rama extract-main-modules desde main
+[00:12] ITER 1: extraer data.js (lineas 1-215) — 12 decls, 24KB
+        SB, WORLD_CUP_LOGO, EQUIPOS, GRUPOS, PARTIDOS, KIT_OVERRIDES,
+        predictions, iaPredictions, totalPoints, getMatchKey, getMySign,
+        iaBonusWillApply, escapeHtml. COMMIT: 812a4d0
+[00:18] ITER 2: extraer scoring.js (lineas 216-1394) — 50 decls, 66KB
+        Motor puntos + tabla avanzada + render tarjetas + premios.
+        Incluye AW_PLAYERS/YOUNG_PLAYERS_NXGN y sus window exports
+        inline (auth.js los consume via window.X). COMMIT: 69aad2f
+[00:25] ITER 3: extraer ui-groups.js (lineas 1184-1349) — 3 decls, 7KB
+        Solo initGrupos, savePredictions, checkGroupsComplete.
+        El "bloque mas grande" documentado en CLAUDE.md resulto ser
+        inexacto: las ~1149 lineas de UI tarjetas estaban dentro del
+        rango scoring. COMMIT: 7320d25
+[00:30] BUG: usuario reporta freeze en leagueLoadMyLeagues()
+        DIAG: classic scripts data/scoring/ui-groups/main en <script src>
+        inline del HTML corrian SINCRONICAMENTE al parseo, antes que
+        main-entry.js (deferred module) pudiera arrancar loadScript
+        chain. leagues.js cargaba despues, asi que referencias top-level
+        a leagueLoadMyLeagues fallaban.
+[00:35] FIX: mover data/scoring/ui-groups/main al loadScript chain de
+        main-entry.js. Eliminar <script src> del HTML. Nuevo orden:
+          leagues → data → scoring → ui-groups → main → auth → ...
+        leagues primero (fix del freeze), data antes de auth (para que
+        onAuthStateChange callback encuentre PARTIDOS cuando fire).
+        COMMIT: 0ad8f72
+[00:45] ITER 4: extraer ko.js (lineas 1350-2389) — 28 decls, 54KB
+        BRACKET, koPredictions, ROUND_CONFIG, BADGE_MAP, bracket views,
+        fetchIAforKO, resolveKO, renderKO, buildKOCard, saveKO. COMMIT:
+        a25b0bc
+[01:00] BUG: usuario reporta 2 regresiones visuales tras iter 4:
+        1) boton "cerrar/finalizar" desaparecido
+        2) 3 checks (#fincheck-grupos/ko/awards) sin actualizar
+        DIAG: main.js residual tenia bloque "Exports para Vite" (lineas
+        651-684) con 30 asignaciones window.X. En particular linea 677:
+          window.checkFinalizarReady = typeof checkFinalizarReady !== ...
+        main.js evalua en posicion 6 del chain (antes de close-porra.js
+        en posicion 9), asi que setea window.checkFinalizarReady =
+        undefined. La hoisting posterior de la function declaration en
+        close-porra.js no estaba sobreescribiendo de forma fiable.
+[01:15] FIX: eliminar bloque completo de exports de main.js (dead code,
+        ningun consumer accede window.X excepto 2 casos). Anadir al final
+        de close-porra.js exports explicitos para los 2 casos consumidos
+        via window (onclick inline + auth.js):
+          window.finalizarPorra = finalizarPorra;
+          window.checkFinalizarReady = checkFinalizarReady;
+        Verificado: regresiones resueltas. COMMIT: d81f2dd
+[01:25] ITER 5: extraer ui-nav.js (todo lo restante de main.js) —
+        17 decls, 37KB. Modal partido, SPA nav, initWelcome, awards
+        footer, IA KO modal, koInit. main.js ELIMINADO del repo.
+        main-entry.js: reemplazar loadScript('/js/main.js') por
+        loadScript('/js/ui-nav.js'). COMMIT: 8590471
+[01:35] VALIDACION: usuario confirma smoke test completo en localhost
+        (welcome, login, liga, grupos, eliminatorias, premios,
+        finalizar, scoreboard, admin, 0 errores consola)
+[01:40] BUILD: npm run build OK → dist con 11 classic scripts + bundle
+[01:42] MERGE: extract-main-modules → main (--no-ff) = ede690c (hash
+        tras rebase sobre aecd847 docs CLAUDE.md)
+[01:45] PUSH: git push origin main — dispara redeploy Vercel
+
+Resumen final:
+  data.js       215 lineas  12 decls
+  scoring.js   1184 lineas  50 decls
+  ui-groups.js  167 lineas   3 decls
+  ko.js        1048 lineas  28 decls
+  ui-nav.js     653 lineas  17 decls
+  TOTAL        3267 lineas 110 decls  (0 solapes entre ficheros)
+  main.js      ELIMINADO
+
+Chain final en js/main-entry.js:
+  misc.js (parallel)
+  leagues → data → scoring → ui-groups → ko → ui-nav →
+    auth → scoreboard → close-porra → admin
+
+
