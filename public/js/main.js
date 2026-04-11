@@ -648,37 +648,3 @@ function updateAwardsFooter() {
   // Re-render box4 dinámico (vista eliminatorias)
   if (typeof window._renderBox4 === 'function') window._renderBox4();
 }
-// ── Exports para Vite (añadir al final de main.js) ──────────────
-// Expone todas las variables/funciones que auth.js y el HTML
-// necesitan encontrar en window cuando main.js sea un módulo ES.
-window.PARTIDOS            = PARTIDOS;
-window.EQUIPOS             = EQUIPOS;
-window.GRUPOS              = GRUPOS;
-window.BRACKET             = typeof BRACKET !== 'undefined' ? BRACKET : undefined;
-window.predictions         = predictions;
-window.koPredictions       = koPredictions;
-window.awPicks             = awPicks;
-window.SB                  = SB;
-window.WORLD_CUP_LOGO      = WORLD_CUP_LOGO;
-window.KIT_OVERRIDES       = typeof KIT_OVERRIDES !== 'undefined' ? KIT_OVERRIDES : undefined;
-window.CLASSIFICATION_PTS  = typeof CLASSIFICATION_PTS !== 'undefined' ? CLASSIFICATION_PTS : undefined;
-window.KO_ROUND_PTS        = typeof KO_ROUND_PTS !== 'undefined' ? KO_ROUND_PTS : undefined;
-window.FINAL_CLASSIFICATION_PTS = typeof FINAL_CLASSIFICATION_PTS !== 'undefined' ? FINAL_CLASSIFICATION_PTS : undefined;
-// Funciones usadas desde auth.js y otros módulos
-window.getMatchKey         = getMatchKey;
-window.escapeHtml          = escapeHtml;
-window.renderAll           = renderAll;
-window.updateCardUI        = typeof updateCardUI !== 'undefined' ? updateCardUI : undefined;
-window.refreshGroupTables  = refreshGroupTables;
-window.normKoPredictions   = typeof normKoPredictions !== 'undefined' ? normKoPredictions : undefined;
-window.getActiveLeagueId   = typeof getActiveLeagueId !== 'undefined' ? getActiveLeagueId : undefined;
-window.showPage            = typeof showPage !== 'undefined' ? showPage : undefined;
-window.initWelcome         = typeof initWelcome !== 'undefined' ? initWelcome : undefined;
-window.checkFinalizarReady = typeof checkFinalizarReady !== 'undefined' ? checkFinalizarReady : undefined;
-window.koInit              = typeof koInit !== 'undefined' ? koInit : undefined;
-window.saveKO              = typeof saveKO !== 'undefined' ? saveKO : undefined;
-window.calcTotalUserPoints = typeof calcTotalUserPoints !== 'undefined' ? calcTotalUserPoints : undefined;
-window.selectAward         = typeof selectAward !== 'undefined' ? selectAward : undefined;
-window.openPicker          = typeof openPicker !== 'undefined' ? openPicker : undefined;
-window.closePicker         = typeof closePicker !== 'undefined' ? closePicker : undefined;
-window.updateAwardsFooter  = typeof updateAwardsFooter !== 'undefined' ? updateAwardsFooter : undefined;
