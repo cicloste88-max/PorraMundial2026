@@ -342,3 +342,9 @@ window.leagueDoJoin      = leagueDoJoin;
 window.leagueCloseModals = leagueCloseModals;
 window.requireLeagueId   = requireLeagueId;
 window.getActiveLeagueId = getActiveLeagueId;
+// Getter dinámico: siempre devuelve el valor actual de _myLeagues
+// (necesario porque _myLeagues se reasigna en leagueLoadMyLeagues)
+Object.defineProperty(window, '_myLeagues', {
+  get: () => _myLeagues,
+  configurable: true
+});
