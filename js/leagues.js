@@ -342,3 +342,4 @@ window.leagueDoJoin      = leagueDoJoin;
 window.leagueCloseModals = leagueCloseModals;
 window.requireLeagueId   = requireLeagueId;
 window.getActiveLeagueId = getActiveLeagueId;
+window._myLeagues = _myLeagues;
