@@ -1,34 +1,36 @@
 # Porra Mundial 2026 — Contexto para Claude Code
 
 ## Proyecto
-App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Netlify.
-Producción: tumundial.netlify.app
+App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
+**Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: vite-migration
+Rama activa: **main** (vite-migration ya mergeada)
 
 ## Estado actual (abril 2026)
-Migración a Vite **COMPLETA** (QA validado 2026-04-11). Todos los módulos JS
-del CLAUDE.md están fuera del index.html y se cargan dinámicamente desde
-main-entry.js. El único script clásico que sigue inline en index.html es
-main.js (~3250 líneas, excluido por tema de CRLF).
-- js/main-entry.js como entry point (type="module")
-- Supabase via npm, carga dinámica con loadScript()
-- QA login con .env.local (VITE_QA_EMAIL / VITE_QA_PASS)
+**Migración Vite COMPLETA.** Deploy en Vercel operativo. Último commit: 7df47ab.
+
+- Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
+- `js/main-entry.js` como entry point Vite (type="module", importa Supabase npm)
+- Build: `npm run build` genera `dist/` con `assets/` + `js/`
+- QA login con `.env.local` (VITE_QA_EMAIL / VITE_QA_PASS)
+- `vercel.json` eliminado — causaba MIME text/html en .js (rompía módulos ES)
+- BOM UTF-8 en index.html — emojis correctos en producción
 
 ## Estructura ficheros JS
 ```
 js/
-  main-entry.js   ← entry point Vite — MODIFICAR AQUÍ para añadir módulos
-  main.js         ← datos + scoring + UI (~3250 líneas, sigue inline en index.html por CRLF)
-  auth.js         ← auth Supabase (migrado)
-  leagues.js      ← ligas (migrado)
-  misc.js         ← utils UI (migrado)
-  scoreboard.js   ← clasificación (migrado)
-  close-porra.js  ← cierre pronósticos (migrado)
-  admin.js        ← panel admin + dados + lockAllCardsIfCerrada (migrado)
+  main-entry.js     <- entry point Vite (type=module) — importa Supabase npm
+public/js/
+  main.js           <- datos + scoring + UI (~3250 líneas, script clásico)
+  auth.js           <- auth Supabase
+  leagues.js        <- ligas y selección de porra
+  misc.js           <- utils UI (sin deps, carga en paralelo)
+  scoreboard.js     <- clasificación
+  close-porra.js    <- cierre de pronósticos
+  admin.js          <- panel admin + dados/simulador + lockAllCardsIfCerrada
 ```
 
-## main-entry.js actual (estado tras migración completa)
+## Cadena de carga en main-entry.js
 ```js
 import { createClient } from '@supabase/supabase-js'
 window.supabase = { createClient }
@@ -43,10 +45,10 @@ function loadScript(src) {
     document.head.appendChild(s)
   })
 }
-// misc.js es autónomo — en paralelo
+// misc.js es autónomo — carga en paralelo
 loadScript('/js/misc.js').catch(e => console.error('misc.js:', e))
 
-// Cadena con dependencias: leagues → auth → scoreboard → close-porra → admin
+// Cadena con dependencias
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
@@ -55,60 +57,70 @@ loadScript('/js/leagues.js')
   .catch(e => console.error('Error cargando modulos:', e))
 ```
 
-## Patrón de migración (seguir EXACTAMENTE)
-Para cada módulo pendiente:
-1. Leer js/[modulo].js para entender sus dependencias
-2. Buscar el bloque inline en index.html con el comentario "Archivo destino : [modulo].js"
-3. Eliminar ese bloque <script>...</script> completo del index.html
-4. Añadir loadScript('/js/[modulo].js') al final de la cadena en main-entry.js
-5. Verificar que el fichero js/[modulo].js ya existe y tiene el mismo contenido
-6. Hacer commit individual por módulo
-
-## Orden de carga actual (CRÍTICO — respetar dependencias)
-- misc: en paralelo (sin deps)
-- Cadena secuencial: leagues → auth → scoreboard → close-porra → admin
-
-## Cómo identificar el bloque inline en index.html
-Buscar: "Archivo destino : scoreboard.js" (o close-porra.js, admin.js)
-El bloque empieza con el comentario <!-- === y termina con </script>
-
-## Reglas importantes
-- NUNCA tocar main (rama principal) ni Netlify — solo vite-migration
-- Los scripts clásicos ejecutan ANTES que módulos ES — loadScript() resuelve esto
-- js/main.js NO se puede importar como módulo ES (tiene CRLF) — dejarlo como está
-- Un commit por módulo migrado
-- Mensaje de commit: "feat: migrar [modulo].js — eliminar inline, carga dinámica"
-
 ## Comandos útiles
 ```bash
-npm run dev   # localhost:5173
-git add -A && git commit -m "..." && git push origin vite-migration
+npm run dev     # localhost:5173
+npm run build   # genera dist/ — verificar antes de push a main
+git add -A && git commit -m "..." && git push origin main
 ```
 
-## Tarea actual
-Migración Vite completa. No hay módulos pendientes del CLAUDE.md.
-Próximos pasos posibles (a petición del usuario):
-- Extraer main.js inline del index.html (requiere resolver tema CRLF)
-- Extraer dice.js como módulo separado de admin.js (ya estaba anotado en el
-  propio bloque con "Archivo destino : dice.js" pero queda dentro de admin.js
-  por ahora)
-- Validar `npm run build` para producción
+## Reglas CRITICAS
+- NUNCA push a main sin validar en localhost:5173 primero
+- Push inmediato tras cada commit — nunca acumular
+- NO crear ni modificar vercel.json — Vercel sirve MIME correctamente por defecto
+- Actualizar migration-log.md tras cada acción importante
+- Un commit por tarea/fix — mensajes descriptivos
+
+## Stack de infraestructura
+- Hosting: Vercel (porramundial2026-seven.vercel.app) — autodeploy desde main
+- DB + Auth: Supabase (proyecto: cmyfyswystjgzdwbqyyb)
+- Secrets en Vault: GITHUB_TOKEN, GITHUB_REPO, ANTHROPIC_API_KEY
+
+## Edge Functions Supabase
+- admin-actions v7: gestión admin (results/overrides/users/leagues/reopen). Requiere JWT admin
+- update-results v2: sync football-data.org. Activar pg_cron el 11 jun 2026
+- porra-orchestrator v3: N agentes Haiku en paralelo → orchestrator_jobs
+- porra-patch-deploy v4: patches search/replace + commit GitHub
+- porra-fix-encoding v5: write/inspect ficheros en GitHub via API
+- porra-github-pusher v6: PLACEHOLDER — ignorar
+
+## Sistema de agentes
+Supervisor (Claude.ai) → porra-orchestrator EF → N Claude Haiku en paralelo → orchestrator_jobs
+Coste < $0.01. ANTHROPIC_API_KEY en Vault.
+Para invocar desde Claude.ai: Supabase MCP execute_sql → net.http_post → SELECT FROM net._http_response WHERE id=N
+
+## Conectores Claude.ai
+- Supabase MCP: execute_sql, get_logs, list/get/deploy_edge_function
+- Claude in Chrome: navigate, screenshot, javascript_tool, read_console_messages, tabs_context_mcp
+
+## Flujo QA con Claude in Chrome
+1. tabs_context_mcp → obtener tabId
+2. navigate → localhost:5173 o producción
+3. read_console_messages(onlyErrors)
+4. Login: doLogin(window.__QA_EMAIL, window.__QA_PASS) via javascript_tool
+5. Verificar: typeof doLogin, admInit, getActiveLeagueId, _porraDb
+6. Screenshot por sección
+
+## Motor de puntuación
+- Partido: +1 signo / +3 exacto (no acumula) / +2 goleador / +1 bonus vs IA (max 7pts)
+- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeon+25
+- Clasificacion final: campeon+30, subcampeon+20, 3o+15, 4o+10
+- Premios: Balon/Bota/Guante Oro 15pts, Mejor Joven 21 20pts (en AWARDS_CFG)
+
+## Estructura torneo
+- 48 equipos, 12 grupos (A-L) de 4, 72 partidos grupos
+- 2 primeros + 8 mejores terceros = 32 a eliminatorias
+- R32, R16, QF, SF, 3er puesto, Final — 104 partidos total
+- Resultados en tabla `results`, overrides via admin-actions
+
+## Pendientes antes del 11 jun 2026
+1. Bug updateCardUI en auth.js:64 — TypeError tarjetas no en DOM al cargar. No bloquea. Fix pendiente.
+2. Activar pg_cron update-results el 11 jun
+3. Seguridad auth: autoconfirm off, pwd min 8, enable_signup false
+4. Email confirmacion al cerrar porra (Resend + EF)
+5. README — actualizar con URL Vercel
 
 ## Log de cambios (OBLIGATORIO)
-Tras cada acción importante (modificar fichero, eliminar bloque, commit, resolver bug),
-añade una línea al fichero `migration-log.md` en la raíz del proyecto con este formato:
-
-```
-[HH:MM] ACCIÓN: descripción breve — ficheros afectados
-```
-
-Ejemplos:
-```
-[11:32] ELIMINAR: bloque inline scoreboard.js del index.html — index.html
-[11:33] AÑADIR: loadScript('/js/scoreboard.js') a main-entry.js — js/main-entry.js
-[11:34] COMMIT: feat: migrar scoreboard.js
-[11:35] BUG: leagueSelect no responde — investigando js/leagues.js
-[11:38] FIX: leagueSelect restaurado en window — js/close-porra.js línea 12
-```
-
-Si migration-log.md no existe, créalo. Nunca borres entradas anteriores.
+Añadir línea a migration-log.md tras cada accion:
+[HH:MM] ACCION: descripcion — ficheros afectados
+Nunca borrar entradas anteriores.
