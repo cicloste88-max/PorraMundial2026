@@ -96,3 +96,18 @@ Para retomar desde aquí:
 [21:45] COMMIT: fix: mover js/*.js a public/js/ para build de Vercel (3f95d68)
 [21:47] PUSH: git push origin main — dispara auto-deploy Vercel
 
+═════════════════════════════════════════════════════════════════════
+  HOTFIX PRODUCCION — vercel.json rompia modulos (2026-04-11)
+═════════════════════════════════════════════════════════════════════
+[22:10] BUG PRODUCCION: usuario reporta doLogin/window.supabase undefined en vercel.app
+[22:12] DIAG: curl -I assets/index-*.js → Content-Type: text/html; charset=utf-8
+         vercel.json forzaba text/html sobre "/(.*)" incluyendo /assets/*.js
+         → browser rechaza modulo con "non-JavaScript MIME type"
+         → main-entry.js nunca ejecuta → loadScript chain nunca arranca
+         → auth.js nunca carga → doLogin stays undefined
+[22:13] FIX: git rm vercel.json (Vercel defaults ya sirven HTML y JS con MIME
+         correctos; index.html tiene BOM UTF-8 + meta charset que cubren el
+         proposito original del vercel.json)
+[22:14] COMMIT: fix: eliminar vercel.json — rompia MIME de modulos JS
+[22:15] PUSH: git push origin main — dispara redeploy Vercel
+
