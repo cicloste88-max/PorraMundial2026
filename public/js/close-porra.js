@@ -242,3 +242,9 @@ async function finalizarPorra() {
     document.getElementById('finalizar-card')?.classList.add('ready');
   }
 }
+
+// Exports explicitos para inline onclick="finalizarPorra()" en index.html.
+// Function declarations de classic scripts dinamicamente inyectados no
+// siempre hoistean a window de forma fiable: asignacion explicita.
+window.finalizarPorra      = finalizarPorra;
+window.checkFinalizarReady = checkFinalizarReady;
