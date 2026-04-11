@@ -13,9 +13,19 @@ const SUPA_URL  = 'https://cmyfyswystjgzdwbqyyb.supabase.co';
 window._supa_url  = SUPA_URL;
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteWZ5c3d5c3RqZ3pkd2JxeXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzU4MDcsImV4cCI6MjA5MDQ1MTgwN30.HtOTJ6VHXMStNH3ASLj5zDabViARzF6vJgHfeSytEKQ';
 window._supa_anon = SUPA_ANON;
-const db = window._porraDb || (window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
-  auth: { storageKey: 'porra_auth', persistSession: false, autoRefreshToken: true }
-}));
+// Inicializacion lazy de db — espera a que window.supabase este disponible
+function getDb() {
+  if (!window._porraDb) {
+    window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
+      auth: { storageKey: 'porra_auth', persistSession: false, autoRefreshToken: true }
+    });
+  }
+  return window._porraDb;
+}
+const db = new Proxy({}, {
+  get(_, prop) { return getDb()[prop]; }
+});
+window._porraDb = window._porraDb || null;
 
 let currentUser = null; // { id, email, nombre }
 

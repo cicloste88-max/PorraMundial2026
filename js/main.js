@@ -1,9 +1,7 @@
-/* main.js — Porra Mundial 2026 (módulo principal — subdividido)
-   Contiene los sub-bloques: data.js + scoring.js + ui-groups.js + ko.js + ui-nav.js
-   Ver cabeceras internas /* js-* */ para delimitación de cada sub-bloque.
-   Líneas: ~3241
+/* main.js - Porra Mundial 2026 (modulo principal)
+   Sub-bloques: data, scoring, ui-groups, ko, ui-nav
 */
-'use strict';
+// (use strict eliminado — módulos ES son strict por defecto)
 
 
 // ========== DATOS DEL MUNDIAL 2026 ==========
