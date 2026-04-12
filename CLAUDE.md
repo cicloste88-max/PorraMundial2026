@@ -6,29 +6,53 @@ App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite
 Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main** (vite-migration ya mergeada)
 
-## Estado actual (abril 2026)
-**Migración Vite COMPLETA.** Deploy en Vercel operativo. Último commit: 7df47ab.
+## Estado actual (2026-04-12)
+**Migración Vite COMPLETA + extracción de main.js COMPLETA.** Deploy en Vercel operativo. Último commit: **744d3f4**.
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
+- `main.js` ELIMINADO del repo — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
 - `js/main-entry.js` como entry point Vite (type="module", importa Supabase npm)
-- Build: `npm run build` genera `dist/` con `assets/` + `js/`
+- Build: `npm run build` genera `dist/` con `assets/` + `js/` (11 classic scripts + 1 bundle)
 - QA login con `.env.local` (VITE_QA_EMAIL / VITE_QA_PASS)
 - `vercel.json` eliminado — causaba MIME text/html en .js (rompía módulos ES)
 - BOM UTF-8 en index.html — emojis correctos en producción
+- Bug patrón `DOMContentLoaded` dead-code handler resuelto (ver sección Patrones)
 
 ## Estructura ficheros JS
 ```
 js/
   main-entry.js     <- entry point Vite (type=module) — importa Supabase npm
 public/js/
-  main.js           <- datos + scoring + UI (~3250 líneas, script clásico)
-  auth.js           <- auth Supabase
-  leagues.js        <- ligas y selección de porra
+  data.js           <- datos torneo + estado global + utils (215 lineas, 12 decls)
+                      SB, EQUIPOS, GRUPOS, PARTIDOS, KIT_OVERRIDES,
+                      predictions, iaPredictions, totalPoints,
+                      getMatchKey, getMySign, iaBonusWillApply, escapeHtml
+  scoring.js        <- motor puntos + tabla + tarjetas + premios (1184 lineas, 50 decls)
+                      KO_ROUND_PTS, FINAL_CLASSIFICATION_PTS, calc*, AWARDS_CFG,
+                      AW_PLAYERS, YOUNG_PLAYERS_NXGN, CLASSIFICATION_PTS, renderAll,
+                      refreshGroupTables, updateCardUI, openPicker, selectAward
+  ui-groups.js      <- init grupos (167 lineas, 3 decls)
+                      initGrupos, savePredictions, checkGroupsComplete
+  ko.js             <- bracket KO + IA (1048 lineas, 28 decls)
+                      BRACKET, koPredictions, ROUND_CONFIG, ROUND_BREAKDOWN,
+                      BADGE_MAP, areGroupsComplete, buildBracketView,
+                      fetchIAforKO, findMatch, getTeamForSlot, saveKO,
+                      normKoPredictions, ...
+  ui-nav.js         <- SPA nav + modal + welcome (653 lineas, 17 decls)
+                      showPage, openModal, closeModal, initWelcome,
+                      updateAwardsFooter, renderPickerList, koInit,
+                      refreshAllViews, fetchIAforKO, showIAresultInModal
+  auth.js           <- auth Supabase (doLogin, doRegister, onAuthStateChange,
+                      loadUserData, renderAuthBar, updateCTAs)
+  leagues.js        <- ligas y seleccion de porra (leagueLoadMyLeagues,
+                      leagueSelect, getActiveLeagueId, _myLeagues via getter)
   misc.js           <- utils UI (sin deps, carga en paralelo)
-  scoreboard.js     <- clasificación
-  close-porra.js    <- cierre de pronósticos
+  scoreboard.js     <- clasificacion multi-usuario
+  close-porra.js    <- cierre de pronosticos (checkFinalizarReady, finalizarPorra)
   admin.js          <- panel admin + dados/simulador + lockAllCardsIfCerrada
 ```
+
+Total extraido de main.js: 3267 lineas, 110 decls top-level, 0 solapes entre ficheros.
 
 ## Cadena de carga en main-entry.js
 ```js
@@ -45,15 +69,34 @@ function loadScript(src) {
     document.head.appendChild(s)
   })
 }
-// misc.js es autónomo — carga en paralelo
+// misc.js es autonomo — carga en paralelo
 loadScript('/js/misc.js').catch(e => console.error('misc.js:', e))
 
-// Cadena con dependencias
+// Cadena con dependencias (orden CRITICO):
+// - leagues PRIMERO: los classic scripts extraidos pueden llamar
+//   leagueLoadMyLeagues/_myLeagues en top-level
+// - data -> scoring -> ui-groups -> ko -> ui-nav: los 5 sub-modulos de
+//   lo que antes era main.js. Se cargan antes que auth para que
+//   onAuthStateChange callback encuentre PARTIDOS, predictions, etc.
+//   cuando fire.
+// - auth -> scoreboard -> close-porra -> admin: orden original
 loadScript('/js/leagues.js')
+  .then(() => loadScript('/js/data.js'))
+  .then(() => loadScript('/js/scoring.js'))
+  .then(() => loadScript('/js/ui-groups.js'))
+  .then(() => loadScript('/js/ko.js'))
+  .then(() => loadScript('/js/ui-nav.js'))
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
   .then(() => loadScript('/js/admin.js'))
+  .then(() => {
+    // Safety net: garantiza que la UI welcome arranca tras cargar toda
+    // la chain. Idempotente con el readyState check de auth.js.
+    if (typeof window.initWelcome === 'function') window.initWelcome();
+    if (typeof window.showPage === 'function') window.showPage('welcome');
+    if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
+  })
   .catch(e => console.error('Error cargando modulos:', e))
 ```
 
@@ -68,8 +111,45 @@ git add -A && git commit -m "..." && git push origin main
 - NUNCA push a main sin validar en localhost:5173 primero
 - Push inmediato tras cada commit — nunca acumular
 - NO crear ni modificar vercel.json — Vercel sirve MIME correctamente por defecto
-- Actualizar migration-log.md tras cada acción importante
+- Actualizar migration-log.md tras cada accion importante
 - Un commit por tarea/fix — mensajes descriptivos
+- NO usar addEventListener DOMContentLoaded en classic scripts cargados
+  via loadScript — ver seccion Patrones abajo
+
+## Patrones — Bug DOMContentLoaded dead-code handler
+
+**Problema**: los classic scripts en `public/js/*.js` se cargan via loadScript
+chain en `main-entry.js`, que es un modulo ES diferido. La chain arranca DESPUES
+del parseo del HTML y se ejecuta async. Cuando un script se evalua via loadScript,
+`DOMContentLoaded` **ya ha disparado** hace ~100-300ms.
+
+Codigo asi es DEAD CODE:
+```js
+document.addEventListener('DOMContentLoaded', () => {
+  initWelcome();  // NUNCA se ejecuta
+});
+```
+
+Fix correcto — chequear readyState antes de attach:
+```js
+const runInit = () => { initWelcome(); /* ... */ };
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', runInit);
+} else {
+  runInit();  // DOM ya listo, correr inmediato
+}
+```
+
+Safety net adicional en el `.then()` final de la loadScript chain de
+main-entry.js — garantiza que la UI welcome arranca tras cargar toda la chain
+aunque el readyState check falle por algun edge case. Las funciones llamadas
+por el safety net deben ser IDEMPOTENTES (guard `if (window._xInited) return`).
+
+Casos conocidos ya arreglados: `initWelcome` (commit 744d3f4), `checkFinalizarReady`
+(commit d81f2dd via exports explicitos en close-porra.js).
+
+Si apareciera otra funcion con sintoma similar (no se ejecuta tras login), buscar
+si su unico call site esta dentro de un `DOMContentLoaded` handler.
 
 ## Stack de infraestructura
 - Hosting: Vercel (porramundial2026-seven.vercel.app) — autodeploy desde main
@@ -114,11 +194,17 @@ Para invocar desde Claude.ai: Supabase MCP execute_sql → net.http_post → SEL
 - Resultados en tabla `results`, overrides via admin-actions
 
 ## Pendientes antes del 11 jun 2026
-1. Bug updateCardUI en auth.js:64 — TypeError tarjetas no en DOM al cargar. No bloquea. Fix pendiente.
-2. Activar pg_cron update-results el 11 jun
-3. Seguridad auth: autoconfirm off, pwd min 8, enable_signup false
-4. Email confirmacion al cerrar porra (Resend + EF)
-5. README — actualizar con URL Vercel
+1. Activar pg_cron update-results el 11 jun
+2. Seguridad auth: autoconfirm off, pwd min 8, enable_signup false
+3. Email confirmacion al cerrar porra (Resend + EF)
+4. README — actualizar con URL Vercel (actualmente dice Netlify)
+
+Sin pendientes criticos. Bugs recientes resueltos en esta sesion:
+- updateCardUI TypeError (commit ee2e25a): early-return si tarjeta no en DOM
+- checkFinalizarReady/finalizarPorra undefined (commit d81f2dd): exports
+  explicitos en close-porra.js + eliminacion de bloque exports dead-code
+- initWelcome nunca ejecutaba (commit 744d3f4): readyState check + safety net
+- Venues gallery vacia (mismo 744d3f4): consecuencia del initWelcome fix
 
 ## Log de cambios (OBLIGATORIO)
 Añadir línea a migration-log.md tras cada accion:
