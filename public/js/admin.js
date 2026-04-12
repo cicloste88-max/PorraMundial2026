@@ -152,6 +152,7 @@ async function admLoadResults() {
   const overrides    = r.data?.overrides     ? JSON.parse(r.data.overrides)     : {};
   _admResultsData    = { matchResults, overrides };
   admRenderResultsTable();
+  if(typeof window.refreshBracketResults==='function') window.refreshBracketResults();
 }
 
 function admRenderResultsTable() {

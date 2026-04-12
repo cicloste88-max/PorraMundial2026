@@ -208,3 +208,55 @@ Chain final en js/main-entry.js:
 [19:20] INICIO: fix diceSimulateMatch — mutar pred en lugar de reemplazarlo
 [19:20] FIX: predictions[key] mutado con Object.assign en vez de reemplazado — public/js/admin.js:585,591 ✓
 [19:20] VERIFICAR: node --check ✓
+[19:20] COMMIT: 187a764 — fix: diceSimulateMatch mutar pred en lugar de reemplazarlo
+[19:20] PUSH: main → origin ✓ — Vercel autodeploy
+[19:20] FIN TAREA: fix undo tras dado completado
+
+## Sesión 2026-04-12 — Rediseño bracket resultados (Fase 0b visual)
+
+[19:30] INICIO: rediseño bracket resultados — INSTRUCCIONES_CLAUDE_CODE_REDISENO_BRACKET.md
+[19:30] VERIFICAR IDs: BRACKET.third[0].id=103, BRACKET.final[0].id=104, SF=[101,102] — proto usaba 105/106 y SF=[103,104] → CORREGIR
+[19:30] VERIFICAR _results: window._results NO existe en auth.js — resultados en admin.js/scoreboard.js via match_results/ko_results de tabla results
+[19:35] T-01: CREAR public/js/bracket-results.js — IDs corregidos: FINAL=104, THIRD=103, SF=[101,102], fases renombradas (5→4 fases reales) ✓
+[19:35] T-02: CSS ya en css/bracket-results.css (prototipo correcto, prefijo brk-) ✓
+[19:35] VERIFICAR: node --check bracket-results.js ✓
+[19:40] T-03a: index.html — tab "Resultados" añadido en view-tabs ✓
+[19:40] T-03b: index.html — panel view-bracket-results con brk-root añadido ✓
+[19:40] T-03c: index.html — link css/bracket-results.css en head ✓
+[19:40] T-03d: js/main-entry.js — bracket-results.js en loadScript chain (después de ko.js, antes de ui-nav.js) ✓
+[19:40] T-03e: ui-nav.js — setView('bracket-results') → initBracketResults con rAF+50ms ✓
+[19:40] T-04: admin.js — refreshBracketResults() tras admLoadResults ✓
+[19:40] VERIFICAR: node --check (3 ficheros) ✓ / npm run build ✓ / checklist 4/4 ✓
+
+Decisiones de diseño:
+- BRK_PHASES reducido de 5 a 4 fases (r32, r16, qf, sf) — el prototipo tenía "oct" como 5ª fase pero realmente r16=octavos en BRACKET
+- IDs corregidos: BRK_FINAL_ID=104 (era 105), BRK_THIRD_ID=103 (era 106), BRK_COLS.sf=[101,102] (era [103,104])
+- brkLoadResults() simplificado — no hay window._results global, usa window._brkResultsOverride como hook para inyectar datos
+- CSS cargado como link externo (no inline) — Vite lo procesa y genera asset separado en dist/
+[19:45] FIX: futurePhs crash — filtrar IDs sin definición en BRK_PHASES (.filter) — bracket-results.js:247 ✓
+[19:45] FIX: labels rail — restaurar '1/32' y '1/16' (no '16avos'/'Octavos') — bracket-results.js:35-36 ✓
+[19:55] INICIO: batch fixes — CSS center scroll/compact + eliminar tab Bracket
+[19:55] FIX1a: .brk-center-inner — overflow-y:auto, scrollbar hidden, gap 8→6px — css/bracket-results.css ✓
+[19:55] FIX1b: .brk-col.center — overflow:hidden — css/bracket-results.css ✓
+[19:55] FIX1c: .brk-host-stack 92→72px, .brk-h-logo 68→54px, .mex/.usa offsets reducidos — css/bracket-results.css ✓
+[19:55] FIX2: tab Bracket eliminado, solo queda Resultados + Cuadro — index.html ✓
+[19:55] VERIFICAR: node --check ✓ / npm run build ✓
+[20:10] INICIO: fix centro — ampliar columna 130→150px + mover sticker stack a col-hd
+[20:10] FIX-A: .brk-col.center flex 130→150px (responsive 110→130px) — css/bracket-results.css ✓
+[20:10] FIX-B: brkMakeCenter() — sticker stack movido a col-hd, logo FIFA eliminado, centro solo Final+3er — bracket-results.js ✓
+[20:10] VERIFICAR: node --check ✓ / npm run build ✓
+[20:20] INICIO: fix fases (añadir Octavos) + columna central colapsable
+[20:20] FIX1: BRK_PHASES 4→5 fases (añadido oct/Octavos IDs 97-100), sf left/right vacios — bracket-results.js ✓
+[20:20] FIX2: columna central colapsable — 48px default, 150px expanded al click "Final" — css/bracket-results.css ✓
+[20:20] FIX2: brkMakeCenter col-hd con trofeo+onclick, brkSetPhase reconoce 'final' toggle — bracket-results.js ✓
+[20:20] FIX2: brkRenderBracket — vista final muestra todas fases como past + centro expanded — bracket-results.js ✓
+[20:20] FIX2: brkRenderRail — final activo resaltado en rail — bracket-results.js ✓
+[20:20] VERIFICAR: node --check ✓ / npm run build ✓
+[20:40] INICIO: 6 fixes — eliminar col central, nueva finalBox, toggle scroll/final, brk-final-area, CSS, ocultar finalizar-section
+[20:40] FIX1: eliminar brkMakeCenter() del render bracket — bracket-results.js ✓
+[20:40] FIX2: nueva brkMakeFinalBox() con Final+3er en layout horizontal — bracket-results.js ✓
+[20:40] FIX3: brkSetPhase toggle scroll/final-area — bracket-results.js ✓
+[20:40] FIX4: brk-final-area en initBracketResults root HTML — bracket-results.js ✓
+[20:40] FIX5: CSS .brk-final-box* estilos caja final — css/bracket-results.css ✓
+[20:40] FIX6: ocultar finalizar-section en vista bracket-results, restaurar en otras — ui-nav.js ✓
+[20:40] VERIFICAR: node --check (2 ficheros) ✓ / npm run build ✓

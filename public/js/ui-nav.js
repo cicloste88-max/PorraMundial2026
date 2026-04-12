@@ -451,11 +451,18 @@ function setView(view) {
   document.querySelectorAll('.view-tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   event.target.classList.add('active');
+  const finSection=document.getElementById('finalizar-section');
   if(view==='bracket'){
     buildBracketView();
     requestAnimationFrame(()=>setTimeout(()=>drawBracketLines(),50));
   }
   else if(view==='stadium') buildStadiumView();
+  else if(view==='bracket-results'){
+    if(finSection) finSection.style.display='none';
+    requestAnimationFrame(()=>setTimeout(()=>initBracketResults(),50));
+    return;
+  }
+  if(finSection) finSection.style.display='';
 }
 
 
