@@ -260,3 +260,12 @@ Decisiones de diseño:
 [20:40] FIX5: CSS .brk-final-box* estilos caja final — css/bracket-results.css ✓
 [20:40] FIX6: ocultar finalizar-section en vista bracket-results, restaurar en otras — ui-nav.js ✓
 [20:40] VERIFICAR: node --check (2 ficheros) ✓ / npm run build ✓
+[20:45] COMMIT: cd4afa2 — feat: bracket de resultados reales (Fase 0b visual)
+[20:45] PUSH: main → origin ✓ — Vercel autodeploy
+[20:50] DOCS: CLAUDE.md actualizado — estado 2026-04-13, bracket-results en estructura, cadena de carga, commit cd4afa2
+
+[sesión 2026-04-13] FEATURE COMPLETA: bracket-results
+- Ficheros nuevos: public/js/bracket-results.js, css/bracket-results.css
+- Modificados: index.html, js/main-entry.js, public/js/ui-nav.js, public/js/admin.js
+- Commit: cd4afa2 — desplegado en producción
+- Pendiente: conectar con _results reales (11 jun, pg_cron update-results)

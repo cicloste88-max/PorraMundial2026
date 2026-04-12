@@ -6,8 +6,8 @@ App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite
 Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main** (vite-migration ya mergeada)
 
-## Estado actual (2026-04-12)
-**Migración Vite COMPLETA + extracción de main.js COMPLETA.** Deploy en Vercel operativo. Último commit: **744d3f4**.
+## Estado actual (2026-04-13)
+**Migración Vite COMPLETA + extracción de main.js COMPLETA + bracket-results COMPLETO.** Deploy en Vercel operativo. Último commit: **cd4afa2**.
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
 - `main.js` ELIMINADO del repo — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
@@ -17,6 +17,12 @@ Rama activa: **main** (vite-migration ya mergeada)
 - `vercel.json` eliminado — causaba MIME text/html en .js (rompía módulos ES)
 - BOM UTF-8 en index.html — emojis correctos en producción
 - Bug patrón `DOMContentLoaded` dead-code handler resuelto (ver sección Patrones)
+- **bracket-results**: vista de resultados reales KO (tab "Resultados" en eliminatorias)
+  - `public/js/bracket-results.js` + `css/bracket-results.css` (prefijo brk-)
+  - 5 fases en rail (1/32, 1/16, Octavos, Cuartos, Semis) + Final como vista separada
+  - Final box fuera del bracket scroll, con cards Final + 3er Puesto
+  - Conectado a admin.js via refreshBracketResults()
+  - Pendiente: conectar con _results reales (11 jun, pg_cron update-results)
 
 ## Estructura ficheros JS
 ```
@@ -33,11 +39,16 @@ public/js/
                       refreshGroupTables, updateCardUI, openPicker, selectAward
   ui-groups.js      <- init grupos (167 lineas, 3 decls)
                       initGrupos, savePredictions, checkGroupsComplete
-  ko.js             <- bracket KO + IA (1048 lineas, 28 decls)
+  ko.js             <- bracket KO + IA + connector lines SVG (~1100 lineas, 30 decls)
                       BRACKET, koPredictions, ROUND_CONFIG, ROUND_BREAKDOWN,
-                      BADGE_MAP, areGroupsComplete, buildBracketView,
+                      BRACKET_CONNECTIONS, BADGE_MAP, areGroupsComplete,
+                      buildBracketView, drawBracketLines, enableDragScroll,
                       fetchIAforKO, findMatch, getTeamForSlot, saveKO,
                       normKoPredictions, ...
+  bracket-results.js <- vista resultados reales KO (342 lineas)
+                      BRK_PHASES, BRK_COLS, BRK_BADGE_MAP,
+                      initBracketResults, refreshBracketResults, brkSetPhase,
+                      brkMakeFinalBox, brkRenderBracket, brkRenderRail
   ui-nav.js         <- SPA nav + modal + welcome (653 lineas, 17 decls)
                       showPage, openModal, closeModal, initWelcome,
                       updateAwardsFooter, renderPickerList, koInit,
@@ -85,6 +96,7 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/scoring.js'))
   .then(() => loadScript('/js/ui-groups.js'))
   .then(() => loadScript('/js/ko.js'))
+  .then(() => loadScript('/js/bracket-results.js'))
   .then(() => loadScript('/js/ui-nav.js'))
   .then(() => loadScript('/js/auth.js'))
   .then(() => loadScript('/js/scoreboard.js'))
