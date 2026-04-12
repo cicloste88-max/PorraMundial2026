@@ -567,6 +567,9 @@ function updateKOPts() {
 /* ══ INIT ══ */
 /* ══ WELCOME INIT ══ */
 function initWelcome() {
+  // Idempotente: safety net en main-entry.js puede llamarlo despues de auth.js
+  if (window._welcomeInited) return;
+  window._welcomeInited = true;
   const WC_SB = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/sites';
   const WC_VENUES_ROW1 = [
     {city:'Dallas',       path:'USA/Dallas.png',               country:'USA', pos:'center 20%',  scale:'115%'},

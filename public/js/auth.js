@@ -285,7 +285,10 @@ window.switchAuthTab=switchAuthTab; window.handleCTA=handleCTA; window.saveAwPic
 
 // Notificar que las funciones de auth ya están disponibles
 document.dispatchEvent(new Event('authReady'));
-document.addEventListener('DOMContentLoaded', async () => {
+// auth.js se carga via loadScript chain DESPUES de DOMContentLoaded,
+// asi que addEventListener('DOMContentLoaded', ...) nunca ejecutaria.
+// Detectar readyState y correr inmediato si ya esta listo.
+const runAuthInit = async () => {
   // Cargar caché local mientras llega la sesión de Supabase
   try {
     const gp = localStorage.getItem('porra_predictions');
@@ -302,7 +305,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   initWelcome();
   renderAuthBar();
   updateCTAs();
-});
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', runAuthInit);
+} else {
+  runAuthInit();
+}
 
 // Procesar llamadas que llegaron antes de que cargara el auth
 if (window._pendingAuth) { openAuthModal(window._pendingAuth); window._pendingAuth = null; }

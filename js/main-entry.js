@@ -46,4 +46,13 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
   .then(() => loadScript('/js/admin.js'))
+  .then(() => {
+    // Safety net: garantizar que la UI welcome arranca tras cargar toda
+    // la chain. Idempotente con el fix readyState de auth.js — si auth.js
+    // ya llamo a initWelcome, la segunda llamada solo reconstruye los
+    // contenedores con el mismo contenido (no-op visible).
+    if (typeof window.initWelcome === 'function') window.initWelcome();
+    if (typeof window.showPage === 'function') window.showPage('welcome');
+    if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
+  })
   .catch(e => console.error('Error cargando modulos:', e))
