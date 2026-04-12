@@ -582,13 +582,13 @@ function diceSimulateMatch(match) {
   const idx  = PARTIDOS.findIndex(p=>p===match);
   if(idx < 0) return;
   const key  = getMatchKey(match);
-  const pred = predictions[key] || {};
+  const pred = predictions[key] || (predictions[key] = {});
   if(pred.saved || pred.lockedByUser) return; // no tocar bloqueados
 
   const [l, v] = dicePickScore();
   const gol    = dicePickScorer(match);
 
-  predictions[key] = { l, v, gol, saved: true, lockedByUser: true };
+  Object.assign(pred, { l, v, gol, saved: true, lockedByUser: true });
 
   // Actualizar UI de la tarjeta completa
   const slEl  = document.getElementById('sl-'+idx);

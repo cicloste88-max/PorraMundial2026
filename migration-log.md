@@ -202,3 +202,9 @@ Chain final en js/main-entry.js:
 [19:10] INICIO: fix getBoundingClientRect=0 en panel hidden — drawBracketLines desde setView
 [19:10] FIX: setView('bracket') ahora llama drawBracketLines con rAF+50ms tras hacer visible el panel — public/js/ui-nav.js ✓
 [19:10] VERIFICAR: node --check ✓ / npm run build ✓
+[19:10] COMMIT: 69481d1 — fix: drawBracketLines after panel visible
+[19:10] PUSH: main → origin ✓ — Vercel autodeploy
+[19:10] FIN TAREA: Fase 1 bracket connector lines CERRADA
+[19:20] INICIO: fix diceSimulateMatch — mutar pred en lugar de reemplazarlo
+[19:20] FIX: predictions[key] mutado con Object.assign en vez de reemplazado — public/js/admin.js:585,591 ✓
+[19:20] VERIFICAR: node --check ✓
