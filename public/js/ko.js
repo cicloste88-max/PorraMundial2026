@@ -843,9 +843,31 @@ function buildFinalSection(match) {
 }
 
 
+const BRACKET_CONNECTIONS = [
+  { from: [74, 77], to: 89 },
+  { from: [73, 75], to: 90 },
+  { from: [76, 78], to: 91 },
+  { from: [79, 80], to: 92 },
+  { from: [83, 84], to: 93 },
+  { from: [81, 82], to: 94 },
+  { from: [86, 88], to: 95 },
+  { from: [85, 87], to: 96 },
+  { from: [89, 90], to: 97 },
+  { from: [93, 94], to: 98 },
+  { from: [91, 92], to: 99 },
+  { from: [95, 96], to: 100 },
+  { from: [97, 98], to: 101 },
+  { from: [99, 100], to: 102 },
+  { from: [101, 102], to: 104 },
+];
+
 function buildBracketView() {
   const inner=document.getElementById('bracket-inner');
   inner.innerHTML='';
+
+  const prevSvg=document.getElementById('bracket-lines-svg');
+  if(prevSvg)prevSvg.remove();
+  if(window._bracketResizeObs){window._bracketResizeObs.disconnect();window._bracketResizeObs=null;}
 
   const rounds=[
     {label:'16avos (1-8)',   matches:BRACKET.r32.slice(0,8)},
@@ -872,6 +894,7 @@ function buildBracketView() {
 
       const card=document.createElement('div');
       card.className='br-card'+(isLocked?' br-locked':'')+(pred.saved?' br-saved':'')+(isFinal?' br-final-c':'');
+      card.dataset.matchId=m.id;
       if(!isLocked) card.onclick=()=>openModal(m);
 
       const hKit=hTeam?`${SB}/kits/${hTeam.slug}/home.jpg`:'';
@@ -923,8 +946,101 @@ function buildBracketView() {
 
   // Enable horizontal drag scroll
   enableDragScroll(document.getElementById('bracket-wrap'));
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      setTimeout(()=>drawBracketLines(),150);
+    });
+  });
+
+  const wrap=document.getElementById('bracket-wrap');
+  if(wrap&&window.ResizeObserver){
+    let _rt;
+    window._bracketResizeObs=new ResizeObserver(()=>{clearTimeout(_rt);_rt=setTimeout(()=>drawBracketLines(),100);});
+    window._bracketResizeObs.observe(wrap);
+  }
 }
 
+function drawBracketLines() {
+  const inner=document.getElementById('bracket-inner');
+  const wrap=document.getElementById('bracket-wrap');
+  if(!inner||!wrap)return;
+
+  const innerRect=inner.getBoundingClientRect();
+  const scrollLeft=wrap.scrollLeft;
+  const scrollTop=wrap.scrollTop;
+
+  let svg=document.getElementById('bracket-lines-svg');
+  if(!svg){
+    svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.id='bracket-lines-svg';
+    svg.style.cssText='position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:5';
+    inner.style.position='relative';
+    inner.appendChild(svg);
+  }
+  svg.style.width=inner.scrollWidth+'px';
+  svg.style.height=inner.scrollHeight+'px';
+  svg.innerHTML='';
+
+  function getCardCoords(matchId){
+    const card=inner.querySelector(`[data-match-id="${matchId}"]`);
+    if(!card)return null;
+    const cr=card.getBoundingClientRect();
+    const ir=innerRect;
+    const x=cr.left-ir.left+scrollLeft;
+    const y=cr.top-ir.top+scrollTop;
+    return{
+      x,y,w:cr.width,h:cr.height,
+      rightMid:{x:x+cr.width,y:y+cr.height/2},
+      leftMid:{x,y:y+cr.height/2},
+    };
+  }
+
+  const C_SAVED='rgba(74,222,128,0.55)';
+  const C_PEND='rgba(255,255,255,0.07)';
+  const C_FINAL='rgba(252,211,77,0.45)';
+
+  BRACKET_CONNECTIONS.forEach(({from,to})=>{
+    const tc=getCardCoords(to);
+    if(!tc)return;
+    const isFinalConn=to===104;
+
+    from.forEach((fromId,idx)=>{
+      const fc=getCardCoords(fromId);
+      if(!fc)return;
+
+      const pred=koPredictions[fromId]||{};
+      const saved=pred.saved===true;
+      const color=isFinalConn?C_FINAL:saved?C_SAVED:C_PEND;
+      const sw=saved?1.5:0.8;
+      const dash=saved?null:'3 4';
+
+      const isRightSide=fc.x>tc.x;
+      let x1,y1,x2,y2;
+
+      if(!isRightSide){
+        x1=fc.rightMid.x; y1=fc.rightMid.y;
+        x2=tc.x;          y2=tc.y+tc.h*(idx===0?0.33:0.67);
+      } else {
+        x1=fc.leftMid.x;  y1=fc.leftMid.y;
+        x2=tc.x+tc.w;     y2=tc.y+tc.h*(idx===0?0.33:0.67);
+      }
+
+      const dx=Math.abs(x2-x1)*0.45;
+      const cp1x=isRightSide?x1-dx:x1+dx, cp1y=y1;
+      const cp2x=isRightSide?x2+dx:x2-dx, cp2y=y2;
+
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke',color);
+      path.setAttribute('stroke-width',sw);
+      path.setAttribute('stroke-linecap','round');
+      if(dash)path.setAttribute('stroke-dasharray',dash);
+      svg.appendChild(path);
+    });
+  });
+}
 
 function enableDragScroll(el) {
   let isDown=false, startX, scrollLeft;

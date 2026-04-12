@@ -508,6 +508,10 @@ body{font-family:'Inter',sans-serif;background:#0f172a;color:#fff;min-height:100
 @keyframes tFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .br-trophy-label{font-family:'Inter Tight',sans-serif;font-size:10px;font-weight:900;color:var(--gold);letter-spacing:.1em;text-align:center}
 
+/* Bracket connector lines SVG overlay */
+#bracket-lines-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:5}
+.bracket-inner{position:relative}
+
 /* ════════════════════════════════════════════════
    ── VIEW B: STADIUM (Copa central) ──
 ════════════════════════════════════════════════ */

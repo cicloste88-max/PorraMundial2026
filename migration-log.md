@@ -193,4 +193,9 @@ Chain final en js/main-entry.js:
   leagues → data → scoring → ui-groups → ko → ui-nav →
     auth → scoreboard → close-porra → admin
 
+## Sesión 2026-04-12 — Bracket connector lines (Fase 1)
 
+[19:00] AÑADIR: BRACKET_CONNECTIONS mapping 15 conexiones — public/js/ko.js
+[19:00] MODIFICAR: buildBracketView — data-match-id, limpieza SVG, ResizeObserver, drawBracketLines() — public/js/ko.js
+[19:00] AÑADIR: drawBracketLines() SVG overlay bezier curves — public/js/ko.js
+[19:00] AÑADIR: CSS #bracket-lines-svg, .bracket-inner — css/ko.css
