@@ -199,3 +199,6 @@ Chain final en js/main-entry.js:
 [19:00] MODIFICAR: buildBracketView — data-match-id, limpieza SVG, ResizeObserver, drawBracketLines() — public/js/ko.js
 [19:00] AÑADIR: drawBracketLines() SVG overlay bezier curves — public/js/ko.js
 [19:00] AÑADIR: CSS #bracket-lines-svg, .bracket-inner — css/ko.css
+[19:10] INICIO: fix getBoundingClientRect=0 en panel hidden — drawBracketLines desde setView
+[19:10] FIX: setView('bracket') ahora llama drawBracketLines con rAF+50ms tras hacer visible el panel — public/js/ui-nav.js ✓
+[19:10] VERIFICAR: node --check ✓ / npm run build ✓

@@ -451,7 +451,10 @@ function setView(view) {
   document.querySelectorAll('.view-tab').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   event.target.classList.add('active');
-  if(view==='bracket') buildBracketView();
+  if(view==='bracket'){
+    buildBracketView();
+    requestAnimationFrame(()=>setTimeout(()=>drawBracketLines(),50));
+  }
   else if(view==='stadium') buildStadiumView();
 }
 
