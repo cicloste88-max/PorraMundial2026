@@ -65,6 +65,7 @@ h2{
 .glow-line{position:absolute;left:50%;top:0;bottom:0;width:1.5px;transform:translateX(-50%);background:linear-gradient(180deg,transparent 0%,rgba(255,255,255,.5) 12%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.5) 88%,transparent 100%);z-index:9;pointer-events:none}
 .spark{position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;z-index:10;animation:spark 2.8s ease-in-out infinite}
 .spark:nth-child(1){top:18%;animation-delay:0s}.spark:nth-child(2){top:50%;animation-delay:.95s}.spark:nth-child(3){top:76%;animation-delay:1.9s}
+@keyframes boostPulse{0%,100%{box-shadow:0 0 0 0 rgba(234,88,12,.4)}50%{box-shadow:0 0 0 4px rgba(234,88,12,.0)}}
 @keyframes spark{0%,100%{opacity:0;transform:translateX(-50%) scale(.4)}50%{opacity:.9;transform:translateX(-50%) scale(1.6)}}
 .center{position:absolute;left:50%;top:0;bottom:0;transform:translateX(-50%);width:96px;z-index:11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
 .mpill{background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:9px;font-weight:600;color:rgba(255,255,255,.92);letter-spacing:.03em;white-space:nowrap;text-align:center}
@@ -2339,10 +2340,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     </div>
   </div>
   <!-- Ticker boost jornada -->
-  <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;letter-spacing:.04em">🔥 BOOST HOY</span>
-    <div id="boost-ticker-matches" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
-    <span id="boost-ticker-status" style="font-size:11px;color:#6b7280;white-space:nowrap;margin-left:auto"></span>
+  <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;flex-wrap:wrap;gap:8px;align-items:center">
   </div>
   <!-- Barra global de simulación -->
   <div id="dice-global-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:rgba(30,27,75,.35);border:1px solid rgba(99,82,199,.2);border-radius:10px">
@@ -2532,6 +2530,13 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
         <div class="fin-check" id="fincheck-awards">
           <div class="fin-check-icon">🏆</div>
           <div><div class="fin-check-text">Premios individuales</div><div class="fin-check-count" id="fincheck-awards-count">0 / 4 premios</div></div>
+        </div>
+        <div class="fin-check" id="fincheck-boost">
+          <span class="fin-check-icon">🔥</span>
+          <div>
+            <div class="fin-check-text">Boost diario</div>
+            <div class="fin-check-count" id="fincheck-boost-count">0 / 17 jornadas</div>
+          </div>
         </div>
       </div>
       <button class="finalizar-btn" id="finalizar-btn" disabled onclick="finalizarPorra()">

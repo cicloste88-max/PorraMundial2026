@@ -145,14 +145,28 @@ async function _checkFinalizarReadyDB(execId) {
     const awFilled     = (awardsDB?.golden_ball && awardsDB?.golden_boot && awardsDB?.golden_glove && awardsDB?.young_player) ? 4 : 0;
     console.log('[checkFinalizar] DB:', gruposFilled, 'grupos,', koFilled, 'KO, awards:', awFilled);
 
+    // Calcular días de grupos con partidos y cuántos tienen burn asignado
+    const diseWithMatches = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))].sort();
+    const boostTotal  = diseWithMatches.length;  // 17 jornadas
+    const boostFilled = diseWithMatches.filter(d => boostPicks[d]).length;
+    const boostDone   = boostFilled >= boostTotal;
+
     const gruposDone = gruposFilled >= 72;
     const koDone     = koFilled >= 32;
     const awDone     = awFilled >= 4;
-    const allDone    = gruposDone && koDone && awDone;
+    const allDone    = gruposDone && koDone && awDone && boostDone;
 
     setCheck('fincheck-grupos', 'fincheck-grupos-count', gruposDone, gruposFilled, 72);
     setCheck('fincheck-ko',     'fincheck-ko-count',     koDone,     koFilled,     32);
     setCheck('fincheck-awards', 'fincheck-awards-count', awDone,     awFilled,     4);
+
+    // Check de burns (nuevo)
+    const boostCheckEl = document.getElementById('fincheck-boost');
+    const boostCountEl = document.getElementById('fincheck-boost-count');
+    if (boostCheckEl) boostCheckEl.classList.toggle('done', boostDone);
+    if (boostCountEl) boostCountEl.textContent = boostFilled + ' / ' + boostTotal + ' jornadas';
+    const boostIcon = boostCheckEl?.querySelector('.fin-check-icon');
+    if (boostIcon) boostIcon.textContent = boostDone ? '✅' : '🔥';
 
     if (allDone) {
       _finalizarDone = true;  // marcar como verificado — no volver a consultar DB
@@ -164,10 +178,11 @@ async function _checkFinalizarReadyDB(execId) {
       if (btn) { btn.disabled = true; btn.className = 'finalizar-btn'; }
       if (btnIcon) btnIcon.textContent = '🔒';
       const missing = [];
-      if (!gruposDone) missing.push((72 - gruposFilled) + ' partidos de grupos sin guardar en BD');
-      if (!koDone)     missing.push((32 - koFilled)     + ' partidos de KO sin guardar en BD');
-      if (!awDone)     missing.push('premios incompletos en BD');
-      if (btnText) btnText.textContent = 'Falta en BD: ' + missing.join(' · ');
+      if (!gruposDone) missing.push((72 - gruposFilled) + ' grupos sin guardar');
+      if (!koDone)     missing.push((32 - koFilled) + ' KO sin guardar');
+      if (!awDone)     missing.push('premios incompletos');
+      if (!boostDone)  missing.push((boostTotal - boostFilled) + ' boosts de jornada sin asignar');
+      if (btnText) btnText.textContent = 'Falta: ' + missing.join(' · ');
       if (card) card.classList.remove('ready');
     }
   } catch(err) {
