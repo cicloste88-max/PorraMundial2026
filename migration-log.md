@@ -382,3 +382,67 @@ Mecánica completa:
   - Persistencia: localStorage (caché) + Supabase (fuente de verdad)
   - Visual: Canvas 2D partículas fuego compartido + glow CSS pulsante + badge x2
 ═════════════════════════════════════════════════════════════════════
+
+## Sesión 2026-04-13 — Boost UX + Vista Jornada
+
+[16:30] FEATURE: pastillas boost pendientes en CTA grupos
+        - ui-groups.js: bloque CTA inferior con pastillas pulsantes por jornada pendiente
+        - index.html: div #cta-boost-pending bajo cta-locked-msg
+[16:35] COMMIT: b173274 — feat: pastillas boost pendientes en CTA grupos
+[16:35] PUSH: main → origin ✓
+
+[16:50] FEATURE: boost ticker mejoras
+        - ui-groups.js: scrollToMatchCard (scroll suave + flash naranja 1.8s)
+        - _buildMatchButtons compartido ticker/CTA con label "J1","J2"...
+        - ctaExpandJornada: panel expandible propio en CTA inferior
+        - Fix: check tarjeta ahora re-renderiza ticker y CTA (scoring.js)
+[16:55] COMMIT: 9d8a56b — feat: boost ticker scroll, label Jornada, panel CTA, fix re-activación
+[16:55] PUSH: main → origin ✓
+
+[17:10] FEATURE: Vista Jornada — nueva pestaña en fase de grupos
+        - index.html: selector toggle "Fase de grupos / Jornada", #jornada-container, CSS completo jcards
+        - ui-groups.js: setVistaGrupos, renderVistaJornada, _buildJCard, jcardBoostToggle, _buildJornadaRanking
+        - scoreboard.js: window._sbData expuesto para ranking
+[17:15] COMMIT: 74a5971 — feat: vista Jornada tarjetas compactas por día con boost, pts y ranking
+[17:15] PUSH: main → origin ✓
+
+[17:20] FIX: vista Jornada no visible — display '' no sobreescribe CSS display:none
+        - setVistaGrupos usa display 'block' en vez de ''
+        - _buildJornadaRanking dispara sbLoad() si _sbData ausente
+[17:25] COMMIT: d8bc246 — fix: vista Jornada display block, cargar sbData si ausente
+[17:25] PUSH: main → origin ✓
+
+[17:40] FEATURE: vista Jornada rediseño completo
+        - CSS: jornada-wrap grid, sidebar única sticky (grid-column:2, grid-row:1/99)
+        - jcards: equipos grandes, marcador centrado, estadio+hora+grupo, chips compactos
+        - Pts: número solo + "PTS posibles"/"PTS ×2" (sin X)
+        - CTA boost completos: pastillas verdes editables "✅ J1 · México vs ..."
+        - renderVistaJornada: sidebar única fuera del loop de jornadas
+[17:45] COMMIT: ef39b3d — feat: vista Jornada rediseño jcards anchas, sidebar sticky, CTA editable
+[17:45] PUSH: main → origin ✓
+
+[17:50] FIX: sidebar clasificación aparecía a la izquierda — faltaba grid-column:2
+[17:50] COMMIT: 52a917c — fix: sidebar clasificación a la derecha
+[17:50] PUSH: main → origin ✓
+
+[17:55] FIX: jcards más estrechas, chips más visibles y centradas
+        - min-height 80→56px, padding reducido, chips 10px font-weight 700, justify-content center
+[18:00] COMMIT: 82b6a77 — fix: jcards más estrechas, chips centradas
+[18:00] PUSH: main → origin ✓
+
+═════════════════════════════════════════════════════════════════════
+  CHECKPOINT — VISTA JORNADA + BOOST UX (2026-04-13)
+─────────────────────────────────────────────────────────────────────
+HEAD: 82b6a77
+Commits sesión (7):
+  b173274  feat: pastillas boost CTA
+  9d8a56b  feat: ticker scroll + label + panel CTA
+  74a5971  feat: vista Jornada
+  d8bc246  fix: display block + sbLoad
+  ef39b3d  feat: rediseño jcards + sidebar + CTA editable
+  52a917c  fix: sidebar a la derecha
+  82b6a77  fix: jcards estrechas + chips centradas
+
+Ficheros modificados: index.html, public/js/ui-groups.js, public/js/scoring.js,
+  public/js/scoreboard.js
+═════════════════════════════════════════════════════════════════════
