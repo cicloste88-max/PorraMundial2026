@@ -411,6 +411,175 @@ function isWideSticker(sticker) {
   return sticker && WIDE_STICKERS.has(sticker);
 }
 
+/* ── Boost: Canvas 2D fire — sistema de partículas compartido ──
+   Un solo canvas reposicionado sobre la tarjeta con boost-active.
+   Partículas con bloom naranja/rojo, fondo transparente, mix-blend-mode:screen.
+   Solo corre cuando hay una tarjeta activa. ── */
+const _boostFire = (function() {
+  let canvas = null, ctx = null, animId = null;
+  let activeCard = null, fadeVal = 0, particles = [];
+  const PAD = 30; // px extra alrededor de la card
+  const MAX_P = 90;
+  const COLORS = [
+    // life ratio → [r, g, b]  (de joven a viejo)
+    [255, 240, 120],  // spark: amarillo claro
+    [255, 160, 40],   // bloom: naranja
+    [240, 80, 15],    // fuego: naranja-rojo
+    [180, 30, 5],     // brasa: rojo oscuro
+  ];
+
+  function colorAt(t) {
+    // t: 0=recién nacida, 1=muerta
+    const idx = t * (COLORS.length - 1);
+    const lo = Math.floor(idx), hi = Math.min(lo + 1, COLORS.length - 1);
+    const f = idx - lo;
+    return [
+      COLORS[lo][0] + (COLORS[hi][0] - COLORS[lo][0]) * f,
+      COLORS[lo][1] + (COLORS[hi][1] - COLORS[lo][1]) * f,
+      COLORS[lo][2] + (COLORS[hi][2] - COLORS[lo][2]) * f,
+    ];
+  }
+
+  function spawn(w, h) {
+    // Zona: 0=bottom, 1=left, 2=right, 3=top
+    const zone = Math.random() < 0.55 ? 0 : Math.random() < 0.5 ? (Math.random()<0.5?1:2) : 3;
+    let x, y, vx, vy;
+    if (zone === 0) { // bottom
+      x = PAD + Math.random() * w;
+      y = PAD + h + Math.random() * 4;
+      vx = (Math.random() - 0.5) * 0.8;
+      vy = -(1.2 + Math.random() * 2.0);
+    } else if (zone === 1) { // left
+      x = PAD - Math.random() * 4;
+      y = PAD + h * 0.2 + Math.random() * h * 0.6;
+      vx = 0.4 + Math.random() * 0.6;
+      vy = -(0.5 + Math.random() * 1.2);
+    } else if (zone === 2) { // right
+      x = PAD + w + Math.random() * 4;
+      y = PAD + h * 0.2 + Math.random() * h * 0.6;
+      vx = -(0.4 + Math.random() * 0.6);
+      vy = -(0.5 + Math.random() * 1.2);
+    } else { // top
+      x = PAD + w * 0.15 + Math.random() * w * 0.7;
+      y = PAD - Math.random() * 4;
+      vx = (Math.random() - 0.5) * 0.5;
+      vy = -(0.3 + Math.random() * 0.8);
+    }
+    const maxLife = 30 + Math.random() * 40;
+    return { x, y, vx, vy, life: maxLife, maxLife, size: 2 + Math.random() * 5 };
+  }
+
+  function ensureCanvas() {
+    if (canvas) return;
+    canvas = document.createElement('canvas');
+    canvas.id = 'boost-fire-canvas';
+    ctx = canvas.getContext('2d');
+  }
+
+  function attachTo(card) {
+    if (!card) return detach();
+    if (activeCard === card) return;
+    activeCard = card;
+    ensureCanvas();
+    card.appendChild(canvas);
+    resize();
+    particles = [];
+    fadeVal = 0;
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+
+  function detach() {
+    activeCard = null;
+    // fade out — loop sigue hasta fadeVal=0
+  }
+
+  function resize() {
+    if (!activeCard || !canvas) return;
+    const w = activeCard.offsetWidth;
+    const h = activeCard.offsetHeight;
+    canvas.width = w + PAD * 2;
+    canvas.height = h + PAD * 2;
+    canvas.style.top = -PAD + 'px';
+    canvas.style.left = -PAD + 'px';
+  }
+
+  function loop() {
+    if (!canvas || !ctx) { animId = null; return; }
+    const cw = canvas.width, ch = canvas.height;
+    const cardW = cw - PAD * 2, cardH = ch - PAD * 2;
+
+    // Fade in/out
+    if (activeCard && fadeVal < 1) fadeVal = Math.min(1, fadeVal + 0.04);
+    if (!activeCard && fadeVal > 0) fadeVal = Math.max(0, fadeVal - 0.03);
+
+    if (!activeCard && fadeVal <= 0) {
+      ctx.clearRect(0, 0, cw, ch);
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      particles = [];
+      animId = null;
+      return;
+    }
+
+    // Spawn
+    const spawnRate = Math.ceil(MAX_P / 35);
+    for (let i = 0; i < spawnRate && particles.length < MAX_P; i++) {
+      particles.push(spawn(cardW, cardH));
+    }
+
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.globalAlpha = fadeVal;
+    ctx.globalCompositeOperation = 'lighter'; // additive
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx + (Math.random() - 0.5) * 0.4; // wobble
+      p.y += p.vy;
+      p.vy *= 0.995; // desacelerar
+      p.life--;
+
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+      const t = 1 - p.life / p.maxLife; // 0=joven, 1=viejo
+      const [r, g, b] = colorAt(t);
+      const alpha = (1 - t) * (1 - t); // fade cuadrático
+      const sz = p.size * (1 + t * 0.5); // crece al envejecer
+
+      // Glow (bloom) via shadowBlur
+      ctx.shadowColor = `rgba(${r|0},${g|0},${b|0},${(alpha*0.8).toFixed(2)})`;
+      ctx.shadowBlur = sz * 3;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${alpha.toFixed(2)})`;
+      ctx.fill();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    animId = requestAnimationFrame(loop);
+  }
+
+  // API pública
+  return { attachTo, detach, resize };
+})();
+
+// Observador global: detecta qué tarjeta tiene boost-active
+const _boostObserver = new MutationObserver(function() {
+  const active = document.querySelector('.card.boost-active');
+  if (active) _boostFire.attachTo(active);
+  else _boostFire.detach();
+});
+// Se activa tras renderizar las tarjetas (en initGrupos o similar)
+setTimeout(function() {
+  const container = document.getElementById('page-grupos') || document.body;
+  _boostObserver.observe(container, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  // Estado inicial
+  const active = document.querySelector('.card.boost-active');
+  if (active) _boostFire.attachTo(active);
+}, 500);
+
 function createMatchCard(match, idx) {
   const homeTeam = EQUIPOS.find(e => e.name === match.home);
   const awayTeam = EQUIPOS.find(e => e.name === match.away);
@@ -459,6 +628,7 @@ function createMatchCard(match, idx) {
 
   // Use dataset to store slug for kit/flag click handlers
   card.innerHTML = [
+    '<div class="card-inner">',
     '<div class="hero">',
       '<div class="half L">',
         '<div class="color-base"></div>',
@@ -568,7 +738,25 @@ function createMatchCard(match, idx) {
         '<span><span class="ptn" id="pnum-'+idx+'">0</span><span class="ptl" id="ptl-'+idx+'"> pts posibles</span></span>',
       '</div>',
       '<div id="btn-row-'+idx+'"><button class="btn-save" disabled data-idx="'+idx+'">Guardar</button></div>',
-    '</div>'
+    '</div>',
+    /* ── Fila Boost (dentro de card-inner, encima del footer) ── */
+    '<div class="boost-row" id="boost-row-'+idx+'">',
+      '<label class="boost-label" for="boost-chk-'+idx+'">',
+        '<div class="boost-chk-wrap">',
+          '<input type="checkbox" id="boost-chk-'+idx+'" class="boost-chk">',
+          '<div class="boost-chk-box">',
+            '<svg class="boost-tick" width="11" height="9" viewBox="0 0 11 9" fill="none">',
+              '<path d="M1 4.5L4 7.5L10 1" stroke="rgb(251,146,60)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+            '</svg>',
+          '</div>',
+        '</div>',
+        '<span style="font-size:15px;line-height:1">🔥</span>',
+        '<span class="boost-txt">Boost a este partido</span>',
+      '</label>',
+      '<span class="boost-x2">×2</span>',
+    '</div>',
+    '</div>',  /* ← cierre .card-inner */
+    '<div class="boost-badge">×2</div>',
   ].join('');
 
   // Kit area click via event delegation on card
@@ -588,6 +776,65 @@ function createMatchCard(match, idx) {
   // ─────────────────────────────────────────────────────────────
 function attachEvents(card, idx, match) {
   // Si la porra está cerrada, renderizar estado pero sin eventos de edición
+  /* ── Boost: lógica de check ── */
+  const _boostRow = card.querySelector('.boost-row');
+  const _boostChk = card.querySelector('.boost-chk');
+  const _boostDate = match.date ? match.date.substring(0, 10) : null;
+
+  if (_boostRow && _boostChk && _boostDate) {
+    // Restaurar estado guardado
+    if (boostPicks[_boostDate] === getMatchKey(match)) {
+      _boostChk.checked = true;
+      _boostRow.classList.add('boost-on');
+      card.classList.add('boost-active');
+    } else if (boostPicks[_boostDate]) {
+      // Otro partido ya tiene el boost de este día → desactivar check
+      _boostChk.disabled = true;
+      _boostRow.style.opacity = '0.45';
+      _boostRow.title = 'Boost del día ya asignado';
+    }
+
+    _boostChk.addEventListener('change', () => {
+      if (_boostChk.checked) {
+        // Si había boost asignado a otro partido hoy, quitárselo
+        const prevKey = boostPicks[_boostDate];
+        if (prevKey && prevKey !== getMatchKey(match)) {
+          document.querySelectorAll('.card').forEach(otherCard => {
+            const oi = otherCard.getAttribute('data-match-idx');
+            if (oi === null) return;
+            const om = PARTIDOS[Number(oi)];
+            if (!om || getMatchKey(om) !== prevKey) return;
+            const oc = otherCard.querySelector('.boost-chk');
+            const or = otherCard.querySelector('.boost-row');
+            if (oc) { oc.checked = false; oc.disabled = false; }
+            if (or) { or.classList.remove('boost-on'); or.style.opacity = ''; or.removeAttribute('title'); }
+            otherCard.classList.remove('boost-active');
+          });
+        }
+        boostPicks[_boostDate] = getMatchKey(match);
+        _boostRow.classList.add('boost-on');
+        card.classList.add('boost-active');
+      } else {
+        delete boostPicks[_boostDate];
+        _boostRow.classList.remove('boost-on');
+        card.classList.remove('boost-active');
+        // Re-habilitar todos los checks del mismo día
+        document.querySelectorAll('.card').forEach(otherCard => {
+          const oi = otherCard.getAttribute('data-match-idx');
+          if (oi === null) return;
+          const om = PARTIDOS[Number(oi)];
+          if (!om || om.date?.substring(0,10) !== _boostDate) return;
+          const oc = otherCard.querySelector('.boost-chk');
+          const or = otherCard.querySelector('.boost-row');
+          if (oc) { oc.disabled = false; }
+          if (or) { or.style.opacity = ''; or.removeAttribute('title'); }
+        });
+      }
+      saveBoostPicks();
+      checkFinalizarReady?.();
+    });
+  }
+
   if (window._porraCerrada) {
     // Sí ejecutar updateCardUI para mostrar chips y pts correctamente
     updateCardUI(idx, match);

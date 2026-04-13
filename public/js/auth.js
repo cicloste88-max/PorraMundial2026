@@ -293,6 +293,7 @@ const runAuthInit = async () => {
   try {
     const gp = localStorage.getItem('porra_predictions');
     if (gp) { const p = JSON.parse(gp); Object.assign(predictions, p); }
+    loadBoostPicks();
     const kp = localStorage.getItem('porra_ko_predictions');
     if (kp) { koPredictions = JSON.parse(kp); normKoPredictions(); }
   } catch(e) {}

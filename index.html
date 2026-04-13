@@ -39,7 +39,9 @@ h2{
 
 /* ===== ESTILOS DE LA TARJETA DE PARTIDO (ya existentes) ===== */
 .card{
-  background:#1c1c1e;border-radius:18px;overflow:hidden;
+  background:#1c1c1e;border-radius:18px;
+  /* overflow:hidden → movido a .card-inner (permite llamas boost) */
+  position:relative;
   box-shadow:0 20px 60px rgba(0,0,0,.55);
   transition:transform .3s,box-shadow .3s;
 }
@@ -1299,6 +1301,7 @@ function handleCTA()        { window._pendingCTA = true; }
 function openAuthModal(tab) { window._pendingAuth = tab; }
 </script>
 <link rel="stylesheet" href="/css/bracket-results.css">
+<link rel="stylesheet" href="/css/boost.css">
 </head>
 <body>
 <!-- ═══ SPLASH SCREEN ═══ -->

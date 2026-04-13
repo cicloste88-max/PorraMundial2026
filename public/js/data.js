@@ -178,8 +178,24 @@ const PARTIDOS = [
   // ESTADO GLOBAL — predictions, iaPredictions, totalPoints
   // ─────────────────────────────────────────────────────────────
 let predictions = {};
+let boostPicks = {};  // { "2026-06-12": "México_Sudáfrica", ... }
 let iaPredictions = {};
 let totalPoints = 0;
+
+function saveBoostPicks() {
+  try {
+    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
+    localStorage.setItem(key, JSON.stringify(boostPicks));
+  } catch(e) {}
+}
+
+function loadBoostPicks() {
+  try {
+    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
+    const raw = localStorage.getItem(key);
+    boostPicks = raw ? JSON.parse(raw) : {};
+  } catch(e) { boostPicks = {}; }
+}
 
 // ========== FUNCIONES AUXILIARES ==========
 function getMatchKey(m) { return `${m.group}_${m.home}_${m.away}`; }
