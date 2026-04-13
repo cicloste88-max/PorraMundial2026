@@ -136,21 +136,32 @@ function checkGroupsComplete() {
       if(boostPendingEl && filled >= total) {
         const pendientes = diasConPartidos.filter(d => !boostPicks[d]);
         if(pendientes.length > 0) {
+          // Guardar qué jornada tiene el panel expandido antes de re-renderizar
+          const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
+
           boostPendingEl.style.display = 'flex';
-          boostPendingEl.innerHTML =
-            '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>' +
-            pendientes.map(d => {
-              const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
-              const nM = PARTIDOS.filter(m => m.date?.substring(0,10) === d).length;
-              return '<button onclick="ctaExpandJornada(\'' + d + '\')" style="' +
-                'display:inline-flex;align-items:center;gap:4px;' +
-                'padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;' +
-                'border:1.5px solid rgba(234,88,12,.5);' +
-                'background:rgba(124,45,18,.35);color:rgb(251,146,60);' +
-                'cursor:pointer;white-space:nowrap;' +
-                'animation:boostPulse 1.5s ease-in-out infinite;' +
-                '">🔥 ' + dayLabel + ' · ' + nM + ' partido' + (nM > 1 ? 's' : '') + '</button>';
-            }).join('');
+          const label = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>';
+          const pills = pendientes.map(d => {
+            const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
+            const nM = PARTIDOS.filter(m => m.date?.substring(0,10) === d).length;
+            const jNum = diasConPartidos.indexOf(d) + 1;
+            return '<button onclick="ctaExpandJornada(\'' + d + '\')" style="' +
+              'display:inline-flex;align-items:center;gap:4px;' +
+              'padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;' +
+              'border:1.5px solid rgba(234,88,12,.5);' +
+              'background:rgba(124,45,18,.35);color:rgb(251,146,60);' +
+              'cursor:pointer;white-space:nowrap;' +
+              'animation:boostPulse 1.5s ease-in-out infinite;' +
+              '">🔥 J' + jNum + ' · ' + dayLabel + ' (' + nM + ')</button>';
+          }).join('');
+
+          // Mantener el panel expandido si estaba abierto
+          const existingPanel = document.getElementById('cta-boost-panel');
+          const panelHtml = (openDate && existingPanel)
+            ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(124,45,18,.3);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
+            : '';
+
+          boostPendingEl.innerHTML = label + pills + panelHtml;
         } else {
           boostPendingEl.style.display = 'none';
         }
@@ -409,8 +420,10 @@ function tickerBoostToggle(matchKey, date) {
 
   saveBoostPicks();
   checkFinalizarReady?.();
-  renderBoostTicker();    // re-render ticker superior
-  checkGroupsComplete();  // re-render pastillas CTA inferior
+  renderBoostTicker();
+  checkGroupsComplete();
+  // Re-renderizar vista jornada si está activa
+  if (_vistaActual === 'jornada') setTimeout(() => renderVistaJornada(), 50);
   // Re-renderizar panel expandido si sigue abierto
   const openPanel = document.getElementById('boost-ticker-panel');
   if (openPanel && openPanel.dataset.date && openPanel.style.display !== 'none') {
@@ -422,6 +435,209 @@ function tickerBoostToggle(matchKey, date) {
   }
 }
 window.tickerBoostToggle = tickerBoostToggle;
+
+/* ════════════════════════════════════════════════════════
+   VISTA JORNADA — tarjetas compactas ordenadas por día
+   ════════════════════════════════════════════════════════ */
+let _vistaActual = 'grupos'; // 'grupos' | 'jornada'
+
+function setVistaGrupos(vista) {
+  _vistaActual = vista;
+  const gruposContainer  = document.getElementById('groups-container');
+  const jornadaContainer = document.getElementById('jornada-container');
+  const btnGrupos  = document.getElementById('btn-vista-grupos');
+  const btnJornada = document.getElementById('btn-vista-jornada');
+
+  if (vista === 'grupos') {
+    if (gruposContainer)  gruposContainer.style.display  = '';
+    if (jornadaContainer) jornadaContainer.style.display = 'none';
+    if (btnGrupos)  { btnGrupos.style.background  = '#27272a'; btnGrupos.style.color  = '#fff'; }
+    if (btnJornada) { btnJornada.style.background = 'transparent'; btnJornada.style.color = '#6b7280'; }
+  } else {
+    if (gruposContainer)  gruposContainer.style.display  = 'none';
+    if (jornadaContainer) jornadaContainer.style.display = '';
+    if (btnGrupos)  { btnGrupos.style.background  = 'transparent'; btnGrupos.style.color  = '#6b7280'; }
+    if (btnJornada) { btnJornada.style.background = '#27272a'; btnJornada.style.color = '#fff'; }
+    renderVistaJornada();
+  }
+}
+window.setVistaGrupos = setVistaGrupos;
+
+function renderVistaJornada() {
+  const container = document.getElementById('jornada-container');
+  if (!container) return;
+
+  // Agrupar PARTIDOS por fecha
+  const jornadasMap = {};
+  PARTIDOS.forEach((m, idx) => {
+    const date = m.date?.substring(0, 10);
+    if (!date) return;
+    if (!jornadasMap[date]) jornadasMap[date] = [];
+    jornadasMap[date].push({ m, idx });
+  });
+  const dias = Object.keys(jornadasMap).sort();
+
+  let html = '';
+  dias.forEach((date, dIdx) => {
+    const jNum = dIdx + 1;
+    const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {
+      weekday: 'long', day: 'numeric', month: 'long'
+    });
+    const boostKey  = boostPicks[date];
+    const boostDone = !!boostKey;
+    const badgeCls  = boostDone ? 'jornada-boost-badge done' : 'jornada-boost-badge';
+    const badgeTxt  = boostDone ? '🔥 Boost asignado' : '🔥 Boost pendiente';
+
+    html += '<div class="jornada-section" id="jornada-' + date + '">';
+    html += '<div class="jornada-header">';
+    html += '<span class="jornada-label">J' + jNum + '</span>';
+    html += '<span class="jornada-date">' + dayLabel + '</span>';
+    html += '<span class="' + badgeCls + '">' + badgeTxt + '</span>';
+    html += '</div>';
+
+    // Layout: tarjetas + sidebar ranking
+    html += '<div class="jornada-layout">';
+    html += '<div class="jornada-cards">';
+
+    jornadasMap[date].forEach(({ m, idx }) => {
+      html += _buildJCard(m, idx, date, boostKey);
+    });
+
+    html += '</div>'; // jornada-cards
+    html += '<div class="jornada-sidebar">' + _buildJornadaRanking() + '</div>';
+    html += '</div>'; // jornada-layout
+    html += '</div>'; // jornada-section
+  });
+
+  container.innerHTML = html;
+}
+window.renderVistaJornada = renderVistaJornada;
+
+function _buildJCard(m, idx, date, boostKey) {
+  const matchKey = getMatchKey(m);
+  const pred = predictions[matchKey] || {};
+  const isBoost = boostKey === matchKey;
+
+  const hTeam = EQUIPOS.find(e => e.name === m.home);
+  const aTeam = EQUIPOS.find(e => e.name === m.away);
+  const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
+  const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
+
+  const hasScore = pred.l !== null && pred.l !== undefined && pred.v !== null && pred.v !== undefined;
+  const hasPred  = pred.saved;
+
+  const lTxt = hasScore ? pred.l : '—';
+  const vTxt = hasScore ? pred.v : '—';
+  const scoreCls = hasScore ? 'jcard-score' : 'jcard-score pending';
+
+  const ia = iaPredictions[matchKey];
+  const mySign = getMySign(pred);
+  const showIA = hasScore && ia && mySign && mySign !== ia.sign;
+  const chipSign   = hasScore ? '<span class="jcard-chip on">1X2</span>' : '<span class="jcard-chip">1X2</span>';
+  const chipExact  = hasScore ? '<span class="jcard-chip on">Exacto</span>' : '';
+  const chipGol    = pred.gol ? '<span class="jcard-chip on">Gol</span>' : '';
+  const chipIA     = showIA   ? '<span class="jcard-chip on">vsIA</span>' : '';
+
+  let maxPts = 0;
+  if (hasScore) {
+    maxPts = 4;
+    if (pred.gol) maxPts += 2;
+    if (showIA)   maxPts += 1;
+  }
+  const ptsActual = hasPred && maxPts > 0 ? maxPts : 0;
+  const ptsCls = isBoost ? 'jcard-pts-num boost' : (ptsActual > 0 ? 'jcard-pts-num' : 'jcard-pts-num pending');
+  const ptsDisp = isBoost ? (ptsActual * 2) + '✕' : (ptsActual || '—');
+
+  const chkChecked = isBoost ? 'checked' : '';
+  const boostRowBg = isBoost ? 'background:rgba(28,14,6,.8);' : '';
+
+  const groupColors = {A:'#4ade80',B:'#60a5fa',C:'#f472b6',D:'#fb923c',E:'#a78bfa',
+    F:'#34d399',G:'#fbbf24',H:'#f87171',I:'#38bdf8',J:'#c084fc',K:'#86efac',L:'#fcd34d'};
+  const groupColor = groupColors[m.group] || '#4ade80';
+
+  const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+
+  return '<div class="jcard' + (isBoost ? ' boost-active' : '') + '" id="jcard-' + idx + '">' +
+    '<div class="jcard-inner">' +
+    '<div class="jcard-group" style="background:' + groupColor + ';opacity:.6"></div>' +
+    '<div class="jcard-match">' +
+      '<div class="jcard-teams">' +
+        '<div class="jcard-team-row">' +
+          '<div class="jcard-flag"><img src="' + hFlag + '" alt=""/></div>' +
+          '<span>' + m.home + '</span>' +
+          '<span style="margin-left:auto;font-size:10px;color:#6b7280">Local · ' + m.group + '</span>' +
+        '</div>' +
+        '<div class="jcard-team-row">' +
+          '<div class="jcard-flag"><img src="' + aFlag + '" alt=""/></div>' +
+          '<span>' + m.away + '</span>' +
+          '<span style="margin-left:auto;font-size:9px;color:#4b5563">' + hora + '</span>' +
+        '</div>' +
+        '<div class="jcard-chips" style="margin-top:4px">' + chipSign + chipExact + chipGol + chipIA + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin:0 8px;">' +
+        '<span class="' + scoreCls + '">' + lTxt + '</span>' +
+        '<span class="jcard-sep">:</span>' +
+        '<span class="' + scoreCls + '">' + vTxt + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="jcard-pts">' +
+      '<div class="' + ptsCls + '">' + ptsDisp + '</div>' +
+      '<div class="jcard-pts-label">pts</div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="jcard-boost" style="' + boostRowBg + '">' +
+      '<input type="checkbox" ' + chkChecked + ' ' +
+        'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
+        'style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;flex-shrink:0">' +
+      '<span style="font-size:11px;color:' + (isBoost ? '#fb923c' : '#6b7280') + ';font-weight:500">🔥 Boost</span>' +
+      '<button onclick="scrollToMatchCard(\'' + matchKey + '\')" ' +
+        'style="margin-left:auto;font-size:10px;color:#4b5563;background:none;border:none;cursor:pointer;' +
+        'padding:2px 6px;border-radius:6px;border:1px solid #27272a" ' +
+        'title="Ver tarjeta completa">↓ Ver tarjeta</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function jcardBoostToggle(matchKey, date, checkbox) {
+  if (window.tickerBoostToggle) {
+    const wasActive = boostPicks[date] === matchKey;
+    if (checkbox.checked && !wasActive) {
+      tickerBoostToggle(matchKey, date);
+    } else if (!checkbox.checked && wasActive) {
+      tickerBoostToggle(matchKey, date);
+    }
+  }
+  setTimeout(() => renderVistaJornada(), 50);
+}
+window.jcardBoostToggle = jcardBoostToggle;
+
+function _buildJornadaRanking() {
+  if (!window._sbData || window._sbData.length === 0) {
+    return '<div class="jornada-ranking">' +
+      '<div class="jornada-ranking-title">🏆 Clasificación</div>' +
+      '<div style="font-size:11px;color:#4b5563;text-align:center;padding:12px 0">' +
+        'Cargando...' +
+      '</div></div>';
+  }
+  const myId = window.currentUser?.id;
+  const rows = window._sbData.slice(0, 10);
+  return '<div class="jornada-ranking">' +
+    '<div class="jornada-ranking-title">🏆 Clasificación liga</div>' +
+    rows.map((u, i) => {
+      const isMe = u.uid === myId;
+      const ini  = (u.nombre || '?').charAt(0).toUpperCase();
+      const posCls = i < 3 ? 'jrank-pos top' : 'jrank-pos';
+      const medals = ['🥇','🥈','🥉'];
+      const posStr = i < 3 ? medals[i] : (i + 1);
+      return '<div class="jrank-row' + (isMe ? ' jrank-me' : '') + '">' +
+        '<span class="' + posCls + '">' + posStr + '</span>' +
+        '<div class="jrank-avatar">' + ini + '</div>' +
+        '<span class="jrank-name">' + escapeHtml(u.nombre) + '</span>' +
+        '<span class="jrank-pts">' + u.total + '</span>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
 
 function initGrupos() {
   // Mostrar barra global de dados si usuario logueado

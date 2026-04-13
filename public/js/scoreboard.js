@@ -168,6 +168,7 @@ async function sbLoad(forceRefresh = false) {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
     _sbData = rows;
+    window._sbData = rows; // exponer para vista jornada
     _sbLoaded = true;
     sbRender(rows, realMatchResults);
 

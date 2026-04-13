@@ -66,6 +66,116 @@ h2{
 .spark{position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;z-index:10;animation:spark 2.8s ease-in-out infinite}
 .spark:nth-child(1){top:18%;animation-delay:0s}.spark:nth-child(2){top:50%;animation-delay:.95s}.spark:nth-child(3){top:76%;animation-delay:1.9s}
 @keyframes boostPulse{0%,100%{box-shadow:0 0 0 0 rgba(234,88,12,.5)}60%{box-shadow:0 0 0 5px rgba(234,88,12,0)}}
+/* ── Vista Jornada ── */
+#jornada-container{display:none}
+.jornada-section{margin-bottom:32px}
+.jornada-header{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:14px;padding-bottom:10px;
+  border-bottom:1px solid #1e293b;
+}
+.jornada-label{
+  font-family:'Inter Tight',sans-serif;font-size:16px;font-weight:900;
+  color:#fff;letter-spacing:-.01em;
+}
+.jornada-date{font-size:12px;color:#6b7280;}
+.jornada-boost-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+  background:rgba(124,45,18,.4);color:#fb923c;
+  border:1px solid rgba(234,88,12,.3);margin-left:auto;
+}
+.jornada-boost-badge.done{background:rgba(5,46,22,.4);color:#4ade80;border-color:rgba(74,222,128,.3);}
+.jornada-layout{
+  display:grid;
+  grid-template-columns:1fr 280px;
+  gap:20px;
+  align-items:start;
+}
+@media(max-width:900px){.jornada-layout{grid-template-columns:1fr}}
+.jcard{
+  background:#1c1c1e;border-radius:14px;
+  border:1px solid #27272a;
+  overflow:hidden;position:relative;
+  transition:border-color .2s;
+  margin-bottom:10px;
+}
+.jcard.boost-active{border-color:rgba(234,88,12,.6);}
+.jcard-inner{display:flex;align-items:stretch;min-height:72px;}
+.jcard-group{
+  width:6px;flex-shrink:0;
+  background:linear-gradient(to bottom,#4ade80,#166534);
+}
+.jcard-match{
+  flex:1;display:flex;align-items:center;gap:10px;
+  padding:10px 12px;
+}
+.jcard-teams{flex:1;}
+.jcard-team-row{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:#e4e4e7;
+  margin-bottom:3px;
+}
+.jcard-team-row:last-child{margin-bottom:0;}
+.jcard-flag{width:16px;height:16px;border-radius:50%;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex-shrink:0;}
+.jcard-flag img{width:100%;height:100%;object-fit:cover;}
+.jcard-score{
+  font-family:'Inter Tight',sans-serif;
+  font-size:18px;font-weight:900;
+  color:#4ade80;min-width:24px;text-align:center;
+  flex-shrink:0;
+}
+.jcard-score.pending{color:#3a3a3e;}
+.jcard-sep{color:#3a3a3e;font-size:14px;margin:0 2px;align-self:center;}
+.jcard-pts{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 12px;border-left:1px solid #27272a;
+  min-width:64px;flex-shrink:0;
+}
+.jcard-pts-num{
+  font-family:'Inter Tight',sans-serif;font-size:20px;font-weight:900;
+  color:#4ade80;line-height:1;
+}
+.jcard-pts-num.pending{color:#3a3a3e;}
+.jcard-pts-num.boost{color:#fb923c;}
+.jcard-pts-label{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+.jcard-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.jcard-chip{
+  font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;
+  background:rgba(255,255,255,.05);color:#6b7280;
+}
+.jcard-chip.on{background:rgba(74,222,128,.12);color:#4ade80;}
+.jcard-chip.boost-chip{background:rgba(234,88,12,.15);color:#fb923c;}
+.jcard-boost{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px 8px 18px;
+  border-top:1px solid #222;
+}
+.jornada-sidebar{
+  position:sticky;top:80px;
+}
+.jornada-ranking{
+  background:#1c1c1e;border-radius:14px;border:1px solid #27272a;
+  padding:14px;
+}
+.jornada-ranking-title{
+  font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:10px;
+}
+.jrank-row{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;border-bottom:1px solid #1a1a1c;
+}
+.jrank-row:last-child{border-bottom:none;}
+.jrank-pos{font-size:11px;font-weight:700;color:#6b7280;min-width:16px;text-align:center;}
+.jrank-pos.top{color:#fbbf24;}
+.jrank-avatar{
+  width:26px;height:26px;border-radius:50%;
+  background:#27272a;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.jrank-name{flex:1;font-size:12px;font-weight:500;color:#e4e4e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jrank-pts{font-size:13px;font-weight:900;color:#4ade80;font-family:'Inter Tight',sans-serif;}
+.jrank-me{background:rgba(74,222,128,.06);border-radius:8px;margin:0 -4px;padding:0 4px;}
 @keyframes spark{0%,100%{opacity:0;transform:translateX(-50%) scale(.4)}50%{opacity:.9;transform:translateX(-50%) scale(1.6)}}
 .center{position:absolute;left:50%;top:0;bottom:0;transform:translateX(-50%);width:96px;z-index:11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
 .mpill{background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:9px;font-weight:600;color:rgba(255,255,255,.92);letter-spacing:.03em;white-space:nowrap;text-align:center}
@@ -2339,6 +2449,19 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
       <div id="grupos-user-bar"></div>
     </div>
   </div>
+  <!-- Selector vista grupos/jornada -->
+  <div style="display:flex;gap:4px;background:#111318;border:1px solid #27272a;border-radius:10px;padding:3px;margin-bottom:12px">
+    <button id="btn-vista-grupos"
+      onclick="setVistaGrupos('grupos')"
+      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:#27272a;color:#fff">
+      ⚽ Fase de grupos
+    </button>
+    <button id="btn-vista-jornada"
+      onclick="setVistaGrupos('jornada')"
+      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#6b7280">
+      📅 Jornada
+    </button>
+  </div>
   <!-- Ticker boost jornada -->
   <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;flex-wrap:wrap;gap:8px;align-items:center">
   </div>
@@ -2350,6 +2473,8 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
     </button>
   </div>
   <div id="groups-container" style="min-height:400px"></div>
+  <!-- Vista jornada -->
+  <div id="jornada-container" style="display:none;min-height:400px"></div>
 <!-- Awards movidos a fase eliminatoria -->
 
   <!-- ── BANNER CTA: IR A ELIMINATORIAS ── -->
