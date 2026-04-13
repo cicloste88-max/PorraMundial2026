@@ -7,7 +7,7 @@ Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main**
 
 ## Estado actual (2026-04-13)
-**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Último commit: cd4afa2.**
+**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Último commit: 3473c76.**
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
 - `main.js` ELIMINADO — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
@@ -238,6 +238,7 @@ MVP/             — imágenes jugadores MVP
 | 2026-04-12 AM | Extracción main.js en 5 módulos, fixes race condition y DOMContentLoaded | ee2e25a |
 | 2026-04-12 PM | Bracket Fase 1 SVG overlay. Fix dado/undo Object.assign | 187a764 |
 | 2026-04-13 | **Bracket de resultados reales** — bracket-results.js + CSS, 6 fases, cards badge+flag, vista Final en caja propia, QA local+producción OK | cd4afa2 |
+| 2026-04-13 PM | **Splash screen** — inline script (fix timing), hero/scroll-cue reposicionados, márgenes móvil welcome | 3473c76 |
 
 ## Log de cambios (OBLIGATORIO)
 Añadir línea a migration-log.md tras cada acción:

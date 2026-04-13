@@ -270,7 +270,25 @@ Decisiones de diseño:
 - Commit: cd4afa2 — desplegado en producción
 - Pendiente: conectar con _results reales (11 jun, pg_cron update-results)
 
-[sesión 2026-04-13] FEATURE: splash screen opening
-- Modificados: index.html (HTML splash + CSS animaciones), public/js/ui-nav.js (initSplash + splashDone)
-- Splash con logo FIFA, anillos giratorios, barra progreso, botón saltar
-- Auto-oculta tras 5.5s o al completar initWelcome (splashDone)
+## Sesión 2026-04-13 — Splash screen + fixes welcome
+
+[13:00] FIX: splash no reaparecía tras primera carga — initSplash estaba en ui-nav.js (loadScript tardío)
+        Movido a script inline en index.html justo tras el div splash — arranca con el parse
+        Añadido guard hidden, minTime 7s, hard cap 10.2s, splashDone respeta mínimo
+        Eliminado initSplash de ui-nav.js (splashDone en initWelcome se mantiene)
+[13:10] FIX: duración splash aumentada — minTime 4s→7s, hard cap 7.2s→10.2s
+[13:15] COMMIT: 0d19ff9 — feat: splash screen opening — animación FIFA 2026
+[13:15] PUSH: main → origin ✓ — Vercel autodeploy
+
+[13:20] FIX: welcome hero y scroll-cue demasiado abajo en pantalla
+        .wc-hero-content margin-top: -140px — index.html:489
+        .wc-scroll-cue margin-top: -72px→-140px — index.html:500
+[13:25] COMMIT: 90de1e7 — fix: subir bloque hero y scroll-cue en welcome
+[13:25] PUSH: main → origin ✓ — Vercel autodeploy
+
+[13:30] FIX: márgenes móvil welcome — bordes sin rellenar en dispositivos móviles
+        #page-welcome margin: -24px -16px — contrarresta padding body global
+[13:35] CONFIG: vite.config.js — host:true para test en red local (móvil)
+        Nota: AP isolation del router impide conexión móvil→PC, se testea en producción
+[13:40] COMMIT: 3473c76 — fix: márgenes móvil welcome
+[13:40] PUSH: main → origin ✓ — Vercel autodeploy
