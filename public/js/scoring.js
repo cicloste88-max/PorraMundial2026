@@ -842,6 +842,9 @@ function attachEvents(card, idx, match) {
       }
       saveBoostPicks();
       checkFinalizarReady?.();
+      // Re-activar ticker y CTA tras cambio desde check de tarjeta
+      if (typeof renderBoostTicker === 'function') renderBoostTicker();
+      if (typeof checkGroupsComplete === 'function') checkGroupsComplete();
     });
   }
 
