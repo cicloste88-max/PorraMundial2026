@@ -74,7 +74,16 @@ h2{
   gap:20px;
   align-items:start;
 }
-@media(max-width:900px){.jornada-wrap{grid-template-columns:1fr}}
+@media(max-width:900px){
+ .jornada-wrap{grid-template-columns:1fr;grid-template-areas:"main";}
+ .jornada-sidebar{position:static;}
+}
+@media(max-width:768px){
+ .jornada-wrap{grid-template-columns:1fr;grid-template-areas:"main";gap:0;padding:0 4px;}
+ .jornada-sidebar{display:none !important;}
+ .jornada-main{padding:0;}
+ #jornada-user-strip{display:flex !important;}
+}
 .jornada-main{min-width:0;}
 .jornada-section{margin-bottom:28px}
 .jornada-header{
@@ -191,6 +200,14 @@ h2{
   background:rgba(0,0,0,.15);
 }
 .jcard-boost.active{background:rgba(28,14,6,.7);}
+#jornada-user-strip{
+  display:none;align-items:center;justify-content:space-between;
+  padding:6px 12px;background:#1c1c1e;border:1px solid #27272a;
+  border-radius:8px;margin-bottom:10px;font-family:Inter,sans-serif;
+}
+#jornada-user-strip .jus-pos{font-size:13px;font-weight:700;color:#fbbf24;min-width:28px;}
+#jornada-user-strip .jus-name{font-size:13px;font-weight:600;color:#e5e7eb;flex:1;text-align:center;}
+#jornada-user-strip .jus-pts{font-size:13px;font-weight:700;color:#4ade80;}
 @keyframes spark{0%,100%{opacity:0;transform:translateX(-50%) scale(.4)}50%{opacity:.9;transform:translateX(-50%) scale(1.6)}}
 .center{position:absolute;left:50%;top:0;bottom:0;transform:translateX(-50%);width:96px;z-index:11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
 .mpill{background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:9px;font-weight:600;color:rgba(255,255,255,.92);letter-spacing:.03em;white-space:nowrap;text-align:center}
@@ -2489,6 +2506,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
   </div>
   <div id="groups-container" style="min-height:400px"></div>
   <!-- Vista jornada -->
+  <div id="jornada-user-strip"></div>
   <div id="jornada-container" style="display:none;min-height:400px"></div>
 <!-- Awards movidos a fase eliminatoria -->
 
