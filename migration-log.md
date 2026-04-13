@@ -292,3 +292,93 @@ Decisiones de diseño:
         Nota: AP isolation del router impide conexión móvil→PC, se testea en producción
 [13:40] COMMIT: 3473c76 — fix: márgenes móvil welcome
 [13:40] PUSH: main → origin ✓ — Vercel autodeploy
+
+## Sesión 2026-04-13 — Feature BOOST x2 comodín diario
+
+[14:00] DOCS: 301235e — actualizar CLAUDE.md y migration-log (splash + fixes welcome)
+
+[14:30] FEATURE: Boost x2 comodín diario — mecánica nueva fase de grupos
+        - css/boost.css NUEVO: estilos checkbox, fila boost, badge x2, glow pulsante
+        - index.html: .card sin overflow:hidden + position:relative, link boost.css
+        - scoring.js: card-inner wrapper, fila boost en innerHTML, lógica check en attachEvents
+          boostFlamesSVG/Top helpers → luego reemplazados por Canvas 2D
+        - data.js: let boostPicks, saveBoostPicks, loadBoostPicks
+        - auth.js: loadBoostPicks() en carga de caché local
+[14:35] COMMIT: 368d8db — feat: boost x2 comodín diario — UI + partículas Canvas 2D fuego
+[14:35] PUSH: main → origin ✓
+
+[14:40] EVOLUCIÓN VISUAL: llamas SVG → intento WebGL shader (CodePen YPGpXjz) → Canvas 2D compartido
+        - WebGL descartado: 72 contextos excede límite navegador, shader no compilaba
+        - Lottie descartado: estilo cartoon, no realista
+        - Canvas 2D final: 1 solo canvas compartido, ~90 partículas, bloom shadowBlur,
+          compositeOperation lighter, mix-blend-mode screen, MutationObserver global
+        - Paleta: amarillo claro → naranja → naranja-rojo → rojo oscuro
+        - Auto-stop cuando no hay tarjeta activa (0 GPU idle)
+
+[15:00] FIX: pred closure stale en attachEvents
+        Los listeners de .sbn y gsel capturaban const pred = predictions[matchKey] una vez.
+        Si loadUserData reemplazaba predictions[key], los listeners mutaban el objeto viejo.
+        Fix: leer predictions[matchKey] dentro de cada listener en tiempo real.
+[15:05] COMMIT: ad343e3 — fix: pred closure stale en attachEvents
+[15:05] PUSH: main → origin ✓
+
+[15:20] FEATURE: Boost x2 en motor de puntuación + ticker
+        - scoring.js: calcMatchPoints aplica x2 si exacto + boost del día (máx 14pts)
+        - index.html: regla boost en normas, "14 con boost" en sistema de puntos
+        - ui-groups.js: renderBoostTicker + tickerBoostToggle, sync bidireccional con cards
+        - index.html: div #boost-ticker con botones por partido del día
+[15:25] COMMIT: 667f565 — feat: boost x2 en puntuación + ticker partidos jornada
+[15:25] PUSH: main → origin ✓
+
+[15:40] FEATURE: Persistencia boost_picks en Supabase
+        - Tabla boost_picks creada (migration): user_id, league_id, match_id, match_date
+          UNIQUE(user_id, league_id, match_date) + RLS
+        - data.js: saveBoostPicks/loadBoostPicks async — localStorage caché + Supabase fuente de verdad
+[15:45] COMMIT: 27e5906 — feat: boost_picks persistencia Supabase
+[15:45] PUSH: main → origin ✓
+
+[15:50] FEATURE: Validación boosts en checkFinalizarReady
+        - close-porra.js: cuenta jornadas con/sin boost, allDone requiere boostDone
+        - index.html: fincheck-boost item con icono 🔥 y contador de jornadas
+[15:55] COMMIT: cb8e969 — feat: checkFinalizarReady valida boosts de todas las jornadas
+[15:55] PUSH: main → origin ✓
+
+[16:00] FEATURE: Ticker boost mejorado — pastillas por jornada
+        - ui-groups.js: renderBoostTicker reescrito con jornadasMap, pastilla HOY pulsante,
+          panel expandible tickerExpandJornada, máx 3 jornadas pendientes + "+N más"
+        - index.html: ticker simplificado (contenido dinámico), @keyframes boostPulse
+[16:05] COMMIT: 494d01c — feat: ticker boost — pastillas por jornada, panel expandible
+[16:05] PUSH: main → origin ✓
+
+[16:10] FEATURE: Bloqueo eliminatorias sin boosts completos
+        - ui-groups.js: checkGroupsComplete requiere boostsCompletos para habilitar botón elim y CTA
+        - index.html: texto normas ampliado, font-weight:900 en "14 con boost", boostPulse afinado
+[16:15] COMMIT: 6c3d30b — feat: boost completo — bloqueo eliminatorias sin boosts
+[16:15] PUSH: main → origin ✓
+
+═════════════════════════════════════════════════════════════════════
+  CHECKPOINT — BOOST x2 COMPLETO (2026-04-13)
+─────────────────────────────────────────────────────────────────────
+HEAD: 6c3d30b
+Commits boost (8):
+  368d8db  feat: boost x2 comodín diario — UI + Canvas 2D fuego
+  ad343e3  fix: pred closure stale en attachEvents
+  667f565  feat: boost x2 puntuación + ticker
+  27e5906  feat: boost_picks persistencia Supabase
+  cb8e969  feat: checkFinalizarReady valida boosts
+  494d01c  feat: ticker boost pastillas jornada
+  6c3d30b  feat: boost completo bloqueo eliminatorias
+
+Ficheros nuevos: css/boost.css
+Ficheros modificados: index.html, public/js/scoring.js, public/js/data.js,
+  public/js/auth.js, public/js/ui-groups.js, public/js/close-porra.js
+Tabla Supabase: boost_picks (migration create_boost_picks)
+
+Mecánica completa:
+  - 1 boost por jornada de grupos (17 jornadas)
+  - Checkbox en tarjeta + ticker en barra superior (sync bidireccional)
+  - Si aciertas exacto en el partido boost → puntos x2 (máx 14)
+  - Sin todos los boosts asignados: no se puede acceder a eliminatorias ni cerrar porra
+  - Persistencia: localStorage (caché) + Supabase (fuente de verdad)
+  - Visual: Canvas 2D partículas fuego compartido + glow CSS pulsante + badge x2
+═════════════════════════════════════════════════════════════════════

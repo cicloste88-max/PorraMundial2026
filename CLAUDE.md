@@ -7,7 +7,7 @@ Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main**
 
 ## Estado actual (2026-04-13)
-**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Último commit: 3473c76.**
+**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Último commit: 6c3d30b.**
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
 - `main.js` ELIMINADO — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
@@ -59,6 +59,8 @@ public/js/
 public/css/
   bracket-results.css <- [NUEVO 2026-04-13] estilos del bracket de resultados
                          Prefijo brk- en todas las clases
+  boost.css          <- [NUEVO 2026-04-13] estilos boost x2: checkbox, badge, glow,
+                         Canvas 2D fuego. card-inner hereda overflow:hidden de .card
 ```
 
 ## Cadena de carga en main-entry.js
@@ -239,6 +241,7 @@ MVP/             — imágenes jugadores MVP
 | 2026-04-12 PM | Bracket Fase 1 SVG overlay. Fix dado/undo Object.assign | 187a764 |
 | 2026-04-13 | **Bracket de resultados reales** — bracket-results.js + CSS, 6 fases, cards badge+flag, vista Final en caja propia, QA local+producción OK | cd4afa2 |
 | 2026-04-13 PM | **Splash screen** — inline script (fix timing), hero/scroll-cue reposicionados, márgenes móvil welcome | 3473c76 |
+| 2026-04-13 PM | **Boost x2 completo** — comodín diario, Canvas 2D fuego, persistencia Supabase, puntuación x2, ticker jornadas, bloqueo eliminatorias/finalizar | 6c3d30b |
 
 ## Log de cambios (OBLIGATORIO)
 Añadir línea a migration-log.md tras cada acción:
