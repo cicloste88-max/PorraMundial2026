@@ -136,43 +136,43 @@ h2{
 .jcard-main{
   display:grid;
   grid-template-columns:4px 1fr auto;
-  min-height:80px;
+  min-height:56px;
 }
 .jcard-stripe{width:4px;background:var(--gc,#4ade80);opacity:.5;flex-shrink:0;}
-.jcard-body{padding:10px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;}
+.jcard-body{padding:8px 12px;display:flex;flex-direction:column;gap:4px;min-width:0;}
 .jcard-teams-row{
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:6px;
 }
 .jcard-team{
-  display:flex;align-items:center;gap:6px;flex:1;min-width:0;
+  display:flex;align-items:center;gap:5px;flex:1;min-width:0;
 }
 .jcard-team-name{
-  font-size:14px;font-weight:700;color:#e4e4e7;
+  font-size:13px;font-weight:700;color:#e4e4e7;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .jcard-vs{
   font-size:11px;font-weight:600;color:#4b5563;
   flex-shrink:0;padding:0 4px;
 }
-.jcard-flag{width:20px;height:20px;border-radius:50%;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex-shrink:0;}
+.jcard-flag{width:18px;height:18px;border-radius:50%;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex-shrink:0;}
 .jcard-flag img{width:100%;height:100%;object-fit:cover;}
 .jcard-score-wrap{
-  display:flex;align-items:center;gap:4px;flex-shrink:0;margin:0 10px;
+  display:flex;align-items:center;gap:4px;flex-shrink:0;margin:0 8px;
 }
 .jcard-score{
-  font-family:'Inter Tight',sans-serif;font-size:22px;font-weight:900;
-  color:#4ade80;min-width:22px;text-align:center;line-height:1;
+  font-family:'Inter Tight',sans-serif;font-size:20px;font-weight:900;
+  color:#4ade80;min-width:20px;text-align:center;line-height:1;
 }
 .jcard-score.pending{color:#3a3a3e;}
-.jcard-score-sep{color:#3a3a3e;font-size:16px;margin:0 2px;}
+.jcard-score-sep{color:#3a3a3e;font-size:14px;margin:0 2px;}
 .jcard-venue{
   font-size:10px;color:#4b5563;
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.jcard-chips{display:flex;gap:4px;flex-wrap:wrap;}
-.jcard-chip{font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;background:rgba(255,255,255,.05);color:#4b5563;}
-.jcard-chip.on{background:rgba(74,222,128,.12);color:#4ade80;}
+.jcard-chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+.jcard-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.06);color:#6b7280;letter-spacing:.02em;}
+.jcard-chip.on{background:rgba(74,222,128,.15);color:#4ade80;}
 .jcard-pts{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:0 16px;border-left:1px solid #27272a;min-width:70px;flex-shrink:0;
