@@ -449,13 +449,13 @@ function setVistaGrupos(vista) {
   const btnJornada = document.getElementById('btn-vista-jornada');
 
   if (vista === 'grupos') {
-    if (gruposContainer)  gruposContainer.style.display  = '';
+    if (gruposContainer)  gruposContainer.style.display  = 'block';
     if (jornadaContainer) jornadaContainer.style.display = 'none';
     if (btnGrupos)  { btnGrupos.style.background  = '#27272a'; btnGrupos.style.color  = '#fff'; }
     if (btnJornada) { btnJornada.style.background = 'transparent'; btnJornada.style.color = '#6b7280'; }
   } else {
     if (gruposContainer)  gruposContainer.style.display  = 'none';
-    if (jornadaContainer) jornadaContainer.style.display = '';
+    if (jornadaContainer) jornadaContainer.style.display = 'block';
     if (btnGrupos)  { btnGrupos.style.background  = 'transparent'; btnGrupos.style.color  = '#6b7280'; }
     if (btnJornada) { btnJornada.style.background = '#27272a'; btnJornada.style.color = '#fff'; }
     renderVistaJornada();
@@ -612,11 +612,19 @@ function jcardBoostToggle(matchKey, date, checkbox) {
 window.jcardBoostToggle = jcardBoostToggle;
 
 function _buildJornadaRanking() {
+  // Si _sbData no está disponible, disparar carga y devolver placeholder
   if (!window._sbData || window._sbData.length === 0) {
+    // Intentar cargar scoreboard si la función existe
+    if (typeof sbLoad === 'function') {
+      sbLoad().then(() => {
+        // Tras cargar, re-renderizar si seguimos en vista jornada
+        if (_vistaActual === 'jornada') renderVistaJornada();
+      });
+    }
     return '<div class="jornada-ranking">' +
       '<div class="jornada-ranking-title">🏆 Clasificación</div>' +
       '<div style="font-size:11px;color:#4b5563;text-align:center;padding:12px 0">' +
-        'Cargando...' +
+        'Cargando clasificación...' +
       '</div></div>';
   }
   const myId = window.currentUser?.id;
