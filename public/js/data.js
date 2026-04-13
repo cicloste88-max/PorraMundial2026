@@ -182,19 +182,67 @@ let boostPicks = {};  // { "2026-06-12": "México_Sudáfrica", ... }
 let iaPredictions = {};
 let totalPoints = 0;
 
-function saveBoostPicks() {
+async function saveBoostPicks() {
+  // 1. Siempre guardar en localStorage como caché rápida
   try {
     const key = 'boostPicks_' + (window._currentLeagueId || 'default');
     localStorage.setItem(key, JSON.stringify(boostPicks));
   } catch(e) {}
+
+  // 2. Sincronizar con Supabase (upsert por usuario/liga/día)
+  try {
+    const db = window._porraDb;
+    const uid = window.currentUser?.id;
+    const leagueId = window.getActiveLeagueId?.();
+    if (!db || !uid || !leagueId) return;
+
+    // Construir filas a upsert
+    const rows = Object.entries(boostPicks).map(([date, matchId]) => ({
+      user_id:    uid,
+      league_id:  leagueId,
+      match_id:   matchId,
+      match_date: date,
+    }));
+    if (rows.length === 0) return;
+    await db.from('boost_picks').upsert(rows, { onConflict: 'user_id,league_id,match_date' });
+  } catch(e) {
+    console.warn('[saveBoostPicks] Supabase error:', e.message);
+  }
 }
 
-function loadBoostPicks() {
+async function loadBoostPicks() {
+  // 1. Cargar desde localStorage primero (respuesta inmediata)
   try {
     const key = 'boostPicks_' + (window._currentLeagueId || 'default');
     const raw = localStorage.getItem(key);
     boostPicks = raw ? JSON.parse(raw) : {};
   } catch(e) { boostPicks = {}; }
+
+  // 2. Sobreescribir con datos de Supabase (fuente de verdad)
+  try {
+    const db = window._porraDb;
+    const uid = window.currentUser?.id;
+    const leagueId = window.getActiveLeagueId?.();
+    if (!db || !uid || !leagueId) return;
+
+    const { data } = await db
+      .from('boost_picks')
+      .select('match_date, match_id')
+      .eq('user_id', uid)
+      .eq('league_id', leagueId);
+
+    if (data && data.length > 0) {
+      boostPicks = {};
+      data.forEach(row => { boostPicks[row.match_date] = row.match_id; });
+      // Actualizar caché local
+      try {
+        const key = 'boostPicks_' + (window._currentLeagueId || 'default');
+        localStorage.setItem(key, JSON.stringify(boostPicks));
+      } catch(e) {}
+    }
+  } catch(e) {
+    console.warn('[loadBoostPicks] Supabase error:', e.message);
+  }
 }
 
 // ========== FUNCIONES AUXILIARES ==========
