@@ -847,11 +847,11 @@ function attachEvents(card, idx, match) {
     return;
   }
   const matchKey = getMatchKey(match);
-  const pred = predictions[matchKey];
   const estado = getEstadoPartido(match);
   card.querySelectorAll('.sbn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if(pred.saved || pred.lockedByUser) return;
+      const pred = predictions[matchKey]; // leer en tiempo real — no capturar en closure
+      if(!pred || pred.saved || pred.lockedByUser) return;
       const side = btn.getAttribute('data-side');
       const inc = parseInt(btn.getAttribute('data-inc'));
       if(pred[side] === null) pred[side] = 0;
@@ -865,7 +865,8 @@ function attachEvents(card, idx, match) {
     });
   });
   document.getElementById(`gsel-${idx}`).addEventListener('change', (e) => {
-    if(pred.saved || pred.lockedByUser) return;
+    const pred = predictions[matchKey]; // leer en tiempo real
+    if(!pred || pred.saved || pred.lockedByUser) return;
     pred.gol = e.target.value || null;
     pred.saved = false;
     updateCardUI(idx, match);
