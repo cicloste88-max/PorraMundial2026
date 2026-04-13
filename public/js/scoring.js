@@ -44,16 +44,16 @@ function calcMatchPoints(pred, realL, realR, matchKey) {
   if(!pred || !pred.saved) return 0;
   let pts = 0;
 
+  const isExact = pred.l === realL && pred.v === realR;
+
   // Signo y exacto
-  if(pred.l === realL && pred.v === realR) {
+  if(isExact) {
     pts += 3; // exacto (ya incluye el punto de signo)
   } else if(Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
     pts += 1; // solo signo
   }
 
-  // Goleador — aciertas cualquier goleador del partido
-  // En producción real: comparar con lista de goleadores reales del partido
-  // Por ahora: comparar con el primer goleador real disponible
+  // Goleador
   if(pred.gol && realL !== realR) {
     const winnerTeam = realL > realR ? pred.home : pred.away;
     const team = EQUIPOS.find(e => e.name === winnerTeam);
@@ -64,7 +64,17 @@ function calcMatchPoints(pred, realL, realR, matchKey) {
   // Bonus vs IA
   if(iaBonusWillApply(matchKey, pred, realL, realR)) pts += 1;
 
-  return Math.min(pts, 7); // máximo 7 pts por partido
+  pts = Math.min(pts, 7);
+
+  // Boost x2: si este partido es el boost del día Y se acertó el exacto
+  if(isExact && matchKey) {
+    const matchDate = PARTIDOS.find(m => getMatchKey(m) === matchKey)?.date?.substring(0,10);
+    if(matchDate && boostPicks[matchDate] === matchKey) {
+      pts *= 2; // máximo 14 pts
+    }
+  }
+
+  return pts;
 }
 
 // ── Puntos KO por ronda ───────────────────────────────────

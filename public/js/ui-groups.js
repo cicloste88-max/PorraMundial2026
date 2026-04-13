@@ -125,6 +125,108 @@ function checkGroupsComplete() {
 }
 
 
+/* ── Ticker boost: muestra los partidos de hoy para elegir boost ── */
+function renderBoostTicker() {
+  const ticker    = document.getElementById('boost-ticker');
+  const container = document.getElementById('boost-ticker-matches');
+  const status    = document.getElementById('boost-ticker-status');
+  if(!ticker || !container) return;
+
+  // Fecha de hoy en formato YYYY-MM-DD (hora local)
+  const today = new Date().toISOString().substring(0,10);
+
+  // Partidos de hoy en fase de grupos
+  const todayMatches = PARTIDOS.filter(m => m.date && m.date.substring(0,10) === today);
+
+  if(todayMatches.length === 0) {
+    ticker.style.display = 'none';
+    return;
+  }
+
+  ticker.style.display = 'flex';
+
+  const boostedToday = boostPicks[today];
+
+  container.innerHTML = todayMatches.map(m => {
+    const key = getMatchKey(m);
+    const isActive = boostedToday === key;
+    const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+    return `<button
+      onclick="tickerBoostToggle('${key}','${today}')"
+      style="
+        display:flex;align-items:center;gap:6px;
+        padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;
+        border:1px solid ${isActive ? 'rgb(234,88,12)' : 'rgba(255,255,255,.12)'};
+        background:${isActive ? 'rgba(124,45,18,.7)' : 'rgba(255,255,255,.04)'};
+        color:${isActive ? 'rgb(251,191,36)' : 'rgba(255,255,255,.6)'};
+        cursor:pointer;transition:all .2s;white-space:nowrap;
+      "
+    >${isActive ? '🔥 ' : ''}${m.home} vs ${m.away} <span style="opacity:.5">${hora}</span></button>`;
+  }).join('');
+
+  // Estado: cuántos quedan sin boost
+  if(boostedToday) {
+    const bMatch = PARTIDOS.find(m => getMatchKey(m) === boostedToday);
+    if(status) status.textContent = '✓ ' + (bMatch ? bMatch.home + ' vs ' + bMatch.away : 'asignado');
+  } else {
+    if(status) status.textContent = 'Elige 1 partido';
+  }
+}
+
+/* Llamado desde el ticker al hacer click en un partido */
+function tickerBoostToggle(matchKey, date) {
+  // Desmarcar boost anterior del mismo día en las tarjetas
+  if(boostPicks[date] && boostPicks[date] !== matchKey) {
+    document.querySelectorAll('.card').forEach(card => {
+      const oi = card.getAttribute('data-match-idx');
+      if(oi === null) return;
+      const om = PARTIDOS[Number(oi)];
+      if(!om || getMatchKey(om) !== boostPicks[date]) return;
+      const chk = card.querySelector('.boost-chk');
+      const row = card.querySelector('.boost-row');
+      if(chk){chk.checked=false;chk.disabled=false;}
+      if(row){row.classList.remove('boost-on');row.style.opacity='';row.removeAttribute('title');}
+      card.classList.remove('boost-active');
+    });
+  }
+
+  // Si ya estaba activo, desactivar (toggle)
+  if(boostPicks[date] === matchKey) {
+    delete boostPicks[date];
+    document.querySelectorAll('.card').forEach(card => {
+      const oi = card.getAttribute('data-match-idx');
+      if(oi === null) return;
+      const om = PARTIDOS[Number(oi)];
+      if(!om || getMatchKey(om) !== matchKey) return;
+      const chk = card.querySelector('.boost-chk');
+      const row = card.querySelector('.boost-row');
+      if(chk){chk.checked=false;}
+      if(row){row.classList.remove('boost-on');}
+      card.classList.remove('boost-active');
+    });
+  } else {
+    // Activar en el objeto boostPicks
+    boostPicks[date] = matchKey;
+    // Sincronizar con el check de la tarjeta correspondiente
+    document.querySelectorAll('.card').forEach(card => {
+      const oi = card.getAttribute('data-match-idx');
+      if(oi === null) return;
+      const om = PARTIDOS[Number(oi)];
+      if(!om || getMatchKey(om) !== matchKey) return;
+      const chk = card.querySelector('.boost-chk');
+      const row = card.querySelector('.boost-row');
+      if(chk){chk.checked=true;chk.disabled=false;}
+      if(row){row.classList.add('boost-on');row.style.opacity='';row.removeAttribute('title');}
+      card.classList.add('boost-active');
+    });
+  }
+
+  saveBoostPicks();
+  checkFinalizarReady?.();
+  renderBoostTicker(); // re-render ticker con nuevo estado
+}
+window.tickerBoostToggle = tickerBoostToggle;
+
 function initGrupos() {
   // Mostrar barra global de dados si usuario logueado
   const diceBar = document.getElementById('dice-global-bar');
@@ -135,6 +237,8 @@ function initGrupos() {
     if (typeof refreshGroupTables === 'function') refreshGroupTables();
   });
   checkGroupsComplete();
+  // Ticker boost: mostrar partidos de hoy
+  if(typeof renderBoostTicker === 'function') renderBoostTicker();
   // Actualizar countdown cada 5s (no cada 1s — mejora rendimiento scroll)
   // Solo actualiza los pills de estado, no re-renderiza todo
   setInterval(() => {

@@ -2156,6 +2156,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
         <div class="wc-rule-item"><div class="wc-rule-ico">✅</div><div><div class="wc-rule-title">100% obligatorio</div><div class="wc-rule-desc">Debes completar los 104 partidos (grupos, cruces y eliminatorias) para poder enviar.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">🥅</div><div><div class="wc-rule-title">Goleador en 0:0</div><div class="wc-rule-desc">Si pronosticas 0-0, el goleador es opcional.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">🔀</div><div><div class="wc-rule-title">Empate en KO</div><div class="wc-rule-desc">En caso de pronosticar empate en fases de eliminación directa, debes indicar qué equipo se clasifica, independientemente del método (prórroga o penaltis).</div></div></div>
+        <div class="wc-rule-item"><div class="wc-rule-ico">🔥</div><div><div class="wc-rule-title">Boost diario (fase de grupos)</div><div class="wc-rule-desc">Cada día con partidos debes elegir obligatoriamente 1 partido como "Boost". Si aciertas el resultado exacto, todos los puntos de esa tarjeta se multiplican por ×2 (máx. 14 pts). Sin boost asignado no se puede cerrar la porra.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">⚖️</div><div><div class="wc-rule-title">Desempate entre participantes</div><div class="wc-rule-desc">En caso de empate a puntos, se deshará por mayor número de marcadores exactos acertados.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">💰</div><div><div class="wc-rule-title">Inscripción</div><div class="wc-rule-desc">La cuota se gestiona vía Bizum con el administrador de la porra.</div></div></div>
       </div>
@@ -2173,7 +2174,8 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
             <div class="wc-row"><span class="wc-row-icon">🎯</span><div class="wc-pts-badge">+3 pts</div><span class="wc-row-text">Marcador exacto</span></div>
             <div class="wc-row"><span class="wc-row-icon">⚽</span><div class="wc-pts-badge">+2 pts</div><span class="wc-row-text">Aciertas cualquier goleador del partido</span></div>
             <div class="wc-row"><span class="wc-row-icon">🤖</span><div class="wc-pts-badge">+1 pt</div><span class="wc-row-text">Tu signo va contra el pronóstico de la IA</span></div>
-            <div class="wc-max-row"><span class="wc-max-label">Máximo por partido</span><span class="wc-max-val" style="margin-right:48px">7 pts</span></div>
+            <div class="wc-row"><span class="wc-row-icon">🔥</span><div class="wc-pts-badge" style="background:rgba(234,88,12,.2);color:#fb923c;border-color:rgba(234,88,12,.4)">×2</div><span class="wc-row-text">Boost diario: elige 1 partido/día — si aciertas el exacto, todos sus puntos se doblan</span></div>
+            <div class="wc-max-row"><span class="wc-max-label">Máximo por partido</span><span class="wc-max-val" style="margin-right:48px">7 pts · <span style="color:#fb923c">14 con boost</span></span></div>
           </div>
           <div style="flex:1;min-width:220px">
             <div class="wc-card-sub" style="margin-bottom:10px">Eliminatorias · adicionalmente</div>
@@ -2335,6 +2337,12 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
       </div>
       <div id="grupos-user-bar"></div>
     </div>
+  </div>
+  <!-- Ticker boost jornada -->
+  <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;letter-spacing:.04em">🔥 BOOST HOY</span>
+    <div id="boost-ticker-matches" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
+    <span id="boost-ticker-status" style="font-size:11px;color:#6b7280;white-space:nowrap;margin-left:auto"></span>
   </div>
   <!-- Barra global de simulación -->
   <div id="dice-global-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:rgba(30,27,75,.35);border:1px solid rgba(99,82,199,.2);border-radius:10px">
