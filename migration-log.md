@@ -445,4 +445,38 @@ Commits sesión (7):
 
 Ficheros modificados: index.html, public/js/ui-groups.js, public/js/scoring.js,
   public/js/scoreboard.js
+
+[18:20] FIX: jornada móvil — 3 problemas Safari/iPhone
+        - CSS: @media <768px grid 1col, sidebar oculta, user-strip visible
+        - HTML: div #jornada-user-strip antes de jornada-container + CSS cinta
+        - JS: _renderUserStrip (posición+nombre+pts), openJcardModal/_showJcardModal
+          (clone tarjeta grupos en modal overlay 480px), botón "Ver tarjeta" → openJcardModal
+[18:25] COMMIT: 8e8ac44 — fix: jornada móvil — grid colapsa, cinta usuario, modal ver tarjeta
+[18:25] PUSH: main → origin ✓
+
+═════════════════════════════════════════════════════════════════════
+  CHECKPOINT FINAL — SESIÓN 2026-04-13 COMPLETA
+─────────────────────────────────────────────────────────────────────
+HEAD: 8e8ac44
+Total commits sesión: 22
+
+Bloques:
+  Splash screen + fixes welcome     (3 commits: 0d19ff9..3473c76)
+  Boost x2 completo                 (8 commits: 368d8db..6c3d30b)
+  Boost UX + Vista Jornada          (8 commits: b173274..82b6a77)
+  Jornada móvil                     (1 commit:  8e8ac44)
+  Docs                              (2 commits: 301235e, a8e5dbc)
+
+Features entregadas:
+  - Splash screen con animación FIFA 2026
+  - Posicionamiento welcome (hero + scroll-cue + márgenes móvil)
+  - Boost x2 comodín diario (UI + Canvas 2D fuego + persistencia Supabase)
+  - Motor puntuación x2 si exacto + boost del día
+  - Ticker boost con pastillas jornada, panel expandible, scroll a tarjeta
+  - Bloqueo eliminatorias y finalizar sin boosts completos
+  - Vista Jornada (tarjetas compactas por día, sidebar clasificación sticky)
+  - Optimización móvil jornada (grid colapsa, cinta usuario, modal tarjeta)
+
+Tabla Supabase: boost_picks (migration create_boost_picks)
+Ficheros nuevos: css/boost.css
 ═════════════════════════════════════════════════════════════════════

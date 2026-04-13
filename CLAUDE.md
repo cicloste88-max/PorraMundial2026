@@ -7,7 +7,7 @@ Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main**
 
 ## Estado actual (2026-04-13)
-**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Vista Jornada COMPLETA. Último commit: 82b6a77.**
+**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Vista Jornada COMPLETA. Último commit: 8e8ac44.**
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
 - `main.js` ELIMINADO — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
@@ -257,6 +257,7 @@ MVP/             — imágenes jugadores MVP
 | 2026-04-13 PM | **Splash screen** — inline script (fix timing), hero/scroll-cue reposicionados, márgenes móvil welcome | 3473c76 |
 | 2026-04-13 PM | **Boost x2 completo** — comodín diario, Canvas 2D fuego, persistencia Supabase, puntuación x2, ticker jornadas, bloqueo eliminatorias/finalizar | 6c3d30b |
 | 2026-04-13 PM | **Vista Jornada** — pestaña tarjetas compactas por día, sidebar clasificación sticky, boost CTA editable, scroll a tarjeta | 82b6a77 |
+| 2026-04-13 PM | **Jornada móvil** — grid colapsa <768px, cinta usuario, modal ver tarjeta con clone | 8e8ac44 |
 
 ## Log de cambios (OBLIGATORIO)
 Añadir línea a migration-log.md tras cada acción:
