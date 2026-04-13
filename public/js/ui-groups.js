@@ -135,11 +135,40 @@ function checkGroupsComplete() {
       const boostPendingEl = document.getElementById('cta-boost-pending');
       if(boostPendingEl && filled >= total) {
         const pendientes = diasConPartidos.filter(d => !boostPicks[d]);
-        if(pendientes.length > 0) {
-          // Guardar qué jornada tiene el panel expandido antes de re-renderizar
-          const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
+        // Guardar qué jornada tiene el panel expandido antes de re-renderizar
+        const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
+        const existingPanel = document.getElementById('cta-boost-panel');
 
-          boostPendingEl.style.display = 'flex';
+        boostPendingEl.style.display = 'flex';
+
+        if (pendientes.length === 0) {
+          // Todos los boosts asignados — mostrar estado "completo" editable
+          const asignados = diasConPartidos.map(d => {
+            const mKey = boostPicks[d];
+            const match = PARTIDOS.find(m => getMatchKey(m) === mKey);
+            const jNum = diasConPartidos.indexOf(d) + 1;
+            const label = match
+              ? match.home.split(' ')[0] + ' vs ' + match.away.split(' ')[0]
+              : '?';
+            return '<button onclick="ctaExpandJornada(\'' + d + '\')" style="' +
+              'display:inline-flex;align-items:center;gap:4px;' +
+              'padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;' +
+              'border:1px solid rgba(74,222,128,.3);' +
+              'background:rgba(5,46,22,.3);color:#4ade80;' +
+              'cursor:pointer;white-space:nowrap;' +
+              '">✅ J' + jNum + ' · ' + label + '</button>';
+          }).join('');
+
+          const panelHtml = (openDate && existingPanel)
+            ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(74,222,128,.15);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
+            : '';
+
+          boostPendingEl.innerHTML =
+            '<span style="font-size:11px;font-weight:700;color:#4ade80;white-space:nowrap;flex-shrink:0">✅ Boosts completos — editar:</span>' +
+            asignados + panelHtml;
+
+        } else {
+          // Quedan boosts pendientes
           const label = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>';
           const pills = pendientes.map(d => {
             const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
@@ -155,15 +184,11 @@ function checkGroupsComplete() {
               '">🔥 J' + jNum + ' · ' + dayLabel + ' (' + nM + ')</button>';
           }).join('');
 
-          // Mantener el panel expandido si estaba abierto
-          const existingPanel = document.getElementById('cta-boost-panel');
           const panelHtml = (openDate && existingPanel)
             ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(124,45,18,.3);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
             : '';
 
           boostPendingEl.innerHTML = label + pills + panelHtml;
-        } else {
-          boostPendingEl.style.display = 'none';
         }
       } else if(boostPendingEl) {
         boostPendingEl.style.display = 'none';
@@ -477,7 +502,10 @@ function renderVistaJornada() {
   });
   const dias = Object.keys(jornadasMap).sort();
 
-  let html = '';
+  // Wrapper con sidebar única a la derecha
+  const sidebarHtml = _buildJornadaRanking();
+
+  let sectionsHtml = '';
   dias.forEach((date, dIdx) => {
     const jNum = dIdx + 1;
     const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {
@@ -486,30 +514,28 @@ function renderVistaJornada() {
     const boostKey  = boostPicks[date];
     const boostDone = !!boostKey;
     const badgeCls  = boostDone ? 'jornada-boost-badge done' : 'jornada-boost-badge';
-    const badgeTxt  = boostDone ? '🔥 Boost asignado' : '🔥 Boost pendiente';
+    const badgeTxt  = boostDone ? '✅ Boost asignado' : '🔥 Pendiente';
 
-    html += '<div class="jornada-section" id="jornada-' + date + '">';
-    html += '<div class="jornada-header">';
-    html += '<span class="jornada-label">J' + jNum + '</span>';
-    html += '<span class="jornada-date">' + dayLabel + '</span>';
-    html += '<span class="' + badgeCls + '">' + badgeTxt + '</span>';
-    html += '</div>';
-
-    // Layout: tarjetas + sidebar ranking
-    html += '<div class="jornada-layout">';
-    html += '<div class="jornada-cards">';
+    sectionsHtml += '<div class="jornada-section" id="jornada-' + date + '">';
+    sectionsHtml += '<div class="jornada-header">';
+    sectionsHtml += '<span class="jornada-label">J' + jNum + '</span>';
+    sectionsHtml += '<span class="jornada-date">' + dayLabel + '</span>';
+    sectionsHtml += '<span class="' + badgeCls + '">' + badgeTxt + '</span>';
+    sectionsHtml += '</div>';
 
     jornadasMap[date].forEach(({ m, idx }) => {
-      html += _buildJCard(m, idx, date, boostKey);
+      sectionsHtml += _buildJCard(m, idx, date, boostKey);
     });
 
-    html += '</div>'; // jornada-cards
-    html += '<div class="jornada-sidebar">' + _buildJornadaRanking() + '</div>';
-    html += '</div>'; // jornada-layout
-    html += '</div>'; // jornada-section
+    sectionsHtml += '</div>'; // jornada-section
   });
 
-  container.innerHTML = html;
+  // Layout: columna de jornadas + sidebar única sticky
+  container.innerHTML =
+    '<div class="jornada-wrap">' +
+      '<div class="jornada-main">' + sectionsHtml + '</div>' +
+      '<div class="jornada-sidebar">' + sidebarHtml + '</div>' +
+    '</div>';
 }
 window.renderVistaJornada = renderVistaJornada;
 
@@ -518,84 +544,104 @@ function _buildJCard(m, idx, date, boostKey) {
   const pred = predictions[matchKey] || {};
   const isBoost = boostKey === matchKey;
 
+  // Equipos y banderas
   const hTeam = EQUIPOS.find(e => e.name === m.home);
   const aTeam = EQUIPOS.find(e => e.name === m.away);
   const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
   const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
 
+  // Estado del pronóstico
   const hasScore = pred.l !== null && pred.l !== undefined && pred.v !== null && pred.v !== undefined;
-  const hasPred  = pred.saved;
 
+  // Marcador pronosticado
   const lTxt = hasScore ? pred.l : '—';
   const vTxt = hasScore ? pred.v : '—';
   const scoreCls = hasScore ? 'jcard-score' : 'jcard-score pending';
 
+  // Chips
   const ia = iaPredictions[matchKey];
   const mySign = getMySign(pred);
   const showIA = hasScore && ia && mySign && mySign !== ia.sign;
-  const chipSign   = hasScore ? '<span class="jcard-chip on">1X2</span>' : '<span class="jcard-chip">1X2</span>';
-  const chipExact  = hasScore ? '<span class="jcard-chip on">Exacto</span>' : '';
-  const chipGol    = pred.gol ? '<span class="jcard-chip on">Gol</span>' : '';
-  const chipIA     = showIA   ? '<span class="jcard-chip on">vsIA</span>' : '';
+  const chips =
+    (hasScore ? '<span class="jcard-chip on">1X2</span>' : '<span class="jcard-chip">1X2</span>') +
+    (hasScore ? '<span class="jcard-chip on">Exacto</span>' : '') +
+    (pred.gol ? '<span class="jcard-chip on">⚽ ' + pred.gol + '</span>' : '') +
+    (showIA   ? '<span class="jcard-chip on">vs IA</span>' : '');
 
+  // Pts posibles
   let maxPts = 0;
   if (hasScore) {
     maxPts = 4;
     if (pred.gol) maxPts += 2;
     if (showIA)   maxPts += 1;
   }
-  const ptsActual = hasPred && maxPts > 0 ? maxPts : 0;
-  const ptsCls = isBoost ? 'jcard-pts-num boost' : (ptsActual > 0 ? 'jcard-pts-num' : 'jcard-pts-num pending');
-  const ptsDisp = isBoost ? (ptsActual * 2) + '✕' : (ptsActual || '—');
+  const ptsVal  = isBoost ? maxPts * 2 : maxPts;
+  const ptsCls  = isBoost ? 'jcard-pts-num boost' : (maxPts > 0 ? 'jcard-pts-num' : 'jcard-pts-num pending');
+  const ptsDisp = ptsVal || '—';
 
-  const chkChecked = isBoost ? 'checked' : '';
-  const boostRowBg = isBoost ? 'background:rgba(28,14,6,.8);' : '';
-
-  const groupColors = {A:'#4ade80',B:'#60a5fa',C:'#f472b6',D:'#fb923c',E:'#a78bfa',
-    F:'#34d399',G:'#fbbf24',H:'#f87171',I:'#38bdf8',J:'#c084fc',K:'#86efac',L:'#fcd34d'};
-  const groupColor = groupColors[m.group] || '#4ade80';
-
+  // Hora y estadio
   const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const stadium = m.stadium ? m.stadium.replace(' Stadium','').replace(' Estadio','') : '';
 
-  return '<div class="jcard' + (isBoost ? ' boost-active' : '') + '" id="jcard-' + idx + '">' +
-    '<div class="jcard-inner">' +
-    '<div class="jcard-group" style="background:' + groupColor + ';opacity:.6"></div>' +
-    '<div class="jcard-match">' +
-      '<div class="jcard-teams">' +
-        '<div class="jcard-team-row">' +
-          '<div class="jcard-flag"><img src="' + hFlag + '" alt=""/></div>' +
-          '<span>' + m.home + '</span>' +
-          '<span style="margin-left:auto;font-size:10px;color:#6b7280">Local · ' + m.group + '</span>' +
+  // Color lateral por grupo
+  const gc = {A:'#4ade80',B:'#60a5fa',C:'#f472b6',D:'#fb923c',E:'#a78bfa',
+    F:'#34d399',G:'#fbbf24',H:'#f87171',I:'#38bdf8',J:'#c084fc',K:'#86efac',L:'#fcd34d'}[m.group] || '#4ade80';
+
+  // Boost row
+  const chkChecked = isBoost ? 'checked' : '';
+  const boostRowCls = isBoost ? 'jcard-boost active' : 'jcard-boost';
+  const boostLabel  = isBoost
+    ? '<span style="font-size:11px;color:#fb923c;font-weight:600">🔥 Boost activo</span>'
+    : '<span style="font-size:11px;color:#6b7280">🔥 Boost a este partido</span>';
+
+  return (
+    '<div class="jcard' + (isBoost ? ' boost-active' : '') + '" id="jcard-' + idx + '">' +
+      '<div class="jcard-main">' +
+        '<div class="jcard-stripe" style="--gc:' + gc + ';background:' + gc + '"></div>' +
+        '<div class="jcard-body">' +
+          '<div class="jcard-teams-row">' +
+            '<div class="jcard-team">' +
+              '<div class="jcard-flag"><img src="' + hFlag + '" loading="lazy"></div>' +
+              '<span class="jcard-team-name">' + m.home + '</span>' +
+            '</div>' +
+            '<div class="jcard-score-wrap">' +
+              '<span class="' + scoreCls + '">' + lTxt + '</span>' +
+              '<span class="jcard-score-sep">:</span>' +
+              '<span class="' + scoreCls + '">' + vTxt + '</span>' +
+            '</div>' +
+            '<div class="jcard-team" style="justify-content:flex-end">' +
+              '<span class="jcard-team-name" style="text-align:right">' + m.away + '</span>' +
+              '<div class="jcard-flag"><img src="' + aFlag + '" loading="lazy"></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="jcard-venue">' +
+            '<span>🏟️ ' + stadium + '</span>' +
+            '<span style="color:#3a3a3e">·</span>' +
+            '<span>⏰ ' + hora + '</span>' +
+            '<span style="color:#3a3a3e">·</span>' +
+            '<span style="color:#4b5563">Grupo ' + m.group + '</span>' +
+          '</div>' +
+          (chips ? '<div class="jcard-chips">' + chips + '</div>' : '') +
         '</div>' +
-        '<div class="jcard-team-row">' +
-          '<div class="jcard-flag"><img src="' + aFlag + '" alt=""/></div>' +
-          '<span>' + m.away + '</span>' +
-          '<span style="margin-left:auto;font-size:9px;color:#4b5563">' + hora + '</span>' +
+        '<div class="jcard-pts">' +
+          '<div class="' + ptsCls + '">' + ptsDisp + '</div>' +
+          '<div class="jcard-pts-label">' + (isBoost ? 'PTS ×2' : 'PTS posibles') + '</div>' +
         '</div>' +
-        '<div class="jcard-chips" style="margin-top:4px">' + chipSign + chipExact + chipGol + chipIA + '</div>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin:0 8px;">' +
-        '<span class="' + scoreCls + '">' + lTxt + '</span>' +
-        '<span class="jcard-sep">:</span>' +
-        '<span class="' + scoreCls + '">' + vTxt + '</span>' +
+      '<div class="' + boostRowCls + '">' +
+        '<input type="checkbox" ' + chkChecked + ' ' +
+          'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
+          'style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;flex-shrink:0">' +
+        boostLabel +
+        '<button onclick="scrollToMatchCard(\'' + matchKey + '\')" ' +
+          'style="margin-left:auto;font-size:10px;color:#4b5563;background:none;border:none;' +
+          'cursor:pointer;padding:2px 8px;border-radius:6px;border:1px solid #27272a;' +
+          'transition:all .15s" ' +
+          'onmouseover="this.style.borderColor=\'#4ade80\';this.style.color=\'#4ade80\'" ' +
+          'onmouseout="this.style.borderColor=\'#27272a\';this.style.color=\'#4b5563\'">↓ Ver tarjeta</button>' +
       '</div>' +
-    '</div>' +
-    '<div class="jcard-pts">' +
-      '<div class="' + ptsCls + '">' + ptsDisp + '</div>' +
-      '<div class="jcard-pts-label">pts</div>' +
-    '</div>' +
-    '</div>' +
-    '<div class="jcard-boost" style="' + boostRowBg + '">' +
-      '<input type="checkbox" ' + chkChecked + ' ' +
-        'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
-        'style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;flex-shrink:0">' +
-      '<span style="font-size:11px;color:' + (isBoost ? '#fb923c' : '#6b7280') + ';font-weight:500">🔥 Boost</span>' +
-      '<button onclick="scrollToMatchCard(\'' + matchKey + '\')" ' +
-        'style="margin-left:auto;font-size:10px;color:#4b5563;background:none;border:none;cursor:pointer;' +
-        'padding:2px 6px;border-radius:6px;border:1px solid #27272a" ' +
-        'title="Ver tarjeta completa">↓ Ver tarjeta</button>' +
-    '</div>' +
-  '</div>';
+    '</div>'
+  );
 }
 
 function jcardBoostToggle(matchKey, date, checkbox) {
