@@ -130,6 +130,33 @@ function checkGroupsComplete() {
     } else {
       ctaLocked.style.display = 'block';
       ctaReady.style.display = 'none';
+
+      // Pastillas boost pendientes bajo el CTA locked
+      const boostPendingEl = document.getElementById('cta-boost-pending');
+      if(boostPendingEl && filled >= total) {
+        const pendientes = diasConPartidos.filter(d => !boostPicks[d]);
+        if(pendientes.length > 0) {
+          boostPendingEl.style.display = 'flex';
+          boostPendingEl.innerHTML =
+            '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>' +
+            pendientes.map(d => {
+              const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
+              const nM = PARTIDOS.filter(m => m.date?.substring(0,10) === d).length;
+              return '<button onclick="tickerExpandJornada(\'' + d + '\')" style="' +
+                'display:inline-flex;align-items:center;gap:4px;' +
+                'padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;' +
+                'border:1.5px solid rgba(234,88,12,.5);' +
+                'background:rgba(124,45,18,.35);color:rgb(251,146,60);' +
+                'cursor:pointer;white-space:nowrap;' +
+                'animation:boostPulse 1.5s ease-in-out infinite;' +
+                '">🔥 ' + dayLabel + ' · ' + nM + ' partido' + (nM > 1 ? 's' : '') + '</button>';
+            }).join('');
+        } else {
+          boostPendingEl.style.display = 'none';
+        }
+      } else if(boostPendingEl) {
+        boostPendingEl.style.display = 'none';
+      }
     }
   }
 }
