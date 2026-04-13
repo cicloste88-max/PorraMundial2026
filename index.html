@@ -65,7 +65,7 @@ h2{
 .glow-line{position:absolute;left:50%;top:0;bottom:0;width:1.5px;transform:translateX(-50%);background:linear-gradient(180deg,transparent 0%,rgba(255,255,255,.5) 12%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.5) 88%,transparent 100%);z-index:9;pointer-events:none}
 .spark{position:absolute;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;z-index:10;animation:spark 2.8s ease-in-out infinite}
 .spark:nth-child(1){top:18%;animation-delay:0s}.spark:nth-child(2){top:50%;animation-delay:.95s}.spark:nth-child(3){top:76%;animation-delay:1.9s}
-@keyframes boostPulse{0%,100%{box-shadow:0 0 0 0 rgba(234,88,12,.4)}50%{box-shadow:0 0 0 4px rgba(234,88,12,.0)}}
+@keyframes boostPulse{0%,100%{box-shadow:0 0 0 0 rgba(234,88,12,.5)}60%{box-shadow:0 0 0 5px rgba(234,88,12,0)}}
 @keyframes spark{0%,100%{opacity:0;transform:translateX(-50%) scale(.4)}50%{opacity:.9;transform:translateX(-50%) scale(1.6)}}
 .center{position:absolute;left:50%;top:0;bottom:0;transform:translateX(-50%);width:96px;z-index:11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
 .mpill{background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:9px;font-weight:600;color:rgba(255,255,255,.92);letter-spacing:.03em;white-space:nowrap;text-align:center}
@@ -2157,7 +2157,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
         <div class="wc-rule-item"><div class="wc-rule-ico">✅</div><div><div class="wc-rule-title">100% obligatorio</div><div class="wc-rule-desc">Debes completar los 104 partidos (grupos, cruces y eliminatorias) para poder enviar.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">🥅</div><div><div class="wc-rule-title">Goleador en 0:0</div><div class="wc-rule-desc">Si pronosticas 0-0, el goleador es opcional.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">🔀</div><div><div class="wc-rule-title">Empate en KO</div><div class="wc-rule-desc">En caso de pronosticar empate en fases de eliminación directa, debes indicar qué equipo se clasifica, independientemente del método (prórroga o penaltis).</div></div></div>
-        <div class="wc-rule-item"><div class="wc-rule-ico">🔥</div><div><div class="wc-rule-title">Boost diario (fase de grupos)</div><div class="wc-rule-desc">Cada día con partidos debes elegir obligatoriamente 1 partido como "Boost". Si aciertas el resultado exacto, todos los puntos de esa tarjeta se multiplican por ×2 (máx. 14 pts). Sin boost asignado no se puede cerrar la porra.</div></div></div>
+        <div class="wc-rule-item"><div class="wc-rule-ico">🔥</div><div><div class="wc-rule-title">Boost diario (fase de grupos)</div><div class="wc-rule-desc">Cada día con partidos debes elegir obligatoriamente 1 partido como "Boost". Si aciertas el resultado exacto, todos los puntos de esa tarjeta se multiplican por ×2 (máx. 14 pts). Sin todos los boosts asignados no se puede acceder a eliminatorias ni cerrar la porra.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">⚖️</div><div><div class="wc-rule-title">Desempate entre participantes</div><div class="wc-rule-desc">En caso de empate a puntos, se deshará por mayor número de marcadores exactos acertados.</div></div></div>
         <div class="wc-rule-item"><div class="wc-rule-ico">💰</div><div><div class="wc-rule-title">Inscripción</div><div class="wc-rule-desc">La cuota se gestiona vía Bizum con el administrador de la porra.</div></div></div>
       </div>
@@ -2176,7 +2176,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
             <div class="wc-row"><span class="wc-row-icon">⚽</span><div class="wc-pts-badge">+2 pts</div><span class="wc-row-text">Aciertas cualquier goleador del partido</span></div>
             <div class="wc-row"><span class="wc-row-icon">🤖</span><div class="wc-pts-badge">+1 pt</div><span class="wc-row-text">Tu signo va contra el pronóstico de la IA</span></div>
             <div class="wc-row"><span class="wc-row-icon">🔥</span><div class="wc-pts-badge" style="background:rgba(234,88,12,.2);color:#fb923c;border-color:rgba(234,88,12,.4)">×2</div><span class="wc-row-text">Boost diario: elige 1 partido/día — si aciertas el exacto, todos sus puntos se doblan</span></div>
-            <div class="wc-max-row"><span class="wc-max-label">Máximo por partido</span><span class="wc-max-val" style="margin-right:48px">7 pts · <span style="color:#fb923c">14 con boost</span></span></div>
+            <div class="wc-max-row"><span class="wc-max-label">Máximo por partido</span><span class="wc-max-val" style="margin-right:48px">7 pts · <span style="color:#fb923c;font-weight:900">14 con boost</span></span></div>
           </div>
           <div style="flex:1;min-width:220px">
             <div class="wc-card-sub" style="margin-bottom:10px">Eliminatorias · adicionalmente</div>

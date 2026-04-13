@@ -61,9 +61,13 @@ function checkGroupsComplete() {
   const icon = document.getElementById('btn-elim-icon');
   const text = document.getElementById('btn-elim-text');
   const count = document.getElementById('btn-elim-count');
+  // Verificar boosts: todas las jornadas deben tener boost asignado
+  const diasConPartidos = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))];
+  const boostsCompletos = diasConPartidos.every(d => boostPicks[d]);
+
   if(btn) {
     count.textContent = filled+'/'+total;
-    if(filled >= total) {
+    if(filled >= total && boostsCompletos) {
       btn.disabled = false;
       btn.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#4ade80;padding:6px 14px;border-radius:10px;border:1px solid #166534;background:#052e16;cursor:pointer;transition:all .3s;opacity:1;font-family:Inter,sans-serif;box-shadow:0 0 16px rgba(74,222,128,.2)';
       icon.textContent = '⚽';
@@ -73,8 +77,14 @@ function checkGroupsComplete() {
       btn.disabled = true;
       btn.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#4b5563;padding:6px 14px;border-radius:10px;border:1px solid #27272a;background:#1c1c1e;cursor:not-allowed;transition:all .3s;opacity:.6;font-family:Inter,sans-serif';
       icon.textContent = '🔒';
-      text.textContent = 'Eliminatorias';
-      count.style.display = 'inline';
+      if(filled >= total && !boostsCompletos) {
+        const pendientes = diasConPartidos.filter(d => !boostPicks[d]).length;
+        text.textContent = 'Boost: faltan ' + pendientes + ' jornada' + (pendientes > 1 ? 's' : '');
+        count.style.display = 'none';
+      } else {
+        text.textContent = 'Eliminatorias';
+        count.style.display = 'inline';
+      }
     }
   }
 
@@ -114,7 +124,7 @@ function checkGroupsComplete() {
   }
 
   if(ctaLocked && ctaReady) {
-    if(filled >= total) {
+    if(filled >= total && boostsCompletos) {
       ctaLocked.style.display = 'none';
       ctaReady.style.display = 'block';
     } else {
