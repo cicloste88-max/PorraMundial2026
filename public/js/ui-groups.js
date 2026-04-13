@@ -125,53 +125,132 @@ function checkGroupsComplete() {
 }
 
 
-/* ── Ticker boost: muestra los partidos de hoy para elegir boost ── */
+/* ── Ticker de jornadas de boost — pastillas en barra superior ── */
 function renderBoostTicker() {
-  const ticker    = document.getElementById('boost-ticker');
-  const container = document.getElementById('boost-ticker-matches');
-  const status    = document.getElementById('boost-ticker-status');
-  if(!ticker || !container) return;
+  const ticker = document.getElementById('boost-ticker');
+  if (!ticker) return;
 
-  // Fecha de hoy en formato YYYY-MM-DD (hora local)
+  // Calcular todas las jornadas de grupos
+  const jornadasMap = {};
+  PARTIDOS.forEach((m, idx) => {
+    const date = m.date?.substring(0,10);
+    if (!date) return;
+    if (!jornadasMap[date]) jornadasMap[date] = [];
+    jornadasMap[date].push({ idx, home: m.home, away: m.away });
+  });
+
   const today = new Date().toISOString().substring(0,10);
+  const jornadas = Object.keys(jornadasMap).sort();
 
-  // Partidos de hoy en fase de grupos
-  const todayMatches = PARTIDOS.filter(m => m.date && m.date.substring(0,10) === today);
+  // Jornadas pendientes de boost (sin asignar)
+  const pendientes = jornadas.filter(d => !boostPicks[d]);
+  // Jornada de hoy si existe
+  const jornadaHoy = jornadasMap[today];
 
-  if(todayMatches.length === 0) {
+  if (pendientes.length === 0 && !jornadaHoy) {
     ticker.style.display = 'none';
     return;
   }
 
   ticker.style.display = 'flex';
+  ticker.style.flexWrap = 'wrap';
+  ticker.style.gap = '8px';
+  ticker.style.alignItems = 'center';
+  ticker.style.padding = '8px 14px';
 
-  const boostedToday = boostPicks[today];
+  let html = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;letter-spacing:.04em;flex-shrink:0">🔥 BOOST</span>';
 
-  container.innerHTML = todayMatches.map(m => {
-    const key = getMatchKey(m);
-    const isActive = boostedToday === key;
-    const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-    return `<button
-      onclick="tickerBoostToggle('${key}','${today}')"
-      style="
-        display:flex;align-items:center;gap:6px;
-        padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;
-        border:1px solid ${isActive ? 'rgb(234,88,12)' : 'rgba(255,255,255,.12)'};
-        background:${isActive ? 'rgba(124,45,18,.7)' : 'rgba(255,255,255,.04)'};
-        color:${isActive ? 'rgb(251,191,36)' : 'rgba(255,255,255,.6)'};
-        cursor:pointer;transition:all .2s;white-space:nowrap;
-      "
-    >${isActive ? '🔥 ' : ''}${m.home} vs ${m.away} <span style="opacity:.5">${hora}</span></button>`;
-  }).join('');
+  // Pastilla especial "HOY" si hay partidos hoy y falta el boost
+  if (jornadaHoy && !boostPicks[today]) {
+    html += `<button onclick="tickerExpandJornada('${today}')" style="
+      display:inline-flex;align-items:center;gap:5px;
+      padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;
+      border:1.5px solid rgb(234,88,12);
+      background:rgba(124,45,18,.5);color:rgb(251,191,36);
+      cursor:pointer;animation:boostPulse 1.5s ease-in-out infinite;
+      white-space:nowrap;
+    ">⚡ HOY — Elige tu boost</button>`;
+  } else if (jornadaHoy && boostPicks[today]) {
+    const bMatch = PARTIDOS.find(m => getMatchKey(m) === boostPicks[today]);
+    const label = bMatch ? bMatch.home.split(' ')[0] + ' vs ' + bMatch.away.split(' ')[0] : 'asignado';
+    html += `<button onclick="tickerExpandJornada('${today}')" style="
+      display:inline-flex;align-items:center;gap:5px;
+      padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;
+      border:1px solid rgba(74,222,128,.4);
+      background:rgba(22,101,52,.3);color:rgb(74,222,128);
+      cursor:pointer;white-space:nowrap;
+    ">✓ HOY: ${label}</button>`;
+  }
 
-  // Estado: cuántos quedan sin boost
-  if(boostedToday) {
-    const bMatch = PARTIDOS.find(m => getMatchKey(m) === boostedToday);
-    if(status) status.textContent = '✓ ' + (bMatch ? bMatch.home + ' vs ' + bMatch.away : 'asignado');
-  } else {
-    if(status) status.textContent = 'Elige 1 partido';
+  // Pastillas de jornadas pendientes (próximas, no hoy)
+  const pendientesSinHoy = pendientes.filter(d => d !== today);
+  // Mostrar máx 3 jornadas pendientes para no saturar
+  pendientesSinHoy.slice(0,3).forEach(d => {
+    const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'short'});
+    const nMatches = jornadasMap[d].length;
+    html += `<button onclick="tickerExpandJornada('${d}')" style="
+      display:inline-flex;align-items:center;gap:4px;
+      padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;
+      border:1px solid rgba(251,146,60,.25);
+      background:rgba(67,20,7,.4);color:rgba(251,146,60,.7);
+      cursor:pointer;white-space:nowrap;
+    ">🔥 ${dayLabel} (${nMatches})</button>`;
+  });
+
+  // Si quedan más jornadas pendientes, mostrar contador
+  if (pendientesSinHoy.length > 3) {
+    html += `<span style="font-size:10px;color:#6b7280">+${pendientesSinHoy.length - 3} más</span>`;
+  }
+
+  ticker.innerHTML = html;
+
+  // Panel expandible de partidos de la jornada (se crea dinámicamente)
+  let panel = document.getElementById('boost-ticker-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'boost-ticker-panel';
+    panel.style.cssText = 'display:none;width:100%;padding:8px 0 4px;border-top:1px solid rgba(124,45,18,.3);margin-top:4px;display:flex;gap:6px;flex-wrap:wrap';
+    ticker.appendChild(panel);
   }
 }
+
+/* Expande/colapsa los partidos de una jornada en el ticker */
+function tickerExpandJornada(date) {
+  const panel = document.getElementById('boost-ticker-panel');
+  if (!panel) return;
+
+  // Si ya estaba expandido para esta fecha, colapsar
+  if (panel.dataset.date === date && panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    panel.dataset.date = '';
+    return;
+  }
+
+  panel.dataset.date = date;
+  panel.style.display = 'flex';
+
+  const matchesOfDay = PARTIDOS.filter(m => m.date?.substring(0,10) === date);
+  const boostedKey = boostPicks[date];
+  const hora = (m) => new Date(m.date).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+
+  panel.innerHTML = matchesOfDay.map(m => {
+    const key = getMatchKey(m);
+    const isActive = boostedKey === key;
+    return `<button
+      onclick="tickerBoostToggle('${key}','${date}')"
+      style="
+        display:inline-flex;align-items:center;gap:5px;
+        padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;
+        border:1px solid ${isActive ? 'rgb(234,88,12)' : 'rgba(255,255,255,.1)'};
+        background:${isActive ? 'rgba(124,45,18,.7)' : 'rgba(255,255,255,.04)'};
+        color:${isActive ? 'rgb(251,191,36)' : 'rgba(255,255,255,.55)'};
+        cursor:pointer;white-space:nowrap;transition:all .2s;
+      "
+    >${isActive ? '🔥 ' : ''}${m.home} vs ${m.away}
+    <span style="opacity:.45;font-size:10px">${hora(m)}</span></button>`;
+  }).join('');
+}
+window.tickerExpandJornada = tickerExpandJornada;
 
 /* Llamado desde el ticker al hacer click en un partido */
 function tickerBoostToggle(matchKey, date) {
