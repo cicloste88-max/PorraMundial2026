@@ -158,6 +158,20 @@ Object.assign(pred, { l, v, gol, saved: true, lockedByUser: true });
 predictions[key] = { l, v, gol, saved: true };
 ```
 
+## Patrón listeners attachEvents — CRÍTICO
+Los listeners de `.sbn` y `gsel` en `attachEvents` deben leer `predictions[matchKey]`
+en tiempo real dentro del listener, NO capturar `pred` como const en el closure:
+```js
+// CORRECTO — lee la referencia actual:
+btn.addEventListener('click', () => {
+  const p = predictions[matchKey];
+  ...
+});
+// MAL — closure huérfano si loadUserData reemplaza el objeto:
+const pred = predictions[matchKey];
+btn.addEventListener('click', () => { pred.l = ...; });
+```
+
 ## Patrón drawBracketLines
 Llamar solo cuando el panel es visible. Desde `switchView('bracket')` con `rAF + 50ms`.
 
