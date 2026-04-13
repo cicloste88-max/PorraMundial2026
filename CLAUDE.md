@@ -6,7 +6,8 @@ App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite
 Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main**
 
-## Estado actual (2026-04-13)
+## Estado actual (2026-04-13 — checkpoint final sesion)
+**Ultimo commit: 8e8ac44 — fix: jornada movil — grid colapsa, cinta usuario, modal ver tarjeta**
 **Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Vista Jornada COMPLETA. Último commit: 8e8ac44.**
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
