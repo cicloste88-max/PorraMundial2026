@@ -269,3 +269,8 @@ Decisiones de diseño:
 - Modificados: index.html, js/main-entry.js, public/js/ui-nav.js, public/js/admin.js
 - Commit: cd4afa2 — desplegado en producción
 - Pendiente: conectar con _results reales (11 jun, pg_cron update-results)
+
+[sesión 2026-04-13] FEATURE: splash screen opening
+- Modificados: index.html (HTML splash + CSS animaciones), public/js/ui-nav.js (initSplash + splashDone)
+- Splash con logo FIFA, anillos giratorios, barra progreso, botón saltar
+- Auto-oculta tras 5.5s o al completar initWelcome (splashDone)

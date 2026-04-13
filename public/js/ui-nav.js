@@ -624,6 +624,8 @@ function initWelcome() {
     wcSizeRow2();
     window.addEventListener('resize', wcSizeRow2);
   }
+  // Señalar al splash que la app está lista
+  if (typeof window.splashDone === 'function') window.splashDone();
 }
 
 

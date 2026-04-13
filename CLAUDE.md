@@ -4,112 +4,119 @@
 App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** (vite-migration ya mergeada)
+Rama activa: **main**
 
 ## Estado actual (2026-04-13)
-**Migración Vite COMPLETA + extracción de main.js COMPLETA + bracket-results COMPLETO.** Deploy en Vercel operativo. Último commit: **cd4afa2**.
+**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Último commit: cd4afa2.**
 
 - Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
-- `main.js` ELIMINADO del repo — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
+- `main.js` ELIMINADO — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
 - `js/main-entry.js` como entry point Vite (type="module", importa Supabase npm)
-- Build: `npm run build` genera `dist/` con `assets/` + `js/` (11 classic scripts + 1 bundle)
+- Build: `npm run build` genera `dist/` con `assets/` + `js/`
 - QA login con `.env.local` (VITE_QA_EMAIL / VITE_QA_PASS)
 - `vercel.json` eliminado — causaba MIME text/html en .js (rompía módulos ES)
-- BOM UTF-8 en index.html — emojis correctos en producción
-- Bug patrón `DOMContentLoaded` dead-code handler resuelto (ver sección Patrones)
-- **bracket-results**: vista de resultados reales KO (tab "Resultados" en eliminatorias)
-  - `public/js/bracket-results.js` + `css/bracket-results.css` (prefijo brk-)
-  - 5 fases en rail (1/32, 1/16, Octavos, Cuartos, Semis) + Final como vista separada
-  - Final box fuera del bracket scroll, con cards Final + 3er Puesto
-  - Conectado a admin.js via refreshBracketResults()
-  - Pendiente: conectar con _results reales (11 jun, pg_cron update-results)
 
 ## Estructura ficheros JS
 ```
 js/
-  main-entry.js     <- entry point Vite (type=module) — importa Supabase npm
+  main-entry.js       <- entry point Vite (type=module) — importa Supabase npm
+
 public/js/
-  data.js           <- datos torneo + estado global + utils (215 lineas, 12 decls)
-                      SB, EQUIPOS, GRUPOS, PARTIDOS, KIT_OVERRIDES,
-                      predictions, iaPredictions, totalPoints,
-                      getMatchKey, getMySign, iaBonusWillApply, escapeHtml
-  scoring.js        <- motor puntos + tabla + tarjetas + premios (1184 lineas, 50 decls)
-                      KO_ROUND_PTS, FINAL_CLASSIFICATION_PTS, calc*, AWARDS_CFG,
-                      AW_PLAYERS, YOUNG_PLAYERS_NXGN, CLASSIFICATION_PTS, renderAll,
-                      refreshGroupTables, updateCardUI, openPicker, selectAward
-  ui-groups.js      <- init grupos (167 lineas, 3 decls)
-                      initGrupos, savePredictions, checkGroupsComplete
-  ko.js             <- bracket KO + IA + connector lines SVG (~1100 lineas, 30 decls)
-                      BRACKET, koPredictions, ROUND_CONFIG, ROUND_BREAKDOWN,
-                      BRACKET_CONNECTIONS, BADGE_MAP, areGroupsComplete,
-                      buildBracketView, drawBracketLines, enableDragScroll,
-                      fetchIAforKO, findMatch, getTeamForSlot, saveKO,
-                      normKoPredictions, ...
-  bracket-results.js <- vista resultados reales KO (342 lineas)
-                      BRK_PHASES, BRK_COLS, BRK_BADGE_MAP,
-                      initBracketResults, refreshBracketResults, brkSetPhase,
-                      brkMakeFinalBox, brkRenderBracket, brkRenderRail
-  ui-nav.js         <- SPA nav + modal + welcome (653 lineas, 17 decls)
-                      showPage, openModal, closeModal, initWelcome,
-                      updateAwardsFooter, renderPickerList, koInit,
-                      refreshAllViews, fetchIAforKO, showIAresultInModal
-  auth.js           <- auth Supabase (doLogin, doRegister, onAuthStateChange,
-                      loadUserData, renderAuthBar, updateCTAs)
-  leagues.js        <- ligas y seleccion de porra (leagueLoadMyLeagues,
-                      leagueSelect, getActiveLeagueId, _myLeagues via getter)
-  misc.js           <- utils UI (sin deps, carga en paralelo)
-  scoreboard.js     <- clasificacion multi-usuario
-  close-porra.js    <- cierre de pronosticos (checkFinalizarReady, finalizarPorra)
-  admin.js          <- panel admin + dados/simulador + lockAllCardsIfCerrada
+  data.js             <- datos torneo + estado global + utils
+                         SB, EQUIPOS, GRUPOS, PARTIDOS, KIT_OVERRIDES,
+                         predictions, iaPredictions, totalPoints,
+                         getMatchKey, getMySign, iaBonusWillApply, escapeHtml
+  scoring.js          <- motor puntos + tabla + tarjetas + premios
+                         KO_ROUND_PTS, FINAL_CLASSIFICATION_PTS, calc*, AWARDS_CFG,
+                         AW_PLAYERS, YOUNG_PLAYERS_NXGN, renderAll,
+                         refreshGroupTables, updateCardUI, openPicker, selectAward
+  ui-groups.js        <- init grupos
+                         initGrupos, savePredictions, checkGroupsComplete
+  ko.js               <- bracket KO + IA pronósticos (vista "Rondas"/"Bracket"/"Cuadro")
+                         BRACKET, koPredictions, ROUND_CONFIG, ROUND_BREAKDOWN,
+                         BADGE_MAP, areGroupsComplete, buildBracketView,
+                         fetchIAforKO, findMatch, getTeamForSlot, saveKO,
+                         normKoPredictions, buildCinematicView, resolvedSlots
+  ui-nav.js           <- SPA nav + modal + welcome
+                         showPage, openModal, closeModal, initWelcome,
+                         updateAwardsFooter, renderPickerList, koInit,
+                         refreshAllViews, setView (gestiona tabs + oculta finalizar en Resultados)
+  auth.js             <- auth Supabase
+                         doLogin, doRegister, onAuthStateChange,
+                         loadUserData, renderAuthBar, updateCTAs
+  leagues.js          <- ligas y selección de porra
+                         leagueLoadMyLeagues, leagueSelect, getActiveLeagueId
+  misc.js             <- utils UI (sin deps, carga en paralelo)
+  scoreboard.js       <- clasificación multi-usuario
+  close-porra.js      <- cierre de pronósticos
+                         checkFinalizarReady, finalizarPorra
+  admin.js            <- panel admin + dados/simulador + lockAllCardsIfCerrada
+                         llama refreshBracketResults() tras actualizar resultados
+  bracket-results.js  <- [NUEVO 2026-04-13] vista de resultados reales del bracket KO
+                         SIN lógica de pronósticos. Lee window._results.
+                         Expone: initBracketResults, refreshBracketResults, brkSetPhase
+
+public/css/
+  bracket-results.css <- [NUEVO 2026-04-13] estilos del bracket de resultados
+                         Prefijo brk- en todas las clases
 ```
 
-Total extraido de main.js: 3267 lineas, 110 decls top-level, 0 solapes entre ficheros.
-
 ## Cadena de carga en main-entry.js
-```js
-import { createClient } from '@supabase/supabase-js'
-window.supabase = { createClient }
-if (import.meta.env.DEV) {
-  window.__QA_EMAIL = import.meta.env.VITE_QA_EMAIL
-  window.__QA_PASS  = import.meta.env.VITE_QA_PASS
-}
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = src; s.onload = resolve; s.onerror = reject
-    document.head.appendChild(s)
-  })
-}
-// misc.js es autonomo — carga en paralelo
-loadScript('/js/misc.js').catch(e => console.error('misc.js:', e))
+```
+misc.js (paralelo)
+leagues → data → scoring → ui-groups → ko → ui-nav
+  → auth → scoreboard → close-porra → admin → bracket-results
+```
 
-// Cadena con dependencias (orden CRITICO):
-// - leagues PRIMERO: los classic scripts extraidos pueden llamar
-//   leagueLoadMyLeagues/_myLeagues en top-level
-// - data -> scoring -> ui-groups -> ko -> ui-nav: los 5 sub-modulos de
-//   lo que antes era main.js. Se cargan antes que auth para que
-//   onAuthStateChange callback encuentre PARTIDOS, predictions, etc.
-//   cuando fire.
-// - auth -> scoreboard -> close-porra -> admin: orden original
-loadScript('/js/leagues.js')
-  .then(() => loadScript('/js/data.js'))
-  .then(() => loadScript('/js/scoring.js'))
-  .then(() => loadScript('/js/ui-groups.js'))
-  .then(() => loadScript('/js/ko.js'))
-  .then(() => loadScript('/js/bracket-results.js'))
-  .then(() => loadScript('/js/ui-nav.js'))
-  .then(() => loadScript('/js/auth.js'))
-  .then(() => loadScript('/js/scoreboard.js'))
-  .then(() => loadScript('/js/close-porra.js'))
-  .then(() => loadScript('/js/admin.js'))
-  .then(() => {
-    // Safety net: garantiza que la UI welcome arranca tras cargar toda
-    // la chain. Idempotente con el readyState check de auth.js.
-    if (typeof window.initWelcome === 'function') window.initWelcome();
-    if (typeof window.showPage === 'function') window.showPage('welcome');
-    if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
-  })
-  .catch(e => console.error('Error cargando modulos:', e))
+## Bracket de Resultados — bracket-results.js (2026-04-13)
+
+### Propósito
+Vista "Resultados" en page-elim. Muestra el estado real del torneo KO sin pronósticos.
+Se activa con el tab "Resultados" (reemplaza el antiguo tab "Bracket").
+
+### Estructura de fases
+```
+BRK_PHASES: r32 → r16 → oct → qf → sf → final
+BRK_COLS:
+  r32: left=[73-80]  right=[81-88]   (16 partidos, IDs de BRACKET.r32)
+  r16: left=[89-92]  right=[93-96]   (8 partidos,  IDs de BRACKET.r16)
+  oct: left=[97,98]  right=[99,100]  (4 partidos,  IDs de BRACKET.qf)
+  qf:  left=[101]    right=[102]     (2 partidos,  IDs de BRACKET.sf)
+  sf:  left=[]       right=[]        (semis — vacío hasta que existan IDs)
+  final: caja propia (no columna del bracket)
+BRK_FINAL_ID = 104   (BRACKET.final[0].id)
+BRK_THIRD_ID = 103   (BRACKET.third[0].id)
+```
+
+### Comportamiento
+- Fases r32/r16/oct/qf/sf: muestra bracket simétrico izquierda/derecha
+  - Fase activa: columna expandida con cards completas
+  - Fases pasadas: columna estrecha con mini-scores
+  - Fases futuras: columna ghost (siluetas semitransparentes)
+- Fase "final": oculta el bracket, muestra `#brk-final-area` con caja
+  horizontal (Final + 3er Puesto) similar a "Cerrar pronósticos"
+- "Cerrar pronósticos" (#finalizar-section) se oculta automáticamente
+  en esta vista (setView lo gestiona en ui-nav.js)
+
+### Cards
+- Hero: bandera equipo de fondo (blur/oscuro) + badge/escudo oficial centrado
+- Score bar: marcador local:visitante
+- Footer: venue + status badge (Finalizado/En vivo con minuto/Próximo/Por definir)
+- BRK_BADGE_MAP: 42 slugs mapeados a ficheros en Supabase Storage /badges/
+
+### Conexión con datos reales
+```js
+// brkLoadResults() lee:
+window._results?.ko_results  // estructura: {"89":{local,visitante,estado,minuto},...}
+// Si null → todos los partidos en estado 'upcoming' (correcto pre-torneo)
+// Activar con pg_cron update-results el 11 jun 2026
+```
+
+### API pública
+```js
+window.initBracketResults()    // inicializa/re-renderiza el bracket
+window.refreshBracketResults() // recarga _results y re-renderiza (llamado por admin.js)
+window.brkSetPhase(id)         // navega entre fases: 'r32','r16','oct','qf','sf','final'
 ```
 
 ## Comandos útiles
@@ -119,49 +126,38 @@ npm run build   # genera dist/ — verificar antes de push a main
 git add -A && git commit -m "..." && git push origin main
 ```
 
-## Reglas CRITICAS
+## Reglas CRÍTICAS
 - NUNCA push a main sin validar en localhost:5173 primero
 - Push inmediato tras cada commit — nunca acumular
-- NO crear ni modificar vercel.json — Vercel sirve MIME correctamente por defecto
-- Actualizar migration-log.md tras cada accion importante
+- NO crear ni modificar vercel.json
+- Actualizar migration-log.md tras cada acción importante
 - Un commit por tarea/fix — mensajes descriptivos
-- NO usar addEventListener DOMContentLoaded en classic scripts cargados
-  via loadScript — ver seccion Patrones abajo
+- NO usar addEventListener DOMContentLoaded en classic scripts cargados via loadScript
 
-## Patrones — Bug DOMContentLoaded dead-code handler
-
-**Problema**: los classic scripts en `public/js/*.js` se cargan via loadScript
-chain en `main-entry.js`, que es un modulo ES diferido. La chain arranca DESPUES
-del parseo del HTML y se ejecuta async. Cuando un script se evalua via loadScript,
-`DOMContentLoaded` **ya ha disparado** hace ~100-300ms.
-
-Codigo asi es DEAD CODE:
+## Patrón DOMContentLoaded en classic scripts
+Los scripts en `public/js/*.js` se cargan via loadScript (async, post-parse).
+`DOMContentLoaded` ya ha disparado cuando se evalúan. Patrón correcto:
 ```js
-document.addEventListener('DOMContentLoaded', () => {
-  initWelcome();  // NUNCA se ejecuta
-});
-```
-
-Fix correcto — chequear readyState antes de attach:
-```js
-const runInit = () => { initWelcome(); /* ... */ };
+const runInit = () => { /* ... */ };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', runInit);
 } else {
-  runInit();  // DOM ya listo, correr inmediato
+  runInit();
 }
 ```
 
-Safety net adicional en el `.then()` final de la loadScript chain de
-main-entry.js — garantiza que la UI welcome arranca tras cargar toda la chain
-aunque el readyState check falle por algun edge case. Las funciones llamadas
-por el safety net deben ser IDEMPOTENTES (guard `if (window._xInited) return`).
+## Patrón diceSimulateMatch — CRÍTICO
+Siempre mutar el objeto prediction con `Object.assign`, nunca reemplazar la referencia.
+Los closures de `attachEvents` dependen de ella:
+```js
+// CORRECTO:
+Object.assign(pred, { l, v, gol, saved: true, lockedByUser: true });
+// MAL — rompe closures:
+predictions[key] = { l, v, gol, saved: true };
+```
 
-Casos conocidos ya arreglados: `initWelcome` (commit 744d3f4), `checkFinalizarReady`
-(commit d81f2dd via exports explicitos en close-porra.js).
-
-Si apareciera otra funcion con sintoma similar (no se ejecuta tras login), buscar
-si su unico call site esta dentro de un `DOMContentLoaded` handler.
+## Patrón drawBracketLines
+Llamar solo cuando el panel es visible. Desde `switchView('bracket')` con `rAF + 50ms`.
 
 ## Stack de infraestructura
 - Hosting: Vercel (porramundial2026-seven.vercel.app) — autodeploy desde main
@@ -169,56 +165,83 @@ si su unico call site esta dentro de un `DOMContentLoaded` handler.
 - Secrets en Vault: GITHUB_TOKEN, GITHUB_REPO, ANTHROPIC_API_KEY
 
 ## Edge Functions Supabase
-- admin-actions v7: gestión admin (results/overrides/users/leagues/reopen). Requiere JWT admin
-- update-results v2: sync football-data.org. Activar pg_cron el 11 jun 2026
-- porra-orchestrator v3: N agentes Haiku en paralelo → orchestrator_jobs
-- porra-patch-deploy v4: patches search/replace + commit GitHub
-- porra-fix-encoding v5: write/inspect ficheros en GitHub via API
-- porra-github-pusher v6: PLACEHOLDER — ignorar
+| EF | Versión | Descripción |
+|---|---|---|
+| admin-actions | v7 | Gestión admin (results/overrides/users/leagues/reopen). Requiere JWT admin |
+| update-results | v2 | Sync football-data.org → tabla results. **Activar pg_cron el 11 jun 2026** |
+| porra-orchestrator | v3 | N agentes Haiku en paralelo → orchestrator_jobs. Coste <$0.01 |
+| porra-patch-deploy | v4 | Patches search/replace + commit GitHub |
+| porra-fix-encoding | v5 | Write/inspect ficheros en GitHub via API |
+| porra-github-pusher | v6 | PLACEHOLDER — ignorar |
 
 ## Sistema de agentes
-Supervisor (Claude.ai) → porra-orchestrator EF → N Claude Haiku en paralelo → orchestrator_jobs
-Coste < $0.01. ANTHROPIC_API_KEY en Vault.
-Para invocar desde Claude.ai: Supabase MCP execute_sql → net.http_post → SELECT FROM net._http_response WHERE id=N
+```
+Supervisor (Claude.ai) → porra-orchestrator EF → N Claude Haiku → orchestrator_jobs
+```
+Coste <$0.01. ANTHROPIC_API_KEY en Vault.
+Invocar desde Claude.ai: Supabase MCP `execute_sql → net.http_post → SELECT FROM net._http_response WHERE id=N`
 
-## Conectores Claude.ai
-- Supabase MCP: execute_sql, get_logs, list/get/deploy_edge_function
-- Claude in Chrome: navigate, screenshot, javascript_tool, read_console_messages, tabs_context_mcp
+## Conectores Claude.ai activos
+- **Supabase MCP**: execute_sql, get_logs, list/get/deploy_edge_function
+- **Claude in Chrome**: navigate, screenshot, javascript_tool, read_console_messages, tabs_context_mcp
 
 ## Flujo QA con Claude in Chrome
-1. tabs_context_mcp → obtener tabId
+```
+1. tabs_context_mcp(createIfEmpty=true) → obtener tabId
 2. navigate → localhost:5173 o producción
-3. read_console_messages(onlyErrors)
-4. Login: doLogin(window.__QA_EMAIL, window.__QA_PASS) via javascript_tool
-5. Verificar: typeof doLogin, admInit, getActiveLeagueId, _porraDb
-6. Screenshot por sección
+3. read_console_messages(onlyErrors) — debe ser []
+4. Login local:  _porraDb.auth.signInWithPassword({email:window.__QA_EMAIL, password:window.__QA_PASS})
+   Login prod:   _porraDb.auth.signInWithPassword({email:'cicloste88@gmail.com', password:'910500'})
+5. showPage('elim') → activar panel view-bracket-results → initBracketResults()
+6. Verificar: typeof initBracketResults, typeof brkSetPhase
+7. Probar fases: ['r32','r16','oct','qf','sf','final'].forEach(id=>brkSetPhase(id))
+8. Screenshot por sección
+```
 
 ## Motor de puntuación
 - Partido: +1 signo / +3 exacto (no acumula) / +2 goleador / +1 bonus vs IA (max 7pts)
-- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeon+25
-- Clasificacion final: campeon+30, subcampeon+20, 3o+15, 4o+10
-- Premios: Balon/Bota/Guante Oro 15pts, Mejor Joven 21 20pts (en AWARDS_CFG)
+- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeón+25
+- Clasificación final: campeón+30, subcampeón+20, 3º+15, 4º+10
+- Premios: Balón/Bota/Guante Oro 15pts, Mejor Joven ≤21 20pts (en AWARDS_CFG)
 
 ## Estructura torneo
 - 48 equipos, 12 grupos (A-L) de 4, 72 partidos grupos
 - 2 primeros + 8 mejores terceros = 32 a eliminatorias
-- R32, R16, QF, SF, 3er puesto, Final — 104 partidos total
-- Resultados en tabla `results`, overrides via admin-actions
+- R32 → R16 → QF → SF → 3er puesto → Final — 104 partidos total
+- Resultados en tabla `results` (id=1), overrides via admin-actions
+
+## Assets Supabase Storage (miniatures/)
+```
+badges/          — 42 escudos oficiales de selecciones (spain.png, germany.png, ...)
+flags/           — banderas por código (ESP.png, GER.png, ...)
+kits/            — equipaciones por slug/home|away.jpg
+Logos/           — logos FIFA 2026 (general + por sede: Canada, Mexico, USA)
+Ball/            — balón oficial Trionda
+awards/          — trofeos individuales (ballon d'or, golden boot, golden glove, young)
+MVP/             — imágenes jugadores MVP
+```
 
 ## Pendientes antes del 11 jun 2026
-1. Activar pg_cron update-results el 11 jun
-2. Seguridad auth: autoconfirm off, pwd min 8, enable_signup false
-3. Email confirmacion al cerrar porra (Resend + EF)
-4. README — actualizar con URL Vercel (actualmente dice Netlify)
+| # | Tarea | Estado |
+|---|---|---|
+| 1 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
+| 2 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ jun |
+| 3 | Desactivar signup público cuando entren todos los amigos | ⏳ |
+| 4 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
+| 5 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
+| 6 | README — actualizar con URL Vercel (dice Netlify) | ⏳ |
 
-Sin pendientes criticos. Bugs recientes resueltos en esta sesion:
-- updateCardUI TypeError (commit ee2e25a): early-return si tarjeta no en DOM
-- checkFinalizarReady/finalizarPorra undefined (commit d81f2dd): exports
-  explicitos en close-porra.js + eliminacion de bloque exports dead-code
-- initWelcome nunca ejecutaba (commit 744d3f4): readyState check + safety net
-- Venues gallery vacia (mismo 744d3f4): consecuencia del initWelcome fix
+## Historial de sesiones clave
+| Fecha | Hito | Commit |
+|---|---|---|
+| 2026-04-11 | Migración Vite completa, merge a main, fix vercel.json MIME | — |
+| 2026-04-12 AM | Extracción main.js en 5 módulos, fixes race condition y DOMContentLoaded | ee2e25a |
+| 2026-04-12 PM | Bracket Fase 1 SVG overlay. Fix dado/undo Object.assign | 187a764 |
+| 2026-04-13 | **Bracket de resultados reales** — bracket-results.js + CSS, 6 fases, cards badge+flag, vista Final en caja propia, QA local+producción OK | cd4afa2 |
 
 ## Log de cambios (OBLIGATORIO)
-Añadir línea a migration-log.md tras cada accion:
-[HH:MM] ACCION: descripcion — ficheros afectados
+Añadir línea a migration-log.md tras cada acción:
+```
+[HH:MM] ACCION: descripción — ficheros afectados
+```
 Nunca borrar entradas anteriores.

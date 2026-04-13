@@ -1246,6 +1246,40 @@ body{font-family:'Inter',sans-serif;background:#0f172a;color:#fff;min-height:100
 }
 .btn-go-groups:hover{background:#22c55e;transform:translateY(-1px)}
 
+/* ═══ SPLASH SCREEN ═══ */
+#splash-screen{position:fixed;inset:0;z-index:9999;background:#060a16;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s ease,visibility .6s ease;}
+#splash-screen.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.spl-glow{position:absolute;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(232,37,26,.12) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);animation:splGp 3.5s ease-in-out infinite;pointer-events:none;}
+@keyframes splGp{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}}
+.spl-grid{position:absolute;inset:0;opacity:.03;background-image:linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;}
+.spl-content{position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 2rem;}
+.spl-host{display:flex;align-items:center;gap:6px;margin-bottom:1.3rem;opacity:0;animation:splFd .6s ease forwards .3s;font-size:15px;}
+.spl-dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.18);}
+.spl-ht{font-size:10px;letter-spacing:.16em;color:rgba(255,255,255,.3);text-transform:uppercase;font-weight:500;}
+.spl-porra{font-size:12px;font-weight:600;letter-spacing:.3em;color:rgba(255,255,255,.4);text-transform:uppercase;opacity:0;animation:splFu .5s ease forwards .7s;margin-bottom:1px;}
+.spl-mundial{font-size:clamp(48px,10vw,64px);font-weight:800;color:#fff;line-height:.95;letter-spacing:-.03em;font-family:'Inter Tight',sans-serif;opacity:0;animation:splFu .6s ease forwards .9s;}
+.spl-year{font-size:clamp(36px,8vw,48px);font-weight:800;color:#e8251a;line-height:1;letter-spacing:-.02em;font-family:'Inter Tight',sans-serif;opacity:0;animation:splFu .6s ease forwards 1.1s;margin-bottom:1.4rem;}
+.spl-logo-wrap{position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center;margin:0 auto 1.3rem;}
+.spl-ring{position:absolute;border-radius:50%;border:1.5px solid transparent;top:50%;left:50%;}
+.spl-ring1{width:174px;height:174px;border-top-color:rgba(232,37,26,.8);border-right-color:rgba(232,37,26,.3);transform:translate(-50%,-50%);opacity:0;animation:splS1 1.4s linear forwards 1.3s;}
+.spl-ring2{width:190px;height:190px;border-top-color:rgba(255,255,255,.14);border-left-color:rgba(255,255,255,.07);transform:translate(-50%,-50%);opacity:0;animation:splS2 1.7s linear forwards 1.3s;}
+@keyframes splS1{0%{opacity:1;transform:translate(-50%,-50%) rotate(0)}80%{opacity:.4}100%{opacity:0;transform:translate(-50%,-50%) rotate(370deg)}}
+@keyframes splS2{0%{opacity:.5;transform:translate(-50%,-50%) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) rotate(-290deg)}}
+.spl-logo-img{position:relative;z-index:2;width:150px;height:150px;object-fit:contain;opacity:0;transform-origin:bottom center;transform:scaleY(.03) scaleX(.2);animation:splLb 1.3s cubic-bezier(.22,1,.36,1) forwards 1.5s;filter:drop-shadow(0 4px 20px rgba(232,37,26,.3)) brightness(1.1);}
+@keyframes splLb{0%{opacity:.2;transform:scaleY(.03) scaleX(.2)}45%{opacity:.9;transform:scaleY(1.05) scaleX(1.02)}70%{opacity:1;transform:scaleY(.97) scaleX(.98)}85%{transform:scaleY(1.02) scaleX(1.005)}100%{opacity:1;transform:scaleY(1) scaleX(1)}}
+.spl-divider{width:32px;height:1px;background:rgba(255,255,255,.1);margin:0 0 1.2rem;opacity:0;animation:splFi .4s ease forwards 3.1s;}
+.spl-stats{display:flex;align-items:center;margin-bottom:1.8rem;opacity:0;animation:splFi .5s ease forwards 3.3s;}
+.spl-si{text-align:center;padding:0 13px;}.spl-sn{font-size:20px;font-weight:700;color:#fff;line-height:1;}.spl-sl{font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.1em;text-transform:uppercase;margin-top:3px;}.spl-ss{width:1px;height:28px;background:rgba(255,255,255,.1);}
+.spl-prog-wrap{width:140px;opacity:0;animation:splFi .4s ease forwards 3.5s;}
+.spl-prog-track{width:100%;height:2px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+.spl-prog-fill{height:100%;background:linear-gradient(90deg,#e8251a,#c0392b);border-radius:2px;width:0%;animation:splFill 3.5s cubic-bezier(.4,0,.2,1) forwards 3.7s;}
+@keyframes splFill{0%{width:0%}55%{width:68%}80%{width:87%}100%{width:100%}}
+.spl-prog-txt{font-size:10px;color:rgba(255,255,255,.2);text-align:center;margin-top:6px;letter-spacing:.06em;opacity:0;animation:splFi .4s ease forwards 3.7s;transition:opacity .3s;}
+.spl-skip{position:fixed;bottom:24px;right:20px;font-size:11px;color:rgba(255,255,255,.28);background:rgba(255,255,255,.06);border:.5px solid rgba(255,255,255,.12);border-radius:20px;padding:6px 16px;cursor:pointer;z-index:10000;opacity:0;animation:splFi .4s ease forwards 4.4s;}
+@keyframes splFu{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes splFd{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes splFi{0%{opacity:0}100%{opacity:1}}
+
 </style>
 
 
@@ -1267,7 +1301,80 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 <link rel="stylesheet" href="/css/bracket-results.css">
 </head>
 <body>
-
+<!-- ═══ SPLASH SCREEN ═══ -->
+<div id="splash-screen">
+  <div class="spl-glow"></div>
+  <div class="spl-grid"></div>
+  <div class="spl-content">
+    <div class="spl-host">
+      <span>🇨🇦</span><div class="spl-dot"></div>
+      <span>🇲🇽</span><div class="spl-dot"></div>
+      <span>🇺🇸</span><div class="spl-dot"></div>
+      <span class="spl-ht">11 jun — 19 jul 2026</span>
+    </div>
+    <div class="spl-porra">Porra</div>
+    <div class="spl-mundial">MUNDIAL</div>
+    <div class="spl-year">2026</div>
+    <div class="spl-logo-wrap">
+      <div class="spl-ring spl-ring1"></div>
+      <div class="spl-ring spl-ring2"></div>
+      <img class="spl-logo-img"
+        src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/2026_FIFA_World_Cup.png"
+        alt="FIFA World Cup 2026">
+    </div>
+    <div class="spl-divider"></div>
+    <div class="spl-stats">
+      <div class="spl-si"><div class="spl-sn">104</div><div class="spl-sl">partidos</div></div>
+      <div class="spl-ss"></div>
+      <div class="spl-si"><div class="spl-sn">48</div><div class="spl-sl">equipos</div></div>
+      <div class="spl-ss"></div>
+      <div class="spl-si"><div class="spl-sn">16</div><div class="spl-sl">sedes</div></div>
+    </div>
+    <div class="spl-prog-wrap">
+      <div class="spl-prog-track"><div class="spl-prog-fill" id="spl-prog-fill"></div></div>
+      <div class="spl-prog-txt" id="spl-prog-txt">Cargando tu porra...</div>
+    </div>
+  </div>
+  <button class="spl-skip" id="spl-skip">Saltar →</button>
+</div>
+<script>
+// Splash controller — inline para que arranque con el parse, no con loadScript
+(function(){
+  var splash = document.getElementById('splash-screen');
+  if (!splash) return;
+  var msgs = ['Cargando tu porra...', 'Preparando los grupos...', '¡A predecir!'];
+  var i = 0;
+  var txtEl = document.getElementById('spl-prog-txt');
+  var iv = setInterval(function(){
+    i = (i + 1) % msgs.length;
+    if (txtEl) {
+      txtEl.style.opacity = '0';
+      setTimeout(function(){ txtEl.textContent = msgs[i]; txtEl.style.opacity = '1'; }, 300);
+    }
+  }, 1600);
+  var hidden = false;
+  function hideSplash(){
+    if (hidden) return;
+    hidden = true;
+    clearInterval(iv);
+    splash.classList.add('hidden');
+    setTimeout(function(){ if (splash.parentNode) splash.parentNode.removeChild(splash); }, 700);
+  }
+  document.getElementById('spl-skip').addEventListener('click', hideSplash);
+  // Auto-ocultar: mínimo 4s de splash visible
+  var minTime = 7000;
+  var readyAt = null;
+  setTimeout(function(){ hideSplash(); }, 10200); // hard cap: nunca más de 10.2s
+  // splashDone: la app señala que está lista, pero respetamos el mínimo
+  window.splashDone = function(){
+    readyAt = Date.now();
+    var elapsed = readyAt - start;
+    if (elapsed >= minTime) hideSplash();
+    else setTimeout(hideSplash, minTime - elapsed);
+  };
+  var start = Date.now();
+})();
+</script>
 
 <!-- ═══════════════════════════════════════════════════════════════
      HTML · AUTH BAR + AUTH MODAL — Barra auth fija + modal login/registro
