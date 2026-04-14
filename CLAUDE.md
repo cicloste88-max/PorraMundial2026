@@ -6,7 +6,29 @@ App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite
 Repo: github.com/cicloste88-max/PorraMundial2026
 Rama activa: **main**
 
-## Estado actual (2026-04-13 — checkpoint final sesion)
+## Estado actual (2026-04-14 — checkpoint madrugada)
+
+### Nuevas tablas
+- live_scores: polling partidos en vivo
+- whatsapp_subscribers: opt-in WhatsApp (phone, user_id, active)
+
+### Nuevas EFs
+- porra-match-live v2: Apify + maquina estados SofaScore
+- porra-whatsapp-send v1: envio WhatsApp via Twilio
+- porra-whatsapp-webhook v4: captura WaId para numero usuario
+
+### Secrets Vault añadidos
+- APIFY_TOKEN (SofaScore PRO actor VzKtdb1t0Qnc07X8V)
+- TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET
+
+### Twilio sandbox
+- Numero: +14155238886 | join load-herd
+- Test GOL exitoso a +34618874646
+
+### Crons activos hoy
+- prematch + poll Atletico-Barcelona UCL QF2 (14 abr)
+
+### Estado anterior (2026-04-13 — checkpoint final sesion)
 **Ultimo commit: 8e8ac44 — fix: jornada movil — grid colapsa, cinta usuario, modal ver tarjeta**
 **Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Vista Jornada COMPLETA. Último commit: 8e8ac44.**
 
