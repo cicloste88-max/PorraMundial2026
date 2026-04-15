@@ -48,7 +48,8 @@ function savePredictions() {
 
 function checkGroupsComplete() {
   if (!boostPicks) return; // NOTA: no usar .length === 0 — debe actualizar UI cuando se eliminan todos los boosts
-  savePredictions(); // persistir siempre al verificar
+  // NO llamar savePredictions() aquí — esta función se invoca cada 1s desde el timer
+  // y causaba un POST a Supabase cada segundo. savePredictions() se llama desde attachEvents() al guardar.
   let filled = 0;
   PARTIDOS.forEach(m => {
     const p = predictions[getMatchKey(m)];
