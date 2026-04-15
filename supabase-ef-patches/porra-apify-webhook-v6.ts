@@ -86,12 +86,26 @@ async function sendWhatsApp(
   message: string
 ): Promise<void> {
   const { data: subs } = await supabase.from('whatsapp_subscribers').select('phone').eq('active', true);
-  if (!subs?.length) return;
+  if (!subs?.length) {
+    console.warn('[WhatsApp] No hay suscriptores activos');
+    return;
+  }
 
   const accountSid = secrets['TWILIO_ACCOUNT_SID'];
   const apiKey     = secrets['TWILIO_API_KEY'];
   const apiSecret  = secrets['TWILIO_API_SECRET'];
-  if (!accountSid || !apiKey || !apiSecret) return;
+
+  if (!accountSid || !apiKey || !apiSecret) {
+    console.error('[WhatsApp] Faltan credenciales Twilio:', {
+      hasSid: !!accountSid,
+      hasKey: !!apiKey,
+      hasSecret: !!apiSecret,
+      secretKeys: Object.keys(secrets),
+    });
+    return;
+  }
+
+  console.log(`[WhatsApp] Enviando a ${subs.length} suscriptor(es): ${message.substring(0, 80)}...`);
 
   const credentials = btoa(`${apiKey}:${apiSecret}`);
 
@@ -101,12 +115,18 @@ async function sendWhatsApp(
     params.append('To',   `whatsapp:${sub.phone}`);
     params.append('Body', message);
     try {
-      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
         method: 'POST',
         headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
       });
-    } catch (e) { console.error('[WhatsApp] Error:', e); }
+      const body = await res.text();
+      if (!res.ok) {
+        console.error(`[WhatsApp] Twilio ${res.status} para ${sub.phone}:`, body.substring(0, 200));
+      } else {
+        console.log(`[WhatsApp] OK → ${sub.phone}`);
+      }
+    } catch (e) { console.error(`[WhatsApp] Fetch error para ${sub.phone}:`, e); }
   }));
 }
 
@@ -166,7 +186,12 @@ Deno.serve(async (req) => {
     body: JSON.stringify({ secret_names: ['APIFY_TOKEN', 'TWILIO_ACCOUNT_SID', 'TWILIO_API_KEY', 'TWILIO_API_SECRET'] }),
   });
   const secrets: Record<string, string> = {};
-  for (const r of (vaultRes.ok ? await vaultRes.json() : [])) secrets[r.name] = r.secret;
+  if (!vaultRes.ok) {
+    console.error('[porra-apify-webhook] Vault error:', vaultRes.status, await vaultRes.text().catch(() => ''));
+  } else {
+    for (const r of await vaultRes.json()) secrets[r.name] = r.secret;
+  }
+  console.log(`[porra-apify-webhook] Vault secrets resueltos: ${Object.keys(secrets).join(', ') || 'NINGUNO'}`);
 
   const apifyToken = secrets['APIFY_TOKEN'];
   if (!apifyToken) return json({ ok: false, error: 'APIFY_TOKEN no encontrado' }, 500);
