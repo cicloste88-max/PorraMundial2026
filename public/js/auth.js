@@ -17,7 +17,13 @@ window._supa_anon = SUPA_ANON;
 function getDb() {
   if (!window._porraDb) {
     window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
-      auth: { storageKey: 'porra_sb_session', persistSession: true, autoRefreshToken: true, lock: false }
+      auth: {
+        persistSession: true,
+        storageKey: 'porra_auth',
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        lock: (name, acquireTimeout, fn) => fn()
+      }
     });
   }
   return window._porraDb;
