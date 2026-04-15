@@ -2922,6 +2922,14 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
      Notas           : Solo script src - mantener o pasar a npm
 ════════════════════════════════════════════════════════════════ -->
 <!-- ══ Supabase CDN ══ -->
+<script>
+// Deshabilitar Navigator Locks ANTES de que Supabase se importe.
+// Supabase v2 usa navigator.locks internamente y causa
+// NavigatorLockAcquireTimeoutError que bloquea getSession().
+if (navigator.locks) {
+  Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });
+}
+</script>
 <script type="module" src="/js/main-entry.js"></script>
 <!-- ══ Auth ══ -->
 

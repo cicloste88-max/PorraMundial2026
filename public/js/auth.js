@@ -13,23 +13,38 @@ const SUPA_URL  = 'https://cmyfyswystjgzdwbqyyb.supabase.co';
 window._supa_url  = SUPA_URL;
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteWZ5c3d5c3RqZ3pkd2JxeXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzU4MDcsImV4cCI6MjA5MDQ1MTgwN30.HtOTJ6VHXMStNH3ASLj5zDabViARzF6vJgHfeSytEKQ';
 window._supa_anon = SUPA_ANON;
-// Inicializacion lazy de db — espera a que window.supabase este disponible
+// Storage síncrono custom — persiste sesión en localStorage sin navigator locks
+const _storage = {
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+  removeItem: (key) => localStorage.removeItem(key),
+};
+// Cliente AUTH — solo para autenticación (signIn, onAuthStateChange, getSession)
 function getDb() {
   if (!window._porraDb) {
     window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
-      auth: {
-        persistSession: true,
-        storageKey: 'porra_auth',
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        lock: (name, acquireTimeout, fn) => fn()
-      }
+      auth: { persistSession: true, storageKey: 'porra_auth', storage: _storage, autoRefreshToken: true, detectSessionInUrl: false }
     });
   }
   return window._porraDb;
 }
+// Cliente QUERY — para todos los from(...) de datos, bypasea getSession()/lock
+function getQueryDb() {
+  if (!window._porraQueryDb) {
+    window._porraQueryDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
+      accessToken: async () => window._porraToken || '',
+      auth: { persistSession: false }
+    });
+  }
+  return window._porraQueryDb;
+}
+window._porraQueryDb = null;
+// Proxy: db.auth → cliente auth, db.from(...) → cliente query
 const db = new Proxy({}, {
-  get(_, prop) { return getDb()[prop]; }
+  get(_, prop) {
+    if (prop === 'auth') return getDb().auth;
+    return getQueryDb()[prop];
+  }
 });
 window._porraDb = window._porraDb || null;
 
@@ -109,7 +124,7 @@ function saveAwPicks() {
     const leagueId = getActiveLeagueId();
     if (!leagueId) return;
     const row = { user_id:currentUser.id, league_id:leagueId, golden_ball:awPicks.golden_ball?.key||null, golden_boot:awPicks.golden_boot?.key||null, golden_glove:awPicks.golden_glove?.key||null, young_player:awPicks.young_player?.key||null };
-    window._porraDb.from('award_picks').upsert(row,{onConflict:'league_id,user_id'})
+    getQueryDb().from('award_picks').upsert(row,{onConflict:'league_id,user_id'})
       .then(({error})=>{
         if(error) console.warn('Error award_picks:',error.message);
         else if(typeof checkFinalizarReady==='function') checkFinalizarReady();
@@ -117,24 +132,8 @@ function saveAwPicks() {
   }
 }
 
-db.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    window._porraToken = session.access_token; sessionStorage.setItem("porra_token", session.access_token);
-    const { data: profile } = await db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single();
-    currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
-    // porra_cerrada ahora es por liga — se restaura en leagueSelect() al entrar a una liga
-    if (event === 'SIGNED_IN') {
-      await loadUserData(session.user.id);
-      // Navegar a welcome para que el usuario elija liga
-      setTimeout(() => showPage('welcome'), 100);
-    }
-  } else {
-    currentUser = null;
-    window._porraToken = null; sessionStorage.removeItem("porra_token");
-  }
-  renderAuthBar();
-  updateCTAs();
-});
+// onAuthStateChange se registra dentro de runAuthInit() para garantizar
+// que todos los scripts de la cadena ya están cargados
 
 /* ── Renderiza la barra de sesión (top-right) ── */
 function renderAuthBar() {
@@ -304,15 +303,33 @@ const runAuthInit = async () => {
     if (kp) { koPredictions = JSON.parse(kp); normKoPredictions(); }
   } catch(e) {}
 
+  // Registrar listener AHORA que todos los scripts están cargados
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user) {
+      window._porraToken = session.access_token; sessionStorage.setItem("porra_token", session.access_token);
+      const { data: profile } = await db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single();
+      currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        await loadUserData(session.user.id);
+        setTimeout(() => showPage('welcome'), 100);
+      }
+    } else {
+      currentUser = null;
+      window._porraToken = null; sessionStorage.removeItem("porra_token");
+    }
+    renderAuthBar();
+    updateCTAs();
+  });
+
   showPage('welcome');
   initWelcome();
   renderAuthBar();
   updateCTAs();
 };
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', runAuthInit);
-} else {
+if (document.readyState === 'complete') {
   runAuthInit();
+} else {
+  window.addEventListener('load', runAuthInit, { once: true });
 }
 
 // Procesar llamadas que llegaron antes de que cargara el auth
