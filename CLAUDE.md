@@ -4,164 +4,201 @@
 App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main**
+Rama activa: **main** | Último commit: **8e8ac44**
 
-## Estado actual (2026-04-14 — checkpoint madrugada)
+---
 
-### Nuevas tablas
-- live_scores: polling partidos en vivo
-- whatsapp_subscribers: opt-in WhatsApp (phone, user_id, active)
+## ⚠️ PENDIENTE URGENTE — Próxima sesión
 
-### Nuevas EFs
-- porra-match-live v2: Apify + maquina estados SofaScore
-- porra-whatsapp-send v1: envio WhatsApp via Twilio
-- porra-whatsapp-webhook v4: captura WaId para numero usuario
+**Bug:** `porra-match-live` EF hace timeout porque el actor Apify tarda ~44s y pg_net corta antes.
 
-### Secrets Vault añadidos
-- APIFY_TOKEN (SofaScore PRO actor VzKtdb1t0Qnc07X8V)
-- TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET
+**Fix — arquitectura async + webhook Apify:**
+1. pg_cron lanza el actor de forma **async** (sin esperar)
+2. Configurar webhook en Apify que llame a una EF cuando el actor termine
+3. La EF del webhook procesa los datos, detecta cambios, envía WhatsApp
 
-### Twilio sandbox
-- Numero: +14155238886 | join load-herd
-- Test GOL exitoso a +34618874646
+---
 
-### Crons activos hoy
-- prematch + poll Atletico-Barcelona UCL QF2 (14 abr)
+## 📊 Estado del sistema live (resumen)
 
-### Estado anterior (2026-04-13 — checkpoint final sesion)
-**Ultimo commit: 8e8ac44 — fix: jornada movil — grid colapsa, cinta usuario, modal ver tarjeta**
-**Migración Vite COMPLETA. Bracket de resultados COMPLETO. Splash screen COMPLETO. Boost x2 COMPLETO. Vista Jornada COMPLETA. Último commit: 8e8ac44.**
+| Componente | Versión | Estado |
+|---|---|---|
+| Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FUNCIONA (~44s, tiempo real) |
+| `porra-match-live` EF | v9 | ⚠️ pg_net timeout |
+| `porra-whatsapp-send` EF | v1 | ✅ FUNCIONA |
+| `porra-whatsapp-webhook` EF | v4 | ✅ FUNCIONA |
+| Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
 
-- Todos los módulos JS en `public/js/` (scripts clásicos, cargados via loadScript)
-- `main.js` ELIMINADO — dividido en 5 sub-módulos (data, scoring, ui-groups, ko, ui-nav)
-- `js/main-entry.js` como entry point Vite (type="module", importa Supabase npm)
-- Build: `npm run build` genera `dist/` con `assets/` + `js/`
-- QA login con `.env.local` (VITE_QA_EMAIL / VITE_QA_PASS)
-- `vercel.json` eliminado — causaba MIME text/html en .js (rompía módulos ES)
+---
 
-## Estructura ficheros JS
+## 🤖 Actor Apify propio
+
+**ID:** `BYLtYcOxYkruVipwr` | **Build:** 1.0.19 | **Repo:** `apify-actors/sofascore-live-proxy/`
+
+**Cómo funciona:**
+- Playwright lanza Chrome con proxy RESIDENTIAL
+- Carga `sofascore.com` para establecer contexto browser
+- `page.evaluate(fetch)` llama en paralelo a:
+  - `api.sofascore.com/api/v1/event/{id}` — status, score, equipos
+  - `api.sofascore.com/api/v1/event/{id}/incidents` — goles, tarjetas
+- Devuelve `{ eventId, event: {data}, incidents: {data} }`
+
+**Input:** `{ "eventId": "15832749" }`
+
+**Por qué bypasea Cloudflare:** el fetch se ejecuta desde dentro del browser con el mismo origen que sofascore.com.
+
+---
+
+## 📁 Estructura ficheros JS
+
 ```
 js/
-  main-entry.js       <- entry point Vite (type=module) — importa Supabase npm
+  main-entry.js       <- entry point Vite (type=module)
 
 public/js/
-  data.js             <- datos torneo + estado global + utils
-                         SB, EQUIPOS, GRUPOS, PARTIDOS, KIT_OVERRIDES,
-                         predictions, iaPredictions, totalPoints,
-                         getMatchKey, getMySign, iaBonusWillApply, escapeHtml
-  scoring.js          <- motor puntos + tabla + tarjetas + premios
-                         KO_ROUND_PTS, FINAL_CLASSIFICATION_PTS, calc*, AWARDS_CFG,
-                         AW_PLAYERS, YOUNG_PLAYERS_NXGN, renderAll,
-                         refreshGroupTables, updateCardUI, openPicker, selectAward
-  ui-groups.js        <- init grupos
-                         initGrupos, savePredictions, checkGroupsComplete
-  ko.js               <- bracket KO + IA pronósticos (vista "Rondas"/"Bracket"/"Cuadro")
-                         BRACKET, koPredictions, ROUND_CONFIG, ROUND_BREAKDOWN,
-                         BADGE_MAP, areGroupsComplete, buildBracketView,
-                         fetchIAforKO, findMatch, getTeamForSlot, saveKO,
-                         normKoPredictions, buildCinematicView, resolvedSlots
+  data.js             <- datos torneo + estado global + boostPicks
+  scoring.js          <- motor puntos + tarjetas + premios
+  ui-groups.js        <- grupos + vista Jornada completa
+  ko.js               <- bracket KO + IA pronósticos
   ui-nav.js           <- SPA nav + modal + welcome
-                         showPage, openModal, closeModal, initWelcome,
-                         updateAwardsFooter, renderPickerList, koInit,
-                         refreshAllViews, setView (gestiona tabs + oculta finalizar en Resultados)
   auth.js             <- auth Supabase
-                         doLogin, doRegister, onAuthStateChange,
-                         loadUserData, renderAuthBar, updateCTAs
   leagues.js          <- ligas y selección de porra
-                         leagueLoadMyLeagues, leagueSelect, getActiveLeagueId
-  misc.js             <- utils UI (sin deps, carga en paralelo)
+  misc.js             <- utils UI
   scoreboard.js       <- clasificación multi-usuario
   close-porra.js      <- cierre de pronósticos
-                         checkFinalizarReady, finalizarPorra
-  admin.js            <- panel admin + dados/simulador + lockAllCardsIfCerrada
-                         llama refreshBracketResults() tras actualizar resultados
-  bracket-results.js  <- [NUEVO 2026-04-13] vista de resultados reales del bracket KO
-                         SIN lógica de pronósticos. Lee window._results.
-                         Expone: initBracketResults, refreshBracketResults, brkSetPhase
+  admin.js            <- panel admin + dados/simulador
+  bracket-results.js  <- vista resultados reales bracket KO
 
 public/css/
-  bracket-results.css <- [NUEVO 2026-04-13] estilos del bracket de resultados
-                         Prefijo brk- en todas las clases
-  boost.css          <- [NUEVO 2026-04-13] estilos boost x2: checkbox, badge, glow,
-                         Canvas 2D fuego. card-inner hereda overflow:hidden de .card
+  bracket-results.css
+  boost.css
 ```
 
-## Cadena de carga en main-entry.js
+## Cadena de carga
 ```
 misc.js (paralelo)
 leagues → data → scoring → ui-groups → ko → ui-nav
   → auth → scoreboard → close-porra → admin → bracket-results
 ```
 
-## Bracket de Resultados — bracket-results.js (2026-04-13)
+---
 
-### Propósito
-Vista "Resultados" en page-elim. Muestra el estado real del torneo KO sin pronósticos.
-Se activa con el tab "Resultados" (reemplaza el antiguo tab "Bracket").
+## 🛢️ Base de datos — tablas live
 
-### Estructura de fases
-```
-BRK_PHASES: r32 → r16 → oct → qf → sf → final
-BRK_COLS:
-  r32: left=[73-80]  right=[81-88]   (16 partidos, IDs de BRACKET.r32)
-  r16: left=[89-92]  right=[93-96]   (8 partidos,  IDs de BRACKET.r16)
-  oct: left=[97,98]  right=[99,100]  (4 partidos,  IDs de BRACKET.qf)
-  qf:  left=[101]    right=[102]     (2 partidos,  IDs de BRACKET.sf)
-  sf:  left=[]       right=[]        (semis — vacío hasta que existan IDs)
-  final: caja propia (no columna del bracket)
-BRK_FINAL_ID = 104   (BRACKET.final[0].id)
-BRK_THIRD_ID = 103   (BRACKET.third[0].id)
-```
+```sql
+live_scores (
+  match_key TEXT PRIMARY KEY,
+  sofascore_url TEXT,
+  sofascore_event_id TEXT,   -- ID numérico de SofaScore API
+  status TEXT,               -- notstarted/inprogress/halftime/overtime/penalties/finished
+  status_code INT,
+  score_home INT,
+  score_away INT,
+  score_agg_home INT,
+  score_agg_away INT,
+  events JSONB,              -- array de incidents
+  lineups JSONB,
+  statistics JSONB,
+  referee TEXT,
+  venue TEXT,
+  poll_active BOOLEAN,
+  poll_interval INT,
+  had_overtime BOOLEAN,
+  had_penalties BOOLEAN,
+  match_start_ts BIGINT,
+  updated_at TIMESTAMPTZ
+)
 
-### Comportamiento
-- Fases r32/r16/oct/qf/sf: muestra bracket simétrico izquierda/derecha
-  - Fase activa: columna expandida con cards completas
-  - Fases pasadas: columna estrecha con mini-scores
-  - Fases futuras: columna ghost (siluetas semitransparentes)
-- Fase "final": oculta el bracket, muestra `#brk-final-area` con caja
-  horizontal (Final + 3er Puesto) similar a "Cerrar pronósticos"
-- "Cerrar pronósticos" (#finalizar-section) se oculta automáticamente
-  en esta vista (setView lo gestiona en ui-nav.js)
-
-### Cards
-- Hero: bandera equipo de fondo (blur/oscuro) + badge/escudo oficial centrado
-- Score bar: marcador local:visitante
-- Footer: venue + status badge (Finalizado/En vivo con minuto/Próximo/Por definir)
-- BRK_BADGE_MAP: 42 slugs mapeados a ficheros en Supabase Storage /badges/
-
-### Conexión con datos reales
-```js
-// brkLoadResults() lee:
-window._results?.ko_results  // estructura: {"89":{local,visitante,estado,minuto},...}
-// Si null → todos los partidos en estado 'upcoming' (correcto pre-torneo)
-// Activar con pg_cron update-results el 11 jun 2026
+whatsapp_subscribers (
+  phone TEXT,
+  active BOOLEAN,
+  wa_id TEXT
+)
 ```
 
-### API pública
-```js
-window.initBracketResults()    // inicializa/re-renderiza el bracket
-window.refreshBracketResults() // recarga _results y re-renderiza (llamado por admin.js)
-window.brkSetPhase(id)         // navega entre fases: 'r32','r16','oct','qf','sf','final'
+---
+
+## ⚙️ Edge Functions Supabase
+
+| EF | Versión | Descripción |
+|---|---|---|
+| `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
+| `update-results` | v2 | Sync football-data.org → results. Activar pg_cron el 11 jun |
+| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
+| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
+| `porra-fix-encoding` | v4 | Write/inspect ficheros GitHub via API |
+| `porra-match-live` | v9 | Live scores + WhatsApp. PROBLEMA: pg_net timeout |
+| `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio |
+| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+| `porra-sofascore-proxy` | v8 | OBSOLETA — sustituida por actor propio |
+
+---
+
+## 🔄 Flujo live scores
+
 ```
+pg_cron (cada minuto durante partido)
+  → net.http_post → porra-match-live EF
+      → Apify: lanzar actor BYLtYcOxYkruVipwr con { eventId }
+      → polling Apify hasta SUCCEEDED
+      → leer dataset: { event, incidents }
+      → detectar cambios vs DB
+      → porra-whatsapp-send → Twilio → WhatsApp
+      → upsert live_scores
+```
+
+**PROBLEMA ACTUAL:** pg_net timeout antes de que actor complete (44s > límite pg_net).
+
+---
+
+## 📱 WhatsApp — Twilio sandbox
+
+- Número: +14155238886
+- Código: join load-herd
+- Secrets en Vault: TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET
+
+---
+
+## 🏆 Motor de puntuación
+
+- Partido: +1 signo / +3 exacto (no acumula) / +2 goleador / +1 bonus vs IA (máx 7pts)
+- Boost x2: si exacto + partido es el boost del día → pts ×2 (máx 14pts)
+- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeón+25
+- Clasificación final: campeón+30, subcampeón+20, 3º+15, 4º+10
+- Premios: Balón/Bota/Guante Oro 15pts, Mejor Joven ≤21 20pts
+
+---
 
 ## Comandos útiles
+
 ```bash
 npm run dev     # localhost:5173
-npm run build   # genera dist/ — verificar antes de push a main
+npm run build   # genera dist/
 git add -A && git commit -m "..." && git push origin main
+
+# Lanzar actor Apify manualmente desde carpeta actor:
+apify call BYLtYcOxYkruVipwr -i '{"eventId":"15832749"}' -t 90
+
+# Push actor Apify:
+cd apify-actors/sofascore-live-proxy
+apify push --actor-id BYLtYcOxYkruVipwr
 ```
 
+---
+
 ## Reglas CRÍTICAS
+
 - NUNCA push a main sin validar en localhost:5173 primero
 - Push inmediato tras cada commit — nunca acumular
 - NO crear ni modificar vercel.json
 - Actualizar migration-log.md tras cada acción importante
-- Un commit por tarea/fix — mensajes descriptivos
 - NO usar addEventListener DOMContentLoaded en classic scripts cargados via loadScript
+- Actor Azzouzana VzKtdb1t0Qnc07X8V tiene caché CDN — NO usar para datos live
+
+---
 
 ## Patrón DOMContentLoaded en classic scripts
-Los scripts en `public/js/*.js` se cargan via loadScript (async, post-parse).
-`DOMContentLoaded` ya ha disparado cuando se evalúan. Patrón correcto:
+
 ```js
 const runInit = () => { /* ... */ };
 if (document.readyState === 'loading') {
@@ -171,118 +208,33 @@ if (document.readyState === 'loading') {
 }
 ```
 
-## Patrón diceSimulateMatch — CRÍTICO
-Siempre mutar el objeto prediction con `Object.assign`, nunca reemplazar la referencia.
-Los closures de `attachEvents` dependen de ella:
-```js
-// CORRECTO:
-Object.assign(pred, { l, v, gol, saved: true, lockedByUser: true });
-// MAL — rompe closures:
-predictions[key] = { l, v, gol, saved: true };
-```
+---
 
-## Patrón listeners attachEvents — CRÍTICO
-Los listeners de `.sbn` y `gsel` en `attachEvents` deben leer `predictions[matchKey]`
-en tiempo real dentro del listener, NO capturar `pred` como const en el closure:
-```js
-// CORRECTO — lee la referencia actual:
-btn.addEventListener('click', () => {
-  const p = predictions[matchKey];
-  ...
-});
-// MAL — closure huérfano si loadUserData reemplaza el objeto:
-const pred = predictions[matchKey];
-btn.addEventListener('click', () => { pred.l = ...; });
-```
+## Stack infraestructura
 
-## Patrón drawBracketLines
-Llamar solo cuando el panel es visible. Desde `switchView('bracket')` con `rAF + 50ms`.
-
-## Stack de infraestructura
 - Hosting: Vercel (porramundial2026-seven.vercel.app) — autodeploy desde main
 - DB + Auth: Supabase (proyecto: cmyfyswystjgzdwbqyyb)
-- Secrets en Vault: GITHUB_TOKEN, GITHUB_REPO, ANTHROPIC_API_KEY
+- Secrets en Vault: GITHUB_TOKEN, GITHUB_REPO, ANTHROPIC_API_KEY, APIFY_TOKEN, PROXY_URL, TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET
 
-## Edge Functions Supabase
-| EF | Versión | Descripción |
-|---|---|---|
-| admin-actions | v7 | Gestión admin (results/overrides/users/leagues/reopen). Requiere JWT admin |
-| update-results | v2 | Sync football-data.org → tabla results. **Activar pg_cron el 11 jun 2026** |
-| porra-orchestrator | v3 | N agentes Haiku en paralelo → orchestrator_jobs. Coste <$0.01 |
-| porra-patch-deploy | v4 | Patches search/replace + commit GitHub |
-| porra-fix-encoding | v5 | Write/inspect ficheros en GitHub via API |
-| porra-github-pusher | v6 | PLACEHOLDER — ignorar |
-
-## Sistema de agentes
-```
-Supervisor (Claude.ai) → porra-orchestrator EF → N Claude Haiku → orchestrator_jobs
-```
-Coste <$0.01. ANTHROPIC_API_KEY en Vault.
-Invocar desde Claude.ai: Supabase MCP `execute_sql → net.http_post → SELECT FROM net._http_response WHERE id=N`
-
-## Conectores Claude.ai activos
-- **Supabase MCP**: execute_sql, get_logs, list/get/deploy_edge_function
-- **Claude in Chrome**: navigate, screenshot, javascript_tool, read_console_messages, tabs_context_mcp
-
-## Flujo QA con Claude in Chrome
-```
-1. tabs_context_mcp(createIfEmpty=true) → obtener tabId
-2. navigate → localhost:5173 o producción
-3. read_console_messages(onlyErrors) — debe ser []
-4. Login local:  _porraDb.auth.signInWithPassword({email:window.__QA_EMAIL, password:window.__QA_PASS})
-   Login prod:   _porraDb.auth.signInWithPassword({email:'cicloste88@gmail.com', password:'910500'})
-5. showPage('elim') → activar panel view-bracket-results → initBracketResults()
-6. Verificar: typeof initBracketResults, typeof brkSetPhase
-7. Probar fases: ['r32','r16','oct','qf','sf','final'].forEach(id=>brkSetPhase(id))
-8. Screenshot por sección
-```
-
-## Motor de puntuación
-- Partido: +1 signo / +3 exacto (no acumula) / +2 goleador / +1 bonus vs IA (max 7pts)
-- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeón+25
-- Clasificación final: campeón+30, subcampeón+20, 3º+15, 4º+10
-- Premios: Balón/Bota/Guante Oro 15pts, Mejor Joven ≤21 20pts (en AWARDS_CFG)
-
-## Estructura torneo
-- 48 equipos, 12 grupos (A-L) de 4, 72 partidos grupos
-- 2 primeros + 8 mejores terceros = 32 a eliminatorias
-- R32 → R16 → QF → SF → 3er puesto → Final — 104 partidos total
-- Resultados en tabla `results` (id=1), overrides via admin-actions
-
-## Assets Supabase Storage (miniatures/)
-```
-badges/          — 42 escudos oficiales de selecciones (spain.png, germany.png, ...)
-flags/           — banderas por código (ESP.png, GER.png, ...)
-kits/            — equipaciones por slug/home|away.jpg
-Logos/           — logos FIFA 2026 (general + por sede: Canada, Mexico, USA)
-Ball/            — balón oficial Trionda
-awards/          — trofeos individuales (ballon d'or, golden boot, golden glove, young)
-MVP/             — imágenes jugadores MVP
-```
+---
 
 ## Pendientes antes del 11 jun 2026
+
 | # | Tarea | Estado |
 |---|---|---|
-| 1 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
-| 2 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ jun |
-| 3 | Desactivar signup público cuando entren todos los amigos | ⏳ |
-| 4 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
-| 5 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
-| 6 | README — actualizar con URL Vercel (dice Netlify) | ⏳ |
+| 0 | **Fix pg_net timeout** (actor async + webhook Apify) | 🔴 URGENTE |
+| 1 | Crons Bayern-Real Madrid y futuros partidos | 🔴 |
+| 2 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
+| 3 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ |
+| 4 | Desactivar signup público | ⏳ |
+| 5 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
+| 6 | Verificar estructura JSON `_results.ko_results` | ⏳ 11 jun |
+| 7 | README — actualizar con URL Vercel | ⏳ |
 
-## Historial de sesiones clave
-| Fecha | Hito | Commit |
-|---|---|---|
-| 2026-04-11 | Migración Vite completa, merge a main, fix vercel.json MIME | — |
-| 2026-04-12 AM | Extracción main.js en 5 módulos, fixes race condition y DOMContentLoaded | ee2e25a |
-| 2026-04-12 PM | Bracket Fase 1 SVG overlay. Fix dado/undo Object.assign | 187a764 |
-| 2026-04-13 | **Bracket de resultados reales** — bracket-results.js + CSS, 6 fases, cards badge+flag, vista Final en caja propia, QA local+producción OK | cd4afa2 |
-| 2026-04-13 PM | **Splash screen** — inline script (fix timing), hero/scroll-cue reposicionados, márgenes móvil welcome | 3473c76 |
-| 2026-04-13 PM | **Boost x2 completo** — comodín diario, Canvas 2D fuego, persistencia Supabase, puntuación x2, ticker jornadas, bloqueo eliminatorias/finalizar | 6c3d30b |
-| 2026-04-13 PM | **Vista Jornada** — pestaña tarjetas compactas por día, sidebar clasificación sticky, boost CTA editable, scroll a tarjeta | 82b6a77 |
-| 2026-04-13 PM | **Jornada móvil** — grid colapsa <768px, cinta usuario, modal ver tarjeta con clone | 8e8ac44 |
+---
 
 ## Log de cambios (OBLIGATORIO)
+
 Añadir línea a migration-log.md tras cada acción:
 ```
 [HH:MM] ACCION: descripción — ficheros afectados
