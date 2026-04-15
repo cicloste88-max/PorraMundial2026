@@ -47,6 +47,7 @@ function savePredictions() {
 }
 
 function checkGroupsComplete() {
+  if (!boostPicks || Object.keys(boostPicks).length === 0) return; // esperar a que carguen
   savePredictions(); // persistir siempre al verificar
   let filled = 0;
   PARTIDOS.forEach(m => {
