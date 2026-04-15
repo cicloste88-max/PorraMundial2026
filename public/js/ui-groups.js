@@ -47,7 +47,7 @@ function savePredictions() {
 }
 
 function checkGroupsComplete() {
-  if (!boostPicks || Object.keys(boostPicks).length === 0) return; // esperar a que carguen
+  if (!boostPicks) return; // NOTA: no usar .length === 0 — debe actualizar UI cuando se eliminan todos los boosts
   savePredictions(); // persistir siempre al verificar
   let filled = 0;
   PARTIDOS.forEach(m => {
@@ -268,6 +268,7 @@ function renderBoostTicker() {
       border:1px solid rgba(251,146,60,.25);
       background:rgba(67,20,7,.4);color:rgba(251,146,60,.7);
       cursor:pointer;white-space:nowrap;
+      animation:boostPulse 1.5s ease-in-out infinite;
     ">🔥 ${dayLabel} (${nMatches})</button>`;
   });
 
