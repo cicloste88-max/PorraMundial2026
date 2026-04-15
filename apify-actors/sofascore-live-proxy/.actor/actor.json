@@ -1,0 +1,7 @@
+{
+  "actorSpecification": 1,
+  "name": "sofascore-live-proxy",
+  "version": "1.0",
+  "buildTag": "latest",
+  "dockerfile": "../Dockerfile"
+}

@@ -1,0 +1,9 @@
+FROM apify/actor-node-playwright-chrome:20
+
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY . ./
+
+RUN node --version && node -e 'console.log("Node OK")'
+
+CMD npm start --silent
