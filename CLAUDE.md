@@ -8,44 +8,49 @@ Rama activa: **main** | Último commit: **8e8ac44**
 
 ---
 
-## ⚠️ PENDIENTE URGENTE — Próxima sesión
+## ⚠️ ESTADO ACTUAL — 2026-04-15
 
-**Bug:** `porra-match-live` EF hace timeout porque el actor Apify tarda ~44s y pg_net corta antes.
+No hay pendiente urgente de código frontend. El foco de la sesión anterior fue:
 
-**Fix — arquitectura async + webhook Apify:**
-1. pg_cron lanza el actor de forma **async** (sin esperar)
-2. Configurar webhook en Apify que llame a una EF cuando el actor termine
-3. La EF del webhook procesa los datos, detecta cambios, envía WhatsApp
+**Fix pg_net timeout en sistema live — RESUELTO ✅**
+
+Arquitectura nueva (2 EFs):
+
+```
+pg_cron (cada minuto)
+  → porra-match-live v11 (<1s, async)
+      → Apify lanza actor BYLtYcOxYkruVipwr con webhook configurado
+      → retorna run_id inmediatamente
+
+~44s después
+  → Apify llama → porra-apify-webhook v2
+      → lee dataset actor
+      → detecta cambios estado/goles
+      → WhatsApp via Twilio
+      → upsert live_scores
+```
+
+**Nota clave:** el `sofascore_event_id` en `live_scores` puede ser el slug de SofaScore (ej: `xdbsEgb`) además del ID numérico. El actor lo acepta.
 
 ---
 
-## 📊 Estado del sistema live (resumen)
+## 📊 Estado sistema live
 
 | Componente | Versión | Estado |
 |---|---|---|
 | Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FUNCIONA (~44s, tiempo real) |
-| `porra-match-live` EF | v9 | ⚠️ pg_net timeout |
+| `porra-match-live` EF | v11 | ✅ Async (<1s), lanza actor + webhook |
+| `porra-apify-webhook` EF | v2 | ✅ Nueva EF, procesa webhook Apify |
 | `porra-whatsapp-send` EF | v1 | ✅ FUNCIONA |
 | `porra-whatsapp-webhook` EF | v4 | ✅ FUNCIONA |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
 
----
+## 🎯 Partido configurado
 
-## 🤖 Actor Apify propio
-
-**ID:** `BYLtYcOxYkruVipwr` | **Build:** 1.0.19 | **Repo:** `apify-actors/sofascore-live-proxy/`
-
-**Cómo funciona:**
-- Playwright lanza Chrome con proxy RESIDENTIAL
-- Carga `sofascore.com` para establecer contexto browser
-- `page.evaluate(fetch)` llama en paralelo a:
-  - `api.sofascore.com/api/v1/event/{id}` — status, score, equipos
-  - `api.sofascore.com/api/v1/event/{id}/incidents` — goles, tarjetas
-- Devuelve `{ eventId, event: {data}, incidents: {data} }`
-
-**Input:** `{ "eventId": "15832749" }`
-
-**Por qué bypasea Cloudflare:** el fetch se ejecuta desde dentro del browser con el mismo origen que sofascore.com.
+Bayern-Real Madrid UCL QF vuelta (2026-04-15 21:00 CET):
+- `match_key`: `ucl_qf2_bayern_realmadrid`
+- `sofascore_event_id`: `xdbsEgb`
+- Crons: `prematch_bayern_realmadrid` (18:15 UTC) + `poll_bayern_realmadrid` (cada min 19-23 UTC)
 
 ---
 
@@ -89,7 +94,7 @@ leagues → data → scoring → ui-groups → ko → ui-nav
 live_scores (
   match_key TEXT PRIMARY KEY,
   sofascore_url TEXT,
-  sofascore_event_id TEXT,   -- ID numérico de SofaScore API
+  sofascore_event_id TEXT,   -- ID numérico O slug SofaScore
   status TEXT,               -- notstarted/inprogress/halftime/overtime/penalties/finished
   status_code INT,
   score_home INT,
@@ -126,28 +131,38 @@ whatsapp_subscribers (
 | `update-results` | v2 | Sync football-data.org → results. Activar pg_cron el 11 jun |
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v4 | Write/inspect ficheros GitHub via API |
-| `porra-match-live` | v9 | Live scores + WhatsApp. PROBLEMA: pg_net timeout |
-| `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio |
-| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+| `porra-fix-encoding` | v5 | Write/inspect ficheros GitHub via API |
+| `porra-match-live` | v11 | Lanza actor Apify ASYNC + webhook. NO espera resultado. |
+| `porra-apify-webhook` | v2 | NUEVA. Recibe callback Apify, procesa datos, WhatsApp, upsert DB |
+| `porra-whatsapp-send` | v1 | Envía mensajes WhatsApp via Twilio |
+| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp, captura WaId |
 | `porra-sofascore-proxy` | v8 | OBSOLETA — sustituida por actor propio |
+| `porra-github-pusher` | v6 | PLACEHOLDER — ignorar |
 
 ---
 
-## 🔄 Flujo live scores
+## 🔄 Flujo live scores (ACTUALIZADO)
 
 ```
 pg_cron (cada minuto durante partido)
-  → net.http_post → porra-match-live EF
-      → Apify: lanzar actor BYLtYcOxYkruVipwr con { eventId }
-      → polling Apify hasta SUCCEEDED
-      → leer dataset: { event, incidents }
-      → detectar cambios vs DB
-      → porra-whatsapp-send → Twilio → WhatsApp
+  → net.http_post → porra-match-live v11
+      → lee match_key de live_scores
+      → si poll_active=false: retorna skipped
+      → obtiene APIFY_TOKEN de Vault
+      → lanza actor BYLtYcOxYkruVipwr ASYNC via Apify API
+        (con ?webhooks=BASE64_JSON apuntando a porra-apify-webhook)
+      → retorna {ok:true, async:true, run_id, dataset_id} — ya terminó, <1s
+
+~44s después (cuando actor termina)
+  → Apify llama POST → porra-apify-webhook v2
+      → verifica secret en query param
+      → lee payload: {eventType, eventData.resource.defaultDatasetId}
+      → lee dataset Apify con APIFY_TOKEN
+      → extractMatchState: status, score, incidents
+      → detecta cambios vs DB
+      → notificaciones WhatsApp si estado cambió o hay goles nuevos
       → upsert live_scores
 ```
-
-**PROBLEMA ACTUAL:** pg_net timeout antes de que actor complete (44s > límite pg_net).
 
 ---
 
@@ -176,8 +191,8 @@ npm run dev     # localhost:5173
 npm run build   # genera dist/
 git add -A && git commit -m "..." && git push origin main
 
-# Lanzar actor Apify manualmente desde carpeta actor:
-apify call BYLtYcOxYkruVipwr -i '{"eventId":"15832749"}' -t 90
+# Lanzar actor Apify manualmente:
+apify call BYLtYcOxYkruVipwr -i '{"eventId":"xdbsEgb"}' -t 90
 
 # Push actor Apify:
 cd apify-actors/sofascore-live-proxy
@@ -194,6 +209,7 @@ apify push --actor-id BYLtYcOxYkruVipwr
 - Actualizar migration-log.md tras cada acción importante
 - NO usar addEventListener DOMContentLoaded en classic scripts cargados via loadScript
 - Actor Azzouzana VzKtdb1t0Qnc07X8V tiene caché CDN — NO usar para datos live
+- sofascore_event_id puede ser slug (ej: xdbsEgb) O ID numérico — ambos funcionan
 
 ---
 
@@ -222,14 +238,12 @@ if (document.readyState === 'loading') {
 
 | # | Tarea | Estado |
 |---|---|---|
-| 0 | **Fix pg_net timeout** (actor async + webhook Apify) | 🔴 URGENTE |
-| 1 | Crons Bayern-Real Madrid y futuros partidos | 🔴 |
-| 2 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
-| 3 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ |
-| 4 | Desactivar signup público | ⏳ |
-| 5 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
-| 6 | Verificar estructura JSON `_results.ko_results` | ⏳ 11 jun |
-| 7 | README — actualizar con URL Vercel | ⏳ |
+| 1 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
+| 2 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ jun |
+| 3 | Desactivar signup público | ⏳ |
+| 4 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
+| 5 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
+| 6 | README — actualizar con URL Vercel | ⏳ |
 
 ---
 
