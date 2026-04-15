@@ -133,44 +133,18 @@ function checkGroupsComplete() {
       ctaLocked.style.display = 'block';
       ctaReady.style.display = 'none';
 
-      // Pastillas boost pendientes bajo el CTA locked
+      // Pastillas boost pendientes bajo el CTA locked — misma lógica que ticker superior
       const boostPendingEl = document.getElementById('cta-boost-pending');
-      if(boostPendingEl && filled >= total) {
+      if(boostPendingEl) {
         const pendientes = diasConPartidos.filter(d => !boostPicks[d]);
-        // Guardar qué jornada tiene el panel expandido antes de re-renderizar
-        const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
-        const existingPanel = document.getElementById('cta-boost-panel');
-
-        boostPendingEl.style.display = 'flex';
-
         if (pendientes.length === 0) {
-          // Todos los boosts asignados — mostrar estado "completo" editable
-          const asignados = diasConPartidos.map(d => {
-            const mKey = boostPicks[d];
-            const match = PARTIDOS.find(m => getMatchKey(m) === mKey);
-            const jNum = diasConPartidos.indexOf(d) + 1;
-            const label = match
-              ? match.home.split(' ')[0] + ' vs ' + match.away.split(' ')[0]
-              : '?';
-            return '<button onclick="ctaExpandJornada(\'' + d + '\')" style="' +
-              'display:inline-flex;align-items:center;gap:4px;' +
-              'padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;' +
-              'border:1px solid rgba(74,222,128,.3);' +
-              'background:rgba(5,46,22,.3);color:#4ade80;' +
-              'cursor:pointer;white-space:nowrap;' +
-              '">✅ J' + jNum + ' · ' + label + '</button>';
-          }).join('');
-
-          const panelHtml = (openDate && existingPanel)
-            ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(74,222,128,.15);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
-            : '';
-
-          boostPendingEl.innerHTML =
-            '<span style="font-size:11px;font-weight:700;color:#4ade80;white-space:nowrap;flex-shrink:0">✅ Boosts completos — editar:</span>' +
-            asignados + panelHtml;
-
+          // Todos asignados — ocultar (igual que ticker superior)
+          boostPendingEl.style.display = 'none';
+          boostPendingEl.innerHTML = '';
         } else {
-          // Quedan boosts pendientes
+          const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
+          const existingPanel = document.getElementById('cta-boost-panel');
+          boostPendingEl.style.display = 'flex';
           const label = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>';
           const pills = pendientes.map(d => {
             const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
@@ -185,15 +159,11 @@ function checkGroupsComplete() {
               'animation:boostPulse 1.5s ease-in-out infinite;' +
               '">🔥 J' + jNum + ' · ' + dayLabel + ' (' + nM + ')</button>';
           }).join('');
-
           const panelHtml = (openDate && existingPanel)
             ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(124,45,18,.3);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
             : '';
-
           boostPendingEl.innerHTML = label + pills + panelHtml;
         }
-      } else if(boostPendingEl) {
-        boostPendingEl.style.display = 'none';
       }
     }
   }

@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-15 02:00 | Fuente: sesión activa
+> Actualizado: 2026-04-15 22:00 | Fuente: sesión tarde/noche
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -12,23 +12,29 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit** | `8e8ac44` |
+| **Último commit** | `12e6c6c` |
 
 ---
 
 ## 🔴 PENDIENTE URGENTE — Próxima sesión
 
-**Bug:** pg_net timeout en `porra-match-live`. El actor tarda ~44s y pg_net corta antes.
+**Bug: porra-apify-webhook no actualiza DB durante partidos en vivo**
 
-**Fix propuesto — arquitectura async en 2 pasos:**
-1. Cron lanza el actor de Apify de forma **async** (sin esperar respuesta)
-2. Apify llama a un **webhook** en Supabase cuando el actor termina
-3. El webhook procesa los datos, detecta cambios y envía WhatsApp
+El webhook extrae `datasetId` de `webhookBody.eventData.resource` pero Apify lo envía en `webhookBody.resource` (raíz). Como `datasetId` queda vacío, skipea con 200 sin procesar datos.
 
-```
-pg_cron → net.http_post (lanzar actor, no esperar)
-Apify actor termina → webhook → EF procesa → WhatsApp
-```
+**Fix preparado:** `supabase-ef-patches/porra-apify-webhook-v6.ts` — solo falta desplegar en dashboard Supabase.
+
+**Otros bugs pendientes:**
+- Barra inferior boost no se actualiza tras seleccionar pick
+- Parpadeo botón envío porra (recurrente)
+
+### Fixes aplicados sesión 2026-04-15 tarde/noche
+
+| Fix | Estado |
+|---|---|
+| Auth persistencia sesión (dos clientes Supabase, navigator.locks, storage custom) | ✅ |
+| Boost UI (guard, parpadeo, savePredictions spam) | ✅ |
+| Botonera KO móvil (flex-wrap) | ✅ |
 
 ---
 
@@ -49,15 +55,13 @@ Apify actor termina → webhook → EF procesa → WhatsApp
 | Componente | Versión | Estado | Notas |
 |---|---|---|---|
 | **Actor sofascore-live-proxy** | build 1.0.19 | ✅ FUNCIONA | Playwright + RESIDENTIAL + page.evaluate. ~44s. Devuelve event+incidents en tiempo real |
-| **porra-match-live EF** | v9 | ⚠️ PARCIAL | Lógica correcta pero pg_net hace timeout (44s > límite) |
+| **porra-match-live EF** | v13 | ✅ FUNCIONA | Async (<1s), lanza actor + webhook |
+| **porra-apify-webhook EF** | v5 | ⚠️ BUG | No extrae datasetId del payload Apify. Fix v6 preparado |
 | **porra-whatsapp-send EF** | v1 | ✅ FUNCIONA | Twilio sandbox, form-urlencoded |
 | **porra-whatsapp-webhook EF** | v4 | ✅ FUNCIONA | Captura WaId del suscriptor |
-| **pg_cron poll_atletico_barcelona** | jobid 6 | ✅ COMPLETADO | Partido terminado, ya no activo |
-| **pg_cron prematch_atletico_barcelona** | jobid 5 | ✅ COMPLETADO | Partido terminado, ya no activo |
-| **WhatsApp notificaciones** | — | ⚠️ CON RETRASO | Llegan pero con ~15min de retraso (caché CDN actor Azzouzana) |
-| **Actor VzKtdb1t0Qnc07X8V (Azzouzana)** | — | ❌ NO USAR LIVE | Scrappea HTML web con caché CDN ~15min. Solo válido para datos históricos |
-| **Proxy residencial Apify** | RESIDENTIAL | ✅ FUNCIONA | En actor propio. En EF Deno da "unsuccessful tunnel" |
-| **porra-sofascore-proxy EF** | v8 | ❌ OBSOLETA | Sustituida por actor propio. Siempre 403 desde Deno |
+| **pg_cron poll_bayern_realmadrid** | jobid 10 | ✅ ACTIVO | Cada 3min 19-23 UTC el 15 abr |
+| **Actor VzKtdb1t0Qnc07X8V (Azzouzana)** | — | ❌ NO USAR LIVE | Caché CDN ~15min |
+| **porra-sofascore-proxy EF** | v8 | ❌ OBSOLETA | Sustituida por actor propio |
 
 ---
 
@@ -77,7 +81,8 @@ pg_cron (cada minuto)
       → upsert live_scores (status, score, events)
 ```
 
-**Problema actual:** pg_net timeout antes de que el actor complete (~44s vs límite pg_net ~30s)
+**Arquitectura async RESUELTA:** pg_cron → match-live (async, <1s) → actor → webhook → apify-webhook → DB + WhatsApp
+**BUG ACTUAL:** webhook no extrae datasetId correctamente (busca en `eventData.resource` en vez de `resource`)
 
 ---
 
@@ -118,7 +123,8 @@ pg_cron (cada minuto)
 | `porra-orchestrator` | v3 | ✅ | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v4 | ✅ | Patches search/replace + commit GitHub |
 | `porra-fix-encoding` | v4 | ✅ | Write/inspect ficheros en GitHub via API |
-| `porra-match-live` | v9 | ⚠️ | Live scores + WhatsApp. Usa actor BYLtYcOxYkruVipwr. Problema pg_net timeout |
+| `porra-match-live` | v13 | ✅ | Async (<1s), lanza actor + webhook |
+| `porra-apify-webhook` | v5 | ⚠️ | BUG: datasetId extraction. Fix v6 en `supabase-ef-patches/` |
 | `porra-whatsapp-send` | v1 | ✅ | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
 | `porra-sofascore-proxy` | v8 | ❌ | Obsoleta, sustituida por actor propio |
@@ -222,8 +228,9 @@ pg_cron (cada minuto)
 
 | # | Tarea | Estado |
 |---|---|---|
-| 0 | **Fix pg_net timeout en porra-match-live** (arquitectura async+webhook) | 🔴 URGENTE |
-| 1 | Crear crons Bayern-Real Madrid y futuros partidos | 🔴 |
+| 0 | **Desplegar porra-apify-webhook v6** (fix datasetId extraction) | 🔴 URGENTE |
+| 0b | Fix barra inferior boost (no se actualiza tras seleccionar pick) | 🟡 |
+| 0c | Fix parpadeo botón envío porra (recurrente) | 🟡 |
 | 2 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
 | 3 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ jun |
 | 4 | Desactivar signup público cuando entren todos los amigos | ⏳ |
@@ -245,7 +252,8 @@ pg_cron (cada minuto)
 | 2026-04-13 tarde | Boost x2 completo — Canvas fuego, Supabase, ticker | 6c3d30b |
 | 2026-04-13 noche | Vista Jornada — pestaña, tarjetas compactas, sidebar | ef39b3d |
 | 2026-04-14 | Vista Jornada fixes (sidebar, chips, móvil). WhatsApp live scores sistema completo | 8e8ac44 |
-| 2026-04-15 | Actor propio BYLtYcOxYkruVipwr build 1.0.19 — datos SofaScore en tiempo real. porra-match-live v9. Pendiente: fix pg_net timeout | — |
+| 2026-04-15 AM | Actor propio BYLtYcOxYkruVipwr build 1.0.19. Arquitectura async+webhook resuelta. match-live v13 + apify-webhook v5 | b95ba00 |
+| 2026-04-15 PM | Fix auth persistencia (2 clientes Supabase, navigator.locks, storage custom). Fix boost UI. Fix botonera KO móvil. Bug webhook datasetId diagnosticado, fix v6 preparado | 12e6c6c |
 
 ---
 

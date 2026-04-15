@@ -4,33 +4,37 @@
 App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit: **8e8ac44**
+Rama activa: **main** | Último commit: **12e6c6c**
 
 ---
 
-## ⚠️ ESTADO ACTUAL — 2026-04-15
+## ⚠️ ESTADO ACTUAL — 2026-04-15 (sesión tarde/noche)
 
-No hay pendiente urgente de código frontend. El foco de la sesión anterior fue:
+### Fixes aplicados esta sesión
 
-**Fix pg_net timeout en sistema live — RESUELTO ✅**
+**Fix auth persistencia sesión — RESUELTO ✅**
+- Dos clientes Supabase separados: `_porraDb` (auth) y `_porraQueryDb` (queries con `accessToken` directo)
+- `navigator.locks` deshabilitado en `index.html` inline script antes del import Supabase
+- Storage custom síncrono (`_storage` → localStorage) para evitar NavigatorLockAcquireTimeoutError
+- `onAuthStateChange` maneja `INITIAL_SESSION` además de `SIGNED_IN` para restaurar sesión tras F5
+- `runAuthInit()` espera `window.load` para garantizar scripts cargados
 
-Arquitectura nueva (2 EFs):
+**Fix boost UI ✅**
+- Guard `if (!boostPicks)` corregido en `checkGroupsComplete()` (antes bloqueaba con `length === 0`)
+- Parpadeo `boostPulse` añadido a pills pendientes de barra superior
+- `savePredictions()` eliminado del timer de 1s (causaba POST a Supabase cada segundo)
 
-```
-pg_cron (cada minuto)
-  → porra-match-live v11 (<1s, async)
-      → Apify lanza actor BYLtYcOxYkruVipwr con webhook configurado
-      → retorna run_id inmediatamente
+**Fix botonera KO móvil ✅**
+- `flex-wrap: wrap; gap: 8px; padding: 8px 12px` en `.global-header`
+- `flex-shrink: 1; min-width: 0` en hijos directos
 
-~44s después
-  → Apify llama → porra-apify-webhook v2
-      → lee dataset actor
-      → detecta cambios estado/goles
-      → WhatsApp via Twilio
-      → upsert live_scores
-```
+### Bugs pendientes
 
-**Nota clave:** el `sofascore_event_id` en `live_scores` puede ser el slug de SofaScore (ej: `xdbsEgb`) además del ID numérico. El actor lo acepta.
+| Bug | Prioridad | Detalle |
+|---|---|---|
+| **porra-apify-webhook no actualiza DB** | 🔴 URGENTE | Webhook extrae `datasetId` de `webhookBody.eventData.resource` pero Apify lo envía en `webhookBody.resource`. Fix preparado en `supabase-ef-patches/porra-apify-webhook-v6.ts` — falta desplegar en dashboard Supabase |
+| **Barra inferior boost no se actualiza** | 🟡 | Tras seleccionar boost, pill no desaparece. Fix parcial aplicado (`innerHTML = ''` al ocultar) pero sin commit |
+| **Parpadeo botón envío porra** | 🟡 | Ya ocurrió antes, buscar en historial git |
 
 ---
 
@@ -39,8 +43,8 @@ pg_cron (cada minuto)
 | Componente | Versión | Estado |
 |---|---|---|
 | Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FUNCIONA (~44s, tiempo real) |
-| `porra-match-live` EF | v11 | ✅ Async (<1s), lanza actor + webhook |
-| `porra-apify-webhook` EF | v2 | ✅ Nueva EF, procesa webhook Apify |
+| `porra-match-live` EF | v13 | ✅ Async (<1s), lanza actor + webhook |
+| `porra-apify-webhook` EF | v5 | ⚠️ BUG: no extrae datasetId correctamente del payload Apify |
 | `porra-whatsapp-send` EF | v1 | ✅ FUNCIONA |
 | `porra-whatsapp-webhook` EF | v4 | ✅ FUNCIONA |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
@@ -49,8 +53,8 @@ pg_cron (cada minuto)
 
 Bayern-Real Madrid UCL QF vuelta (2026-04-15 21:00 CET):
 - `match_key`: `ucl_qf2_bayern_realmadrid`
-- `sofascore_event_id`: `xdbsEgb`
-- Crons: `prematch_bayern_realmadrid` (18:15 UTC) + `poll_bayern_realmadrid` (cada min 19-23 UTC)
+- `sofascore_event_id`: `15632088` (numérico, no slug)
+- Crons: `prematch_bayern_realmadrid` (18:15 UTC) + `poll_bayern_realmadrid` (cada 3min 19-23 UTC)
 
 ---
 
@@ -132,8 +136,8 @@ whatsapp_subscribers (
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
 | `porra-fix-encoding` | v5 | Write/inspect ficheros GitHub via API |
-| `porra-match-live` | v11 | Lanza actor Apify ASYNC + webhook. NO espera resultado. |
-| `porra-apify-webhook` | v2 | NUEVA. Recibe callback Apify, procesa datos, WhatsApp, upsert DB |
+| `porra-match-live` | v13 | Lanza actor Apify ASYNC + webhook. NO espera resultado. |
+| `porra-apify-webhook` | v5 | ⚠️ BUG parsing datasetId. Fix v6 preparado en `supabase-ef-patches/` |
 | `porra-whatsapp-send` | v1 | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp, captura WaId |
 | `porra-sofascore-proxy` | v8 | OBSOLETA — sustituida por actor propio |
@@ -156,7 +160,7 @@ pg_cron (cada minuto durante partido)
 ~44s después (cuando actor termina)
   → Apify llama POST → porra-apify-webhook v2
       → verifica secret en query param
-      → lee payload: {eventType, eventData.resource.defaultDatasetId}
+      → lee payload: {eventType, resource.defaultDatasetId}  ← BUG v5: buscaba en eventData.resource
       → lee dataset Apify con APIFY_TOKEN
       → extractMatchState: status, score, incidents
       → detecta cambios vs DB
@@ -213,15 +217,24 @@ apify push --actor-id BYLtYcOxYkruVipwr
 
 ---
 
-## Patrón DOMContentLoaded en classic scripts
+## Patrón inicialización en classic scripts
 
 ```js
-const runInit = () => { /* ... */ };
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', runInit);
-} else {
+// Para scripts que necesitan DOM completo + todos los scripts cargados:
+const runInit = async () => { /* ... */ };
+if (document.readyState === 'complete') {
   runInit();
+} else {
+  window.addEventListener('load', runInit, { once: true });
 }
+```
+
+## Arquitectura auth — dos clientes Supabase
+
+```js
+// _porraDb: solo auth (signIn, onAuthStateChange). persistSession + storage custom.
+// _porraQueryDb: solo queries (from().select()). accessToken directo, sin lock.
+// Proxy db: db.auth → _porraDb.auth, db.from() → _porraQueryDb.from()
 ```
 
 ---
