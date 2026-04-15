@@ -17,7 +17,7 @@ window._supa_anon = SUPA_ANON;
 function getDb() {
   if (!window._porraDb) {
     window._porraDb = window.supabase.createClient(SUPA_URL, SUPA_ANON, {
-      auth: { storageKey: 'porra_auth', persistSession: false, autoRefreshToken: true }
+      auth: { storageKey: 'porra_auth', persistSession: true, autoRefreshToken: true }
     });
   }
   return window._porraDb;
@@ -297,10 +297,6 @@ const runAuthInit = async () => {
     const kp = localStorage.getItem('porra_ko_predictions');
     if (kp) { koPredictions = JSON.parse(kp); normKoPredictions(); }
   } catch(e) {}
-
-  // Con persistSession:false la sesión no persiste entre recargas — el usuario debe hacer login
-  // Limpieza defensiva de tokens huérfanos
-  Object.keys(localStorage).filter(k => k.includes('porra_auth') || k.includes('supabase')).forEach(k => localStorage.removeItem(k));
 
   showPage('welcome');
   initWelcome();
