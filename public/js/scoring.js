@@ -1169,8 +1169,9 @@ function checkKitConflict(card, idx, homeTeam, awayTeam, hKitType, aKitType) {
     img.src = url;
   }
 
-  const hUrl = hKitEl.style.backgroundImage.replace(/url\(['"]?|['"]?\)/g,'');
-  const aUrl = aKitEl.style.backgroundImage.replace(/url\(['"]?|['"]?\)/g,'');
+  const extractUrl = bg => { const m = bg.match(/url\(['"]?([^'")\s]+)['"]?\)/); return m ? m[1] : ''; };
+  const hUrl = extractUrl(hKitEl.style.backgroundImage);
+  const aUrl = extractUrl(aKitEl.style.backgroundImage);
 
   analyzeKit(hUrl, hColor => {
     analyzeKit(aUrl, aColor => {
