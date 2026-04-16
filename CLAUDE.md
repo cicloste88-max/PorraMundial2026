@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit: **18ae20a**
+Rama activa: **main** | Último commit: **2600c1a**
 
 ---
 
@@ -13,6 +13,22 @@ Rama activa: **main** | Último commit: **18ae20a**
 1. **Migrar WhatsApp sandbox → producción** (número Business aprobado por Meta) — CRÍTICO antes del 11 jun. Error 63016: Twilio sandbox expira ventana 24h, no entrega mensajes iniciados por el negocio fuera de esa ventana.
 2. **Fix parpadeo botón envío porra**
 3. **Fix barra inferior boost** (ya en commit ea6c621, verificar en prod)
+
+### Fixes aplicados sesión 2026-04-16/17
+
+**Fix 404 masivos consola (scoring.js) — RESUELTO ✅**
+- Regex `backgroundImage.replace(...)` no extraía URL cuando había `linear-gradient(...)` delante
+- Nuevo `extractUrl()` con `bg.match(/url\(['"]?([^'")\s]+)['"]?\)/)` extrae solo la URL limpia
+
+**Header eliminatorias responsive — RESUELTO ✅**
+- Reestructurado HTML: layout 2 columnas como fase de grupos (izq: back+título, der: clasificación+puntos+userbar)
+- View-tabs y botón simular en `.ko-sub-bar` separado
+- Pill liga en `#elim-league-pill-slot` dedicado (leagues.js actualizado)
+- Botón clasificación con inline styles idénticos a grupos (dorado, hover)
+
+**Bracket results rediseño — RESUELTO ✅**
+- Timeline vertical + live hero (adiós layout espejo izq/der)
+- Columnas móvil reducidas (past 28px, future 20px, center 32px)
 
 ---
 
