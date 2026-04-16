@@ -1,12 +1,12 @@
 /* bracket-results.js — Porra Mundial 2026
-   Vista de resultados reales del bracket KO. Sin lógica de pronósticos.
-   Lee: window.BRACKET (ko.js), window.EQUIPOS (data.js), window.SB (data.js)
+   Vista de resultados reales del bracket KO: timeline vertical + live hero.
+   Lee: window.BRACKET (ko.js), window.EQUIPOS (data.js), window.resolvedSlots
    Expone: window.initBracketResults, window.refreshBracketResults, window.brkSetPhase
 */
 
 const BRK_SB = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures';
 
-// ── BADGE MAP (slug equipo → fichero badge sin .png, null = sin badge) ──
+// Badge map: slug equipo → fichero badge sin .png (null = sin badge)
 const BRK_BADGE_MAP = {
   'spain':'spain','germany':'germany','france':'france','brazil':'brazil',
   'england':'england','netherlands':'netherlands','portugal':'portugal',
@@ -21,37 +21,23 @@ const BRK_BADGE_MAP = {
   'jordan':'jordan','new-zealand':'new-zealand','south-africa':'south-africa',
   'ivory-coast':'ivory-coast','iran':'iran','austria':'austria',
   'paraguay':'paraguay','scotland':'scotland',
-  // sin badge:
   'nigeria':null,'drc-jam':null,'irak':null,'bosnia':null,
   'turkey':null,'sweden':null,'czech':null,
 };
 
-// ── FASES Y DISTRIBUCIÓN IZQUIERDA/DERECHA ──
-// IDs verificados contra BRACKET en ko.js (data.js):
-//   r32: 73-88, r16: 89-96, qf: 97-100, sf: 101-102, third: 103, final: 104
+// Fases reales del bracket KO (4 rondas + 3er puesto + final).
+// `path` es la clave en window.BRACKET; IDs se leen de ahí dinámicamente.
 const BRK_PHASES = [
-  {id:'r32', label:'1/32',    dates:'28 jun – 3 jul'},
-  {id:'r16', label:'1/16',    dates:'4 – 7 jul'},
-  {id:'oct', label:'Octavos', dates:'9 – 11 jul'},
-  {id:'qf',  label:'Cuartos', dates:'14 – 15 jul'},
-  {id:'sf',  label:'Semis',   dates:'18 – 19 jul'},
+  {id:'r32',   label:'Dieciseisavos', dates:'28 jun – 3 jul',     path:'r32'},
+  {id:'r16',   label:'Octavos',       dates:'4 – 7 jul',          path:'r16'},
+  {id:'qf',    label:'Cuartos',       dates:'9 – 11 jul',         path:'qf'},
+  {id:'sf',    label:'Semifinales',   dates:'14 – 15 jul',        path:'sf'},
+  {id:'third', label:'3er Puesto',    dates:'18 jul · Miami',     path:'third'},
+  {id:'final', label:'Final',         dates:'19 jul · Nueva York',path:'final'},
 ];
-const BRK_PH_IDS = BRK_PHASES.map(p => p.id);
 
-const BRK_COLS = {
-  r32: {left:[73,74,75,76,77,78,79,80], right:[81,82,83,84,85,86,87,88]},
-  r16: {left:[89,90,91,92],             right:[93,94,95,96]},
-  oct: {left:[97,98],                   right:[99,100]},
-  qf:  {left:[101],                     right:[102]},
-  sf:  {left:[],                        right:[]},
-};
-const BRK_FINAL_ID = 104;  // BRACKET.final[0].id
-const BRK_THIRD_ID = 103;  // BRACKET.third[0].id
-
-// ── STATE ──
-let _brkActivePhase = 'r32';
-let _brkResults     = {};
-let _brkInited      = false;
+let _brkResults = {};
+let _brkInited  = false;
 
 // ── HELPERS ──
 function brkBadgeUrl(slug){
@@ -63,119 +49,161 @@ function brkGetTeam(name){
   if(!name||!window.EQUIPOS) return null;
   return window.EQUIPOS.find(e=>e.name===name)||null;
 }
+function brkPhaseMatches(path){
+  const B = window.BRACKET;
+  return (B && B[path]) ? B[path] : [];
+}
 function brkFindMatch(id){
-  if(!window.BRACKET) return null;
-  return [...window.BRACKET.r32,...window.BRACKET.r16,...window.BRACKET.qf,
-          ...window.BRACKET.sf,...(window.BRACKET.third||[]),...(window.BRACKET.final||[])]
-    .find(m=>m.id===id)||null;
+  for(const ph of BRK_PHASES){
+    const m = brkPhaseMatches(ph.path).find(x=>x.id===id);
+    if(m) return m;
+  }
+  return null;
 }
 function brkGetResult(id){
-  return _brkResults[id]||_brkResults[String(id)]||null;
+  return _brkResults[id] || _brkResults[String(id)] || null;
 }
 function brkMatchStatus(id,match){
-  const r=brkGetResult(id);
+  const r = brkGetResult(id);
   if(r){
     if(r.estado==='live') return 'live';
-    if(r.estado==='done'||(r.local!==null&&r.visitante!==null)) return 'done';
+    if(r.estado==='done' || (r.local!=null && r.visitante!=null)) return 'done';
   }
   if(!match) return 'tbd';
-  const slots=['W','L','T_'];
-  const hOk=match.home&&!slots.some(s=>match.home.startsWith(s));
-  const aOk=match.away&&!slots.some(s=>match.away.startsWith(s));
-  return (hOk&&aOk)?'upcoming':'tbd';
-}
-function brkDetectActivePhase(){
-  let found='r32';
-  for(const ph of BRK_PHASES){
-    const allIds=[...(BRK_COLS[ph.id]?.left||[]),...(BRK_COLS[ph.id]?.right||[])];
-    const hasActivity=allIds.some(id=>{
-      const r=brkGetResult(id);
-      return r&&(r.estado==='done'||r.estado==='live'||(r.local!==null&&r.visitante!==null));
-    });
-    if(hasActivity) found=ph.id;
-  }
-  return found;
+  const slots = ['W','L','T_'];
+  const hOk = match.home && !slots.some(s=>match.home.startsWith(s));
+  const aOk = match.away && !slots.some(s=>match.away.startsWith(s));
+  return (hOk && aOk) ? 'upcoming' : 'tbd';
 }
 
-// ── DATA LOADING ──
-// Resultados reales vienen de la tabla `results` en Supabase.
-// scoreboard.js los parsea como realKoResults = JSON.parse(res.ko_results).
-// No hay un window._results global — usamos lo que esté disponible.
+// ── DATA ──
 function brkLoadResults(){
-  // Intentar fuentes conocidas de resultados KO
-  if(window._brkResultsOverride){
-    _brkResults=window._brkResultsOverride;
-    return;
-  }
-  // Fallback: sin datos de resultados, todo queda como upcoming/tbd
-  _brkResults={};
+  if(window._brkResultsOverride){ _brkResults = window._brkResultsOverride; return; }
+  _brkResults = {};
 }
 
-// ── RENDER: HERO (bandera fondo + badge) ──
-function brkMakeHero(hSlug,aSlug,hFlag,aFlag,hName,aName,isTbd){
-  const hBadge=hSlug?brkBadgeUrl(hSlug):null;
-  const aBadge=aSlug?brkBadgeUrl(aSlug):null;
-  const hFlagUrl=brkFlagUrl(hFlag);
-  const aFlagUrl=brkFlagUrl(aFlag);
-  const nameCls=isTbd?' tbd':'';
+// ── LIVE HERO ──
+function brkFindLiveMatch(){
+  for(const ph of BRK_PHASES){
+    for(const m of brkPhaseMatches(ph.path)){
+      const r = brkGetResult(m.id);
+      if(r && r.estado==='live') return {match:m, phase:ph, result:r};
+    }
+  }
+  return null;
+}
+function brkRenderLiveHero(){
+  const hero = document.getElementById('brk-live-hero');
+  if(!hero) return;
+  const live = brkFindLiveMatch();
+  if(!live){ hero.style.display='none'; hero.innerHTML=''; return; }
+  hero.style.display = '';
 
-  const halfL=`<div class="brk-half hL">
-    ${hFlagUrl?`<div class="brk-flag-bg" style="background-image:url('${hFlagUrl}')"></div>`:''}
+  const {match, phase, result} = live;
+  const hName = (window.resolvedSlots?.[match.home]) || match.home || '—';
+  const aName = (window.resolvedSlots?.[match.away]) || match.away || '—';
+  const hT = brkGetTeam(hName), aT = brkGetTeam(aName);
+  const hFlag = brkFlagUrl(hT?.flag), aFlag = brkFlagUrl(aT?.flag);
+  const hBadge = brkBadgeUrl(hT?.slug), aBadge = brkBadgeUrl(aT?.slug);
+  const hG = result.local ?? 0;
+  const aG = result.visitante ?? 0;
+  const min = result.minuto ? `${result.minuto}'` : 'EN JUEGO';
+
+  const sideHtml = (flag, badge, name) => `
+    <div class="brk-lh-side">
+      <div class="brk-lh-badge-wrap">
+        ${flag ? `<img class="brk-lh-flag" src="${flag}" onerror="this.style.visibility='hidden'">` : '<div class="brk-lh-flag"></div>'}
+        ${badge ? `<img class="brk-lh-badge" src="${badge}" onerror="this.style.display='none'">` : ''}
+      </div>
+      <div class="brk-lh-name">${(name||'?').substring(0,16)}</div>
+    </div>`;
+
+  hero.innerHTML = `
+    <div class="brk-lh-bar">
+      <span class="brk-lh-dot"></span>
+      <span class="brk-lh-lbl">En directo</span>
+      <span class="brk-lh-sep">·</span>
+      <span class="brk-lh-phase">${phase.label}</span>
+      <span class="brk-lh-sep">·</span>
+      <span class="brk-lh-min">${min}</span>
+    </div>
+    <div class="brk-lh-main" onclick="brkJumpTo(${match.id})">
+      ${sideHtml(hFlag, hBadge, hName)}
+      <div class="brk-lh-score">
+        <span class="brk-lh-g">${hG}</span>
+        <span class="brk-lh-dash">–</span>
+        <span class="brk-lh-g">${aG}</span>
+      </div>
+      ${sideHtml(aFlag, aBadge, aName)}
+    </div>
+    ${match.venue ? `<div class="brk-lh-venue">${match.venue}</div>` : ''}
+  `;
+}
+
+// ── MATCH CARD (hero con bandera + badge, score, footer) ──
+function brkMakeHero(hSlug,aSlug,hFlag,aFlag,hName,aName,isTbd){
+  const hBadge = hSlug ? brkBadgeUrl(hSlug) : null;
+  const aBadge = aSlug ? brkBadgeUrl(aSlug) : null;
+  const hFlagUrl = brkFlagUrl(hFlag);
+  const aFlagUrl = brkFlagUrl(aFlag);
+  const nameCls = isTbd ? ' tbd' : '';
+
+  const halfL = `<div class="brk-half hL">
+    ${hFlagUrl ? `<div class="brk-flag-bg" style="background-image:url('${hFlagUrl}')"></div>` : ''}
     <div class="brk-vign"></div>
     <div class="brk-badge-wrap">
-      ${hBadge?`<img class="brk-badge" src="${hBadge}" onerror="this.outerHTML='<div class=brk-badge-ph>?</div>'">`:`<div class="brk-badge-ph">${hFlag?'&#127988;':'?'}</div>`}
-      <div class="brk-tname${nameCls}">${(hName||'?').substring(0,11)}</div>
+      ${hBadge ? `<img class="brk-badge" src="${hBadge}" onerror="this.outerHTML='<div class=brk-badge-ph>?</div>'">` : `<div class="brk-badge-ph">${hFlag?'&#127988;':'?'}</div>`}
+      <div class="brk-tname${nameCls}">${(hName||'?').substring(0,12)}</div>
     </div>
   </div>`;
 
-  const halfR=`<div class="brk-half hR">
-    ${aFlagUrl?`<div class="brk-flag-bg" style="background-image:url('${aFlagUrl}')"></div>`:''}
+  const halfR = `<div class="brk-half hR">
+    ${aFlagUrl ? `<div class="brk-flag-bg" style="background-image:url('${aFlagUrl}')"></div>` : ''}
     <div class="brk-vign"></div>
     <div class="brk-badge-wrap">
-      ${aBadge?`<img class="brk-badge" src="${aBadge}" onerror="this.outerHTML='<div class=brk-badge-ph>?</div>'">`:`<div class="brk-badge-ph">${aFlag?'&#127988;':'?'}</div>`}
-      <div class="brk-tname${nameCls}">${(aName||'?').substring(0,11)}</div>
+      ${aBadge ? `<img class="brk-badge" src="${aBadge}" onerror="this.outerHTML='<div class=brk-badge-ph>?</div>'">` : `<div class="brk-badge-ph">${aFlag?'&#127988;':'?'}</div>`}
+      <div class="brk-tname${nameCls}">${(aName||'?').substring(0,12)}</div>
     </div>
   </div>`;
 
   return `<div class="brk-hero">${halfL}${halfR}<div class="brk-vs">VS</div><div class="brk-fade"></div></div>`;
 }
 
-// ── RENDER: MATCH CARD ──
-function brkMakeCard(matchId,isFinal,isThird){
-  const match =brkFindMatch(matchId);
-  const result=brkGetResult(matchId);
-  const status=brkMatchStatus(matchId,match);
+function brkMakeCard(matchId, isFinal, isThird){
+  const match  = brkFindMatch(matchId);
+  const result = brkGetResult(matchId);
+  const status = brkMatchStatus(matchId, match);
 
-  let hName='—',aName='—',hSlug=null,aSlug=null,hFlag=null,aFlag=null;
+  let hName='—', aName='—', hSlug=null, aSlug=null, hFlag=null, aFlag=null;
   if(match){
-    hName=(window.resolvedSlots&&window.resolvedSlots[match.home])||match.home||'—';
-    aName=(window.resolvedSlots&&window.resolvedSlots[match.away])||match.away||'—';
-    const hT=brkGetTeam(hName); const aT=brkGetTeam(aName);
-    hSlug=hT?.slug||null; aSlug=aT?.slug||null;
-    hFlag=hT?.flag||null; aFlag=aT?.flag||null;
+    hName = (window.resolvedSlots?.[match.home]) || match.home || '—';
+    aName = (window.resolvedSlots?.[match.away]) || match.away || '—';
+    const hT = brkGetTeam(hName); const aT = brkGetTeam(aName);
+    hSlug = hT?.slug||null; aSlug = aT?.slug||null;
+    hFlag = hT?.flag||null; aFlag = aT?.flag||null;
   }
 
-  const isTbd   =status==='tbd';
-  const hasScore=result&&result.local!==null&&result.visitante!==null;
-  const hG      =hasScore?result.local:null;
-  const aG      =hasScore?result.visitante:null;
-  const hWin    =hasScore&&hG>aG;
-  const aWin    =hasScore&&aG>hG;
-  const isLive  =status==='live';
-  const scHas   =(hasScore||isLive)?'has':'';
+  const isTbd   = status==='tbd';
+  const hasScore = result && result.local!=null && result.visitante!=null;
+  const hG = hasScore ? result.local : null;
+  const aG = hasScore ? result.visitante : null;
+  const hWin = hasScore && hG>aG;
+  const aWin = hasScore && aG>hG;
+  const isLive = status==='live';
+  const scHas = (hasScore||isLive) ? 'has' : '';
 
-  const hScCls=isLive?'brk-sc-live':hasScore?(hWin?'winner':'loser'):'';
-  const aScCls=isLive?'brk-sc-live':hasScore?(aWin?'winner':'loser'):'';
-  const hSc=hasScore?hG:'–';
-  const aSc=hasScore?aG:'–';
+  const hScCls = isLive ? 'brk-sc-live' : hasScore ? (hWin?'winner':'loser') : '';
+  const aScCls = isLive ? 'brk-sc-live' : hasScore ? (aWin?'winner':'loser') : '';
+  const hSc = hasScore ? hG : '–';
+  const aSc = hasScore ? aG : '–';
 
   let stHtml='';
-  if(status==='done')     stHtml=`<span class="brk-st done">Final</span>`;
-  else if(isLive)         stHtml=`<span class="brk-st live"><span class="brk-live-dot"></span>${result?.minuto?result.minuto+"'":'•'}</span>`;
-  else if(status==='upcoming') stHtml=`<span class="brk-st upcoming">Próximo</span>`;
-  else                    stHtml=`<span class="brk-st tbd">—</span>`;
+  if(status==='done')          stHtml = `<span class="brk-st done">Final</span>`;
+  else if(isLive)              stHtml = `<span class="brk-st live"><span class="brk-live-dot"></span>${result?.minuto?result.minuto+"'":'•'}</span>`;
+  else if(status==='upcoming') stHtml = `<span class="brk-st upcoming">Próximo</span>`;
+  else                         stHtml = `<span class="brk-st tbd">—</span>`;
 
-  const cardCls=isFinal?'final-card':isThird?'third-card':status;
+  const cardCls = isFinal ? 'final-card' : isThird ? 'third-card' : status;
   return `<div class="brk-mc ${cardCls}" data-match-id="${matchId}">
     ${brkMakeHero(hSlug,aSlug,hFlag,aFlag,hName,aName,isTbd)}
     <div class="brk-scores">
@@ -190,146 +218,98 @@ function brkMakeCard(matchId,isFinal,isThird){
   </div>`;
 }
 
-// ── RENDER: PAST MINI ──
-function brkMakePast(matchId){
-  const match =brkFindMatch(matchId); if(!match) return '';
-  const result=brkGetResult(matchId);
-  const hName=(window.resolvedSlots?.[match.home])||match.home||'?';
-  const aName=(window.resolvedSlots?.[match.away])||match.away||'?';
-  const hT=brkGetTeam(hName); const aT=brkGetTeam(aName);
-  const hFlagEl=hT?.flag?`<img class="brk-pm-flag" src="${brkFlagUrl(hT.flag)}" onerror="this.className='brk-pm-flag'">`:'<div class="brk-pm-flag"></div>';
-  const aFlagEl=aT?.flag?`<img class="brk-pm-flag" src="${brkFlagUrl(aT.flag)}" onerror="this.className='brk-pm-flag'">`:'<div class="brk-pm-flag"></div>';
-  const hG=result?.local??'?'; const aG=result?.visitante??'?';
-  const hWin=result&&result.local>result.visitante;
-  return `<div class="brk-pm" title="${hName} ${hG}-${aG} ${aName}">
-    <div class="brk-pm-row">${hFlagEl}<span class="brk-pm-name${hWin?' w':''}">${hName.substring(0,8)}</span><span class="brk-pm-sc${hWin?'':' l'}">${hG}</span></div>
-    <div class="brk-pm-row">${aFlagEl}<span class="brk-pm-name${!hWin?' w':''}">${aName.substring(0,8)}</span><span class="brk-pm-sc${!hWin?'':' l'}">${aG}</span></div>
-  </div>`;
+// ── RAIL (chips quick-nav) ──
+function brkPhaseStats(path){
+  const matches = brkPhaseMatches(path);
+  const total = matches.length;
+  let done=0, live=0;
+  matches.forEach(m=>{
+    const s = brkMatchStatus(m.id, m);
+    if(s==='done') done++;
+    else if(s==='live') live++;
+  });
+  return {total, done, live};
 }
-
-// ── RENDER: FINAL BOX (fuera del bracket scroll) ──
-function brkMakeFinalBox(){
-  return `<div class="brk-final-box" id="brk-final-box">
-    <div class="brk-final-box-hd">
-      <div class="brk-final-box-title">🏆 Final · Copa del Mundo 2026</div>
-      <div class="brk-final-box-sub">19 jul · MetLife Stadium, Nueva York</div>
-    </div>
-    <div class="brk-final-box-cards">
-      ${brkMakeCard(BRK_FINAL_ID,true,false)}
-      <div class="brk-final-box-divider"></div>
-      ${brkMakeCard(BRK_THIRD_ID,false,true)}
-    </div>
-    <div class="brk-final-box-footer">
-      <span class="brk-final-box-third-lbl">🥉 3er Puesto · 18 jul · Hard Rock Stadium, Miami</span>
-    </div>
-  </div>`;
-}
-
-// ── RENDER: RAIL ──
 function brkRenderRail(){
-  const rail=document.getElementById('brk-rail'); if(!rail) return;
-  const isFinalView=_brkActivePhase==='final';
-  const ai=isFinalView?BRK_PH_IDS.length:BRK_PH_IDS.indexOf(_brkActivePhase);
-  const segs=BRK_PHASES.map((p,i)=>{
-    const cls=isFinalView?'done':i<ai?'done':i===ai?'active':'future';
-    return `<div class="brk-ph ${cls}" onclick="brkSetPhase('${p.id}')"><span class="brk-ph-dot"></span>${p.label}</div>`;
-  });
-  const finalCls=isFinalView?'final active':'final';
-  segs.push(`<div class="brk-ph ${finalCls}" onclick="brkSetPhase('final')"><span class="brk-ph-dot"></span>Final</div>`);
-  rail.innerHTML=segs.join('<div style="width:1px;background:#0c0e14;flex-shrink:0"></div>');
+  const rail = document.getElementById('brk-rail'); if(!rail) return;
+  const html = BRK_PHASES.map(ph=>{
+    const {total, done, live} = brkPhaseStats(ph.path);
+    const isComplete = total>0 && done===total;
+    const cls = ph.id==='final' ? (isComplete?'final done':'final')
+              : live>0       ? 'live'
+              : isComplete   ? 'done'
+              : done>0       ? 'partial'
+              : 'future';
+    const prog = (total>1) ? `<span class="brk-ph-prog">${done}/${total}</span>` : '';
+    return `<div class="brk-ph ${cls}" onclick="brkSetPhase('${ph.id}')" data-phase="${ph.id}">
+      <span class="brk-ph-dot"></span>
+      <span class="brk-ph-lbl">${ph.label}</span>
+      ${prog}
+    </div>`;
+  }).join('');
+  rail.innerHTML = html;
 }
 
-// ── RENDER: BRACKET BODY ──
-function brkRenderBracket(){
-  const body=document.getElementById('brk-body'); if(!body) return;
-  const isFinalView=_brkActivePhase==='final';
-  const ai=isFinalView?BRK_PH_IDS.length:BRK_PH_IDS.indexOf(_brkActivePhase);
-  const futurePhs=isFinalView?[]:BRK_PH_IDS.slice(ai+1).filter(id=>BRK_PHASES.find(p=>p.id===id));
-  const aph=isFinalView?null:BRK_PHASES.find(p=>p.id===_brkActivePhase);
-  let html='';
+// ── TIMELINE (secciones verticales apiladas) ──
+function brkRenderTimeline(){
+  const tl = document.getElementById('brk-timeline'); if(!tl) return;
+  const html = BRK_PHASES.map(ph=>{
+    const matches = brkPhaseMatches(ph.path);
+    const {total, done, live} = brkPhaseStats(ph.path);
+    const isFinal = ph.id==='final';
+    const isThird = ph.id==='third';
+    const sectCls = `brk-sect${isFinal?' is-final':isThird?' is-third':''}${live>0?' has-live':''}`;
+    const icon    = isFinal ? '🏆' : isThird ? '🥉' : '';
+    const iconHtml = icon ? `<span class="brk-sect-ico">${icon}</span>` : '';
+    const liveBadge = live>0 ? `<span class="brk-sect-live"><span class="brk-live-dot"></span>EN VIVO</span>` : '';
+    const progBadge = total>1 ? `<span class="brk-sect-prog">${done}/${total}</span>` : '';
+    const gridCls = `brk-sect-grid${matches.length<=1?' single':''}`;
+    const cards = matches.length
+      ? matches.map(m=>brkMakeCard(m.id, isFinal, isThird)).join('')
+      : `<div class="brk-sect-empty">Sin partidos programados</div>`;
 
-  // Past left
-  const pastIds=isFinalView?BRK_PH_IDS:BRK_PH_IDS.slice(0,ai);
-  pastIds.forEach(pid=>{
-    const ph=BRK_PHASES.find(p=>p.id===pid);
-    html+=`<div class="brk-col past"><div class="brk-col-hd"><span class="brk-col-lbl">${ph.label}</span></div>
-      <div class="brk-past-wrap">${(BRK_COLS[pid]?.left||[]).map(brkMakePast).join('')}</div></div>`;
-  });
-
-  if(!isFinalView){
-    // Active left
-    html+=`<div class="brk-col active"><div class="brk-col-hd"><span class="brk-col-lbl">${aph.label} · en curso</span><div class="brk-col-sub">${aph.dates}</div></div>
-      <div class="brk-matches">${(BRK_COLS[_brkActivePhase]?.left||[]).map(id=>brkMakeCard(id,false,false)).join('')}</div></div>`;
-
-    // Future left (ghost)
-    futurePhs.forEach((pid,i)=>{
-      const ph=BRK_PHASES.find(p=>p.id===pid);
-      const n=BRK_COLS[pid]?.left?.length||1;
-      html+=`<div class="brk-col future f${Math.min(i+1,3)}"><div class="brk-col-hd"><span class="brk-col-lbl">${ph?.label||pid}</span></div>
-        <div class="brk-ghost-wrap">${Array(n).fill('<div class="brk-ghost"></div>').join('')}</div></div>`;
-    });
-  }
-
-  if(!isFinalView){
-    // Future right (mirror, opacidad inversa)
-    [...futurePhs].reverse().forEach((pid,i)=>{
-      const ph=BRK_PHASES.find(p=>p.id===pid);
-      const n=BRK_COLS[pid]?.right?.length||1;
-      const fi=Math.min(futurePhs.length-i,3);
-      html+=`<div class="brk-col future rfuture f${fi}"><div class="brk-col-hd"><span class="brk-col-lbl">${ph?.label||pid}</span></div>
-        <div class="brk-ghost-wrap">${Array(n).fill('<div class="brk-ghost"></div>').join('')}</div></div>`;
-    });
-
-    // Active right
-    html+=`<div class="brk-col active ractive"><div class="brk-col-hd"><span class="brk-col-lbl">${aph.label} · en curso</span><div class="brk-col-sub">${aph.dates}</div></div>
-      <div class="brk-matches">${(BRK_COLS[_brkActivePhase]?.right||[]).map(id=>brkMakeCard(id,false,false)).join('')}</div></div>`;
-  }
-
-  // Past right (reversed)
-  [...pastIds].reverse().forEach(pid=>{
-    const ph=BRK_PHASES.find(p=>p.id===pid);
-    html+=`<div class="brk-col past rpast"><div class="brk-col-hd"><span class="brk-col-lbl">${ph.label}</span></div>
-      <div class="brk-past-wrap">${(BRK_COLS[pid]?.right||[]).map(brkMakePast).join('')}</div></div>`;
-  });
-
-  body.innerHTML=html;
-  brkEnableDrag(document.getElementById('brk-scroll'));
+    return `<section class="${sectCls}" id="brk-sect-${ph.id}" data-phase="${ph.id}">
+      <header class="brk-sect-hd">
+        <div class="brk-sect-title">${iconHtml}<span>${ph.label}</span></div>
+        <div class="brk-sect-meta">
+          <span class="brk-sect-dates">${ph.dates}</span>
+          ${liveBadge}
+          ${progBadge}
+        </div>
+      </header>
+      <div class="${gridCls}">${cards}</div>
+    </section>`;
+  }).join('');
+  tl.innerHTML = html;
 }
 
-// ── DRAG SCROLL ──
-function brkEnableDrag(el){
-  if(!el||el._brkDrag) return; el._brkDrag=true;
-  let down=false,startX,scrollL;
-  el.addEventListener('mousedown',e=>{down=true;el.classList.add('dragging');startX=e.pageX-el.offsetLeft;scrollL=el.scrollLeft});
-  el.addEventListener('mouseleave',()=>{down=false;el.classList.remove('dragging')});
-  el.addEventListener('mouseup',  ()=>{down=false;el.classList.remove('dragging')});
-  el.addEventListener('mousemove',e=>{if(!down)return;e.preventDefault();el.scrollLeft=scrollL-(e.pageX-el.offsetLeft-startX)*1.4});
+// ── NAV ──
+function brkSetPhase(phaseId){
+  const el = document.getElementById(`brk-sect-${phaseId}`);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.classList.add('brk-sect-flash');
+  setTimeout(()=>el.classList.remove('brk-sect-flash'), 1400);
 }
+window.brkSetPhase = brkSetPhase;
 
-// ── PUBLIC API ──
-function brkSetPhase(id){
-  _brkActivePhase=id;
-  brkRenderRail();
-  if(id==='final'){
-    document.getElementById('brk-scroll').style.display='none';
-    const area=document.getElementById('brk-final-area');
-    if(area){area.innerHTML=brkMakeFinalBox();area.style.display='block';}
-  } else {
-    document.getElementById('brk-scroll').style.display='';
-    const area=document.getElementById('brk-final-area');
-    if(area){area.innerHTML='';area.style.display='none';}
-    brkRenderBracket();
-  }
+function brkJumpTo(matchId){
+  const el = document.querySelector(`[data-match-id="${matchId}"]`);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+  el.classList.add('brk-mc-flash');
+  setTimeout(()=>el.classList.remove('brk-mc-flash'), 1600);
 }
-window.brkSetPhase=brkSetPhase;
+window.brkJumpTo = brkJumpTo;
 
+// ── INIT / REFRESH ──
 function initBracketResults(){
-  const root=document.getElementById('brk-root'); if(!root) return;
+  const root = document.getElementById('brk-root'); if(!root) return;
   if(!_brkInited){
-    root.innerHTML=`<div class="brk-root">
+    root.innerHTML = `<div class="brk-root">
+      <div class="brk-live-hero" id="brk-live-hero" style="display:none"></div>
       <div class="brk-rail" id="brk-rail"></div>
-      <div class="brk-scroll" id="brk-scroll"><div class="brk-body" id="brk-body"></div></div>
-      <div class="brk-final-area" id="brk-final-area" style="display:none"></div>
+      <div class="brk-timeline" id="brk-timeline"></div>
       <div class="brk-legend">
         <div class="brk-leg-i"><div class="brk-leg-d" style="background:#3ddc84"></div>Finalizado</div>
         <div class="brk-leg-i"><div class="brk-leg-d" style="background:#f75f5f"></div>En vivo</div>
@@ -338,17 +318,25 @@ function initBracketResults(){
         <div class="brk-leg-i"><div class="brk-leg-d" style="background:#fbbf24"></div>Final</div>
       </div>
     </div>`;
-    _brkInited=true;
+    _brkInited = true;
   }
   brkLoadResults();
-  _brkActivePhase=brkDetectActivePhase();
   brkRenderRail();
-  brkRenderBracket();
+  brkRenderTimeline();
+  brkRenderLiveHero();
 }
-window.initBracketResults=initBracketResults;
+window.initBracketResults = initBracketResults;
 
 function refreshBracketResults(){
   brkLoadResults();
-  brkSetPhase(brkDetectActivePhase());
+  brkRenderRail();
+  brkRenderTimeline();
+  brkRenderLiveHero();
 }
-window.refreshBracketResults=refreshBracketResults;
+window.refreshBracketResults = refreshBracketResults;
+
+if(document.readyState==='loading'){
+  addEventListener('DOMContentLoaded',()=>{ if(document.getElementById('brk-root')) initBracketResults(); });
+}else{
+  if(document.getElementById('brk-root')) initBracketResults();
+}
