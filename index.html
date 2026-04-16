@@ -1800,16 +1800,17 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
   .group-section h2{font-size:18px;margin-bottom:12px}
 
   /* ── Header de Eliminatorias ── */
-  .global-header{flex-wrap:wrap;gap:6px;padding:8px 12px}
-  .gh-left{flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .global-header{flex-wrap:wrap;gap:6px;padding:8px 12px;justify-content:space-between}
+  .gh-left{gap:6px;flex:0 0 auto}
   .gh-back{font-size:11px;padding:5px 8px}
-  .gh-title{font-size:13px;width:100%}
+  .gh-title{font-size:13px}
   .gh-pts{flex-shrink:0}
-  .gh-pts-label{font-size:10px}
   .gh-pts-num{font-size:16px}
-  .view-tabs{order:3;width:100%;justify-content:center}
-  .view-tab{font-size:11px;padding:5px 10px;flex:1;justify-content:center}
-  #elim-user-bar{flex-shrink:0}
+  .global-header>div:last-child{flex-wrap:nowrap;gap:6px;align-items:center}
+  #elim-user-bar{display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
+  .ko-sub-bar{padding:4px 12px 8px;gap:8px}
+  .view-tabs{flex:1}
+  .view-tab{font-size:11px;padding:5px 8px;flex:1;justify-content:center}
   #elim-user-bar .wc-user-name{display:none}
   #elim-user-bar .wc-user-badge{padding:4px 8px 4px 6px}
   #elim-user-bar .wc-logout-btn{font-size:10px;padding:4px 7px}
@@ -2572,29 +2573,43 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 ════════════════════════════════════════════════════════════════ -->
 <div id="page-elim" style="display:none">
 <!-- ══ HEADER GLOBAL ══ -->
+<div id="elim-league-pill-slot" style="display:flex;justify-content:center;padding:4px 0 0"></div>
 <div class="global-header">
-  <div class="gh-left">
-    <a class="gh-back" href="#" onclick="showPage('grupos');return false;">← Fase de Grupos</a>
-    <a class="gh-back" href="#" onclick="showPage('score');return false;"
-       style="color:#fbbf24;border-color:#78350f;background:#1c1008"
-       onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='#78350f'">🏆 Clasificación</a>
-    <div class="gh-title">⚽ Porra <span>Eliminatorias</span></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="#" onclick="showPage('grupos');return false;" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#6b7280;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid #27272a;background:#1c1c1e;transition:all .15s" onmouseover="this.style.borderColor='#4ade80';this.style.color='#4ade80'" onmouseout="this.style.borderColor='#27272a';this.style.color='#6b7280'">← Fase de Grupos</a>
+    <div>
+      <h1 style="color:#fff;font-size:22px;font-family:'Inter Tight',sans-serif;font-weight:900;letter-spacing:-.02em">⚽ Porra <span style="color:#4ade80">Eliminatorias</span></h1>
+      <p style="color:#6b7280;font-size:12px;">Fase eliminatoria — 32 partidos</p>
+    </div>
   </div>
-  <div class="gh-pts">
+  <div class="gh-pts" style="margin-right:auto">
     <span class="gh-pts-label">Mis puntos</span>
     <strong class="gh-pts-num" id="total-ko-pts">—</strong>
   </div>
+  <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-left:auto">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <button onclick="showPage('score')"
+        style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+               color:#fbbf24;padding:6px 14px;border-radius:10px;
+               border:1px solid #78350f;background:#1c1008;cursor:pointer;
+               transition:all .15s;font-family:'Inter',sans-serif"
+        onmouseover="this.style.borderColor='#f59e0b';this.style.background='#292010'"
+        onmouseout="this.style.borderColor='#78350f';this.style.background='#1c1008'">
+        🏆 Clasificación
+      </button>
+      <div id="elim-user-bar"></div>
+    </div>
+  </div>
+</div>
+<div class="ko-sub-bar">
   <div class="view-tabs">
     <button class="view-tab active" onclick="setView('cinematic')">📋 Rondas</button>
     <button class="view-tab" onclick="setView('bracket-results')">📊 Resultados</button>
     <button class="view-tab" onclick="setView('stadium')">🏟️ Cuadro</button>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end">
-    <button class="dice-btn" onclick="diceSimulateAllKO()" style="padding:5px 12px;font-size:11px;display:none" id="ko-dice-btn">
-      <span class="dice-icon">🎲</span> Simular eliminatorias
-    </button>
-    <div id="elim-user-bar" style="display:flex;align-items:center;gap:8px"></div>
-  </div>
+  <button class="dice-btn" onclick="diceSimulateAllKO()" style="display:none" id="ko-dice-btn">
+    <span class="dice-icon">🎲</span> Simular eliminatorias
+  </button>
 </div>
 
 <!-- ══ MODAL ══ -->

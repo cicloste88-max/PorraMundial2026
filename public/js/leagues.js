@@ -120,15 +120,12 @@ function leagueUpdateNavPill() {
   // Sincronizar también en barra de eliminatorias
   let elimPill = document.getElementById('elim-league-pill');
   if (!elimPill) {
-    const elimBar = document.getElementById('elim-user-bar');
-    if (elimBar) {
-      elimPill = document.createElement('div');
-      elimPill.id = 'elim-league-pill';
-      elimPill.className = 'league-nav-pill';
-      elimPill.style.marginRight = 'auto';
-      elimPill.onclick = () => showPage('welcome');
-      elimBar.parentElement.insertBefore(elimPill, elimBar);
-    }
+    elimPill = document.createElement('div');
+    elimPill.id = 'elim-league-pill';
+    elimPill.className = 'league-nav-pill';
+    elimPill.onclick = () => showPage('welcome');
+    const slot = document.getElementById('elim-league-pill-slot');
+    if (slot) slot.appendChild(elimPill);
   }
   if (elimPill) {
     elimPill.style.display = 'inline-flex';
