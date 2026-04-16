@@ -480,3 +480,5 @@ Features entregadas:
 Tabla Supabase: boost_picks (migration create_boost_picks)
 Ficheros nuevos: css/boost.css
 ═════════════════════════════════════════════════════════════════════
+
+[23:02] FIX-BRK-MOBILE: .brk-col.active min-width 260px en móvil (<=900px) + ancho mínimo body 860px + past/future/center reducidos para dar espacio a cuando el espejo izq/der comparte flex:1 — css/bracket-results.css

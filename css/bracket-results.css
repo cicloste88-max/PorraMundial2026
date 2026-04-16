@@ -358,7 +358,13 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
-  .brk-body { min-width: 700px; }
-  .brk-col.past, .brk-col.rpast { flex: 0 0 40px; }
-  .brk-col.center.expanded { flex: 0 0 130px; }
+  /* En móvil el contenedor es scrollable horizontalmente: forzamos un ancho
+     mínimo suficiente para que cada columna activa (izq + der, por el espejo)
+     mantenga una anchura legible sin deformar las tarjetas. */
+  .brk-body { min-width: 860px; }
+  .brk-col.past, .brk-col.rpast     { flex: 0 0 36px; }
+  .brk-col.future, .brk-col.rfuture { flex: 0 0 28px; }
+  .brk-col.center                   { flex: 0 0 40px; }
+  .brk-col.center.expanded          { flex: 0 0 130px; }
+  .brk-col.active                   { flex: 1 0 260px; min-width: 260px; }
 }
