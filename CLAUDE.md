@@ -4,31 +4,45 @@
 App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit: **2600c1a**
+Rama activa: **main** | Último commit: **2600c1a** (bracket-results móvil — min-width 260px por columna activa)
 
 ---
 
-## ⚠️ PENDIENTE URGENTE — Próxima sesión
+## 🔴 Pendientes abiertos
 
-1. **Migrar WhatsApp sandbox → producción** (número Business aprobado por Meta) — CRÍTICO antes del 11 jun. Error 63016: Twilio sandbox expira ventana 24h, no entrega mensajes iniciados por el negocio fuera de esa ventana.
-2. **Fix parpadeo botón envío porra**
-3. **Fix barra inferior boost** (ya en commit ea6c621, verificar en prod)
+### Bugs UI
+1. **Parpadeo botón envío porra** — pendiente diagnóstico
+2. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
+3. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
+4. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
 
-### Fixes aplicados sesión 2026-04-16/17
+### Antes del 11 junio 2026
+1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked)
+2. Activar pg_cron `update-results` el 11 jun
+3. Cargar convocatorias reales (`EQUIPOS[].players`)
+4. Email confirmación cierre porra (Resend + EF)
+5. Actualizar README con URL Vercel
+6. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
+7. Desactivar signup público cuando entren todos los amigos
+8. IDs SofaScore de KO (disponibles ~28 jun, tras finalizar fase de grupos)
 
-**Fix 404 masivos consola (scoring.js) — RESUELTO ✅**
-- Regex `backgroundImage.replace(...)` no extraía URL cuando había `linear-gradient(...)` delante
-- Nuevo `extractUrl()` con `bg.match(/url\(['"]?([^'")\s]+)['"]?\)/)` extrae solo la URL limpia
+### Playoffs UEFA marzo 2026 — resueltos
+- Grupo A + República Checa
+- Grupo B + Bosnia
+- Grupo D + Turquía
+- Grupo F + Suecia
+- Grupo I + Irak
+- Grupo K + RD Congo
 
-**Header eliminatorias responsive — RESUELTO ✅**
-- Reestructurado HTML: layout 2 columnas como fase de grupos (izq: back+título, der: clasificación+puntos+userbar)
-- View-tabs y botón simular en `.ko-sub-bar` separado
-- Pill liga en `#elim-league-pill-slot` dedicado (leagues.js actualizado)
-- Botón clasificación con inline styles idénticos a grupos (dorado, hover)
+---
 
-**Bracket results rediseño — RESUELTO ✅**
-- Timeline vertical + live hero (adiós layout espejo izq/der)
-- Columnas móvil reducidas (past 28px, future 20px, center 32px)
+## ✅ Bugs recientemente resueltos
+- updateCardUI race condition ✅ (commit ee2e25a)
+- CSS grid-areas Vista Jornada ✅
+- 404 masivos consola (extractUrl linear-gradient) ✅
+- Header eliminatorias responsive ✅ (mismo patrón que fase grupos)
+- Bracket-results móvil ✅ parcial (commit 2600c1a — min-width 260px por columna activa, past 36px / future 28px / center 40px)
+- pg_net timeout en `porra-match-live` ✅ (resuelto vía async + webhook Apify)
 
 ---
 
@@ -36,20 +50,32 @@ Rama activa: **main** | Último commit: **2600c1a**
 
 | Componente | Versión | Estado |
 |---|---|---|
-| Actor sofascore-webshare-proxy `N8vUChlhok5JU3cnL` | build 1.0.6 | ✅ EN PRODUCCIÓN |
-| Actor sofascore-live-proxy FALLBACK `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK activo |
-| `porra-apify-webhook` EF | v7 | ✅ FUNCIONA — logging completo, detecta goles, llama Twilio |
-| `porra-match-live` EF | v13 | ✅ lanza actor async |
-| `porra-whatsapp-send` EF | v1 | ✅ |
+| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.6 | ✅ **PRODUCCIÓN** — proxy Webshare residencial rotativo (~$0.001/run) |
+| Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK intacto — proxies Apify residenciales (~$0.03/run) |
+| `porra-match-live` EF | v13 | ✅ async + webhook |
+| `porra-apify-webhook` EF | v7 | ✅ logging completo, detecta goles + status, llama Twilio directo |
+| `porra-whatsapp-send` EF | v1 | ✅ form-urlencoded via fetch (pg_net no soporta) |
 | `porra-whatsapp-webhook` EF | v4 | ✅ |
-| WhatsApp notificaciones | — | ⚠️ ERROR 63016 — sandbox Twilio, ventana 24h expirada |
+| Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
 
-### Validación Bayern-Real Madrid 15/04 (4-3)
-- Datos SofaScore: ✅ llegaron en tiempo real
-- DB actualizada correctamente (score, events, status finished) ✅
-- Detección goles: ✅ (Olise 90', newGoals=1 detectado)
-- Twilio acepta envío: ✅ (HTTP 200)
-- WhatsApp entrega: ❌ error 63016 (ventana 24h sandbox)
+### Costes live scoring
+- **Actor Webshare (producción):** ~**$13 total** torneo completo
+- Actor anterior (fallback): ~$318 estimados
+- Webshare: 1GB gratis/mes + $3.50/mes plan pagado
+
+---
+
+## 🤖 Actor Apify principal — sofascore-webshare-proxy
+
+**ID:** `N8vUChlhok5JU3cnL` | **Build:** 1.0.6 | **En producción**
+
+**Cómo funciona:**
+- Proxy Webshare residencial rotativo
+- Fetch directo a `api.sofascore.com/api/v1/event/{id}` y `/incidents`
+- Cookies SofaScore reutilizables entre requests (no IP-bound)
+
+**Input:** `{ "eventId": "15832749" }`
+**Output JSON:** `item.event={status,ok,data:{event:{...}}}` y `item.incidents={status,ok,data:{incidents:[]}}`
 
 ---
 
@@ -60,74 +86,171 @@ js/
   main-entry.js       <- entry point Vite (type=module)
 
 public/js/
-  data.js             <- datos torneo + estado global + boostPicks
-  scoring.js          <- motor puntos + tarjetas + premios
-  ui-groups.js        <- grupos + vista Jornada completa
-  ko.js               <- bracket KO + IA pronósticos
-  ui-nav.js           <- SPA nav + modal + welcome
+  data.js             <- 215L — datos torneo + estado global + boostPicks
+  scoring.js          <- 1184L — motor puntos + tarjetas + premios
+  ui-groups.js        <- 167L — grupos + vista Jornada completa
+  ko.js               <- 1048L — bracket KO + IA pronósticos
+  ui-nav.js           <- 653L — SPA nav + modal + welcome
   auth.js             <- auth Supabase
   leagues.js          <- ligas y selección de porra
   misc.js             <- utils UI
   scoreboard.js       <- clasificación multi-usuario
   close-porra.js      <- cierre de pronósticos
-  admin.js            <- panel admin + dados/simulador
+  admin.js            <- panel admin + dados/simulador (dice.js integrado)
   bracket-results.js  <- vista resultados reales bracket KO
 
-public/css/
+css/ (raíz, no en public/)
+  base.css
+  admin.css
+  ko.css
+  welcome.css
   bracket-results.css
-  boost.css
+```
+
+**Referencias CSS en index.html:** `/css/fichero.css`
+
+**Cadena de carga:**
+```
+misc.js (paralelo)
+leagues → data → scoring → ui-groups → ko → ui-nav
+  → auth → scoreboard → close-porra → admin → bracket-results
+```
+
+---
+
+## 🛢️ Base de datos — tablas live
+
+```sql
+live_scores (
+  match_key TEXT PRIMARY KEY,
+  sofascore_url TEXT,
+  sofascore_event_id TEXT,
+  status TEXT,               -- notstarted/inprogress/halftime/overtime/penalties/finished
+  status_code INT,
+  score_home INT,
+  score_away INT,
+  score_agg_home INT,
+  score_agg_away INT,
+  events JSONB,
+  lineups JSONB,
+  statistics JSONB,
+  referee TEXT,
+  venue TEXT,
+  poll_active BOOLEAN,
+  poll_interval INT,
+  had_overtime BOOLEAN,
+  had_penalties BOOLEAN,
+  match_start_ts BIGINT,
+  updated_at TIMESTAMPTZ
+)
+
+whatsapp_subscribers (
+  phone TEXT,
+  active BOOLEAN,
+  wa_id TEXT
+)
 ```
 
 ---
 
 ## ⚙️ Edge Functions Supabase
 
-| EF | Versión | Estado |
+| EF | Versión | Descripción |
 |---|---|---|
-| `admin-actions` | v7 | ✅ |
-| `update-results` | v2 | ⏳ activar pg_cron 11 jun |
-| `porra-orchestrator` | v3 | ✅ |
-| `porra-patch-deploy` | v4 | ✅ |
-| `porra-fix-encoding` | v4 | ✅ |
-| `porra-match-live` | v13 | ✅ lanza actor async |
-| `porra-apify-webhook` | v7 | ✅ logging completo |
-| `porra-whatsapp-send` | v1 | ✅ |
-| `porra-whatsapp-webhook` | v4 | ✅ |
+| `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
+| `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun |
+| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
+| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
+| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Soporta `inspect` y `write`. Defaults: CLAUDE.md / main |
+| `porra-match-live` | v13 | Async + webhook, live scores |
+| `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo |
+| `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
+| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+| `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
+| `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
 
 ---
 
-## 🔄 Flujo live scores (actual, validado)
+## 🔄 Flujo live scores (resuelto — async + webhook)
 
 ```
-pg_cron (cada 3min durante partido)
+pg_cron (cada minuto durante partido)
   → net.http_post → porra-match-live EF
-      → Apify: lanzar actor N8vUChlhok5JU3cnL async (Webshare)
-         fallback: BYLtYcOxYkruVipwr (RESIDENTIAL)
-      → Apify webhook → porra-apify-webhook EF v7
-          → leer dataset Apify
-          → detectar goles nuevos (por ID)
-          → detectar cambio de status
-          → sendWhatsApp → Twilio → WhatsApp
+      → Apify API: lanzar actor N8vUChlhok5JU3cnL async (no espera)
+  → (Apify termina ~5-10s con Webshare)
+      → Apify webhook → porra-apify-webhook EF
+          → leer dataset: { event, incidents }
+          → detectar cambios vs DB
+          → detecta goles + cambios status
+          → Twilio directo (form-urlencoded fetch)
           → upsert live_scores
 ```
 
+**Pattern live cron:** Pre-match T-45min (1 call) → polling cada 3min durante partido → estados: `notstarted/inprogress/halftime/overtime/penalties/finished`
+
 ---
 
-## 📱 WhatsApp — Twilio sandbox ⚠️
+## 📱 WhatsApp — Twilio sandbox
 
 - Número: +14155238886
-- Código: join load-herd
-- **Error 63016:** sandbox solo permite freeform dentro de ventana 24h tras último mensaje entrante
-- **SOLUCIÓN PRODUCCIÓN:** migrar a número WhatsApp Business aprobado por Meta antes del 11 jun
+- Código de acceso: `join load-herd`
+- AccountSid: `AC519cc59a65a9b28a71c178325b6307a5`
+- API Key: `SK4d89720c0f1a25825542156cfea170f1`
+- Secrets en Vault: `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`
+
+**Notificaciones:** 🟢 Arranca / ⏸ Descanso / 🟢 2ª parte / ⚽ Gol (jugador + minuto + marcador) / ⚡ Prórroga / 🤽 Penaltis / 🏁 Fin
 
 ---
 
 ## 🏆 Motor de puntuación
 
-- Partido: +1 signo / +3 exacto / +2 goleador / +1 bonus vs IA (máx 7pts)
-- Boost x2: si exacto + partido es el boost del día → pts ×2 (máx 14pts)
-- KO avance: grupos+5, r32+5, r16+10, qf+15, sf+20, campeón+25
-- Clasificación final: campeón+30, subcampeón+20, 3º+15, 4º+10
+**Por partido (máx 7pts, 14 con boost x2):**
+- Signo correcto (1/X/2): +1
+- Resultado exacto: +3 (no acumula con signo)
+- Goleador correcto: +2
+- Bonus vs IA (pronóstico opuesto a IA y aciertas): +1
+
+**KO avance por equipo:** Grupos→R32 +5 / R32→R16 +5 / R16→QF +10 / QF→SF +15 / SF→Final +20 / Campeón +25
+
+**Clasificación final:** Campeón +30 / Subcampeón +20 / 3º +15 / 4º +10
+
+**Premios individuales (AWARDS_CFG):** Balón/Bota/Guante Oro +15pts, Mejor Joven ≤21 +20pts
+
+---
+
+## 🌍 Estructura torneo
+
+48 equipos, 12 grupos (A–L) de 4, 72 partidos grupos, 17 jornadas.
+2 primeros + 8 mejores terceros = 32 equipos.
+R32 → R16 → QF → SF → 3er puesto → Final = **104 partidos total**.
+**Inicio:** 11 jun 2026 — México vs Sudáfrica en Azteca (eventId=15186710).
+
+---
+
+## 🔑 SofaScore IDs
+
+| Torneo | tournament | season |
+|---|---|---|
+| UCL 2025/26 | 7 | 61644 |
+| World Cup 2026 | 16 | 58210 |
+
+- 72 partidos grupos mapeados en `worldcup-2026-sofascore-ids.json` (repo)
+- IDs KO disponibles ~28 jun 2026
+- Primer partido WC: eventId=15186710
+
+---
+
+## 🔧 Herramientas disponibles en Claude.ai
+
+**Supabase MCP** (`cmyfyswystjgzdwbqyyb`):
+- `execute_sql`, `get_logs`, `list_edge_functions`, `get_edge_function`, `deploy_edge_function`
+
+**Claude in Chrome:**
+- QA autónomo en `localhost:5173` y producción
+- Login prod: `_porraDb.auth.signInWithPassword({email:'cicloste88@gmail.com', password:'910500'})`
+- Login local: usar `window.__QA_EMAIL` / `window.__QA_PASS` via `.env.local`
+
+**Canva MCP:** disponible (no usado en porra)
 
 ---
 
@@ -135,41 +258,71 @@ pg_cron (cada 3min durante partido)
 
 ```bash
 npm run dev     # localhost:5173
-npm run build
+npm run build   # genera dist/
 git add -A && git commit -m "..." && git push origin main
+
+# Lanzar actor Apify manualmente:
+apify call N8vUChlhok5JU3cnL -i '{"eventId":"15832749"}' -t 90
+
+# Push actor Apify:
+cd apify-actors/sofascore-webshare-proxy
+apify push --actor-id N8vUChlhok5JU3cnL
 ```
 
 ---
 
 ## Reglas CRÍTICAS
 
-- NUNCA push a main sin validar en localhost:5173 primero
-- Push inmediato tras cada commit
-- NO crear ni modificar vercel.json
-- NO usar addEventListener DOMContentLoaded en classic scripts cargados via loadScript
-- Actor Azzouzana VzKtdb1t0Qnc07X8V tiene caché CDN — NO usar para datos live
+- **NUNCA push a main sin validar en localhost:5173 primero**
+- **Push inmediato tras cada commit** — nunca acumular
+- **NO crear ni modificar vercel.json** (borrarlo fue el fix correcto; el wildcard `source: "/(.*)"` corrompía MIME types de ES modules)
+- **Actualizar migration-log.md** tras cada acción importante
+- **NO usar addEventListener DOMContentLoaded** en classic scripts cargados via loadScript
+- Actor Azzouzana `VzKtdb1t0Qnc07X8V` tiene caché CDN — NO usar para datos live
+- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-20) antes de debuggear
+- **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
+- dice.js se mantiene dentro de admin.js (no separar)
+- **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo
 
 ---
 
-## ⏳ Pendientes antes del 11 junio 2026
+## Patrón DOMContentLoaded en classic scripts
 
-| # | Tarea | Estado |
-|---|---|---|
-| 0 | **Migrar WhatsApp sandbox → producción** (Meta Business) | 🔴 CRÍTICO |
-| 1 | Fix parpadeo botón envío porra | 🔴 |
-| 2 | Activar pg_cron update-results el 11 jun | ⏳ |
-| 3 | Actualizar EQUIPOS[].players con convocatorias reales | ⏳ |
-| 4 | Desactivar signup público | ⏳ |
-| 5 | Email confirmación al cerrar porra | ⏳ |
-| 6 | Verificar ko_results con update-results real | ⏳ 11 jun |
-| 7 | README — actualizar URL Vercel | ⏳ |
-| 8 | IDs KO Mundial en SofaScore (~28 jun) | ⏳ |
+```js
+const runInit = () => { /* ... */ };
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', runInit);
+} else {
+  runInit();
+}
+```
+Red de seguridad adicional en `main-entry.js`.
+
+---
+
+## End-of-session protocol (OBLIGATORIO)
+
+1. Actualizar **CLAUDE.md** + commit
+2. Actualizar **CONTEXTO_PORRA_2026.md** si hay cambios estructurales
+3. Generar/actualizar **ESQUEMA_SISTEMA_PORRA2026.xlsx** y push al repo
+4. Notificar a Claude.ai para actualizar memorias
+
+**Frase inicio sesión:** "Continuamos con la Porra Mundial 2026. Revisa tus memorias y dime el estado actual del proyecto."
+
+---
+
+## Stack infraestructura
+
+- **Hosting:** Vercel (porramundial2026-seven.vercel.app) — autodeploy desde `main`
+- **DB + Auth:** Supabase (proyecto: `cmyfyswystjgzdwbqyyb`)
+- **Secrets Vault:** `GITHUB_TOKEN`, `GITHUB_REPO`, `ANTHROPIC_API_KEY`, `APIFY_TOKEN`, `PROXY_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`
 
 ---
 
 ## Log de cambios (OBLIGATORIO)
 
-Añadir línea a migration-log.md tras cada acción:
+Añadir línea a `migration-log.md` tras cada acción:
 ```
 [HH:MM] ACCION: descripción — ficheros afectados
 ```
+Nunca borrar entradas anteriores.
