@@ -26,7 +26,7 @@ function loadScript(src) {
 loadScript('/js/misc.js')
   .catch(e => console.error('Error cargando misc.js:', e))
 
-// Orden: leagues → data → scoring → ui-groups → ko → ui-nav → auth → scoreboard → close-porra → admin
+// Orden: leagues → data → scoring → ui-groups → ko → ui-nav → auth → scoreboard → close-porra → admin → live-sync
 // main.js eliminado tras extraccion completa en 5 sub-bloques (data, scoring,
 // ui-groups, ko, ui-nav). Cada sub-bloque es un classic script independiente.
 //
@@ -36,6 +36,9 @@ loadScript('/js/misc.js')
 //   antes era main.js (PARTIDOS, EQUIPOS, predictions, BRACKET, showPage,
 //   initWelcome, etc.). Se cargan antes que auth
 // - auth → scoreboard → close-porra → admin: orden original preservado
+// - live-sync AL FINAL: necesita _porraDb (auth), EQUIPOS+PARTIDOS (data) y las
+//   tarjetas renderizadas. Solo arranca si el usuario está autenticado (porque
+//   _porraDb.channel() requiere sesión para realtime).
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/data.js'))
   .then(() => loadScript('/js/scoring.js'))
@@ -47,6 +50,7 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
   .then(() => loadScript('/js/admin.js'))
+  .then(() => loadScript('/js/live-sync.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
@@ -55,5 +59,12 @@ loadScript('/js/leagues.js')
     if (typeof window.initWelcome === 'function') window.initWelcome();
     if (typeof window.showPage === 'function') window.showPage('welcome');
     if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
+
+    // Arrancar sincronización live. Si _porraDb aún no existe (usuario no
+    // logeado), liveSyncInit saltará silenciosamente el snapshot y el
+    // subscribe. El usuario podrá reactivarla tras login llamando manualmente.
+    if (typeof window.liveSyncInit === 'function') {
+      window.liveSyncInit();
+    }
   })
   .catch(e => console.error('Error cargando modulos:', e))
