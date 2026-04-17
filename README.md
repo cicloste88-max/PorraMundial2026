@@ -84,7 +84,7 @@ porra-mundial-2026/
 | `boost_picks` | Boosts diarios `(user_id, league_id, match_id, match_date)` |
 | `results` | Resultados reales del torneo + overrides manuales (JSON, id=1) |
 | `orchestrator_jobs` | Historial ejecuciones agentes Haiku |
-| `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id) |
+| `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id). Columna `is_historic BOOLEAN DEFAULT false`: `true` = trial runs / pruebas, conservado como referencia consultiva de formatos/estados. **No usar en scoring** (filtrar `WHERE is_historic = false`). |
 | `whatsapp_subscribers` | Teléfonos activos para notificaciones |
 
 RLS habilitado en todas las tablas.
@@ -104,6 +104,27 @@ RLS habilitado en todas las tablas.
 | `porra-apify-webhook` | v7 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
 | `porra-whatsapp-send` | v1 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+
+---
+
+## Funciones DB helpers
+
+Helpers SQL para programar los crons de un partido sin duplicar lógica. Generan automáticamente un **prematch** (T-45min, 1 disparo) más **polling** (`*/3 * * * *` durante 150min desde `start_ts`).
+
+| Función | Descripción |
+|---------|-------------|
+| `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` | Crea los crons `prematch_<match_key>` y `poll_<match_key>`, ambos invocando `porra-match-live`. |
+| `unschedule_match_crons(match_key TEXT)` | Elimina ambos crons del partido. Uso: limpieza tras cambio de fecha o cancelación. |
+
+```sql
+-- Programar partido
+SELECT schedule_match_crons('wc_mex_rsa', '2026-06-11 20:00:00+00'::timestamptz);
+
+-- Limpiar
+SELECT unschedule_match_crons('wc_mex_rsa');
+```
+
+**Nota:** patrón reutilizable para los 104 partidos del Mundial. Reemplaza duplicación manual de crons.
 
 ---
 
@@ -194,6 +215,17 @@ pg_cron (durante partido)
 
 ---
 
+## Documentación interna
+
+| Fichero | Propósito |
+|---------|-----------|
+| `CLAUDE.md` | Contexto de trabajo para Claude Code (sesiones). |
+| `errores_conocidos_porra.md` | Histórico de bugs resueltos y patrones críticos (ERR-01 a ERR-20, 13 documentados). |
+| `migration-log.md` | Bitácora cronológica de etapas del proyecto. |
+| `CONTEXTO_PORRA_2026.md` | Contexto maestro del proyecto. |
+
+---
+
 ## Desarrollo local
 
 ```bash
@@ -230,6 +262,8 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Push inmediato tras cada commit — nunca acumular
 - No crear ni modificar `vercel.json`
 - Actualizar `migration-log.md` tras cada acción importante
+- Actualizar `README.md` cuando haya cambios estructurales en arquitectura, stack, EFs, funciones DB o features visibles al usuario
+- Para crons de partidos usar `schedule_match_crons`, nunca duplicar crons manualmente
 
 ---
 
@@ -254,9 +288,11 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - [ ] Migrar WhatsApp sandbox → Meta Business producción
 - [ ] Activar pg_cron para `update-results`
 - [ ] Cargar convocatorias reales (`EQUIPOS[].players`)
-- [ ] Email de confirmación al cerrar porra (Resend + EF)
+- [ ] Email de confirmación al cerrar porra **con copia de pronósticos al usuario** (Resend + EF)
 - [ ] Desactivar signup público cuando entren todos los amigos
 - [ ] Verificar estructura JSON `_results.ko_results` con `update-results` real
+- [ ] Auto-completar Pichichi del torneo sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
+- [ ] Enganche final de frases IA para pronóstico signo de partido (lógica ya incorporada, falta wiring)
 - [ ] Bugs UI: parpadeo botón envío porra, hora CEST en píldora partido, cinta tabs móvil eliminatorias, simular eliminatorias visible a todos
 
 ### Post-torneo
