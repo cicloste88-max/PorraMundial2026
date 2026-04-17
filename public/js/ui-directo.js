@@ -416,7 +416,7 @@
 
     return (
       '<div class="' + classes + '" id="' + id + '" data-sim-key="' + mk + '">' +
-        '<span class="dcard-simulacro-badge">🧪 SIMULACRO</span>' +
+        '<div class="dcard-simulacro-banner">🧪 SIMULACRO · PARTIDO FUERA DEL MUNDIAL</div>' +
         '<div class="dcard-main">' +
           '<div class="dcard-stripe" style="background:#facc15"></div>' +
           '<div class="dcard-body">' +
