@@ -651,3 +651,28 @@ Pase de limpieza sobre crons y `live_scores`, más helpers reutilizables para au
   - `wc2026_gA_15186710` → `_historic_wc2026_gA_15186710_trial` (México-Sudáfrica real ocupará la clave original el 11 jun 2026).
 
 [13:00] PATRÓN: a partir de ahora, para programar los crons de un partido **usar exclusivamente** `schedule_match_crons(match_key, start_ts)`. No duplicar crons manualmente (evita el caso de crons huérfanos tipo `prematch_bayern_realmadrid`).
+
+## 2026-04-17 PM — Sesión Vista Directo + simulacros
+
+Diagnóstico de "Vista Directo no funciona", llegada de simulacros como mecanismo de testing live, y feature completa para el simulacro Copa del Rey 18 abr.
+
+[16:00] DIAGNÓSTICO: Vista Directo nunca estuvo rota. La causa real fue que el rename matinal (`wc2026_gA_15186710` → `_historic_wc2026_gA_15186710_trial`, [12:58]) había roto el match_key esperado por el frontend. **Revertido** a `wc2026_gA_15186710`. Pipeline live validado contra el dummy.
+
+[16:30] SCHEMA: nuevas columnas en `live_scores`:
+  - `home_team_name TEXT`, `away_team_name TEXT`, `competition TEXT`.
+  - Soporte para partidos genéricos fuera del Mundial (los del torneo siguen leyendo nombres desde `EQUIPOS` via `match_key`).
+
+[16:45] INSERTAR SIMULACRO: fila `copadelrey_final_atm_rso` para la final Atleti — Real Sociedad (18 abr 19:00 UTC, `sofascore_event_id = 15664537`, `competition = "Copa del Rey 2026 · Final"`). `is_historic = true`.
+
+[16:50] CRONS: `schedule_match_crons('copadelrey_final_atm_rso', '2026-04-18 19:00:00+00')` → `prematch_copadelrey_final_atm_rso` (18:15 UTC) + `poll_copadelrey_final_atm_rso` (cada 3 min). **Ampliación manual** del polling a 3 h (19–22 UTC) para cubrir prórroga + penaltis.
+
+[16:55] LIMPIEZA: fila dummy `wc2026_gA_15186710` (México-Sudáfrica) restablecida a `status='notstarted'`, `score_*=NULL` tras completar la validación del pipeline.
+
+[17:00] FEATURE PR #3 (`claude/vista-directo-simulacros`, mergeada `614b5ef`):
+  - Commit `d137d99` — soporte simulacros en `live-sync.js` (`_simulacrosByKey`, `getSimulacros()`, `applyRow` discrimina simulacro vs Mundial), `_buildSimulacroCard` en `ui-directo.js` (sin flags, banner amarillo, pie con CEST), `directo.css` (sección + tarjetas).
+  - Commit `6d2c028` — fix visual: badge esquina superior se solapaba con nombre equipo. Reemplazado por banda 100% ancho `🧪 SIMULACRO · PARTIDO FUERA DEL MUNDIAL`.
+  - Commit `0421f0f` — fix `checkIsAdmin` async (ver ERR-14): retries hasta 5 s si auth no hidratada, re-render tras cache, guard anti-loop con `_lastRenderAdminValue`.
+
+[17:10] QA visual (Chrome MCP desde claude.ai): admin ve la sección, no-admin no la ve, `UPDATE live_scores` manual → tarjeta refleja cambio en <2 s vía realtime, 72 tarjetas Mundial intactas, consola sin errores.
+
+[17:15] DOCUMENTACIÓN: nuevo ERR-14 en `errores_conocidos_porra.md` (checkIsAdmin async patrón). Nueva sección **🧪 Simulacros (testing live)** en `CLAUDE.md`. README.md y este log actualizados en commit checkpoint.

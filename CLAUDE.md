@@ -46,6 +46,10 @@ Rama activa: **main** | Último commit estable: **2600c1a**
 - Bracket-results móvil ✅ (commit 2600c1a — min-width 260px por columna activa)
 - Rediseño bracket: timeline vertical + live hero ✅ (commit 2600c1a)
 - pg_net timeout en `porra-match-live` ✅ (async + webhook Apify)
+- **Vista Directo + sección simulacros admin ✅** (PR #3, commits `d137d99` + `6d2c028` + `0421f0f`, merge `614b5ef`)
+  - Banner superior `🧪 SIMULACRO · PARTIDO FUERA DEL MUNDIAL` (no se solapa con nombre equipo)
+  - `checkIsAdmin` async con retries hasta 5s + re-render anti-loop (ver ERR-14)
+  - Causa raíz original: `match_key` renombrado por error matinal `wc2026_gA_15186710` → `_historic_..._trial`. Revertido.
 
 ---
 
@@ -164,6 +168,9 @@ live_scores (
   had_penalties BOOLEAN,
   match_start_ts BIGINT,
   is_historic BOOLEAN DEFAULT false,  -- true = trial runs / pruebas, referencia consultiva de formatos. NO usar en scoring ni UI live (filtrar WHERE is_historic=false)
+  home_team_name TEXT,                -- usado por simulacros (partidos fuera del Mundial). Para el Mundial los nombres salen de EQUIPOS via match_key
+  away_team_name TEXT,                -- idem
+  competition TEXT,                   -- ej. "Copa del Rey 2026 · Final" — render en pie de tarjeta simulacro
   updated_at TIMESTAMPTZ
 )
 
@@ -209,6 +216,38 @@ SELECT unschedule_match_crons('wc_mex_rsa');
 ```
 
 **Regla:** para programar crons de partidos usar **siempre** `schedule_match_crons`, nunca duplicar crons manualmente (evita crons huérfanos).
+
+---
+
+## 🧪 Simulacros (testing live)
+
+**Propósito:** probar el pipeline live (Apify → webhook → live_scores → realtime → UI + WhatsApp) con partidos reales fuera del Mundial **antes del 11 jun**, sin contaminar datos del torneo.
+
+**Cómo activar un simulacro:**
+1. Crear fila en `live_scores` con `is_historic = true` y los campos necesarios:
+   ```sql
+   INSERT INTO live_scores (
+     match_key, sofascore_event_id,
+     home_team_name, away_team_name, competition,
+     match_start_ts, status, is_historic
+   ) VALUES (
+     'copadelrey_final_atm_rso', '15664537',
+     'Atlético de Madrid', 'Real Sociedad', 'Copa del Rey 2026 · Final',
+     extract(epoch FROM '2026-04-18 19:00:00+00'::timestamptz)::bigint,
+     'notstarted', true
+   );
+   ```
+2. Programar crons:
+   ```sql
+   SELECT schedule_match_crons('copadelrey_final_atm_rso', '2026-04-18 19:00:00+00'::timestamptz);
+   ```
+
+**Visibilidad:**
+- Sólo usuarios con `profiles.is_admin = true` ven la sección **🧪 Simulacros activos** dentro de la vista Directo.
+- La fila se sigue procesando por el pipeline normal (Apify, webhook, WhatsApp si está suscrito), pero **no aparece** en las 72 tarjetas del Mundial ni se considera para scoring (filtro `is_historic = false`).
+
+**Simulacro actualmente activo:**
+- `copadelrey_final_atm_rso` — Atlético de Madrid vs Real Sociedad, 18 abr 2026 19:00 UTC (21:00 CEST), `sofascore_event_id = 15664537`. Crons: `prematch_copadelrey_final_atm_rso` (18:15 UTC) + `poll_copadelrey_final_atm_rso` (cada 3 min, 19–22 UTC).
 
 ---
 
