@@ -16,12 +16,14 @@ Rama activa: **main** | Último commit estable: **2600c1a**
 2. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
 3. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
 4. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
+5. **Auto-completar Pichichi torneo** sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
+6. **Enganche final frases IA** para pronóstico signo partido (lógica incorporada, falta wiring final)
 
 ### Antes del 11 junio 2026
 1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked)
 2. Activar pg_cron `update-results` el 11 jun
 3. Cargar convocatorias reales (`EQUIPOS[].players`)
-4. Email confirmación cierre porra (Resend + EF)
+4. Email confirmación cierre porra (Resend + EF) **con copia de pronósticos al usuario** para que tenga registro
 5. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
 6. Desactivar signup público cuando entren todos los amigos
 7. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos)
