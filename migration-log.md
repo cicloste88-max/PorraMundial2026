@@ -608,3 +608,46 @@ SELECT vault.update_secret(
 [04:28] QA localhost:5173: pestaña Directo sigue sin cargar el partido dummy que simulamos. Aparentemente ni siquiera la tarjeta del partido test aparece. Causa exacta sin diagnosticar.
 
 [04:30] CHECKPOINT: commit WIP "feat(vista-directo): skeleton pestaña Directo (incompleto)". Se retomará en próxima sesión. Pipeline backend sigue operativo (live_scores se escribe vía webhook Apify → Twilio OK); solo falla la renderización en la nueva vista.
+
+## 2026-04-17 — Persistencia histórica en repo
+
+Materializar en disco lo que hasta ahora sólo vivía en la memoria de Claude.ai, para poder liberar memorias sin perder contexto crítico.
+
+[12:00] CREAR: errores_conocidos_porra.md — catálogo ERR-01 a ERR-12 + placeholders ERR-13 a ERR-20. Síntoma/Causa/Fix/Patrón preventivo/Fecha para cada uno.
+
+[12:05] CONFIRMAR: migration-log.md ya existía con histórico detallado 11-17 abr 2026. Se añade esta sección en lugar de reescribirlo.
+
+[12:10] MODIFICAR: CLAUDE.md — pendientes nuevos:
+  - Bugs UI #5 — Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario).
+  - Bugs UI #6 — Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
+  - Antes del 11 jun 2026 #4 — Email cierre porra (Resend + EF) **con copia de pronósticos al usuario** para que tenga registro.
+
+[12:12] COMMIT: docs: crear histórico bugs + bitácora etapas para liberar memoria Claude.ai — errores_conocidos_porra.md + migration-log.md
+[12:13] COMMIT: docs: añadir pendientes Pichichi auto, frases IA, email cierre con copia pronósticos — CLAUDE.md
+[12:14] PUSH: claude/persist-historical-files-OxmLQ → origin
+
+### BD + helpers (continuación 2026-04-17)
+
+Pase de limpieza sobre crons y `live_scores`, más helpers reutilizables para automatizar programación de crons por partido.
+
+[12:40] ELIMINAR CRONS: `prematch_bayern_realmadrid` + `poll_bayern_realmadrid` — el partido UCL correspondiente ya estaba finalizado, los crons seguían activos sin efecto útil.
+
+[12:45] CREAR FUNCIÓN: `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` — genera automáticamente los dos crons asociados a un partido:
+  - Prematch **T-45 min** (1 call antes del inicio).
+  - Polling **`*/3 * * * *`** durante **150 min** desde `start_ts` (cada 3 min, cubre 90' + descanso + prórroga + margen).
+  - Ambos invocan `porra-match-live` via `net.http_post` con el `match_key` correspondiente.
+  - Ejemplo:
+    ```sql
+    SELECT schedule_match_crons('wc_mex_rsa', '2026-06-11 20:00:00+00'::timestamptz);
+    ```
+
+[12:50] CREAR FUNCIÓN: `unschedule_match_crons(match_key TEXT)` — elimina los dos crons (`prematch_<match_key>` y `poll_<match_key>`) de un partido. Uso principal: limpieza tras cambio de fecha o cancelación.
+
+[12:55] SCHEMA: `ALTER TABLE live_scores ADD COLUMN is_historic BOOLEAN DEFAULT false`.
+  - **Semántica:** `true` = trial runs / pruebas manuales, conservado como referencia consultiva de formatos JSON y estados (`events`, `incidents`, transiciones de `status`).
+  - **NO usar en scoring ni en UI live** — filtrar con `WHERE is_historic = false` en todas las queries de scoring y realtime.
+
+[12:58] MARCAR HISTÓRICOS: 9 filas de `live_scores` existentes marcadas `is_historic = true`, `poll_active = false`. Una renombrada para evitar colisión con el primer partido real del Mundial:
+  - `wc2026_gA_15186710` → `_historic_wc2026_gA_15186710_trial` (México-Sudáfrica real ocupará la clave original el 11 jun 2026).
+
+[13:00] PATRÓN: a partir de ahora, para programar los crons de un partido **usar exclusivamente** `schedule_match_crons(match_key, start_ts)`. No duplicar crons manualmente (evita el caso de crons huérfanos tipo `prematch_bayern_realmadrid`).

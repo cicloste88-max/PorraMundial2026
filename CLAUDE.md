@@ -16,12 +16,14 @@ Rama activa: **main** | Último commit estable: **2600c1a**
 2. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
 3. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
 4. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
+5. **Auto-completar Pichichi torneo** sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
+6. **Enganche final frases IA** para pronóstico signo partido (lógica incorporada, falta wiring final)
 
 ### Antes del 11 junio 2026
 1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked)
 2. Activar pg_cron `update-results` el 11 jun
 3. Cargar convocatorias reales (`EQUIPOS[].players`)
-4. Email confirmación cierre porra (Resend + EF)
+4. Email confirmación cierre porra (Resend + EF) **con copia de pronósticos al usuario** para que tenga registro
 5. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
 6. Desactivar signup público cuando entren todos los amigos
 7. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos)
@@ -161,6 +163,7 @@ live_scores (
   had_overtime BOOLEAN,
   had_penalties BOOLEAN,
   match_start_ts BIGINT,
+  is_historic BOOLEAN DEFAULT false,  -- true = trial runs / pruebas, referencia consultiva de formatos. NO usar en scoring ni UI live (filtrar WHERE is_historic=false)
   updated_at TIMESTAMPTZ
 )
 
@@ -188,6 +191,24 @@ whatsapp_subscribers (
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
 | `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
 | `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
+
+---
+
+## 🔧 Funciones DB helpers
+
+| Función | Descripción |
+|---|---|
+| `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` | Genera automáticamente los dos crons de un partido: **prematch T-45min** (1 call) + **polling `*/3 * * * *` durante 150min** desde `start_ts`. Ambos invocan `porra-match-live` con el `match_key`. |
+| `unschedule_match_crons(match_key TEXT)` | Elimina los crons `prematch_<match_key>` y `poll_<match_key>`. Uso: limpieza tras cambio de fecha o cancelación. |
+
+Ejemplo:
+```sql
+SELECT schedule_match_crons('wc_mex_rsa', '2026-06-11 20:00:00+00'::timestamptz);
+-- ...si se cancela o se reprograma:
+SELECT unschedule_match_crons('wc_mex_rsa');
+```
+
+**Regla:** para programar crons de partidos usar **siempre** `schedule_match_crons`, nunca duplicar crons manualmente (evita crons huérfanos).
 
 ---
 
@@ -303,6 +324,7 @@ apify push --actor-id N8vUChlhok5JU3cnL
 - **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
 - dice.js se mantiene dentro de admin.js (no separar)
 - **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo
+- **Para programar crons de partidos usar `schedule_match_crons(match_key, start_ts)`**, nunca duplicar crons manualmente
 
 ---
 
