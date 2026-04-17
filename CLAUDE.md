@@ -1,10 +1,11 @@
 # Porra Mundial 2026 — Contexto para Claude Code
 
 ## Proyecto
-App de pronósticos del Mundial 2026. Stack: HTML+CSS+JS vanilla, Supabase, Vite, Vercel.
+App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit: **2600c1a** (bracket-results móvil — min-width 260px por columna activa)
+Rama activa: **main** | Último commit estable: **2600c1a**
+(Pendiente commit de limpieza de repo sesión 17 abr 2026)
 
 ---
 
@@ -21,10 +22,9 @@ Rama activa: **main** | Último commit: **2600c1a** (bracket-results móvil — 
 2. Activar pg_cron `update-results` el 11 jun
 3. Cargar convocatorias reales (`EQUIPOS[].players`)
 4. Email confirmación cierre porra (Resend + EF)
-5. Actualizar README con URL Vercel
-6. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
-7. Desactivar signup público cuando entren todos los amigos
-8. IDs SofaScore de KO (disponibles ~28 jun, tras finalizar fase de grupos)
+5. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
+6. Desactivar signup público cuando entren todos los amigos
+7. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos)
 
 ### Playoffs UEFA marzo 2026 — resueltos
 - Grupo A + República Checa
@@ -41,8 +41,25 @@ Rama activa: **main** | Último commit: **2600c1a** (bracket-results móvil — 
 - CSS grid-areas Vista Jornada ✅
 - 404 masivos consola (extractUrl linear-gradient) ✅
 - Header eliminatorias responsive ✅ (mismo patrón que fase grupos)
-- Bracket-results móvil ✅ parcial (commit 2600c1a — min-width 260px por columna activa, past 36px / future 28px / center 40px)
-- pg_net timeout en `porra-match-live` ✅ (resuelto vía async + webhook Apify)
+- Bracket-results móvil ✅ (commit 2600c1a — min-width 260px por columna activa)
+- Rediseño bracket: timeline vertical + live hero ✅ (commit 2600c1a)
+- pg_net timeout en `porra-match-live` ✅ (async + webhook Apify)
+
+---
+
+## 🧹 Limpieza repo — sesión 17 abr 2026
+
+Eliminados del repo:
+- 5 backups `.bak`: `index.html.bak`, `js/main.js.bak{,2,3}`, `js/auth.js.bak`
+- 3 duplicados bracket-results (raíz `.js/.css` + `js/bracket-results.js` viejo)
+- 6 patches Python one-shot (`patch_*.py`)
+- 5 markdowns de diseños ejecutados (`vista-jornada.md`, `jornada-redesign.md`, `fix-vista-jornada.md`, `boost-ticker-mejoras.md`, `new_bracket.txt`)
+- `js/utils.js` huérfano (shims ya están inline en `index.html` líneas 1440-1445)
+- `supabase-ef-patches/porra-apify-webhook-v6.ts` (producción en v7)
+- 3 scripts exploratorios Apify
+
+Añadido a `.gitignore`:
+- `apify-actors/*/node_modules/`
 
 ---
 
@@ -50,17 +67,17 @@ Rama activa: **main** | Último commit: **2600c1a** (bracket-results móvil — 
 
 | Componente | Versión | Estado |
 |---|---|---|
-| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.6 | ✅ **PRODUCCIÓN** — proxy Webshare residencial rotativo (~$0.001/run) |
-| Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK intacto — proxies Apify residenciales (~$0.03/run) |
+| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.6 | ✅ **PRODUCCIÓN** — proxy Webshare residencial (~$0.001/run) |
+| Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK — proxies Apify residenciales (~$0.03/run) |
 | `porra-match-live` EF | v13 | ✅ async + webhook |
 | `porra-apify-webhook` EF | v7 | ✅ logging completo, detecta goles + status, llama Twilio directo |
-| `porra-whatsapp-send` EF | v1 | ✅ form-urlencoded via fetch (pg_net no soporta) |
+| `porra-whatsapp-send` EF | v1 | ✅ form-urlencoded via fetch |
 | `porra-whatsapp-webhook` EF | v4 | ✅ |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
 
 ### Costes live scoring
 - **Actor Webshare (producción):** ~**$13 total** torneo completo
-- Actor anterior (fallback): ~$318 estimados
+- Fallback anterior: ~$318 estimados
 - Webshare: 1GB gratis/mes + $3.50/mes plan pagado
 
 ---
@@ -86,11 +103,11 @@ js/
   main-entry.js       <- entry point Vite (type=module)
 
 public/js/
-  data.js             <- 215L — datos torneo + estado global + boostPicks
-  scoring.js          <- 1184L — motor puntos + tarjetas + premios
-  ui-groups.js        <- 167L — grupos + vista Jornada completa
-  ko.js               <- 1048L — bracket KO + IA pronósticos
-  ui-nav.js           <- 653L — SPA nav + modal + welcome
+  data.js             <- datos torneo + estado global + boostPicks
+  scoring.js          <- motor puntos + tarjetas + premios
+  ui-groups.js        <- grupos + vista Jornada completa
+  ko.js               <- bracket KO + IA pronósticos
+  ui-nav.js           <- SPA nav + modal + welcome
   auth.js             <- auth Supabase
   leagues.js          <- ligas y selección de porra
   misc.js             <- utils UI
@@ -104,17 +121,20 @@ css/ (raíz, no en public/)
   admin.css
   ko.css
   welcome.css
+  boost.css
   bracket-results.css
 ```
 
 **Referencias CSS en index.html:** `/css/fichero.css`
 
-**Cadena de carga:**
+**Cadena de carga (main-entry.js):**
 ```
 misc.js (paralelo)
-leagues → data → scoring → ui-groups → ko → ui-nav
-  → auth → scoreboard → close-porra → admin → bracket-results
+leagues → data → scoring → ui-groups → ko → bracket-results → ui-nav
+  → auth → scoreboard → close-porra → admin
 ```
+
+**Shims inline en index.html (líneas 1440-1445):** `handleCTA()`, `openAuthModal()` — previene error si onclick HTML dispara antes de que auth.js cargue.
 
 ---
 
@@ -161,7 +181,7 @@ whatsapp_subscribers (
 | `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun |
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Soporta `inspect` y `write`. Defaults: CLAUDE.md / main |
+| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main |
 | `porra-match-live` | v13 | Async + webhook, live scores |
 | `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
@@ -171,7 +191,7 @@ whatsapp_subscribers (
 
 ---
 
-## 🔄 Flujo live scores (resuelto — async + webhook)
+## 🔄 Flujo live scores (async + webhook)
 
 ```
 pg_cron (cada minuto durante partido)
@@ -204,7 +224,7 @@ pg_cron (cada minuto durante partido)
 
 ## 🏆 Motor de puntuación
 
-**Por partido (máx 7pts, 14 con boost x2):**
+**Por partido (máx 7pts · 14pts con boost x2):**
 - Signo correcto (1/X/2): +1
 - Resultado exacto: +3 (no acumula con signo)
 - Goleador correcto: +2

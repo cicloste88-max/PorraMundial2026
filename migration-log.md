@@ -512,3 +512,4 @@ Fixes:
 [02:05] ELIMINAR: 24 ficheros obsoletos tracked en git — backups .bak, duplicados bracket-results en raíz/js, patches Python one-shot, scratch markdowns (vista-jornada, jornada-redesign, boost-ticker, fix-vista-jornada), new_bracket.txt, js/utils.js (huérfano), porra-apify-webhook-v6.ts (EF v7 en prod), explore-*.js del actor Webshare
 [02:05] ACTUALIZAR: .gitignore — añadido `apify-actors/*/node_modules/`
 [02:05] ACTUALIZAR: CLAUDE.md — retirada línea utils.js de estructura JS
+[02:15] REDACTAR: CLAUDE.md sección WhatsApp — AccountSid + API Key SID movidos a solo-Vault (GitHub secret scanning bloqueó push)
