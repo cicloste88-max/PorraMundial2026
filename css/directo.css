@@ -284,3 +284,40 @@
   border-radius: 12px;
   border: 1px dashed #27272a;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Sección "🧪 Simulacros activos" — solo visible para admin.
+   Banner amarillo suave encima del bloque principal de jornadas.
+   ───────────────────────────────────────────────────────────── */
+.directo-simulacros-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(250, 204, 21, 0.05);
+  border-left: 3px solid #facc15;
+}
+.directo-simulacros-header {
+  font-size: 0.9em;
+  font-style: italic;
+  color: #9ca3af;
+  margin-bottom: 12px;
+}
+
+/* Tarjeta simulacro (variante de .dcard con banda superior y sin flags) */
+.dcard-simulacro {
+  position: relative;
+  overflow: hidden;
+}
+.dcard-simulacro-banner {
+  width: 100%;
+  padding: 4px 12px;
+  background: rgba(250, 204, 21, 0.15);
+  border-bottom: 1px solid rgba(250, 204, 21, 0.4);
+  color: #facc15;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-align: center;
+  border-radius: 12px 12px 0 0;
+}

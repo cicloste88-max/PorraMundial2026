@@ -30,6 +30,17 @@
   // {match_key, status, score_home, score_away, events, minute, _teams_swapped}
   window._liveScoresByMatchKey = {};
 
+  // Cache de simulacros (is_historic=true con team_names). Indexada por match_key.
+  // La expone window.getSimulacros() como array.
+  window._simulacrosByKey = {};
+
+  // ─────────────────────────────────────────────────────────────
+  // Detectar row de simulacro (histórica con nombres rellenos)
+  // ─────────────────────────────────────────────────────────────
+  function isSimulacroRow(row) {
+    return !!(row && row.is_historic === true && row.home_team_name && row.away_team_name);
+  }
+
   // ─────────────────────────────────────────────────────────────
   // CARGA JSON MAPEO
   // ─────────────────────────────────────────────────────────────
@@ -101,13 +112,34 @@
   // APLICAR row a la cache + disparar repintado de tarjeta
   // ─────────────────────────────────────────────────────────────
   function applyRow(row) {
+    // Simulacros (partidos fuera del Mundial marcados is_historic).
+    // Siempre cacheamos. Si la tarjeta DOM no existe (p.ej. el check admin aún
+    // no ha completado, o el user no es admin), updateSimulacroCard hace early-
+    // return silencioso — sin console.warn — y el cache queda disponible para
+    // cuando se dispare el re-render tras resolver el check admin.
+    if (isSimulacroRow(row)) {
+      window._simulacrosByKey[row.match_key] = row;
+      if (typeof window.updateSimulacroCard === 'function') {
+        window.updateSimulacroCard(row.match_key);
+      }
+      return;
+    }
+
+    // Partido del Mundial
     const norm = normalizeRow(row);
-    if (!norm) return; // silencioso: match_key no del Mundial
+    if (!norm) return; // silencioso: match_key no del Mundial ni simulacro válido
     window._liveScoresByMatchKey[norm.match_key] = norm;
     if (typeof window.updateDirectoCard === 'function') {
       window.updateDirectoCard(norm.match_key);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // API simulacros
+  // ─────────────────────────────────────────────────────────────
+  window.getSimulacros = function () {
+    return Object.values(window._simulacrosByKey || {});
+  };
 
   // ─────────────────────────────────────────────────────────────
   // SNAPSHOT INICIAL
@@ -126,14 +158,21 @@
       }
       console.log('[live-sync] Snapshot inicial:', data.length, 'filas');
       let relevantes = 0;
+      let simulacros = 0;
       for (const row of data) {
+        if (isSimulacroRow(row)) {
+          window._simulacrosByKey[row.match_key] = row;
+          simulacros++;
+          continue;
+        }
         const norm = normalizeRow(row);
         if (norm) {
           window._liveScoresByMatchKey[norm.match_key] = norm;
           relevantes++;
         }
       }
-      console.log('[live-sync] Relevantes para el Mundial:', relevantes);
+      console.log('[live-sync] Relevantes para el Mundial:', relevantes,
+                  '· Simulacros activos:', simulacros);
     } catch (err) {
       console.error('[live-sync] Snapshot exception:', err);
     }
