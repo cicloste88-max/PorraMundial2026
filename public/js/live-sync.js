@@ -1,29 +1,37 @@
-// live-sync.js — Porra Mundial 2026
-// Puente realtime entre live_scores (Supabase) y tarjetas del frontend.
+// live-sync.js — Porra Mundial 2026 (v2)
+// Puente realtime entre live_scores (Supabase) y la vista Directo del frontend.
 //
-// Usa: window._porraDb (auth.js), PARTIDOS + EQUIPOS (data.js),
+// Usa: window._porraDb (auth.js), PARTIDOS + EQUIPOS (data.js)
 //      fetch('/data/worldcup-2026-matches.json')
-// Expone: window.liveSyncInit, window.liveSyncStop, window.matchKeyFor
+// Expone:
+//   - window.liveSyncInit()     — arranca todo
+//   - window.liveSyncStop()     — desconecta canal realtime
+//   - window.matchKeyFor(match) — utility: dado un match de PARTIDOS, devuelve match_key (o null)
+//   - window._liveScoresByMatchKey — cache indexada por match_key, lee ui-directo.js
 //
 // Flujo:
-//   1. Al arrancar, carga el JSON de mapeo y lo indexa por match_key
-//   2. Hace snapshot inicial: SELECT * FROM live_scores para pintar estado actual
-//   3. Se suscribe a cambios en live_scores (INSERT/UPDATE)
-//   4. Cada cambio: actualiza el DOM de la tarjeta correspondiente
+//   1. Carga /data/worldcup-2026-matches.json → indexa por match_key
+//   2. Snapshot inicial: SELECT * FROM live_scores y actualiza la cache
+//   3. Subscribe a postgres_changes de live_scores
+//   4. Cada cambio: actualiza cache y llama window.updateDirectoCard(matchKey)
 
 (function () {
   'use strict';
 
   // ─────────────────────────────────────────────────────────────
-  // ESTADO INTERNO
+  // ESTADO
   // ─────────────────────────────────────────────────────────────
-  let matchesByKey = null;         // Map<match_key, {sofascore_id, home_en, away_en, home_es, away_es, teams_swapped, group, ...}>
-  let keyByMatchSignature = null;  // Map<"home_en|away_en|group", match_key>
-  let channel = null;              // Supabase realtime channel
+  let matchesByKey = null;         // del JSON: {match_key: {home_en, home_es, teams_swapped, ...}}
+  let keyByMatchSignature = null;  // índice: "home_en|away_en|group" → match_key
+  let channel = null;
   let initialized = false;
 
+  // Cache que consume ui-directo.js. Row normalizada desde perspectiva de data.js:
+  // {match_key, status, score_home, score_away, events, minute, _teams_swapped}
+  window._liveScoresByMatchKey = {};
+
   // ─────────────────────────────────────────────────────────────
-  // CARGA DEL JSON DE MAPEO
+  // CARGA JSON MAPEO
   // ─────────────────────────────────────────────────────────────
   async function loadMatchesJson() {
     try {
@@ -32,10 +40,8 @@
       const data = await res.json();
       matchesByKey = data;
 
-      // Índice inverso para resolver un match de PARTIDOS → match_key
       keyByMatchSignature = {};
       for (const [key, m] of Object.entries(data)) {
-        // Firma canónica: equipos en orden alfabético (aguanta teams_swapped)
         const sig = [m.home_en, m.away_en].sort().join('|') + '|' + m.group;
         keyByMatchSignature[sig] = key;
       }
@@ -48,67 +54,30 @@
   }
 
   // ─────────────────────────────────────────────────────────────
-  // RESOLUCIÓN match de PARTIDOS → match_key
+  // RESOLVER match de PARTIDOS → match_key
   // ─────────────────────────────────────────────────────────────
   function matchKeyFor(match) {
     if (!match || !keyByMatchSignature) return null;
-
-    // Encontrar los nombres en inglés vía EQUIPOS
-    const equipos = window.EQUIPOS || [];
-    const homeTeam = equipos.find(e => e.name === match.home);
-    const awayTeam = equipos.find(e => e.name === match.away);
-    if (!homeTeam?.name_en || !awayTeam?.name_en) {
-      // Partidos de KO con placeholders (ej "1A", "2B") no tendrán match_key aún
-      return null;
-    }
-
+    // EQUIPOS es const global de data.js, accesible por scope léxico
+    // (NO via window.* porque const/let top-level no se adjuntan a window)
+    const homeTeam = EQUIPOS.find(e => e.name === match.home);
+    const awayTeam = EQUIPOS.find(e => e.name === match.away);
+    if (!homeTeam?.name_en || !awayTeam?.name_en) return null;
     const sig = [homeTeam.name_en, awayTeam.name_en].sort().join('|') + '|' + match.group;
     return keyByMatchSignature[sig] || null;
   }
-
-  // Exponer tempranamente por si otros módulos lo necesitan
   window.matchKeyFor = matchKeyFor;
 
   // ─────────────────────────────────────────────────────────────
-  // RESOLUCIÓN match_key → idx de tarjeta (posición en PARTIDOS)
+  // NORMALIZAR row de live_scores → cache desde perspectiva de data.js
+  // (aplica teams_swapped a score. events se traducirá en ui-directo.js
+  //  usando la flag _teams_swapped)
   // ─────────────────────────────────────────────────────────────
-  function idxForMatchKey(matchKey) {
-    const meta = matchesByKey[matchKey];
-    if (!meta) return -1;
-
-    const partidos = window.PARTIDOS || [];
-    // Buscar el match de PARTIDOS cuyo par de equipos coincide con el de meta
-    for (let i = 0; i < partidos.length; i++) {
-      const p = partidos[i];
-      if (p.group !== meta.group) continue;
-      // Misma pareja de equipos (ambos órdenes)
-      if ((p.home === meta.home_es && p.away === meta.away_es) ||
-          (p.home === meta.away_es && p.away === meta.home_es)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // APLICAR un registro de live_scores a la tarjeta correspondiente
-  // ─────────────────────────────────────────────────────────────
-  function applyLiveRowToCard(row) {
-    if (!row || !row.match_key) return;
-
+  function normalizeRow(row) {
+    if (!row || !row.match_key) return null;
     const meta = matchesByKey[row.match_key];
-    if (!meta) {
-      // Puede ser un match_key de otra competición (UCL de prueba etc.) → ignorar silenciosamente
-      return;
-    }
+    if (!meta) return null; // match_key de otra competición (UCL test, etc.)
 
-    const idx = idxForMatchKey(row.match_key);
-    if (idx === -1) {
-      console.warn('[live-sync] match_key sin idx:', row.match_key);
-      return;
-    }
-
-    // Determinar home/away score desde la perspectiva de data.js
     let scoreHome = row.score_home;
     let scoreAway = row.score_away;
     if (meta.teams_swapped) {
@@ -116,35 +85,32 @@
       scoreAway = row.score_home;
     }
 
-    // Mostrar/ocultar contenedor y actualizar números
-    const container = document.getElementById('score-live-' + idx);
-    const rlEl = document.getElementById('rl-' + idx);
-    const rrEl = document.getElementById('rr-' + idx);
-
-    if (!container || !rlEl || !rrEl) {
-      // Tarjeta aún no renderizada; se volverá a intentar cuando el usuario navegue a grupos
-      return;
-    }
-
-    const hasScore = scoreHome != null && scoreAway != null;
-    const isLive   = row.status === 'inprogress' || row.status === 'halftime'
-                  || row.status === 'overtime'   || row.status === 'penalties';
-    const isFinal  = row.status === 'finished';
-
-    if (hasScore && (isLive || isFinal)) {
-      container.style.display = '';
-      rlEl.textContent = String(scoreHome);
-      rrEl.textContent = String(scoreAway);
-
-      // Badge de estado si existe la clase correspondiente
-      container.classList.toggle('is-live',  isLive);
-      container.classList.toggle('is-final', isFinal);
-    }
-    // Nota: no ocultamos la tarjeta aunque status vuelva a notstarted (no debería pasar)
+    return {
+      match_key:      row.match_key,
+      status:         row.status,
+      score_home:     scoreHome,
+      score_away:     scoreAway,
+      events:         Array.isArray(row.events) ? row.events : [],
+      minute:         null, // pendiente: SofaScore pone minuto en status.time.played (no está en la tabla actual)
+      _teams_swapped: !!meta.teams_swapped,
+      raw:            row
+    };
   }
 
   // ─────────────────────────────────────────────────────────────
-  // SNAPSHOT INICIAL: leer todos los live_scores al cargar
+  // APLICAR row a la cache + disparar repintado de tarjeta
+  // ─────────────────────────────────────────────────────────────
+  function applyRow(row) {
+    const norm = normalizeRow(row);
+    if (!norm) return; // silencioso: match_key no del Mundial
+    window._liveScoresByMatchKey[norm.match_key] = norm;
+    if (typeof window.updateDirectoCard === 'function') {
+      window.updateDirectoCard(norm.match_key);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // SNAPSHOT INICIAL
   // ─────────────────────────────────────────────────────────────
   async function loadInitialSnapshot() {
     const db = window._porraDb;
@@ -159,7 +125,15 @@
         return;
       }
       console.log('[live-sync] Snapshot inicial:', data.length, 'filas');
-      for (const row of data) applyLiveRowToCard(row);
+      let relevantes = 0;
+      for (const row of data) {
+        const norm = normalizeRow(row);
+        if (norm) {
+          window._liveScoresByMatchKey[norm.match_key] = norm;
+          relevantes++;
+        }
+      }
+      console.log('[live-sync] Relevantes para el Mundial:', relevantes);
     } catch (err) {
       console.error('[live-sync] Snapshot exception:', err);
     }
@@ -182,8 +156,9 @@
         (payload) => {
           const row = payload.new || payload.record;
           if (row) {
-            console.log('[live-sync] change:', payload.eventType, row.match_key, row.score_home, '-', row.score_away, row.status);
-            applyLiveRowToCard(row);
+            console.log('[live-sync] change:', payload.eventType, row.match_key,
+              row.score_home, '-', row.score_away, row.status);
+            applyRow(row);
           }
         }
       )
@@ -208,6 +183,13 @@
 
     await loadInitialSnapshot();
     subscribe();
+
+    // Si la vista Directo ya está visible, refresca completa
+    const directoContainer = document.getElementById('directo-container');
+    if (directoContainer && directoContainer.style.display !== 'none' &&
+        typeof window.renderVistaDirecto === 'function') {
+      window.renderVistaDirecto();
+    }
   }
 
   function liveSyncStop() {
@@ -220,14 +202,5 @@
 
   window.liveSyncInit = liveSyncInit;
   window.liveSyncStop = liveSyncStop;
-
-  // ─────────────────────────────────────────────────────────────
-  // Re-aplicación cuando se re-renderizan las tarjetas
-  // (renderAll destruye y recrea #score-live-<idx>, hay que repintar)
-  // ─────────────────────────────────────────────────────────────
-  window.liveSyncRepaint = async function () {
-    if (!matchesByKey) return;
-    await loadInitialSnapshot();
-  };
 
 })();

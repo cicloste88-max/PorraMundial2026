@@ -1445,6 +1445,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 </script>
 <link rel="stylesheet" href="/css/bracket-results.css">
 <link rel="stylesheet" href="/css/boost.css">
+<link rel="stylesheet" href="/css/directo.css">
 </head>
 <body>
 <!-- ═══ SPLASH SCREEN ═══ -->
@@ -2494,6 +2495,11 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
       style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#6b7280">
       📅 Jornada
     </button>
+    <button id="btn-vista-directo"
+      onclick="setVistaGrupos('directo')"
+      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#6b7280">
+      🔴 Directo
+    </button>
   </div>
   <!-- Ticker boost jornada -->
   <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;flex-wrap:wrap;gap:8px;align-items:center">
@@ -2509,6 +2515,8 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
   <!-- Vista jornada -->
   <div id="jornada-user-strip"></div>
   <div id="jornada-container" style="display:none;min-height:400px"></div>
+  <!-- Vista directo (live scores) -->
+  <div id="directo-container" style="display:none;min-height:400px"></div>
 <!-- Awards movidos a fase eliminatoria -->
 
   <!-- ── BANNER CTA: IR A ELIMINATORIAS ── -->

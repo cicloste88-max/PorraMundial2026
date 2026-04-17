@@ -26,19 +26,18 @@ function loadScript(src) {
 loadScript('/js/misc.js')
   .catch(e => console.error('Error cargando misc.js:', e))
 
-// Orden: leagues → data → scoring → ui-groups → ko → ui-nav → auth → scoreboard → close-porra → admin → live-sync
-// main.js eliminado tras extraccion completa en 5 sub-bloques (data, scoring,
-// ui-groups, ko, ui-nav). Cada sub-bloque es un classic script independiente.
+// Orden: leagues → data → scoring → ui-groups → ko → bracket-results → ui-nav
+//        → auth → scoreboard → close-porra → admin → ui-directo → live-sync
 //
-// - leagues PRIMERO: los classic scripts extraidos pueden llamar
-//   leagueLoadMyLeagues/_myLeagues en top-level
-// - data → scoring → ui-groups → ko → ui-nav: los 5 sub-bloques de lo que
-//   antes era main.js (PARTIDOS, EQUIPOS, predictions, BRACKET, showPage,
-//   initWelcome, etc.). Se cargan antes que auth
+// Notas sobre el orden:
+// - leagues PRIMERO: classic scripts extraidos pueden llamar leagueLoadMyLeagues
+// - data → scoring → ui-groups → ko → ui-nav: los 5 sub-bloques de main.js
+//   (PARTIDOS, EQUIPOS, predictions, BRACKET, showPage, initWelcome, etc.)
 // - auth → scoreboard → close-porra → admin: orden original preservado
-// - live-sync AL FINAL: necesita _porraDb (auth), EQUIPOS+PARTIDOS (data) y las
-//   tarjetas renderizadas. Solo arranca si el usuario está autenticado (porque
-//   _porraDb.channel() requiere sesión para realtime).
+// - ui-directo PENÚLTIMO: necesita PARTIDOS+EQUIPOS+predictions (data.js),
+//   calcMatchPoints (scoring.js), renderVistaJornada (ui-groups.js) y sobreescribe
+//   setVistaGrupos para incluir el tercer estado 'directo'.
+// - live-sync AL FINAL: necesita matchKeyFor/updateDirectoCard expuestos por ui-directo.
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/data.js'))
   .then(() => loadScript('/js/scoring.js'))
@@ -50,6 +49,7 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/scoreboard.js'))
   .then(() => loadScript('/js/close-porra.js'))
   .then(() => loadScript('/js/admin.js'))
+  .then(() => loadScript('/js/ui-directo.js'))
   .then(() => loadScript('/js/live-sync.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
@@ -62,7 +62,7 @@ loadScript('/js/leagues.js')
 
     // Arrancar sincronización live. Si _porraDb aún no existe (usuario no
     // logeado), liveSyncInit saltará silenciosamente el snapshot y el
-    // subscribe. El usuario podrá reactivarla tras login llamando manualmente.
+    // subscribe. Al hacer login, auth.js puede llamar manualmente.
     if (typeof window.liveSyncInit === 'function') {
       window.liveSyncInit();
     }

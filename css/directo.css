@@ -1,0 +1,286 @@
+/* ─────────────────────────────────────────────────────────────
+   directo.css — Vista Directo (marcadores en tiempo real)
+   Clon visual de .jcard con adaptaciones para live data.
+   ───────────────────────────────────────────────────────────── */
+
+#directo-container { display: none; }
+
+/* Reusa layout base de jornada-wrap */
+.directo-wrap {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .directo-wrap {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main";
+  }
+  .directo-sidebar { position: static; }
+}
+@media (max-width: 768px) {
+  .directo-wrap {
+    grid-template-columns: 1fr;
+    grid-template-areas: "main";
+    gap: 0;
+    padding: 0 4px;
+  }
+  .directo-sidebar { display: none !important; }
+  .directo-main { padding: 0; }
+}
+.directo-main { min-width: 0; }
+
+/* Tarjeta (clon visual de .jcard) */
+.dcard {
+  position: relative;
+  background: #1c1c1e;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color .15s, transform .15s;
+}
+.dcard:hover { border-color: #3a3a3e; }
+.dcard.is-live { border-color: rgba(220, 38, 38, .4); }
+.dcard.is-final { opacity: .82; }
+
+.dcard-main {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  position: relative;
+}
+.dcard-stripe {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.dcard-body { flex: 1; min-width: 0; }
+
+/* Fila equipos + marcador */
+.dcard-teams-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.dcard-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dcard-flag {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #0a0a0b;
+}
+.dcard-flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dcard-team-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #e5e7eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Marcador live */
+.dcard-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+.dcard-score {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #fafafa;
+  line-height: 1;
+  min-width: 16px;
+  text-align: center;
+}
+.dcard-score.pending {
+  color: #3a3a3e;
+  font-size: 20px;
+}
+.dcard-score-sep {
+  font-size: 18px;
+  color: #4b5563;
+  font-weight: 700;
+}
+
+/* Estado (EN VIVO, DESCANSO, FINAL, etc.) */
+.dcard-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: #6b7280;
+}
+.dcard-status .sep { color: #3a3a3e; }
+.dcard-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.dcard-status-pill.live {
+  background: rgba(220, 38, 38, .15);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, .35);
+}
+.dcard-status-pill.live::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+.dcard-status-pill.halftime { background: rgba(234, 179, 8, .15); color: #fbbf24; border: 1px solid rgba(234, 179, 8, .3); }
+.dcard-status-pill.overtime { background: rgba(168, 85, 247, .15); color: #c084fc; border: 1px solid rgba(168, 85, 247, .35); }
+.dcard-status-pill.penalties { background: rgba(236, 72, 153, .15); color: #f472b6; border: 1px solid rgba(236, 72, 153, .35); }
+.dcard-status-pill.final { background: rgba(75, 85, 99, .2); color: #9ca3af; border: 1px solid rgba(75, 85, 99, .3); }
+.dcard-status-pill.notstarted { background: rgba(55, 65, 81, .25); color: #6b7280; border: 1px solid rgba(55, 65, 81, .35); }
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .4; transform: scale(.85); }
+}
+
+/* Goleadores + incidentes */
+.dcard-events {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 6px;
+  border-top: 1px solid #27272a;
+}
+.dcard-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.dcard-event .evt-icon { font-size: 12px; flex-shrink: 0; }
+.dcard-event .evt-min {
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 700;
+  color: #6b7280;
+  min-width: 26px;
+  font-size: 10.5px;
+}
+.dcard-event .evt-player {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dcard-event .evt-extra {
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+}
+.dcard-event.own-goal .evt-player { color: #f87171; }
+.dcard-event.red-card .evt-icon { filter: drop-shadow(0 0 2px rgba(220, 38, 38, .6)); }
+
+/* Pronóstico + puntos vivos */
+.dcard-pred {
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  background: rgba(74, 222, 128, .05);
+  border-left: 1px solid #27272a;
+}
+.dcard-pred-label {
+  font-size: 9px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 2px;
+}
+.dcard-pred-score {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #d1d5db;
+  line-height: 1;
+}
+.dcard-pred-score.pending { color: #4b5563; }
+.dcard-pts-live {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.dcard-pts-live.zero { background: rgba(75, 85, 99, .15); color: #6b7280; }
+.dcard-pts-live.won  { background: rgba(74, 222, 128, .15); color: #4ade80; }
+.dcard-pts-live.won.boost { background: rgba(251, 146, 60, .15); color: #fb923c; }
+
+/* Venue/hora inferior */
+.dcard-venue {
+  display: flex;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #4b5563;
+  margin-top: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Header fecha/jornada (reutiliza estilos de jornada) */
+.directo-section { margin-bottom: 28px; }
+.directo-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1e293b;
+}
+.directo-label {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -.01em;
+}
+.directo-date { font-size: 11px; color: #6b7280; }
+.directo-live-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(220, 38, 38, .15);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, .35);
+  letter-spacing: .03em;
+}
+
+/* Placeholder cuando no hay partidos */
+.directo-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  font-size: 13px;
+  background: rgba(28, 28, 30, .5);
+  border-radius: 12px;
+  border: 1px dashed #27272a;
+}
