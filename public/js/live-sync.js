@@ -112,7 +112,11 @@
   // APLICAR row a la cache + disparar repintado de tarjeta
   // ─────────────────────────────────────────────────────────────
   function applyRow(row) {
-    // Simulacros (partidos fuera del Mundial marcados is_historic)
+    // Simulacros (partidos fuera del Mundial marcados is_historic).
+    // Siempre cacheamos. Si la tarjeta DOM no existe (p.ej. el check admin aún
+    // no ha completado, o el user no es admin), updateSimulacroCard hace early-
+    // return silencioso — sin console.warn — y el cache queda disponible para
+    // cuando se dispare el re-render tras resolver el check admin.
     if (isSimulacroRow(row)) {
       window._simulacrosByKey[row.match_key] = row;
       if (typeof window.updateSimulacroCard === 'function') {

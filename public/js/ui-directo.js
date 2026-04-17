@@ -23,31 +23,84 @@
 
   // ─────────────────────────────────────────────────────────────
   // Admin flag (cache) — para mostrar la sección "Simulacros"
-  // window._isAdminCached: undefined=no comprobado, true/false=resultado
+  // window._isAdminCached: undefined/null = no comprobado, true/false = resultado
+  //
+  // Problema histórico: tras un refresh, ui-directo.js corre antes de que
+  // auth.js haya rehidratado la sesión, así que _porraDb.auth.getUser() devuelve
+  // null y el cache se quedaba cerrado como `false` para siempre. Ahora:
+  //  - Si db o user no están listos, NO cacheamos; reintentamos hasta 10 veces
+  //    (cada 500 ms ⇒ 5 s máx).
+  //  - Al completar con valor definitivo, si cambia respecto al último render,
+  //    disparamos renderVistaDirecto() para que la sección simulacros aparezca.
   // ─────────────────────────────────────────────────────────────
+  let _checkInProgress = false;
+  let _checkAttempts = 0;
+  const _MAX_CHECK_ATTEMPTS = 10;
+  let _lastRenderAdminValue; // snapshot de _isAdminCached usado en el último render
+
+  function _triggerReRenderIfChanged() {
+    if (_lastRenderAdminValue === window._isAdminCached) return;
+    _lastRenderAdminValue = window._isAdminCached;
+    const container = document.getElementById('directo-container');
+    if (container && container.style.display !== 'none' &&
+        typeof window.renderVistaDirecto === 'function') {
+      console.log('[ui-directo] checkIsAdmin: cache actualizado, re-renderizando');
+      window.renderVistaDirecto();
+    }
+  }
+
+  function _scheduleCheckRetry(reason) {
+    _checkAttempts++;
+    if (_checkAttempts >= _MAX_CHECK_ATTEMPTS) {
+      console.log('[ui-directo] checkIsAdmin: máximo intentos (' + _MAX_CHECK_ATTEMPTS + ') alcanzado, asumiendo no-admin');
+      window._isAdminCached = false;
+      _triggerReRenderIfChanged();
+      return;
+    }
+    console.log('[ui-directo] checkIsAdmin: ' + reason + ', reintentando en 500ms (intento ' + (_checkAttempts + 1) + '/' + _MAX_CHECK_ATTEMPTS + ')');
+    setTimeout(() => { checkIsAdmin(); }, 500);
+  }
+
   async function checkIsAdmin() {
-    if (window._isAdminCached !== undefined) return window._isAdminCached;
-    const db = window._porraDb;
-    if (!db) return false;
+    if (window._isAdminCached === true || window._isAdminCached === false) {
+      return window._isAdminCached;
+    }
+    if (_checkInProgress) return undefined;
+    _checkInProgress = true;
     try {
+      console.log('[ui-directo] checkIsAdmin: iniciando (intento ' + (_checkAttempts + 1) + '/' + _MAX_CHECK_ATTEMPTS + ')');
+      const db = window._porraDb;
+      if (!db) {
+        _scheduleCheckRetry('_porraDb no disponible');
+        return undefined;
+      }
       const { data: { user } } = await db.auth.getUser();
-      if (!user) { window._isAdminCached = false; return false; }
-      const { data, error } = await db
+      console.log('[ui-directo] checkIsAdmin: user =', user ? user.id : null);
+      if (!user) {
+        _scheduleCheckRetry('sesión aún no hidratada');
+        return undefined;
+      }
+      const { data: profileData, error } = await db
         .from('profiles')
         .select('is_admin')
         .eq('id', user.id)
         .single();
       if (error) {
-        console.warn('[ui-directo] No se pudo leer profile.is_admin:', error);
+        console.warn('[ui-directo] checkIsAdmin: error leyendo profile:', error);
         window._isAdminCached = false;
+        _triggerReRenderIfChanged();
         return false;
       }
-      window._isAdminCached = !!(data && data.is_admin);
+      console.log('[ui-directo] checkIsAdmin: is_admin =', profileData ? profileData.is_admin : null);
+      window._isAdminCached = !!(profileData && profileData.is_admin);
+      _triggerReRenderIfChanged();
       return window._isAdminCached;
     } catch (err) {
-      console.warn('[ui-directo] Excepción checkIsAdmin:', err);
-      window._isAdminCached = false;
-      return false;
+      console.warn('[ui-directo] checkIsAdmin: excepción:', err);
+      _scheduleCheckRetry('excepción');
+      return undefined;
+    } finally {
+      _checkInProgress = false;
     }
   }
 
@@ -460,12 +513,11 @@
     const container = document.getElementById('directo-container');
     if (!container) return;
 
-    // Disparar comprobación admin si aún no está cacheada; re-render cuando llegue.
-    if (window._isAdminCached === undefined) {
-      checkIsAdmin().then((v) => {
-        // Re-render solo si hay algo que mostrar y la vista sigue visible
-        if (container.style.display !== 'none') renderVistaDirecto();
-      });
+    // Comprobación admin asíncrona — NO bloquea el render del Mundial.
+    // Si aún no está cacheada (undefined/null), se dispara fire-and-forget.
+    // La propia checkIsAdmin llamará a renderVistaDirecto() cuando cambie el valor.
+    if (window._isAdminCached !== true && window._isAdminCached !== false) {
+      checkIsAdmin();
     }
 
     // PARTIDOS es const global de data.js, accesible por scope léxico
