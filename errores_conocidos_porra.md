@@ -192,9 +192,20 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
-## ERR-14 — _reservado_
+## ERR-14 — `checkIsAdmin` async no completa y la sección admin-only nunca renderiza
 
-_(Placeholder para bug futuro.)_
+- **Síntoma:** tras login como admin, una sección admin-only (p. ej. **🧪 Simulacros activos** en la vista Directo) no aparece en el DOM, aunque la query directa a BD devuelve `is_admin = true` y forzar `window._isAdminCached = true` + `renderVistaDirecto()` por consola la pinta correctamente.
+- **Causa:**
+  1. El check admin se llamaba *fire-and-forget* desde `renderVistaDirecto` pero **no disparaba re-render** al completar.
+  2. Si el script se ejecutaba antes de que la sesión Supabase estuviese hidratada (común tras refresh), `_porraDb.auth.getUser()` devolvía `null` y el check se abandonaba prematuramente cacheando `false` para siempre.
+- **Fix aplicado** (`public/js/ui-directo.js`, commit `0421f0f`):
+  - **(a)** Retries del check (cada **500 ms**, hasta **10 intentos** ⇒ 5 s máx) si `_porraDb` no existe o `getUser()` devuelve `null`. No se cachea `false` hasta agotar reintentos.
+  - **(b)** Tras completar y actualizar `window._isAdminCached`, dispara `renderVistaDirecto()` de nuevo.
+  - **(c)** Guard anti-loop: `_lastRenderAdminValue` se compara con `_isAdminCached`; sólo re-render si cambia.
+  - **(d)** Flag `_checkInProgress` para evitar checks paralelos.
+  - Logs explícitos `[ui-directo] checkIsAdmin: …` en cada paso (inicio, user, is_admin, cache actualizado, retry, max alcanzado).
+- **Patrón preventivo:** cualquier chequeo asíncrono que condicione render debe (1) reintentarse si los recursos *upstream* (auth, BD, librerías) no están listos, (2) disparar re-render al completar, (3) tener guard anti-loop comparando con el último valor renderizado.
+- **Fecha:** 17 abr 2026 PM.
 
 ---
 

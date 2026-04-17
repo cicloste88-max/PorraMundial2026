@@ -282,6 +282,7 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Sistema live scores con actor Webshare (~$13 torneo completo)
 - Notificaciones WhatsApp (goles, descanso, fin…)
 - Bracket de resultados reales (timeline vertical + live hero)
+- Vista Directo con pipeline live realtime (72 tarjetas Mundial + sección **🧪 Simulacros activos** sólo admin para testing con partidos fuera del torneo)
 
 ### Antes del 11 de junio de 2026
 
