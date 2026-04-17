@@ -625,3 +625,29 @@ Materializar en disco lo que hasta ahora sólo vivía en la memoria de Claude.ai
 [12:12] COMMIT: docs: crear histórico bugs + bitácora etapas para liberar memoria Claude.ai — errores_conocidos_porra.md + migration-log.md
 [12:13] COMMIT: docs: añadir pendientes Pichichi auto, frases IA, email cierre con copia pronósticos — CLAUDE.md
 [12:14] PUSH: claude/persist-historical-files-OxmLQ → origin
+
+### BD + helpers (continuación 2026-04-17)
+
+Pase de limpieza sobre crons y `live_scores`, más helpers reutilizables para automatizar programación de crons por partido.
+
+[12:40] ELIMINAR CRONS: `prematch_bayern_realmadrid` + `poll_bayern_realmadrid` — el partido UCL correspondiente ya estaba finalizado, los crons seguían activos sin efecto útil.
+
+[12:45] CREAR FUNCIÓN: `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` — genera automáticamente los dos crons asociados a un partido:
+  - Prematch **T-45 min** (1 call antes del inicio).
+  - Polling **`*/3 * * * *`** durante **150 min** desde `start_ts` (cada 3 min, cubre 90' + descanso + prórroga + margen).
+  - Ambos invocan `porra-match-live` via `net.http_post` con el `match_key` correspondiente.
+  - Ejemplo:
+    ```sql
+    SELECT schedule_match_crons('wc_mex_rsa', '2026-06-11 20:00:00+00'::timestamptz);
+    ```
+
+[12:50] CREAR FUNCIÓN: `unschedule_match_crons(match_key TEXT)` — elimina los dos crons (`prematch_<match_key>` y `poll_<match_key>`) de un partido. Uso principal: limpieza tras cambio de fecha o cancelación.
+
+[12:55] SCHEMA: `ALTER TABLE live_scores ADD COLUMN is_historic BOOLEAN DEFAULT false`.
+  - **Semántica:** `true` = trial runs / pruebas manuales, conservado como referencia consultiva de formatos JSON y estados (`events`, `incidents`, transiciones de `status`).
+  - **NO usar en scoring ni en UI live** — filtrar con `WHERE is_historic = false` en todas las queries de scoring y realtime.
+
+[12:58] MARCAR HISTÓRICOS: 9 filas de `live_scores` existentes marcadas `is_historic = true`, `poll_active = false`. Una renombrada para evitar colisión con el primer partido real del Mundial:
+  - `wc2026_gA_15186710` → `_historic_wc2026_gA_15186710_trial` (México-Sudáfrica real ocupará la clave original el 11 jun 2026).
+
+[13:00] PATRÓN: a partir de ahora, para programar los crons de un partido **usar exclusivamente** `schedule_match_crons(match_key, start_ts)`. No duplicar crons manualmente (evita el caso de crons huérfanos tipo `prematch_bayern_realmadrid`).

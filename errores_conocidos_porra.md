@@ -177,9 +177,18 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
-## ERR-13 — _reservado_
+## ERR-13 — `porra-fix-encoding action:inspect` devuelve 404 para ficheros que sí existen
 
-_(Placeholder para bug futuro.)_
+- **Síntoma:** `inspect` sobre `migration-log.md` desde Claude.ai vía `net.http_post` responde `HTTP 500 {"ok":false,"error":"No se pudo leer: 404"}`, pero el fichero existe en `main` y es accesible vía clone / `git show`.
+- **Causa posible (sin diagnosticar todavía):**
+  - EF apuntando a rama incorrecta (no `main`).
+  - Path-matching sensible a encoding de URL / barras iniciales.
+  - BOM u otro encoding raro del fichero que confunda a la API de GitHub.
+- **Workaround actual:** pedir a Claude Code que lea el fichero tras clone local (`Read` tool) en lugar de depender de `inspect` desde Claude.ai.
+- **Impacto:** bajo. Sólo afecta la verificación de existencia de ficheros desde Claude.ai; no afecta al runtime ni al pipeline live.
+- **Patrón preventivo:** no depender de `porra-fix-encoding action:inspect` para confirmar existencia de ficheros. Usar Claude Code (`Read` / `git ls-files`) cuando la verificación sea crítica.
+- **Estado:** pendiente de diagnosticar cuando sea relevante (probablemente al tocar `porra-fix-encoding` por otro motivo).
+- **Fecha detección:** 17 abr 2026.
 
 ---
 
