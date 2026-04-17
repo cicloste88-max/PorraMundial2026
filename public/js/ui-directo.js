@@ -22,6 +22,60 @@
   window._liveScoresByMatchKey = window._liveScoresByMatchKey || {};
 
   // ─────────────────────────────────────────────────────────────
+  // Admin flag (cache) — para mostrar la sección "Simulacros"
+  // window._isAdminCached: undefined=no comprobado, true/false=resultado
+  // ─────────────────────────────────────────────────────────────
+  async function checkIsAdmin() {
+    if (window._isAdminCached !== undefined) return window._isAdminCached;
+    const db = window._porraDb;
+    if (!db) return false;
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      if (!user) { window._isAdminCached = false; return false; }
+      const { data, error } = await db
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+      if (error) {
+        console.warn('[ui-directo] No se pudo leer profile.is_admin:', error);
+        window._isAdminCached = false;
+        return false;
+      }
+      window._isAdminCached = !!(data && data.is_admin);
+      return window._isAdminCached;
+    } catch (err) {
+      console.warn('[ui-directo] Excepción checkIsAdmin:', err);
+      window._isAdminCached = false;
+      return false;
+    }
+  }
+
+  // match_key suele ser alfanumérico + underscores, pero sanitizamos por seguridad
+  function sanitizeMatchKey(k) {
+    return String(k || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+
+  // Hora local (Europe/Madrid) + día/mes desde match_start_ts (BIGINT en BD).
+  // Acepta segundos (10 dígitos) o milisegundos (13) — detecta por magnitud.
+  function formatStartCEST(ts) {
+    if (ts == null) return '';
+    const num = Number(ts);
+    if (!Number.isFinite(num) || num <= 0) return '';
+    const ms = num > 1e12 ? num : num * 1000;
+    const d = new Date(ms);
+    try {
+      return new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid',
+        day: 'numeric', month: 'short',
+        hour: '2-digit', minute: '2-digit'
+      }).format(d);
+    } catch {
+      return d.toLocaleString('es-ES');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Override de setVistaGrupos para soportar 'directo' como 3er estado
   // ─────────────────────────────────────────────────────────────
   const _originalSetVistaGrupos = window.setVistaGrupos;
@@ -301,11 +355,118 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // Construir tarjeta de SIMULACRO (partido fuera del Mundial, is_historic=true)
+  // Lee directamente campos de live_scores: home_team_name, away_team_name,
+  // competition, venue, match_start_ts, status, score_home, score_away, events.
+  // ─────────────────────────────────────────────────────────────
+  function _buildSimulacroCard(row) {
+    const mk = row.match_key;
+    const id = 'simulacro-card-' + sanitizeMatchKey(mk);
+    const home = row.home_team_name || '?';
+    const away = row.away_team_name || '?';
+    const comp = row.competition || '';
+    const venue = row.venue || '';
+    const startStr = formatStartCEST(row.match_start_ts);
+
+    const status = row.status || 'notstarted';
+    const hasScore = row.score_home != null && row.score_away != null;
+    const isLive   = status === 'inprogress' || status === 'halftime' ||
+                     status === 'overtime'   || status === 'penalties';
+    const isFinal  = status === 'finished';
+
+    const lTxt = hasScore ? String(row.score_home) : '—';
+    const vTxt = hasScore ? String(row.score_away) : '—';
+    const scoreCls = hasScore ? 'dcard-score' : 'dcard-score pending';
+    const { txt: statusTxt, cls: statusCls } = statusLabel(status);
+
+    // Eventos (no hay teams_swapped en simulacros: isHome viene directo de la fuente)
+    const events = extractRelevantEvents(row.events, false, home, away);
+    let eventsHtml = '';
+    if (events.length > 0) {
+      eventsHtml = '<div class="dcard-events">';
+      for (const ev of events) {
+        const extraHtml = ev.extra ? '<span class="evt-extra">(' + ev.extra + ')</span>' : '';
+        eventsHtml += '<div class="dcard-event ' + ev.kind + '">' +
+          '<span class="evt-icon">' + ev.icon + '</span>' +
+          "<span class=\"evt-min\">" + ev.minute + "'</span>" +
+          '<span class="evt-player">' + ev.player + '</span>' +
+          extraHtml +
+          '<span style="font-size:10px;color:#4b5563">· ' + ev.team + '</span>' +
+        '</div>';
+      }
+      eventsHtml += '</div>';
+    }
+
+    // Pie: competición · estadio · hora CEST
+    const footerParts = [];
+    if (comp) footerParts.push(comp);
+    if (venue) footerParts.push('🏟️ ' + venue);
+    if (startStr && !isLive && !isFinal) footerParts.push('⏰ ' + startStr);
+    const footerHtml = footerParts.length
+      ? '<div class="dcard-status">' +
+          '<span class="dcard-status-pill ' + statusCls + '">' + statusTxt + '</span>' +
+          footerParts.map((p, i) =>
+            (i === 0 ? '' : '<span class="sep">·</span>') +
+            '<span>' + p + '</span>'
+          ).join('') +
+        '</div>'
+      : '';
+
+    const classes = 'dcard dcard-simulacro' + (isLive ? ' is-live' : '') + (isFinal ? ' is-final' : '');
+
+    return (
+      '<div class="' + classes + '" id="' + id + '" data-sim-key="' + mk + '">' +
+        '<span class="dcard-simulacro-badge">🧪 SIMULACRO</span>' +
+        '<div class="dcard-main">' +
+          '<div class="dcard-stripe" style="background:#facc15"></div>' +
+          '<div class="dcard-body">' +
+            '<div class="dcard-teams-row">' +
+              '<div class="dcard-team">' +
+                '<span class="dcard-team-name">' + home + '</span>' +
+              '</div>' +
+              '<div class="dcard-score-wrap">' +
+                '<span class="' + scoreCls + '">' + lTxt + '</span>' +
+                '<span class="dcard-score-sep">:</span>' +
+                '<span class="' + scoreCls + '">' + vTxt + '</span>' +
+              '</div>' +
+              '<div class="dcard-team" style="justify-content:flex-end">' +
+                '<span class="dcard-team-name" style="text-align:right">' + away + '</span>' +
+              '</div>' +
+            '</div>' +
+            footerHtml +
+            eventsHtml +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function _buildSimulacrosSectionHtml() {
+    const sims = (typeof window.getSimulacros === 'function') ? window.getSimulacros() : [];
+    if (!sims || sims.length === 0) return '';
+    const cards = sims.map(_buildSimulacroCard).join('');
+    return (
+      '<div class="directo-simulacros-section">' +
+        '<div class="directo-simulacros-header">🧪 Simulacros activos <span style="opacity:.7">(solo admin)</span></div>' +
+        cards +
+      '</div>'
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Render completo de la vista Directo
   // ─────────────────────────────────────────────────────────────
   function renderVistaDirecto() {
     const container = document.getElementById('directo-container');
     if (!container) return;
+
+    // Disparar comprobación admin si aún no está cacheada; re-render cuando llegue.
+    if (window._isAdminCached === undefined) {
+      checkIsAdmin().then((v) => {
+        // Re-render solo si hay algo que mostrar y la vista sigue visible
+        if (container.style.display !== 'none') renderVistaDirecto();
+      });
+    }
 
     // PARTIDOS es const global de data.js, accesible por scope léxico
     // (NO via window.* porque const/let top-level no se adjuntan a window)
@@ -362,17 +523,48 @@
       sectionsHtml += '</div>';
     });
 
+    // Sección simulacros (solo admin, solo si hay alguno)
+    const simsHtml = (window._isAdminCached === true) ? _buildSimulacrosSectionHtml() : '';
+
     if (sidebarHtml) {
       container.innerHTML =
         '<div class="directo-wrap">' +
-          '<div class="directo-main">' + sectionsHtml + '</div>' +
+          '<div class="directo-main">' + simsHtml + sectionsHtml + '</div>' +
           '<div class="directo-sidebar">' + sidebarHtml + '</div>' +
         '</div>';
     } else {
-      container.innerHTML = '<div class="directo-main">' + sectionsHtml + '</div>';
+      container.innerHTML = '<div class="directo-main">' + simsHtml + sectionsHtml + '</div>';
     }
   }
   window.renderVistaDirecto = renderVistaDirecto;
+
+  // ─────────────────────────────────────────────────────────────
+  // Actualizar una tarjeta de SIMULACRO (llamado por live-sync.js)
+  // ─────────────────────────────────────────────────────────────
+  function updateSimulacroCard(matchKey) {
+    const container = document.getElementById('directo-container');
+    if (!container || container.style.display === 'none') return;
+    if (window._isAdminCached !== true) return; // no admin: no hay sección
+
+    const id = 'simulacro-card-' + sanitizeMatchKey(matchKey);
+    const existing = document.getElementById(id);
+    const row = (window._simulacrosByKey || {})[matchKey];
+
+    // Si la fila deja de ser simulacro o desaparece, no tocamos (solo repintado)
+    if (!row) return;
+
+    if (!existing) {
+      // Primera aparición: re-render completo para insertar la sección si faltaba
+      renderVistaDirecto();
+      return;
+    }
+
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _buildSimulacroCard(row);
+    const newCard = tmp.firstElementChild;
+    if (newCard) existing.replaceWith(newCard);
+  }
+  window.updateSimulacroCard = updateSimulacroCard;
 
   // ─────────────────────────────────────────────────────────────
   // Actualizar una tarjeta individual (llamado por live-sync.js)
