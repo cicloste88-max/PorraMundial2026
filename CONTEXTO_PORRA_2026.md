@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-15 22:00 | Fuente: sesión tarde/noche
+> Actualizado: 2026-04-17 | Fuente: sesión limpieza repo + revisión profunda
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -12,29 +12,63 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit** | `12e6c6c` |
+| **Último commit estable** | `2600c1a` (bracket-results móvil) |
 
 ---
 
-## 🔴 PENDIENTE URGENTE — Próxima sesión
+## 🔴 Pendientes abiertos
 
-**Bug: porra-apify-webhook no actualiza DB durante partidos en vivo**
-
-El webhook extrae `datasetId` de `webhookBody.eventData.resource` pero Apify lo envía en `webhookBody.resource` (raíz). Como `datasetId` queda vacío, skipea con 200 sin procesar datos.
-
-**Fix preparado:** `supabase-ef-patches/porra-apify-webhook-v6.ts` — solo falta desplegar en dashboard Supabase.
-
-**Otros bugs pendientes:**
-- Barra inferior boost no se actualiza tras seleccionar pick
-- Parpadeo botón envío porra (recurrente)
-
-### Fixes aplicados sesión 2026-04-15 tarde/noche
-
-| Fix | Estado |
+### Bugs UI
+| Bug | Prioridad |
 |---|---|
-| Auth persistencia sesión (dos clientes Supabase, navigator.locks, storage custom) | ✅ |
-| Boost UI (guard, parpadeo, savePredictions spam) | ✅ |
-| Botonera KO móvil (flex-wrap) | ✅ |
+| Parpadeo botón envío porra (recurrente) | 🟡 |
+| Cinta tabs ronda no se visualiza completa en móvil (eliminatorias) | 🟡 |
+| Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido | 🟡 |
+| Botón simular eliminatorias visible para todos (actualmente solo admin) | 🟢 |
+
+### Antes del 11 junio 2026
+| # | Tarea | Estado |
+|---|---|---|
+| 1 | Migrar WhatsApp sandbox → Meta Business (error 63016, parked) | ⏳ |
+| 2 | Activar `pg_cron` para `update-results` | ⏳ 11 jun |
+| 3 | Cargar convocatorias reales (`EQUIPOS[].players`) | ⏳ jun |
+| 4 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
+| 5 | Desactivar signup público | ⏳ |
+| 6 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
+| 7 | IDs SofaScore de KO (disponibles ~28 jun) | ⏳ 28 jun |
+
+### Playoffs UEFA marzo 2026 — resueltos
+Grupo A + República Checa · B + Bosnia · D + Turquía · F + Suecia · I + Irak · K + RD Congo
+
+---
+
+## 🧹 Limpieza repo — sesión 17 abr 2026
+
+Eliminados del repo (24 ficheros tracked, ~1.1 MB):
+- 5 backups `.bak`: `index.html.bak`, `js/main.js.bak{,2,3}`, `js/auth.js.bak`
+- 3 duplicados bracket-results (raíz + `js/bracket-results.js` versión vieja)
+- 6 patches Python one-shot
+- 5 markdowns de diseños ya ejecutados
+- `js/utils.js` huérfano
+- `supabase-ef-patches/porra-apify-webhook-v6.ts` (producción en v7)
+- 3 scripts exploratorios Apify
+
+Añadido a `.gitignore`: `apify-actors/*/node_modules/`
+
+---
+
+## ✅ Bugs recientemente resueltos
+
+| Fix | Commit / sesión |
+|---|---|
+| Auth persistencia sesión (2 clientes Supabase, navigator.locks, storage custom) | 12e6c6c (15 abr PM) |
+| Boost UI (guard, parpadeo, savePredictions spam) | 12e6c6c (15 abr PM) |
+| Botonera KO móvil (flex-wrap) | 12e6c6c (15 abr PM) |
+| `porra-apify-webhook` datasetId extraction (v5 → v7) | 16 abr |
+| 404 masivos consola (extractUrl linear-gradient en scoring.js) | 502a464 (16 abr) |
+| Header eliminatorias responsive | 43d466c (17 abr) |
+| Bracket-results móvil (columnas min-width) | ef82fea (17 abr) |
+| Rediseño bracket: timeline vertical + live hero | 2600c1a (17 abr) |
 
 ---
 
@@ -45,7 +79,7 @@ El webhook extrae `datasetId` de `webhookBody.eventData.resource` pero Apify lo 
 | Frontend | Vite + vanilla JS/CSS, SPA |
 | DB + Auth | Supabase (Postgres + Auth + Storage + Edge Functions) |
 | Hosting | Vercel (autodeploy desde `main`) |
-| Live scores | Apify actor propio (Playwright + proxy residencial) |
+| Live scores | Apify actor propio (proxy Webshare residencial) |
 | Notificaciones | Twilio WhatsApp sandbox |
 
 ---
@@ -54,35 +88,37 @@ El webhook extrae `datasetId` de `webhookBody.eventData.resource` pero Apify lo 
 
 | Componente | Versión | Estado | Notas |
 |---|---|---|---|
-| **Actor sofascore-live-proxy** | build 1.0.19 | ✅ FUNCIONA | Playwright + RESIDENTIAL + page.evaluate. ~44s. Devuelve event+incidents en tiempo real |
+| **Actor sofascore-webshare-proxy** | build 1.0.6 | ✅ **PRODUCCIÓN** | Proxy Webshare residencial rotativo. ~5-10s por run. ~$0.001/run |
+| **Actor sofascore-live-proxy** | build 1.0.19 | ✅ FALLBACK | Playwright + proxy Apify RESIDENTIAL. ~44s por run. ~$0.03/run. Intacto como backup |
 | **porra-match-live EF** | v13 | ✅ FUNCIONA | Async (<1s), lanza actor + webhook |
-| **porra-apify-webhook EF** | v5 | ⚠️ BUG | No extrae datasetId del payload Apify. Fix v6 preparado |
+| **porra-apify-webhook EF** | v7 | ✅ FUNCIONA | Logging completo, detecta goles + status, llama Twilio directo |
 | **porra-whatsapp-send EF** | v1 | ✅ FUNCIONA | Twilio sandbox, form-urlencoded |
 | **porra-whatsapp-webhook EF** | v4 | ✅ FUNCIONA | Captura WaId del suscriptor |
-| **pg_cron poll_bayern_realmadrid** | jobid 10 | ✅ ACTIVO | Cada 3min 19-23 UTC el 15 abr |
-| **Actor VzKtdb1t0Qnc07X8V (Azzouzana)** | — | ❌ NO USAR LIVE | Caché CDN ~15min |
+| **Actor Azzouzana `VzKtdb1t0Qnc07X8V`** | — | ❌ NO USAR LIVE | Caché CDN ~15min |
 | **porra-sofascore-proxy EF** | v8 | ❌ OBSOLETA | Sustituida por actor propio |
+
+**Coste estimado torneo completo:** ~$13 con Webshare (antes: ~$318 con Apify residential)
 
 ---
 
-## 🔄 Flujo de llamadas actual
+## 🔄 Flujo de llamadas actual (async + webhook)
 
 ```
-pg_cron (cada minuto)
-  → net.http_post → porra-match-live EF
-      → Apify API (lanzar actor BYLtYcOxYkruVipwr)
-          → Playwright browser + proxy RESIDENTIAL
-              → sofascore.com (cargar página, establecer contexto)
-              → page.evaluate(fetch) → api.sofascore.com/event/{id}
-              → page.evaluate(fetch) → api.sofascore.com/event/{id}/incidents
-          → Apify dataset (event + incidents JSON)
-      → EF parsea datos → detecta cambios → porra-whatsapp-send
-          → Twilio API → WhatsApp usuario
-      → upsert live_scores (status, score, events)
+pg_cron (cada minuto durante partido)
+  → net.http_post → porra-match-live EF (<1s)
+      → Apify API (lanzar actor N8vUChlhok5JU3cnL async, no espera)
+  → (actor termina ~5-10s con Webshare)
+      → Apify webhook → porra-apify-webhook EF
+          → leer dataset: { event, incidents }
+          → detectar cambios vs DB
+          → detecta goles + cambios status
+          → Twilio directo (form-urlencoded fetch) → WhatsApp
+          → upsert live_scores (status, score, events)
 ```
 
-**Arquitectura async RESUELTA:** pg_cron → match-live (async, <1s) → actor → webhook → apify-webhook → DB + WhatsApp
-**BUG ACTUAL:** webhook no extrae datasetId correctamente (busca en `eventData.resource` en vez de `resource`)
+**Arquitectura async RESUELTA:** pg_net no soporta llamadas >30s, por eso lanza+webhook en vez de request-response.
+
+**Pattern cron:** Pre-match T-45min (1 call) → polling cada 3min durante partido → estados: `notstarted/inprogress/halftime/overtime/penalties/finished`
 
 ---
 
@@ -99,7 +135,7 @@ pg_cron (cada minuto)
 | `boost_picks` | Boosts diarios `(user_id, league_id, match_id, match_date)` |
 | `results` | Resultados reales + overrides manuales (JSON, id=1) |
 | `orchestrator_jobs` | Historial ejecuciones agentes |
-| `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id) |
+| `live_scores` | Estado partidos en vivo |
 | `whatsapp_subscribers` | Teléfonos activos para notificaciones |
 
 **Campos clave `live_scores`:**
@@ -119,12 +155,12 @@ pg_cron (cada minuto)
 | EF | Versión | Estado | Descripción |
 |---|---|---|---|
 | `admin-actions` | v7 | ✅ | Gestión admin. Requiere JWT admin |
-| `update-results` | v2 | ⏳ | Sync football-data.org → `results`. Activar pg_cron el 11 jun 2026 |
+| `update-results` | v4 | ⏳ | Sync football-data.org → `results`. Activar pg_cron el 11 jun 2026 |
 | `porra-orchestrator` | v3 | ✅ | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v4 | ✅ | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v4 | ✅ | Write/inspect ficheros en GitHub via API |
+| `porra-fix-encoding` | v5 | ✅ | Inspect/write ficheros en GitHub via API |
 | `porra-match-live` | v13 | ✅ | Async (<1s), lanza actor + webhook |
-| `porra-apify-webhook` | v5 | ⚠️ | BUG: datasetId extraction. Fix v6 en `supabase-ef-patches/` |
+| `porra-apify-webhook` | v7 | ✅ | Detecta goles + status, llama Twilio directo |
 | `porra-whatsapp-send` | v1 | ✅ | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
 | `porra-sofascore-proxy` | v8 | ❌ | Obsoleta, sustituida por actor propio |
@@ -132,7 +168,26 @@ pg_cron (cada minuto)
 
 ---
 
-## 🤖 Actor Apify propio — sofascore-live-proxy
+## 🤖 Actor Apify principal — sofascore-webshare-proxy
+
+| Campo | Valor |
+|---|---|
+| **Actor ID** | `N8vUChlhok5JU3cnL` |
+| **Build** | 1.0.6 |
+| **Repo** | `apify-actors/sofascore-webshare-proxy/` en GitHub |
+| **Input** | `{ "eventId": "15832749" }` |
+| **Output** | `{ eventId, event: {data:{event}}, incidents: {data:{incidents:[]}} }` |
+| **Latencia** | ~5-10s por run |
+| **Coste** | ~$0.001 por run |
+| **Técnica** | Proxy Webshare residencial rotativo + fetch directo a `api.sofascore.com` |
+
+**Por qué funciona:** las IPs residenciales no están en las listas negras de Cloudflare Bot Management. Las cookies SofaScore no están ligadas a IP — se pueden reutilizar entre requests desde IPs distintas.
+
+**Ventaja vs actor previo (sofascore-live-proxy):** ~$13 coste total torneo vs ~$318. No requiere Playwright ni browser context; Webshare resuelve el problema de Cloudflare con solo rotación de IP.
+
+---
+
+## 🤖 Actor Apify fallback — sofascore-live-proxy
 
 | Campo | Valor |
 |---|---|
@@ -140,15 +195,11 @@ pg_cron (cada minuto)
 | **Build** | 1.0.19 |
 | **Imagen Docker** | `apify/actor-node-playwright-chrome:20` |
 | **Repo** | `apify-actors/sofascore-live-proxy/` en GitHub |
-| **Input** | `{ "eventId": "15832749" }` |
-| **Output** | `{ eventId, event: {data:{event}}, incidents: {data:{incidents:[]}} }` |
 | **Latencia** | ~30-44s por run |
 | **Coste** | ~$0.03 por run |
-| **Técnica** | Playwright lanza Chrome + proxy RESIDENTIAL → carga sofascore.com → page.evaluate(fetch) llama a api.sofascore.com desde contexto browser → bypasea Cloudflare |
+| **Técnica** | Playwright lanza Chrome + proxy Apify RESIDENTIAL → carga sofascore.com → `page.evaluate(fetch)` llama a api.sofascore.com desde contexto browser → bypasea Cloudflare |
 
-**Por qué funciona:** el fetch se ejecuta desde dentro del browser con el mismo origen que sofascore.com. Cloudflare lo trata como petición legítima del navegador.
-
-**Por qué el proxy residencial es clave:** las IPs residenciales no están en las listas negras de Cloudflare Bot Management.
+**Por qué se mantiene:** fallback si Webshare falla o su plan expira. Más caro pero robusto.
 
 ---
 
@@ -158,8 +209,10 @@ pg_cron (cada minuto)
 |---|---|
 | **Twilio sandbox** | +14155238886 |
 | **Código de acceso** | join load-herd |
+| **AccountSid** | `AC519cc59a65a9b28a71c178325b6307a5` |
+| **API Key** | `SK4d89720c0f1a25825542156cfea170f1` |
 | **Suscriptores activos** | +34618874646 |
-| **Secrets en Vault** | TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET |
+| **Secrets en Vault** | `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET` |
 
 **Notificaciones configuradas:**
 - 🟢 Arranca el partido
@@ -169,6 +222,8 @@ pg_cron (cada minuto)
 - ⚡ Prórroga
 - 🤽 Penaltis
 - 🏁 Fin del partido
+
+**Pendiente:** migración a Meta Business producción. Bloqueado por error Meta 63016 (parked).
 
 ---
 
@@ -194,6 +249,19 @@ pg_cron (cada minuto)
 - 48 equipos, 12 grupos (A-L) de 4, 72 partidos grupos, 17 jornadas
 - 2 primeros + 8 mejores terceros = 32 equipos
 - R32 → R16 → QF → SF → 3er puesto → Final — **104 partidos total**
+- **Primer partido:** México vs Sudáfrica · 11 jun 2026 · Azteca · eventId=15186710
+
+---
+
+## 🔑 SofaScore IDs
+
+| Torneo | tournament | season |
+|---|---|---|
+| UCL 2025/26 | 7 | 61644 |
+| World Cup 2026 | 16 | 58210 |
+
+72 partidos grupos mapeados en `worldcup-2026-sofascore-ids.json` (repo).
+IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 
 ---
 
@@ -202,12 +270,14 @@ pg_cron (cada minuto)
 **Supabase MCP** (`cmyfyswystjgzdwbqyyb`):
 - `execute_sql` — ejecutar SQL
 - `get_logs` — logs de Edge Functions
-- `deploy_edge_function` — desplegar EFs
-- `get_edge_function` — leer código de EFs
+- `list_edge_functions` / `get_edge_function` / `deploy_edge_function`
 
 **Claude in Chrome:**
-- QA visual en localhost:5173 y producción
+- QA visual en `localhost:5173` y producción
 - Login producción: `_porraDb.auth.signInWithPassword({email:'cicloste88@gmail.com', password:'910500'})`
+- Login local: `window.__QA_EMAIL` / `window.__QA_PASS` via `.env.local`
+
+**Canva MCP:** disponible, no usado en porra.
 
 ---
 
@@ -221,22 +291,7 @@ pg_cron (cada minuto)
 
 **NUNCA push sin validación local previa.**
 **NO tocar vercel.json.**
-
----
-
-## ⏳ Pendientes antes del 11 junio 2026
-
-| # | Tarea | Estado |
-|---|---|---|
-| 0 | **Desplegar porra-apify-webhook v6** (fix datasetId extraction) | 🔴 URGENTE |
-| 0b | Fix barra inferior boost (no se actualiza tras seleccionar pick) | 🟡 |
-| 0c | Fix parpadeo botón envío porra (recurrente) | 🟡 |
-| 2 | Activar `pg_cron` para `update-results` el 11 jun | ⏳ |
-| 3 | Actualizar `EQUIPOS[].players` con convocatorias reales | ⏳ jun |
-| 4 | Desactivar signup público cuando entren todos los amigos | ⏳ |
-| 5 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
-| 6 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
-| 7 | README — actualizar con URL Vercel | ⏳ |
+**Push inmediato tras cada commit — nunca acumular.**
 
 ---
 
@@ -251,9 +306,12 @@ pg_cron (cada minuto)
 | 2026-04-13 PM | Splash screen — inline script, hero/scroll-cue | 3473c76 |
 | 2026-04-13 tarde | Boost x2 completo — Canvas fuego, Supabase, ticker | 6c3d30b |
 | 2026-04-13 noche | Vista Jornada — pestaña, tarjetas compactas, sidebar | ef39b3d |
-| 2026-04-14 | Vista Jornada fixes (sidebar, chips, móvil). WhatsApp live scores sistema completo | 8e8ac44 |
-| 2026-04-15 AM | Actor propio BYLtYcOxYkruVipwr build 1.0.19. Arquitectura async+webhook resuelta. match-live v13 + apify-webhook v5 | b95ba00 |
-| 2026-04-15 PM | Fix auth persistencia (2 clientes Supabase, navigator.locks, storage custom). Fix boost UI. Fix botonera KO móvil. Bug webhook datasetId diagnosticado, fix v6 preparado | 12e6c6c |
+| 2026-04-14 | Vista Jornada fixes. Sistema WhatsApp live scores completo | 8e8ac44 |
+| 2026-04-15 AM | Actor propio BYLtYcOxYkruVipwr. Arquitectura async+webhook resuelta. match-live v13 + apify-webhook v5 | b95ba00 |
+| 2026-04-15 PM | Fix auth persistencia, boost UI, botonera KO móvil. Diagnóstico bug webhook datasetId | 12e6c6c |
+| 2026-04-16 | Fix `porra-apify-webhook` datasetId (v7). Migración actor a Webshare (~$0.001/run, ~$13 torneo) | — |
+| 2026-04-17 AM | Fix 404 linear-gradient, header eliminatorias responsive, bracket móvil, rediseño bracket timeline | 2600c1a |
+| 2026-04-17 PM | Revisión profunda del código (crítica constructiva). Limpieza repo: 24 ficheros eliminados, docs reescritas | pendiente |
 
 ---
 
@@ -263,12 +321,35 @@ pg_cron (cada minuto)
 ```js
 if (document.readyState === 'loading') { addEventListener('DOMContentLoaded', fn) } else { fn() }
 ```
+Los classic scripts cargados via `loadScript` chain se ejecutan después de `DOMContentLoaded`, por lo que `addEventListener('DOMContentLoaded', fn)` a secas NO se dispara.
 
 **SofaScore API — por qué 403 desde servidor:**
-Cloudflare Bot Management detecta peticiones no-browser. Solución: Playwright con proxy RESIDENTIAL + page.evaluate(fetch) desde contexto del browser.
+Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
+- **Webshare residential** (actor actual): IPs residenciales rotativas bypasean Cloudflare directamente
+- **Playwright + page.evaluate(fetch)** (fallback): fetch desde contexto browser real con el mismo origen
 
-**pg_net timeout:** llamadas que tardan >30s deben usar patrón async (lanzar + no esperar) y recoger resultado en siguiente ciclo.
+**pg_net timeout:** llamadas que tardan >30s deben usar patrón async (lanzar + no esperar) y recoger resultado via webhook. Aplicado en `porra-match-live` v13.
 
-**boost_picks upsert:** `onConflict:'user_id,league_id,match_date'` — no DELETE.
+**boost_picks upsert:** `onConflict:'user_id,league_id,match_date'` — no DELETE. Evita parpadeo UI.
 
-**vercel.json:** NO crear ni modificar. Vercel gestiona MIME types correctamente por defecto.
+**vercel.json:** NO crear ni modificar. Vercel gestiona MIME types correctamente por defecto. El wildcard `source: "/(.*)"` corrompe MIME de ES modules.
+
+**Vite + public/ colisión de rutas:** si hay un fichero en raíz y otro en `public/` con la misma URL, **raíz gana en dev, sólo public/ existe en build**. Causa desincronización silenciosa dev vs prod. Aprendido tras descubrir que `js/bracket-results.js` (raíz, viejo) ganaba en dev sobre `public/js/bracket-results.js` (nuevo).
+
+**Shims inline en index.html:** `handleCTA()` y `openAuthModal()` están inline (líneas 1440-1445) como fallback para onclick HTML que dispara antes de que `auth.js` cargue vía loadScript chain.
+
+---
+
+## 🔍 Deuda técnica identificada (abr 2026)
+
+| Área | Detalle | Prioridad |
+|---|---|---|
+| CSS | 4 bloques `<style>` inline en index.html (~1925 LOC) duplicados con `css/*.css` (~2347 LOC) | Alta |
+| Tests | 0 tests. Motor de puntuación sin cobertura | Alta |
+| JS | 70 `onclick=` inline en index.html — fuerza funciones globales | Media |
+| JS | Estado global sin contrato: `EQUIPOS` es globals implícito, `AWARDS_CFG` explícito, `window.BRACKET` mixto | Media |
+| JS | `scoring.js` 1446 LOC mezclando lógica pura y render (41 `document.*` calls) | Media |
+| JS | 86 `innerHTML=` total, uso irregular de `escapeHtml` | Media |
+| JS | 17 `console.log/warn/info` residuales en producción | Baja |
+
+**Plan de 6 fases propuesto** (Fase 0 higiene · Fase 1 CSS · Fase 2 tests · Fase 3 onclick delegation · Fase 4 refactor scoring · Fase 5 ES modules). Fase 0 ejecutada 17 abr 2026.

@@ -1,8 +1,9 @@
 # Porra Mundial 2026
 
-App de pronósticos para el Mundial 2026. Grupos de amigos crean ligas privadas, predicen partidos (fase de grupos + eliminatorias + premios individuales) y compiten en un scoreboard en tiempo real.
+App de pronósticos para el Mundial 2026 (Canadá · México · Estados Unidos). Grupos de amigos crean ligas privadas, predicen partidos (fase de grupos + eliminatorias + premios individuales) y compiten en un scoreboard en tiempo real.
 
-**Producción:** [tumundial.netlify.app](https://tumundial.netlify.app)
+**Producción:** [porramundial2026-seven.vercel.app](https://porramundial2026-seven.vercel.app)
+**Arranque del torneo:** 11 de junio de 2026
 
 ---
 
@@ -10,10 +11,12 @@ App de pronósticos para el Mundial 2026. Grupos de amigos crean ligas privadas,
 
 | Capa | Tecnología |
 |------|-----------|
-| Frontend | HTML + CSS + JS vanilla (sin build step) |
+| Frontend | Vite + vanilla JS/CSS (SPA) |
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions) |
-| Deploy | Netlify (auto-deploy desde GitHub en cada commit) |
-| Agentes | Claude Haiku via Anthropic API + porra-orchestrator EF |
+| Deploy | Vercel (autodeploy desde `main`) |
+| Live scoring | Apify actor propio (Playwright + proxy residencial Webshare) |
+| Notificaciones | Twilio WhatsApp |
+| Agentes | Claude Haiku via Anthropic API + `porra-orchestrator` EF |
 
 ---
 
@@ -21,19 +24,47 @@ App de pronósticos para el Mundial 2026. Grupos de amigos crean ligas privadas,
 
 ```
 porra-mundial-2026/
-├── index.html          ← App completa (SPA, checkpoint v15c)
-├── main.js             ← Módulo principal: data + scoring + ui-groups + ko + ui-nav
-├── auth.js             ← Autenticación y sesión Supabase
-├── leagues.js          ← Sistema de ligas (crear / unirse / seleccionar)
-├── scoreboard.js       ← Clasificación multi-usuario
-├── close-porra.js      ← Cierre y finalización de pronósticos
-├── admin.js            ← Panel de administración
-├── misc.js             ← Utilidades UI (popovers, responsive)
-├── utils.js            ← Stubs pre-Supabase
-├── base.css            ← Reset, variables, layout principal
-├── welcome.css         ← Welcome screen + auth modal
-├── ko.css              ← Bracket KO + modal de partido + awards
-└── admin.css           ← Responsive + panel admin + dado
+│
+├── index.html                          ← SPA (checkpoint v15c)
+├── vite.config.js                      ← Config Vite
+├── package.json
+│
+├── css/                                ← Estilos
+│   ├── base.css                        · Reset, variables, layout principal
+│   ├── welcome.css                     · Welcome screen + auth modal
+│   ├── ko.css                          · Bracket KO + modal partido + awards
+│   ├── admin.css                       · Panel admin + dado
+│   ├── boost.css                       · Boost x2 (llamas, ticker)
+│   └── bracket-results.css             · Vista resultados KO
+│
+├── js/                                 ← Entry point Vite
+│   └── main-entry.js                   · ESM entry, expone Supabase y carga la chain
+│
+├── public/js/                          ← Classic scripts cargados vía loadScript
+│   ├── data.js                         · PARTIDOS, EQUIPOS, GRUPOS, BRACKET, predictions
+│   ├── scoring.js                      · Motor de puntos + tarjetas + premios
+│   ├── ui-groups.js                    · Vista Grupos + Vista Jornada
+│   ├── ko.js                           · Bracket KO + predicciones IA
+│   ├── ui-nav.js                       · SPA nav + modal + welcome
+│   ├── auth.js                         · Autenticación Supabase
+│   ├── leagues.js                      · Sistema de ligas (crear/unirse/seleccionar)
+│   ├── scoreboard.js                   · Clasificación multi-usuario
+│   ├── close-porra.js                  · Cierre de pronósticos
+│   ├── admin.js                        · Panel admin + dado + simulador
+│   ├── bracket-results.js              · Vista resultados reales del bracket KO
+│   └── misc.js                         · Utilidades UI
+│
+├── apify-actors/                       ← Actores Apify custom
+│   └── sofascore-webshare-proxy/       · Actor principal (producción)
+│
+├── supabase-ef-patches/                ← Snapshots de Edge Functions
+│
+├── docs/                               ← Documentación técnica histórica
+│
+├── CLAUDE.md                           ← Contexto para Claude Code
+├── CONTEXTO_PORRA_2026.md              ← Contexto maestro
+├── migration-log.md                    ← Bitácora cronológica
+└── ESQUEMA_SISTEMA_PORRA2026.xlsx      ← Esquema sistema completo
 ```
 
 ---
@@ -47,32 +78,39 @@ porra-mundial-2026/
 | `profiles` | Usuarios registrados (`is_admin`, `nombre`) |
 | `leagues` | Ligas creadas (`nombre`, `codigo`, `created_by`) |
 | `league_members` | Membresías (`porra_cerrada`, `cerrada_at`) |
-| `predictions` | Pronósticos de grupos por `(user_id, league_id, match_id)` |
-| `ko_predictions` | Pronósticos KO por `(user_id, league_id, match_id)` |
-| `award_picks` | Premios individuales por `(user_id, league_id)` |
-| `results` | Resultados reales del torneo + overrides manuales (id=1) |
-| `orchestrator_jobs` | Historial de ejecuciones de agentes |
+| `predictions` | Pronósticos de grupos `(user_id, league_id, match_id)` |
+| `ko_predictions` | Pronósticos KO `(user_id, league_id, match_id)` |
+| `award_picks` | Premios individuales `(user_id, league_id)` |
+| `boost_picks` | Boosts diarios `(user_id, league_id, match_id, match_date)` |
+| `results` | Resultados reales del torneo + overrides manuales (JSON, id=1) |
+| `orchestrator_jobs` | Historial ejecuciones agentes Haiku |
+| `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id) |
+| `whatsapp_subscribers` | Teléfonos activos para notificaciones |
 
 RLS habilitado en todas las tablas.
 
 ---
 
-## Edge Functions (6)
+## Edge Functions
 
 | Función | Versión | Descripción |
 |---------|---------|-------------|
-| `admin-actions` | v7 | Gestión admin: resultados, overrides, usuarios, ligas, reabrir pronósticos, cron. Requiere JWT de admin. |
-| `update-results` | v2 | Sync desde football-data.org → tabla `results`. Activar pg_cron el 11 jun 2026. |
-| `porra-orchestrator` | v3 | Lanza N agentes Claude Haiku en paralelo. Guarda resultados en `orchestrator_jobs`. |
-| `porra-patch-deploy` | v4 | Lee fichero GitHub, aplica patches search/replace y hace commit automático. Pipeline principal. |
-| `porra-fix-encoding` | v1 | Restaura UTF-8 correcto en index.html desde URL externa limpia. |
-| `porra-github-pusher` | v6 | PLACEHOLDER — no usar. |
+| `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
+| `update-results` | v4 | Sync football-data.org → `results`. Activar pg_cron el 11 jun |
+| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → `orchestrator_jobs` |
+| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
+| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API |
+| `porra-match-live` | v13 | Live scores async + webhook |
+| `porra-apify-webhook` | v7 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
+| `porra-whatsapp-send` | v1 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
+| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
 
 ---
 
 ## Motor de puntuación
 
-### Por partido (máximo 7 pts)
+### Por partido (máximo 7 pts · 14 pts con boost x2)
+
 | Concepto | Puntos |
 |----------|--------|
 | Signo correcto (1/X/2) | +1 |
@@ -81,6 +119,7 @@ RLS habilitado en todas las tablas.
 | Bonus vs IA (pronóstico opuesto a IA y aciertas) | +1 |
 
 ### Por equipos que avanzan en KO
+
 | Ronda | Puntos |
 |-------|--------|
 | Grupos → R32 | +5 por equipo |
@@ -91,6 +130,7 @@ RLS habilitado en todas las tablas.
 | Campeón | +25 |
 
 ### Clasificación final
+
 | Posición | Puntos |
 |----------|--------|
 | Campeón | +30 |
@@ -99,31 +139,41 @@ RLS habilitado en todas las tablas.
 | 4.º puesto | +10 |
 
 ### Premios individuales
-Balón de Oro, Bota de Oro, Guante de Oro, Mejor Joven ≤21 — puntos definidos en `AWARDS_CFG`.
+
+Balón de Oro, Bota de Oro, Guante de Oro (+15 pts), Mejor Joven ≤21 (+20 pts). Configurados en `AWARDS_CFG`.
 
 ---
 
 ## Estructura del torneo
 
-- 48 equipos · 12 grupos (A-L) de 4 equipos · 72 partidos de grupos
+- 48 equipos · 12 grupos (A–L) de 4 equipos · 72 partidos de grupos · 17 jornadas
 - Clasifican: 2 primeros de cada grupo + 8 mejores terceros = 32 equipos
 - Rondas KO: R32 → R16 → QF → SF → 3er puesto → Final
 - Total: 104 partidos
 
+**Primer partido:** México vs Sudáfrica · 11 jun 2026 · Estadio Azteca
+
 ---
 
-## Pipeline de deploy (automatizado)
+## Sistema live scores
 
-El flujo no requiere intervención manual:
+Flujo asíncrono con webhook:
 
 ```
-1. San describe el bug o mejora en el chat
-2. Claude analiza y genera el fix
-3. porra-patch-deploy aplica el patch y hace commit a GitHub
-4. Netlify detecta el commit y despliega (~30s)
-5. Claude in Chrome verifica en tumundial.netlify.app
-6. Claude da resumen ejecutivo
+pg_cron (durante partido)
+  → net.http_post → porra-match-live EF
+      → Apify API: lanzar actor N8vUChlhok5JU3cnL async
+  → Apify webhook → porra-apify-webhook EF
+      → leer dataset: { event, incidents }
+      → detectar goles + cambios status
+      → Twilio directo (form-urlencoded fetch) → WhatsApp
+      → upsert live_scores
 ```
+
+**Actor principal (producción):** `sofascore-webshare-proxy` (~$0.001/run)
+**Coste estimado torneo completo:** ~$13
+
+**Patrón de polling:** Pre-match T-45min (1 call) → cada 3min durante partido → estados: `notstarted/inprogress/halftime/overtime/penalties/finished`
 
 ---
 
@@ -134,215 +184,99 @@ El flujo no requiere intervención manual:
 | `SUPABASE_URL` | Auto-inyectado |
 | `SUPABASE_SERVICE_ROLE_KEY` | Auto-inyectado |
 | `SUPABASE_ANON_KEY` | Auto-inyectado |
-| `ANTHROPIC_API_KEY` | API key Anthropic para agentes Haiku |
-| `GITHUB_TOKEN` | Token acceso repo para porra-patch-deploy |
-| `GITHUB_REPO` | Nombre del repo (usuario/repo) |
-| `FOOTBALL_DATA_API_KEY` | API key football-data.org para update-results |
-
----
-
-## Activar resultados en tiempo real (11 jun 2026)
-
-Desde panel admin → Sistema, o via `admin-actions`:
-```json
-{ "action": "cron_resume" }
-```
-Sincroniza resultados cada 5 minutos durante el torneo.
-
----
-
-## Roadmap
-
-### Completado ✓
-- Sistema de ligas multijugador con códigos de invitación
-- Panel admin completo (resultados, overrides, usuarios, ligas)
-- Flujo cierre / reapertura de porra
-- Bracket KO con predicciones y predicción IA
-- Scoreboard en tiempo real
-- Pipeline de deploy automatizado (EF + GitHub + Netlify)
-
-### Antes del 11 jun 2026
-- [ ] Seguridad auth: autoconfirm off, pwd mínimo 8 chars, enable_signup false
-- [ ] Email de confirmación al cerrar porra (Resend + EF)
-- [ ] Activar pg_cron para update-results
-
-### Post-torneo
-- [ ] Migración a Vite (módulos ya preparados)
-- [ ] CDN Supabase → npm
-- [ ] Netlify CI/CD con build pipeline
-- [ ] Notificaciones email con resumen de pronósticos
-
----
-
-*Proyecto personal · Mundial 2026 · cicloste88*
-
-App de pronósticos para el Mundial 2026. Permite a grupos de amigos crear ligas privadas, hacer predicciones de partidos (fase de grupos + eliminatorias + premios individuales), y competir en un scoreboard en tiempo real.
-
-**Demo:** [porrafutbol2026.netlify.app](https://porrafutbol2026.netlify.app)
-
----
-
-## Stack
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | HTML + CSS + JS vanilla (monolítico · sin build step) |
-| Backend | Supabase (Postgres + Auth + Storage + Edge Functions) |
-| Deploy | Netlify (drag & drop · pendiente CI/CD con GitHub) |
-| Agentes | Claude Haiku via Anthropic API + porra-orchestrator (EF) |
-
----
-
-## Estructura del proyecto
-
-```
-porra-mundial-2026/
-│
-├── index.html                        ← App completa (checkpoint v15c)
-│
-├── css/                              ← Módulos CSS extraídos
-│   ├── base.css                      · Reset, variables, layout principal
-│   ├── welcome.css                   · Welcome screen + auth modal
-│   ├── ko.css                        · Bracket KO + modal de partido + awards
-│   └── admin.css                     · Responsive + panel admin + dado
-│
-├── js/                               ← Módulos JS extraídos
-│   ├── data/
-│   │   └── main.js                   · Módulo principal (data+scoring+ui+ko+nav)
-│   ├── auth.js                       · Autenticación y sesión Supabase
-│   ├── leagues.js                    · Sistema de ligas (crear/unirse/seleccionar)
-│   ├── scoreboard.js                 · Clasificación multi-usuario
-│   ├── close-porra.js                · Cierre y finalización de pronósticos
-│   ├── admin.js                      · Panel de administración
-│   ├── misc.js                       · Utilidades UI (popovers, responsive)
-│   └── utils.js                      · Stubs pre-Supabase (absorber en auth.js)
-│
-├── supabase/
-│   └── functions/
-│       ├── admin-actions/            · Gestión privilegiada (usuarios, ligas, overrides)
-│       │   └── index.ts              · v6 — requiere JWT de admin
-│       ├── update-results/           · Sincronización con football-data.org
-│       │   └── index.ts              · v1 — pg_cron activa el 11 jun 2026
-│       └── porra-orchestrator/       · Orquestador de agentes de refactorización
-│           └── index.ts              · v3 — usa ANTHROPIC_API_KEY del vault
-│
-└── docs/
-    ├── porra_bloque_map_v15b.json    · Mapa de 21 bloques con deps/expone/fase
-    └── porra_roadmap_refactorizacion.html · Dashboard de progreso de refactorización
-```
-
----
-
-## Base de datos (Supabase)
-
-**Proyecto:** `cmyfyswystjgzdwbqyyb`
-
-| Tabla | Descripción |
-|-------|-------------|
-| `profiles` | Usuarios registrados (`is_admin`, `nombre`) |
-| `leagues` | Ligas creadas (`nombre`, `codigo`, `created_by`) |
-| `league_members` | Membresías (`porra_cerrada`, `cerrada_at`) |
-| `predictions` | Pronósticos de grupos por `(user_id, league_id, match_id)` |
-| `ko_predictions` | Pronósticos KO por `(user_id, league_id, match_id)` |
-| `award_picks` | Premios individuales por `(user_id, league_id)` |
-| `results` | Resultados del torneo + overrides manuales (JSON) |
-| `orchestrator_jobs` | Historial de ejecuciones de agentes de refactorización |
-
-RLS habilitado en todas las tablas. Sin recursión en políticas.
-
----
-
-## Edge Functions
-
-### `admin-actions` (v6)
-Operaciones privilegiadas del panel admin. Requiere JWT de usuario con `is_admin = true`.
-
-Acciones: `get_stats`, `get_users`, `get_leagues`, `get_results`, `set_override`, `reopen_prediction`, `reopen_ko_prediction`, `reset_porra_cerrada`, `force_sync`, `cron_pause`, `cron_resume`
-
-### `update-results` (v1)
-Sincroniza resultados desde [football-data.org](https://football-data.org). Activar pg_cron el 11 de junio de 2026 (inicio del torneo).
-
-```sql
-SELECT cron.schedule('update-results-job', '*/5 * * * *', $$
-  SELECT net.http_post(
-    url := 'https://cmyfyswystjgzdwbqyyb.supabase.co/functions/v1/update-results',
-    ...
-  )
-$$);
-```
-
-### `porra-orchestrator` (v3)
-Orquestador de agentes de refactorización. Lanza N llamadas a Claude Haiku en paralelo, guarda resultados en `orchestrator_jobs`.
-
-Acciones: `ping`, `status`, `run_fase`, `get_job`, `run_single`
-
----
-
-## Variables de entorno (Supabase Vault)
-
-| Secret | Descripción |
-|--------|-------------|
-| `SUPABASE_URL` | Auto-inyectado |
-| `SUPABASE_SERVICE_ROLE_KEY` | Auto-inyectado |
-| `SUPABASE_ANON_KEY` | Auto-inyectado |
-| `ANTHROPIC_API_KEY` | Añadir manualmente en Settings → Vault |
+| `ANTHROPIC_API_KEY` | API Anthropic para agentes Haiku |
+| `GITHUB_TOKEN` | Token acceso repo para `porra-patch-deploy` |
+| `GITHUB_REPO` | Nombre del repo (`usuario/repo`) |
+| `APIFY_TOKEN` | Token Apify para actores |
+| `TWILIO_ACCOUNT_SID` | Twilio |
+| `TWILIO_API_KEY` | Twilio |
+| `TWILIO_API_SECRET` | Twilio |
 
 ---
 
 ## Desarrollo local
 
-Abre `index.html` directamente en el navegador o usa un servidor local:
-
 ```bash
-# Con Python
-python3 -m http.server 5500
+# Instalar
+npm install
 
-# Con VS Code Live Server
-# → http://127.0.0.1:5500
+# Arrancar dev server
+npm run dev          # localhost:5173
+
+# Build producción
+npm run build        # genera dist/
+npm run preview      # previsualizar build
 ```
 
-No requiere build step. La app funciona directamente desde el HTML.
+**Credenciales QA locales:** definir en `.env.local`:
+```
+VITE_QA_EMAIL=...
+VITE_QA_PASS=...
+```
+Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 
 ---
 
-## Roadmap técnico
+## Pipeline de deploy
+
+1. Trabajar en local (`npm run dev` → localhost:5173)
+2. QA visual + funcional
+3. `git add -A && git commit -m "..." && git push origin main`
+4. Vercel detecta el commit y despliega (~30s)
+5. Verificar en `porramundial2026-seven.vercel.app`
+
+**Reglas críticas:**
+- Nunca push a `main` sin validación local previa
+- Push inmediato tras cada commit — nunca acumular
+- No crear ni modificar `vercel.json`
+- Actualizar `migration-log.md` tras cada acción importante
+
+---
+
+## Roadmap
 
 ### Completado
-- [x] Sistema de ligas multijugador (`league_id` en todas las tablas)
-- [x] Panel admin con selector de liga
-- [x] Flujo reabrir porra → finalizar → cerrada validado end-to-end
-- [x] Anotación completa de bloques (Usa/Expone/Deps) — 26 agentes
-- [x] Extracción física de módulos CSS y JS
-- [x] Globales implícitas convertidas a `window.X` explícitos
 
-### Pendiente (antes del torneo — 11 jun 2026)
-- [ ] Deploy Netlify con v15c
-- [ ] Activar pg_cron el 11 de junio
-- [ ] Seguridad auth: autoconfirm off, pwd min 8, enable_signup: false
-- [ ] Email de confirmación al cerrar porra (Resend + Edge Function)
+- Sistema de ligas multijugador con códigos de invitación
+- Panel admin completo (resultados, overrides, usuarios, ligas)
+- Flujo cierre / reapertura de porra
+- Bracket KO con predicciones + predicción IA
+- Scoreboard en tiempo real
+- Migración a Vite (5 módulos extraídos de `main.js`)
+- Boost x2 diario con Canvas de fuego
+- Vista Jornada (pestaña, tarjetas compactas, sidebar)
+- Sistema live scores con actor Webshare (~$13 torneo completo)
+- Notificaciones WhatsApp (goles, descanso, fin…)
+- Bracket de resultados reales (timeline vertical + live hero)
 
-### Pendiente (post-torneo)
-- [ ] Migración a Vite (estructura de módulos ya preparada)
-- [ ] Reemplazar CDN Supabase por `npm install @supabase/supabase-js`
-- [ ] Netlify CI/CD desde GitHub (reemplazar drag & drop)
-- [ ] Pestaña admin "Ligas" con gestión completa
-- [ ] Notificaciones personalizadas y email con resumen de pronósticos
+### Antes del 11 de junio de 2026
+
+- [ ] Migrar WhatsApp sandbox → Meta Business producción
+- [ ] Activar pg_cron para `update-results`
+- [ ] Cargar convocatorias reales (`EQUIPOS[].players`)
+- [ ] Email de confirmación al cerrar porra (Resend + EF)
+- [ ] Desactivar signup público cuando entren todos los amigos
+- [ ] Verificar estructura JSON `_results.ko_results` con `update-results` real
+- [ ] Bugs UI: parpadeo botón envío porra, hora CEST en píldora partido, cinta tabs móvil eliminatorias, simular eliminatorias visible a todos
+
+### Post-torneo
+
+- [ ] Refactor `scoring.js`: separar lógica pura del render
+- [ ] Tests unitarios del motor de puntuación (Vitest)
+- [ ] Migrar `onclick=` inline a event delegation
+- [ ] Consolidar CSS inline restante en ficheros separados
+- [ ] Migración completa a ES modules (eliminar `loadScript` chain)
 
 ---
 
 ## Arquitectura de agentes
 
-El proyecto incluye una red de agentes Claude para automatizar tareas de refactorización y mantenimiento:
-
 ```
-Supervisor (Claude en conversación)
+Supervisor (Claude en conversación · claude.ai)
     └── porra-orchestrator (Edge Function en Supabase)
             └── N agentes Claude Haiku en paralelo
                     └── Resultados en orchestrator_jobs (Postgres)
 ```
-
-Tiempo de ejecución de las 5 fases de anotación: ~40 segundos total.
-Coste total de API: < $0.01.
 
 ---
 

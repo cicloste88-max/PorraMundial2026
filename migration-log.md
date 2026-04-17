@@ -507,9 +507,68 @@ Fixes:
   - Bracket results: columnas móvil + rediseño timeline vertical
 ═════════════════════════════════════════════════════════════════════
 
-## 2026-04-17 — Limpieza ficheros legacy
+## 2026-04-17 — Limpieza repo
 
-[02:05] ELIMINAR: 24 ficheros obsoletos tracked en git — backups .bak, duplicados bracket-results en raíz/js, patches Python one-shot, scratch markdowns (vista-jornada, jornada-redesign, boost-ticker, fix-vista-jornada), new_bracket.txt, js/utils.js (huérfano), porra-apify-webhook-v6.ts (EF v7 en prod), explore-*.js del actor Webshare
-[02:05] ACTUALIZAR: .gitignore — añadido `apify-actors/*/node_modules/`
-[02:05] ACTUALIZAR: CLAUDE.md — retirada línea utils.js de estructura JS
-[02:15] REDACTAR: CLAUDE.md sección WhatsApp — AccountSid + API Key SID movidos a solo-Vault (GitHub secret scanning bloqueó push)
+[02:00] REVISIÓN: crítica constructiva completa del código — detectados CSS duplicado inline/ficheros, 1 MB de .bak trackeados, estado global sin contrato, 70 onclick= inline, cero tests, docs duplicadas. Plan de 6 fases propuesto.
+
+[02:05] ELIMINAR (24 ficheros tracked, ~1.1 MB):
+  - 5 backups .bak: index.html.bak, js/main.js.bak{,2,3}, js/auth.js.bak
+  - 3 duplicados bracket-results: bracket-results.js/.css raíz + js/bracket-results.js (versión vieja con r16/oct/qf, mientras public/js/ tiene r32/r16/qf/sf/third/final — el bueno)
+  - 6 patches Python one-shot: patch_fix_auth_lazy_db.py, patch_fix_main_comment.py, patch_fix_main_encoding.py, patch_fix_use_strict.py, patch_remove_auth_inline.py, patch_remove_leagues_inline.py
+  - 5 markdowns de diseños ejecutados: vista-jornada.md, jornada-redesign.md, fix-vista-jornada.md, boost-ticker-mejoras.md, new_bracket.txt
+  - js/utils.js (huérfano — shims handleCTA/openAuthModal ya inline en index.html:1440-1445)
+  - supabase-ef-patches/porra-apify-webhook-v6.ts (producción en v7)
+  - 3 scripts exploratorios Apify
+
+[02:06] GITIGNORE: añadido `apify-actors/*/node_modules/`
+
+[02:08] DOC: README.md reescrito completo (estaba duplicado desde línea 179, apuntaba a Netlify y utils.js obsoleto). Estado real abril 2026: Vercel, Vite, 11 EFs, sistema live Webshare, estructura js/ + public/js/
+
+[02:09] DOC: CLAUDE.md actualizado — retirada referencia a utils.js, añadida sección "Limpieza repo — sesión 17 abr 2026", shims inline documentados en estructura JS
+
+[02:10] DOC: CONTEXTO_PORRA_2026.md actualizado — bug urgente webhook v5 eliminado (resuelto en v7), actor Webshare documentado como primario y sofascore-live-proxy como fallback, nueva sección "Deuda técnica identificada" con 7 áreas, nuevo patrón crítico "Vite public/ collision", patrón shims inline.
+
+[02:12] VERIFICACIÓN: QA localhost:5173 post-limpieza ✅ (usuario confirma). En dev Vite, al borrar /js/bracket-results.js raíz, pasa a servirse /public/js/bracket-results.js (versión correcta con rondas nuevas). Alinea dev con prod.
+
+## 2026-04-17 — Rotación credenciales Twilio
+
+[02:40] ROTAR: nuevas TWILIO_API_KEY (SK8bd3...) y TWILIO_API_SECRET en Supabase Vault. TWILIO_ACCOUNT_SID intacto (misma cuenta Twilio). API Key antigua revocada en Twilio Console.
+
+[02:41] TEST 1: invocar porra-whatsapp-send → 401 "Authenticate" (Twilio code 20003). Request_id 727.
+
+[02:45] TEST 2: tras re-pegado de credenciales → 401 "Authentication Error - invalid username" (Twilio code 20003). Request_id 728.
+
+[02:47] DIAGNÓSTICO: query a vault.decrypted_secrets con detector de whitespace revela:
+  - TWILIO_API_KEY: 35 chars (esperado 34), space al final
+  - TWILIO_ACCOUNT_SID: 35 chars (esperado 34), space al final
+  - TWILIO_API_SECRET: 32 chars ✅ limpio
+Causa: al copiar de Twilio Console, selección manual agarró espacio extra al final. TWILIO_ACCOUNT_SID tenía el problema desde sesiones anteriores (solo revelado ahora al invocar la EF con credenciales limpias de API Key).
+
+[02:48] FIX: vault.update_secret con trim() aplicado a TWILIO_API_KEY y TWILIO_ACCOUNT_SID. Verificación: len=34, whitespace_chars=0 en ambos.
+
+[02:49] TEST 3: invocar porra-whatsapp-send → 200 OK. Twilio acepta credenciales. SID SMf1dd5661d7c41f0c78cad2473cbfaf8d encolado. Usuario confirma recepción WhatsApp en +34618874646. Request_id 729.
+
+[02:50] NUEVO PATRÓN CRÍTICO documentado: "Whitespace en Supabase Vault UI" — al pegar valores sensibles (credenciales, tokens) el campo a veces retiene whitespace invisible. Longitudes Twilio esperadas: Account SID 34, API Key SID 34, API Key Secret 32.
+
+Query de diagnóstico reutilizable:
+```sql
+SELECT
+  name,
+  length(decrypted_secret) AS len,
+  left(decrypted_secret, 4) AS starts,
+  right(decrypted_secret, 2) AS ends,
+  length(decrypted_secret) - length(trim(decrypted_secret)) AS whitespace_chars,
+  (decrypted_secret LIKE '%' || chr(10) || '%') AS has_newline,
+  (decrypted_secret LIKE '%' || chr(9)  || '%') AS has_tab,
+  (decrypted_secret LIKE '% %')                 AS has_space
+FROM vault.decrypted_secrets
+WHERE name IN (...);
+```
+
+Fix SQL reutilizable (no expone valores en claro):
+```sql
+SELECT vault.update_secret(
+  (SELECT id FROM vault.secrets WHERE name = 'NOMBRE_SECRET'),
+  trim((SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'NOMBRE_SECRET'))
+);
+```
