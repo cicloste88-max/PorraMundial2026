@@ -5,15 +5,396 @@ const IS_MOBILE = () => window.matchMedia('(max-width: 640px)').matches;
 
 if (!window.groupSaved) window.groupSaved = {};
 
-function openMobileFocus(letra) {
-  console.log('[mobile-grupos] openMobileFocus stub', letra);
+// ═══════════════════════════════════════════════════════════════════════════
+// PART 1 — FOCUS LAYER + CARRUSEL + SWIPE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Estado privado del focus layer
+const __mobileFocusState = { letra: null, slide: 0 };
+const __mobileOriginalGrid = { letra: null, gridEl: null, cards: [] };
+
+// Helpers: valida si un pronóstico existe (mismo criterio que getGroupCompleted)
+function __mobileIsPredValid(pred) {
+  return !!(pred && pred.l !== null && pred.l !== undefined &&
+            pred.v !== null && pred.v !== undefined);
 }
+
+// Devuelve los 6 partidos del grupo en el mismo orden que el DOM del grid
+function __mobileMatchesForLetra(letra) {
+  if (typeof PARTIDOS === 'undefined') return [];
+  return PARTIDOS.filter(function (m) { return m.group === letra; });
+}
+
+// Construye el focus layer una única vez y cablea listeners estáticos
+function ensureFocusLayer() {
+  let layer = document.getElementById('mobile-focus-layer');
+  if (layer) return layer;
+
+  layer = document.createElement('div');
+  layer.id = 'mobile-focus-layer';
+  layer.className = 'mobile-focus-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  layer.innerHTML = [
+    '<div class="mobile-focus-header">',
+    '  <div class="mobile-focus-header-top">',
+    '    <button class="mobile-back-btn" id="mobile-back-btn">‹ Grupos</button>',
+    '    <h2 class="mobile-focus-title" id="mobile-focus-title">Grupo A</h2>',
+    '    <button class="dice-btn mobile-focus-dice" id="mobile-focus-dice">🎲</button>',
+    '  </div>',
+    '  <div class="mobile-motivational" id="mobile-motivational"></div>',
+    '  <div class="mobile-dots-row" id="mobile-dots-row"></div>',
+    '</div>',
+    '<div class="mobile-focus-progress">',
+    '  <div class="mobile-focus-progress-track"><div class="mobile-focus-progress-fill" id="mobile-focus-progress-fill" style="width:0%"></div></div>',
+    '</div>',
+    '<div class="mobile-focus-body" id="mobile-focus-body">',
+    '  <button class="mobile-arrow left" id="mobile-arrow-left">‹</button>',
+    '  <button class="mobile-arrow right" id="mobile-arrow-right">›</button>',
+    '  <div class="mobile-carousel" id="mobile-carousel"></div>',
+    '</div>'
+  ].join('');
+  document.body.appendChild(layer);
+
+  // ── Listeners estáticos: botones cabecera y flechas ──
+  const backBtn = layer.querySelector('#mobile-back-btn');
+  if (backBtn) backBtn.addEventListener('click', function () { closeMobileFocus(); });
+
+  const diceBtn = layer.querySelector('#mobile-focus-dice');
+  if (diceBtn) diceBtn.addEventListener('click', function () {
+    if (typeof window.diceSimulateGroup === 'function' && __mobileFocusState.letra) {
+      window.diceSimulateGroup(__mobileFocusState.letra);
+    }
+  });
+
+  const arrowL = layer.querySelector('#mobile-arrow-left');
+  const arrowR = layer.querySelector('#mobile-arrow-right');
+  if (arrowL) arrowL.addEventListener('click', function () { gotoSlide(__mobileFocusState.slide - 1); });
+  if (arrowR) arrowR.addEventListener('click', function () { gotoSlide(__mobileFocusState.slide + 1); });
+
+  // ── Swipe en el body (touch + mouse fallback) ──
+  const body = layer.querySelector('#mobile-focus-body');
+  if (body) {
+    let startX = 0, startY = 0, isDragging = false, axisLocked = null;
+
+    const onStart = function (x, y) {
+      startX = x; startY = y; isDragging = true; axisLocked = null;
+    };
+    const onMove = function (x, y) {
+      if (!isDragging) return;
+      const dx = x - startX;
+      const dy = y - startY;
+      if (axisLocked === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        axisLocked = Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
+      }
+      if (axisLocked === 'v') {
+        // scroll vertical: cancelar swipe
+        isDragging = false;
+      }
+    };
+    const onEnd = function (x, y) {
+      if (!isDragging) return;
+      const dx = x - startX;
+      const dy = y - startY;
+      isDragging = false;
+      if (Math.abs(dy) > Math.abs(dx)) return;
+      if (Math.abs(dx) > 50) {
+        if (dx < 0) gotoSlide(__mobileFocusState.slide + 1);
+        else gotoSlide(__mobileFocusState.slide - 1);
+      }
+    };
+
+    body.addEventListener('touchstart', function (e) {
+      const t = e.touches && e.touches[0]; if (!t) return;
+      onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    body.addEventListener('touchmove', function (e) {
+      const t = e.touches && e.touches[0]; if (!t) return;
+      onMove(t.clientX, t.clientY);
+    }, { passive: true });
+    body.addEventListener('touchend', function (e) {
+      const t = (e.changedTouches && e.changedTouches[0]) || null;
+      if (!t) { isDragging = false; return; }
+      onEnd(t.clientX, t.clientY);
+    });
+
+    body.addEventListener('mousedown', function (e) { onStart(e.clientX, e.clientY); });
+    body.addEventListener('mousemove', function (e) { if (isDragging) onMove(e.clientX, e.clientY); });
+    body.addEventListener('mouseup', function (e) { onEnd(e.clientX, e.clientY); });
+    body.addEventListener('mouseleave', function () { isDragging = false; });
+
+    // ── Delegated click handler para boost-row (capture phase, ver PART 2) ──
+    body.addEventListener('click', __mobileBoostRowClickHandler, true);
+  }
+
+  // ── Tab listeners: cerrar focus al cambiar a Jornada/Directo ──
+  const btnJornada = document.getElementById('btn-vista-jornada');
+  const btnDirecto = document.getElementById('btn-vista-directo');
+  const tabHandler = function () {
+    const l = document.getElementById('mobile-focus-layer');
+    if (l && l.classList.contains('open')) closeMobileFocus();
+  };
+  if (btnJornada) btnJornada.addEventListener('click', tabHandler, { capture: true });
+  if (btnDirecto) btnDirecto.addEventListener('click', tabHandler, { capture: true });
+
+  return layer;
+}
+
+function openMobileFocus(letra) {
+  ensureFocusLayer();
+  __mobileFocusState.letra = letra;
+  __mobileFocusState.slide = 0;
+
+  const gridEl = document.getElementById('grid-' + letra);
+  if (!gridEl) {
+    console.log('[mobile-grupos] openMobileFocus: grid no encontrado', letra);
+    return;
+  }
+  const cards = Array.prototype.slice.call(gridEl.querySelectorAll('.card'));
+
+  __mobileOriginalGrid.letra = letra;
+  __mobileOriginalGrid.gridEl = gridEl;
+  __mobileOriginalGrid.cards = cards.slice();
+
+  const carousel = document.getElementById('mobile-carousel');
+  if (carousel) {
+    // Limpiar por si quedase algo de una apertura previa
+    while (carousel.firstChild) carousel.removeChild(carousel.firstChild);
+    cards.forEach(function (card) {
+      const slide = document.createElement('div');
+      slide.className = 'mobile-carousel-slide';
+      slide.appendChild(card); // mueve el nodo (no clone)
+      carousel.appendChild(slide);
+    });
+    carousel.style.transform = 'translateX(0%)';
+  }
+
+  const title = document.getElementById('mobile-focus-title');
+  if (title) title.textContent = 'Grupo ' + letra;
+
+  updateFocusUI();
+
+  document.body.style.overflow = 'hidden';
+  const layer = document.getElementById('mobile-focus-layer');
+  if (layer) {
+    layer.classList.add('open');
+    layer.setAttribute('aria-hidden', 'false');
+  }
+
+  // Refrescar estado visual de las boost-rows tras inyectar cards
+  refreshBoostRowsInFocus();
+
+  console.log('[mobile-grupos] openMobileFocus', letra);
+}
+
 function closeMobileFocus() {
-  console.log('[mobile-grupos] closeMobileFocus stub');
+  if (__mobileFocusState.letra == null) return;
+  const letra = __mobileFocusState.letra;
+
+  // Devolver cards al grid original en el orden guardado
+  const gridEl = __mobileOriginalGrid.gridEl;
+  const cards = __mobileOriginalGrid.cards || [];
+  if (gridEl) {
+    cards.forEach(function (card) {
+      gridEl.appendChild(card);
+    });
+  }
+
+  // Limpiar los wrappers .mobile-carousel-slide
+  const carousel = document.getElementById('mobile-carousel');
+  if (carousel) {
+    while (carousel.firstChild) carousel.removeChild(carousel.firstChild);
+    carousel.style.transform = 'translateX(0%)';
+  }
+
+  const layer = document.getElementById('mobile-focus-layer');
+  if (layer) {
+    layer.classList.remove('open');
+    layer.classList.remove('done');
+    layer.setAttribute('aria-hidden', 'true');
+  }
+  document.body.style.overflow = '';
+
+  __mobileFocusState.letra = null;
+  __mobileFocusState.slide = 0;
+  __mobileOriginalGrid.letra = null;
+  __mobileOriginalGrid.gridEl = null;
+  __mobileOriginalGrid.cards = [];
+
+  if (typeof window.refreshMobileGroupProgress === 'function') {
+    window.refreshMobileGroupProgress(letra);
+  }
+  console.log('[mobile-grupos] closeMobileFocus', letra);
+}
+
+function gotoSlide(i) {
+  if (i < 0) i = 0;
+  if (i > 5) i = 5;
+  __mobileFocusState.slide = i;
+  const carousel = document.getElementById('mobile-carousel');
+  if (carousel) carousel.style.transform = 'translateX(-' + (i * 100) + '%)';
+  updateFocusUI();
+}
+
+function updateFocusUI() {
+  const letra = __mobileFocusState.letra;
+  if (!letra) return;
+
+  const matches = __mobileMatchesForLetra(letra);
+  const preds = (typeof predictions !== 'undefined') ? predictions : {};
+  const getKey = (typeof getMatchKey === 'function') ? getMatchKey : null;
+
+  // Dots
+  const dotsRow = document.getElementById('mobile-dots-row');
+  if (dotsRow) {
+    const parts = [];
+    for (let i = 0; i < 6; i++) {
+      const m = matches[i];
+      let done = false;
+      if (m && getKey) {
+        const k = getKey(m);
+        done = __mobileIsPredValid(preds[k]);
+      }
+      const cur = (i === __mobileFocusState.slide);
+      parts.push(
+        '<button class="mobile-dot' + (cur ? ' current' : '') + (done ? ' done' : '') +
+        '" data-slide="' + i + '"><span>' + (i + 1) + '</span></button>'
+      );
+    }
+    dotsRow.innerHTML = parts.join('');
+    Array.prototype.forEach.call(dotsRow.querySelectorAll('.mobile-dot'), function (btn) {
+      btn.addEventListener('click', function () {
+        const n = parseInt(btn.getAttribute('data-slide'), 10);
+        if (!isNaN(n)) gotoSlide(n);
+      });
+    });
+  }
+
+  // Completed count (usa getGroupCompleted para consistencia)
+  const completed = (typeof getGroupCompleted === 'function') ? getGroupCompleted(letra) : 0;
+
+  // Motivational
+  const motiv = document.getElementById('mobile-motivational');
+  if (motiv) {
+    motiv.textContent = (typeof getPhraseForGroup === 'function')
+      ? getPhraseForGroup(completed, 6) : '';
+  }
+
+  // Progress fill
+  const fill = document.getElementById('mobile-focus-progress-fill');
+  if (fill) fill.style.width = Math.round((completed / 6) * 100) + '%';
+
+  // Done flag on layer
+  const layer = document.getElementById('mobile-focus-layer');
+  if (layer) {
+    if (completed === 6) layer.classList.add('done');
+    else layer.classList.remove('done');
+  }
+
+  // Flechas
+  const arrowL = document.getElementById('mobile-arrow-left');
+  const arrowR = document.getElementById('mobile-arrow-right');
+  if (arrowL) arrowL.disabled = (__mobileFocusState.slide <= 0);
+  if (arrowR) arrowR.disabled = (__mobileFocusState.slide >= 5);
 }
 
 window.openMobileFocus = openMobileFocus;
 window.closeMobileFocus = closeMobileFocus;
+window.gotoSlide = gotoSlide;
+window.updateFocusUI = updateFocusUI;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART 2 — SMART BOOST ROW (sección independiente)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Etiqueta legible ("Local - Visitante") a partir de un matchKey
+function matchLabelFromKey(matchKey) {
+  if (typeof PARTIDOS === 'undefined' || typeof getMatchKey !== 'function') return '?';
+  for (let i = 0; i < PARTIDOS.length; i++) {
+    const m = PARTIDOS[i];
+    if (getMatchKey(m) === matchKey) {
+      return (m.home || '?') + ' - ' + (m.away || '?');
+    }
+  }
+  return '?';
+}
+
+// Refresca el estado visual de las boost-rows dentro del focus layer
+function refreshBoostRowsInFocus() {
+  if (!IS_MOBILE()) return;
+  if (__mobileFocusState.letra == null) return;
+  if (typeof PARTIDOS === 'undefined' || typeof getMatchKey !== 'function') return;
+
+  const bp = (typeof boostPicks !== 'undefined') ? boostPicks : {};
+  const body = document.getElementById('mobile-focus-body');
+  if (!body) return;
+
+  const rows = body.querySelectorAll('.boost-row');
+  Array.prototype.forEach.call(rows, function (row) {
+    const card = row.closest && row.closest('.card');
+    if (!card) return;
+    const idxStr = card.getAttribute('data-match-idx');
+    if (idxStr == null) return;
+    const idx = parseInt(idxStr, 10);
+    if (isNaN(idx)) return;
+    const m = PARTIDOS[idx];
+    if (!m || !m.date) return;
+    const date = m.date.slice(0, 10);
+    const matchKey = getMatchKey(m);
+    const boostedKey = bp[date];
+    if (boostedKey && boostedKey !== matchKey) {
+      row.classList.add('boost-blocked');
+    } else {
+      row.classList.remove('boost-blocked');
+    }
+  });
+}
+
+// Handler delegado (capture phase) para clicks en boost-row dentro del focus
+function __mobileBoostRowClickHandler(e) {
+  const body = document.getElementById('mobile-focus-body');
+  if (!body) return;
+  const row = e.target && e.target.closest && e.target.closest('.boost-row');
+  if (!row) return;
+  if (!body.contains(row)) return;
+  if (typeof PARTIDOS === 'undefined' || typeof getMatchKey !== 'function') return;
+
+  // Interceptar ANTES del listener original (capture + stopImmediate)
+  e.stopImmediatePropagation();
+  e.preventDefault();
+
+  const card = row.closest('.card');
+  if (!card) return;
+  const idxStr = card.getAttribute('data-match-idx');
+  if (idxStr == null) return;
+  const idx = parseInt(idxStr, 10);
+  if (isNaN(idx)) return;
+  const m = PARTIDOS[idx];
+  if (!m || !m.date) return;
+
+  const date = m.date.slice(0, 10);
+  const matchKey = getMatchKey(m);
+  const bp = (typeof boostPicks !== 'undefined') ? boostPicks : {};
+  const boostedKey = bp[date];
+
+  // Conflicto: otro partido ya tiene el boost del día
+  if (boostedKey && boostedKey !== matchKey) {
+    const label = matchLabelFromKey(boostedKey);
+    const ok = confirm('Ya has asignado boost a ' + label + ' en esta jornada. ¿Cambiar a este partido?');
+    if (!ok) return;
+  }
+
+  if (typeof window.tickerBoostToggle === 'function') {
+    window.tickerBoostToggle(matchKey, date);
+  }
+
+  refreshBoostRowsInFocus();
+  if (typeof window.renderBoostTicker === 'function') {
+    window.renderBoostTicker();
+  }
+}
+
+window.refreshBoostRowsInFocus = refreshBoostRowsInFocus;
+window.matchLabelFromKey = matchLabelFromKey;
 
 // ───────────────────────────── Helpers de progreso ─────────────────────────────
 

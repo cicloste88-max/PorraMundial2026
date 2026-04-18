@@ -496,4 +496,32 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
     white-space: nowrap;
     padding-right: 8px;
   }
+  .mobile-focus-layer { position: fixed; inset: 0; z-index: 100; background: #0a0a0b; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.32s cubic-bezier(.4,0,.2,1); pointer-events: none; opacity: 0; }
+  .mobile-focus-layer.open { transform: translateX(0); pointer-events: auto; opacity: 1; }
+  .mobile-focus-header { padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #0a0a0b; }
+  .mobile-focus-header-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .mobile-back-btn { background: transparent; border: none; color: #a1a1a6; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 0; font-family: inherit; }
+  .mobile-focus-title { font-size: 15px; font-weight: 600; margin: 0; flex: 1; text-align: center; color: #f5f5f7; }
+  .mobile-focus-dice { background: transparent; border: 1px solid rgba(255,255,255,0.08); color: #f5f5f7; padding: 4px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .mobile-motivational { font-size: 11px; color: #6e6e73; text-align: center; font-style: italic; padding: 2px 10px; min-height: 14px; }
+  .mobile-dots-row { display: flex; justify-content: center; gap: 6px; padding-top: 2px; }
+  .mobile-dot { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.08); background: #1C1C1E; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #6e6e73; cursor: pointer; transition: all 0.2s; }
+  .mobile-dot.current { border-color: #ea580c; color: #ea580c; background: rgba(234,88,12,0.12); transform: scale(1.1); }
+  .mobile-dot.done { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .mobile-dot.done::before { content: ""; width: 6px; height: 10px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(45deg) translate(-1px, -1px); }
+  .mobile-dot.done span { display: none; }
+  .mobile-dot.summary { font-size: 12px; border-style: dashed; }
+  .mobile-focus-progress { padding: 6px 14px 10px; }
+  .mobile-focus-progress-track { height: 3px; background: #2a2a2e; border-radius: 3px; overflow: hidden; }
+  .mobile-focus-progress-fill { height: 100%; background: #ea580c; transition: width 0.35s ease; }
+  .mobile-focus-layer.done .mobile-focus-progress-fill { background: #16a34a; }
+  .mobile-focus-body { flex: 1; overflow: hidden; position: relative; touch-action: pan-y; }
+  .mobile-carousel { display: flex; height: 100%; transition: transform 0.32s cubic-bezier(.4,0,.2,1); will-change: transform; }
+  .mobile-carousel-slide { flex: 0 0 100%; padding: 10px 14px 14px; box-sizing: border-box; overflow-y: auto; }
+  .mobile-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%; background: rgba(20,20,22,0.85); border: 1px solid rgba(255,255,255,0.08); display: grid; place-items: center; cursor: pointer; z-index: 5; color: #f5f5f7; backdrop-filter: blur(6px); font-family: inherit; font-size: 16px; }
+  .mobile-arrow:disabled { opacity: 0.25; cursor: default; }
+  .mobile-arrow.left { left: 6px; }
+  .mobile-arrow.right { right: 6px; }
+  .boost-row.boost-blocked { opacity: 0.6; }
+  .boost-row.boost-blocked .boost-txt::after { content: " (tap para cambiar)"; font-size: 10px; color: #6e6e73; margin-left: 4px; }
 }

@@ -739,7 +739,7 @@ function createMatchCard(match, idx) {
       '<div id="btn-row-'+idx+'"><button class="btn-save" disabled data-idx="'+idx+'">Guardar</button></div>',
     '</div>',
     /* ── Fila Boost (dentro de card-inner, encima del footer) ── */
-    '<div class="boost-row" id="boost-row-'+idx+'">',
+    '<div class="boost-row" id="boost-row-'+idx+'" data-jornada-date="'+match.date.slice(0,10)+'" data-match-key="'+matchKey+'">',
       '<label class="boost-label" for="boost-chk-'+idx+'">',
         '<div class="boost-chk-wrap">',
           '<input type="checkbox" id="boost-chk-'+idx+'" class="boost-chk">',
