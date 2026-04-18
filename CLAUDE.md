@@ -25,7 +25,7 @@ Rama activa: **main** | Último commit estable: **2600c1a**
 3. Cargar convocatorias reales (`EQUIPOS[].players`)
 4. Email confirmación cierre porra (Resend + EF) **con copia de pronósticos al usuario** para que tenga registro
 5. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
-6. Desactivar signup público cuando entren todos los amigos
+6. ✅ ~~Desactivar signup público cuando entren todos los amigos~~ — innecesario desactivarlo para testear: no-admin puede crear sus propias porras (límite 3) vía EF `create-league`
 7. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos)
 
 ### Playoffs UEFA marzo 2026 — resueltos
@@ -188,6 +188,7 @@ whatsapp_subscribers (
 | EF | Versión | Descripción |
 |---|---|---|
 | `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
+| `create-league` | v1 | Crear liga para cualquier user autenticado. Límite 3 ligas si no-admin. Admins ilimitados. |
 | `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun |
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |

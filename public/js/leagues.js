@@ -208,16 +208,22 @@ async function leagueDoCreate() {
 
   msgEl.textContent = 'Creando…'; msgEl.className = 'league-modal-msg';
 
-  // Llamar a la Edge Function para crear la liga (service_role genera el código)
+  // Llamar a la Edge Function create-league (válido para admin y no-admin;
+  // no-admin tiene límite de 3 ligas, admin ilimitado — la EF lo valida).
   const token = window._porraToken || sessionStorage.getItem('porra_token') || '';
   try {
-    const res = await fetch(`${window._supa_url}/functions/v1/admin-actions`, {
+    const res = await fetch(`${window._supa_url}/functions/v1/create-league`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'apikey': window._supa_anon },
-      body: JSON.stringify({ action: 'create_league', nombre, admin_id: currentUser.id })
+      body: JSON.stringify({ nombre })
     });
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Error desconocido');
+    if (!data.ok) {
+      if (data.limit_reached) {
+        throw new Error('Has alcanzado el límite de 3 porras creadas. Pide a un admin que cree nuevas por ti o únete a una existente.');
+      }
+      throw new Error(data.error || 'Error desconocido');
+    }
 
     const codigo = data.data.codigo;
     const ligaNombre = data.data.nombre;
