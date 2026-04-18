@@ -742,3 +742,10 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   - `js/main-entry.js`: script añadido a la loadScript chain entre `ui-groups.js` y `ko.js` (decisión autónoma: la spec pedía `<script>` en `index.html`, pero la cadena de carga canónica vive en `main-entry.js` per CLAUDE.md; ir por `<script>` en HTML rompería el orden "después de ui-groups").
   - `css/base.css`: bloque placeholder `@media (max-width: 640px)` al final del fichero.
   - `migration-log.md`: nota pendiente sobre ALTER TABLE (commit 4) + esta entrada.
+
+[HH:MM] COMMIT 2/4 grupos-mobile: acordeón + barra progreso por grupo en lista
+  - `public/js/scoring.js` (+4 líneas, 3 subagente A): `data-grupo="${match.group}"` en la raíz `.card` de `createMatchCard`; invocación defensiva `window.applyMobileGroupCollapse(section, grupo.letra)` en `renderAll` tras pintar cada `.group-section`.
+  - `css/base.css` (+36 líneas, subagente B): placeholder del `@media (max-width: 640px)` reemplazado por las reglas reales (`.mobile-collapsed`, `.mobile-group-progress*`, `.mobile-motivational-small`). Sin tocar nada fuera del bloque.
+  - `public/js/ui-groups-mobile.js` (+150 líneas, subagente C): helpers `getGroupCompleted` / `getPhraseForGroup`, `applyMobileGroupCollapse`, `refreshMobileGroupProgress`, resize listener con debounce 150ms, `initMobileGrupos` extendido para iterar todas las `.group-section` al cargar.
+  - Decisión autónoma del subagente C: la spec mencionaba `.dado-btn` para ignorar clicks del dado; el selector real en el codebase es `.dice-btn` (usado en `scoring.js` y `admin.js`). Subagente usó `.dice-btn` — correcto.
+  - UX desktop inalterada: todo lo nuevo vive tras guards `IS_MOBILE()` o dentro del `@media (max-width: 640px)`.

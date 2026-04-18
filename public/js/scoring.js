@@ -635,6 +635,7 @@ function createMatchCard(match, idx) {
   const card = document.createElement('div');
   card.className = 'card';
   card.setAttribute('data-match-idx', String(idx));
+  card.setAttribute('data-grupo', match.group);
 
   // Use dataset to store slug for kit/flag click handlers
   card.innerHTML = [
@@ -1203,6 +1204,9 @@ function renderAll(onComplete) {
     renderGroupTableCard(grupo.letra);
     // Bloquear tarjetas si porra cerrada, justo después de renderizar
     if (window._porraCerrada) requestAnimationFrame(() => lockAllCardsIfCerrada());
+    if (typeof window.applyMobileGroupCollapse === 'function') {
+      window.applyMobileGroupCollapse(section, grupo.letra);
+    }
     setTimeout(renderNextGroup, 0); // cede control al navegador entre grupos
   }
   renderNextGroup();

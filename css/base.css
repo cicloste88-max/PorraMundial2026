@@ -460,7 +460,40 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
    Placeholders — implementación en commits 2-4
    ============================================ */
 @media (max-width: 640px) {
-  /* .mobile-collapsed, .mobile-group-progress,
-     .mobile-focus-layer, .mobile-carousel, etc.
-     se añadirán en los siguientes commits */
+  .group-section.mobile-collapsed .group-layout { display: none; }
+  .group-section.mobile-collapsed .group-header,
+  .group-section.mobile-collapsed > div:first-child { cursor: pointer; }
+
+  .mobile-group-progress {
+    padding: 0 14px 12px;
+  }
+  .mobile-group-progress-track {
+    height: 5px;
+    background: #2a2a2e;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .mobile-group-progress-fill {
+    height: 100%;
+    background: #ea580c;
+    transition: width 0.4s ease;
+  }
+  .mobile-group-progress.done .mobile-group-progress-fill {
+    background: #16a34a;
+  }
+  .mobile-group-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #6e6e73;
+    margin-top: 4px;
+  }
+  .mobile-motivational-small {
+    flex: 1;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+  }
 }
