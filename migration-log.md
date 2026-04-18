@@ -729,3 +729,16 @@ Alineación del contexto maestro con el estado actual de `main` tras la cascada 
   - `CLAUDE.md`: elimina líneas Twilio expuestas, bump `create-league` v2 con nota `verify_jwt=false`.
   - `migration-log.md`: esta entrada PM.
   - `errores_conocidos_porra.md`: rellena ERR-15 (password overwrite destructivo) y ERR-16 (JWT ES256 vs verify_jwt).
+
+## 2026-04-18 — Rediseño móvil fase de grupos
+
+Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación en 4 commits; este es el 1/4 (infra + CSS base, sin UX visible todavía).
+
+**Migración Supabase pendiente (commit 4):** `ALTER TABLE league_members ADD COLUMN groups_saved JSONB DEFAULT '{}'`. La ejecuta Claude.ai vía Supabase MCP antes del commit 4. No tocar desde Claude Code.
+
+[HH:MM] COMMIT 1/4 grupos-mobile: infra base
+  - `public/js/ui-groups-mobile.js` creado (stubs `openMobileFocus`/`closeMobileFocus` + `IS_MOBILE` + `window.groupSaved` init).
+  - `public/js/data.js`: `window.PHRASES_GRUPO` añadido (empty / low / mid / high / done).
+  - `js/main-entry.js`: script añadido a la loadScript chain entre `ui-groups.js` y `ko.js` (decisión autónoma: la spec pedía `<script>` en `index.html`, pero la cadena de carga canónica vive en `main-entry.js` per CLAUDE.md; ir por `<script>` en HTML rompería el orden "después de ui-groups").
+  - `css/base.css`: bloque placeholder `@media (max-width: 640px)` al final del fichero.
+  - `migration-log.md`: nota pendiente sobre ALTER TABLE (commit 4) + esta entrada.

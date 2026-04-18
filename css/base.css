@@ -454,3 +454,13 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
 .vs-ball{position:absolute;inset:0;background-image:url('https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Ball/Trionda-official-ball.png');background-size:130%;background-position:center;background-repeat:no-repeat;opacity:.55;animation:ballSpin 12s linear infinite}
 .vs-text{position:relative;z-index:1}
 .white-kit{mix-blend-mode:normal;filter:brightness(.85) contrast(1.1) saturate(1.05)}
+
+/* ============================================
+   Rediseño móvil fase de grupos (commit 1/4)
+   Placeholders — implementación en commits 2-4
+   ============================================ */
+@media (max-width: 640px) {
+  /* .mobile-collapsed, .mobile-group-progress,
+     .mobile-focus-layer, .mobile-carousel, etc.
+     se añadirán en los siguientes commits */
+}
