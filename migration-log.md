@@ -701,3 +701,31 @@ Alineación del contexto maestro con el estado actual de `main` tras la cascada 
   - Historial de sesiones: entries 17 abr PM (×3) + 18 abr AM añadidas.
   - Patrones críticos: añadido patrón ERR-14 (chequeos async que condicionan render).
 - `ESQUEMA_SISTEMA_PORRA2026.xlsx` — **no tocado**: binario, Claude Code no dispone de herramientas para regenerarlo; queda como tarea para Claude.ai si procede.
+
+
+## 2026-04-18 PM — QA feature no-admin + higiene docs + ERR-15/16
+
+- **QA completo por Claude.ai** vía Chrome MCP + Supabase MCP, de la feature ``create-league`` (PR #5, `34c3532`).
+  - Admin (cicloste88): creación OK de dos ligas consecutivas (`QA_TEST_ADMIN_DELME` → `6SSG84`; `QA_TEST_ADMIN_4TH_DELME` → `5FW6MS`). Verificado **sin límite**.
+  - No-admin (mavc_999) con 3 ligas QA precargadas (`QA_MAVC_L1/L2/L3`): la 4ª devuelve **HTTP 403** `{ ok:false, limit_reached:true, current_count:3, limit:3 }`.
+  - Tras borrar `QA_MAVC_L3` (conteo=2), la 3ª vuelve a crearse OK (`QA_MAVC_REAL_LIGA` → `AN2TFR`). 4ª vuelve a fallar correctamente.
+  - Frontend prod: ``/js/leagues.js`` usa `functions/v1/create-league`, maneja `limit_reached`, no llama ya a `admin-actions` para crear ligas.
+
+- **Bump EF `create-league` v1 → v2** con `verify_jwt=false`. Causa: la plataforma Supabase rechazó JWT ES256 con `UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM` cuando `verify_jwt=true`. Fix: desactivar `verify_jwt` en el deploy y validar el JWT manualmente con `svc.auth.getUser(jwt)` + service_role (mismo patrón que `admin-actions`). Documentado en **ERR-16**.
+
+- **Limpieza post-QA:**
+  - Borradas 5 ligas de test (`QA_TEST_ADMIN_DELME`, `QA_TEST_ADMIN_4TH_DELME`, `QA_MAVC_L1`, `QA_MAVC_L2`, `QA_MAVC_REAL_LIGA`) + filas en `league_members`.
+  - Contador final: cicloste88 con 2 ligas preexistentes, mavc_999 con 0, resto 0.
+
+- **Incidente password `mavc_999` (ver ERR-15):**
+  - Para testear como no-admin, Claude.ai sobrescribió temporalmente `auth.users.encrypted_password` con `QA_TEMP_PASS_123`. Al acabar el QA, la sustituyó por un hash aleatorio irrecuperable.
+  - Efecto: mavc_999 **no puede login** con su password original. Debe usar "Recuperar contraseña" (reset vía email).
+  - Aprendizaje: para QA de flujos autenticados nunca tocar `encrypted_password`. Usar `auth.admin.generateLink({ type: 'magiclink', email })`.
+
+- **Residuos Twilio en `CLAUDE.md`:**
+  - El commit `850df2a` (Code) dejó hardcodeados AccountSid + una API Key antigua en la sección WhatsApp. La API Key ya estaba rotada; el AccountSid se rotó por separado antes de este checkpoint. En este checkpoint se eliminan los residuos del documento.
+
+- **Docs actualizados (PR #8, este commit):**
+  - `CLAUDE.md`: elimina líneas Twilio expuestas, bump `create-league` v2 con nota `verify_jwt=false`.
+  - `migration-log.md`: esta entrada PM.
+  - `errores_conocidos_porra.md`: rellena ERR-15 (password overwrite destructivo) y ERR-16 (JWT ES256 vs verify_jwt).

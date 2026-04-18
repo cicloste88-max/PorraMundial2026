@@ -209,9 +209,37 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
-## ERR-15 — _reservado_
+## ERR-15 — Sobrescritura de `encrypted_password` en QA es destructiva e irreversible
 
-_(Placeholder para bug futuro.)_
+- **Síntoma:** durante un QA de flujo autenticado, se sobrescribe `auth.users.encrypted_password` para poder hacer login como otro usuario. Al terminar, no existe forma de restaurar el hash original → el usuario no puede volver a entrar con su password.
+- **Causa:**
+  1. `encrypted_password` es un hash **bcrypt** (one-way). La password plaintext original no se guarda en ningún sitio.
+  2. Supabase no mantiene un historial/backup por columna. El único mecanismo de rollback es **Point-in-Time Recovery** a nivel proyecto, que revierte **toda** la BD y destruye trabajo posterior (inviable).
+  3. Los logs no guardan el hash antiguo; aunque lo hicieran, bcrypt no se revierte a plaintext.
+- **Fix aplicado (mitigación, NO restauración):**
+  - Invalidar el password temporal usado durante el QA con un hash aleatorio largo: `UPDATE auth.users SET encrypted_password = crypt(gen_random_uuid()::text || gen_random_uuid()::text, gen_salt('bf')) WHERE email = ...`.
+  - Comunicar al usuario afectado que use **"Recuperar contraseña"** (flujo estándar de reset vía email).
+- **Patrón preventivo (obligatorio para futuros QA):** cuando haya que actuar como otro usuario, **nunca sobrescribir `encrypted_password`**. Opciones válidas:
+  1. `auth.admin.generateLink({ type: 'magiclink', email })` → devuelve `action_link` con tokens consumibles que crean sesión directa sin password.
+  2. Crear un usuario QA dedicado (`qa_test_<fecha>@dominio`) y eliminarlo al terminar.
+  3. Hacer el test llamando a la EF desde SQL con un JWT generado para ese user (requiere firmar manualmente con el JWT secret del proyecto — más complejo pero posible).
+- **Fecha detección:** 18 abr 2026 PM, QA feature `create-league` con mavc_999.
+
+---
+
+## ERR-16 — Plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` en EFs
+
+- **Síntoma:** una Edge Function recién desplegada con `verify_jwt: true` devuelve **HTTP 401** con `{ "code": "UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM", "message": "Unsupported JWT algorithm ES256" }` al recibir un JWT válido del frontend (`supabase.auth.getSession().access_token`).
+- **Causa:** los proyectos Supabase modernos pueden tener **JWT signing keys ES256** en lugar de HS256. El verificador de la plataforma delante de las EFs **todavía no soporta ES256** cuando `verify_jwt=true`. El mismo JWT, validado dentro de la EF con `supabase.auth.getUser(jwt)`, funciona perfectamente (el SDK sí soporta ES256).
+- **Fix aplicado** (`create-league` v1 → v2, 18 abr 2026 PM):
+  - Desactivar `verify_jwt` en el deploy (`verify_jwt: false`).
+  - Validar el JWT manualmente dentro de la EF creando un cliente con `SUPABASE_SERVICE_ROLE_KEY` y llamando a `supabase.auth.getUser(jwt)`. Si devuelve `authErr` o `user == null`, responder 401.
+  - Este es el mismo patrón que usa `admin-actions` desde su origen.
+- **Patrón preventivo:**
+  - Por defecto, las EFs que dependan de la identidad del usuario en este proyecto se despliegan con **`verify_jwt: false` + validación manual**.
+  - Si en el futuro la plataforma soporta ES256 en el verificador, se puede reevaluar.
+  - CORS: seguir respondiendo manualmente (`OPTIONS` → headers `Access-Control-Allow-*`) porque al desactivar `verify_jwt` se pierde también el preflight automático que venía con él.
+- **Fecha detección:** 18 abr 2026 PM.
 
 ---
 

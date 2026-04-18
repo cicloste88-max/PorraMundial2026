@@ -187,7 +187,7 @@ whatsapp_subscribers (
 | EF | Versión | Descripción |
 |---|---|---|
 | `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
-| `create-league` | v1 | Crear liga para cualquier user autenticado. Límite 3 ligas si no-admin. Admins ilimitados. |
+| `create-league` | v2 | Crear liga para cualquier user autenticado. Límite 3 ligas si no-admin. Admins ilimitados. **`verify_jwt=false`** (plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` — validación manual con service_role dentro de la EF). Ver ERR-16. |
 | `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun |
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
@@ -274,8 +274,7 @@ pg_cron (cada minuto durante partido)
 
 - Número: +14155238886
 - Código de acceso: `join load-herd`
-- AccountSid: `AC519cc59a65a9b28a71c178325b6307a5`
-- API Key: `SK4d89720c0f1a25825542156cfea170f1`
+- Credenciales Twilio (AccountSid, API Key SID + Secret): **solo en Supabase Vault** (nunca hardcodear en código ni docs)
 - Secrets en Vault: `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`
 
 **Notificaciones:** 🟢 Arranca / ⏸ Descanso / 🟢 2ª parte / ⚽ Gol (jugador + minuto + marcador) / ⚡ Prórroga / 🤽 Penaltis / 🏁 Fin
