@@ -684,3 +684,20 @@ Diagnóstico de "Vista Directo no funciona", llegada de simulacros como mecanism
 - Test previo en BD: insert directo simulando `mavc_999` funciona (rollback OK).
 - Frontend `leagues.js`: `leagueDoCreate` apunta ahora a `create-league`, body simplificado a `{ nombre }`, manejo específico de `limit_reached` con mensaje: *"Has alcanzado el límite de 3 porras creadas. Pide a un admin que cree nuevas por ti o únete a una existente."*
 - `admin-actions` v7 intacta. El case `create_league` allí queda como legacy no usado desde frontend.
+
+## 2026-04-18 — Checkpoint: sincronizar CONTEXTO_PORRA_2026.md y cabecera CLAUDE.md
+
+Alineación del contexto maestro con el estado actual de `main` tras la cascada Vista Directo → simulacros → ERR-14 → no-admin crea porras.
+
+- `CLAUDE.md` — cabecera: último commit estable pasa de `2600c1a` a `34c3532` (feat ligas: no-admin crea porras). Eliminada la nota obsoleta "Pendiente commit de limpieza de repo sesión 17 abr 2026".
+- `CONTEXTO_PORRA_2026.md` actualizado:
+  - Cabecera: fecha 2026-04-18, último commit `34c3532`.
+  - Pendientes UI: añadidos Pichichi auto + frases IA. Email cierre anotado con copia de pronósticos. Punto 5 (signup público) tachado como innecesario (no-admin crea porras).
+  - Bugs recientemente resueltos: añadidos pipeline live async+webhook (`6aeb470`), Vista Directo + simulacros + ERR-14 (`614b5ef`), no-admin crea porras (`34c3532`).
+  - `live_scores` campos clave: documentadas `is_historic`, `home_team_name`, `away_team_name`, `competition`.
+  - Tabla Edge Functions: añadida `create-league` v1.
+  - Nueva sección **🔧 Funciones DB helpers** con `schedule_match_crons` / `unschedule_match_crons`.
+  - Nueva sección **🧪 Simulacros (testing live)** con activación, visibilidad y simulacro activo (`copadelrey_final_atm_rso`).
+  - Historial de sesiones: entries 17 abr PM (×3) + 18 abr AM añadidas.
+  - Patrones críticos: añadido patrón ERR-14 (chequeos async que condicionan render).
+- `ESQUEMA_SISTEMA_PORRA2026.xlsx` — **no tocado**: binario, Claude Code no dispone de herramientas para regenerarlo; queda como tarea para Claude.ai si procede.

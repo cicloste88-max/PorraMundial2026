@@ -4,8 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit estable: **2600c1a**
-(Pendiente commit de limpieza de repo sesión 17 abr 2026)
+Rama activa: **main** | Último commit estable: **34c3532** (feat ligas: no-admin crea porras)
 
 ---
 
