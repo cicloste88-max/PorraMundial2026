@@ -676,3 +676,11 @@ Diagnóstico de "Vista Directo no funciona", llegada de simulacros como mecanism
 [17:10] QA visual (Chrome MCP desde claude.ai): admin ve la sección, no-admin no la ve, `UPDATE live_scores` manual → tarjeta refleja cambio en <2 s vía realtime, 72 tarjetas Mundial intactas, consola sin errores.
 
 [17:15] DOCUMENTACIÓN: nuevo ERR-14 en `errores_conocidos_porra.md` (checkIsAdmin async patrón). Nueva sección **🧪 Simulacros (testing live)** en `CLAUDE.md`. README.md y este log actualizados en commit checkpoint.
+
+## 2026-04-18 AM — Feature: usuarios no-admin pueden crear porras
+
+- EF nueva `create-league` v1 desplegada por Claude.ai vía Supabase MCP. Gate de admin eliminado, límite 3 ligas para no-admin, admin ilimitado.
+- Arquitectura: EF propia separada de `admin-actions` (que sigue siendo admin-only para el resto de acciones). Razón: mantener aislamiento de privilegios.
+- Test previo en BD: insert directo simulando `mavc_999` funciona (rollback OK).
+- Frontend `leagues.js`: `leagueDoCreate` apunta ahora a `create-league`, body simplificado a `{ nombre }`, manejo específico de `limit_reached` con mensaje: *"Has alcanzado el límite de 3 porras creadas. Pide a un admin que cree nuevas por ti o únete a una existente."*
+- `admin-actions` v7 intacta. El case `create_league` allí queda como legacy no usado desde frontend.
