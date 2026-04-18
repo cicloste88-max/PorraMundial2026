@@ -243,15 +243,17 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
-## ERR-16 — _reservado_
+## ERR-17 — Claude Code no puede borrar ramas remotas (HTTP 403 del proxy git)
 
-_(Placeholder para bug futuro.)_
+- **Síntoma:** `git push origin --delete <rama>` desde la sesión de Claude Code responde **HTTP 403**. También falla cualquier variante (`git push origin :rama`).
+- **Causa:** el proxy git del entorno sandbox de Claude Code no autoriza operaciones de **borrado de refs remotas**; sólo permite `push` de nuevos commits.
+- **Fix aplicado (18 abr 2026):** borrado ejecutado desde **Claude.ai** vía GitHub REST API con `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}` usando `GITHUB_TOKEN` del Vault de Supabase + `net.http_post` desde SQL. `HTTP 204` = borrado OK. Las ramas locales las borró después Claude Code sin problema (`git branch -D` sí funciona; sólo falla el `push --delete`).
+- **Patrón preventivo:** para limpieza de ramas remotas, **NO intentarlo desde Claude Code**. División de responsabilidades:
+  - **Remotas** → Claude.ai (GitHub API + token del Vault).
+  - **Locales** → Claude Code (`git branch -D` + `git fetch --prune`).
 
----
-
-## ERR-17 — _reservado_
-
-_(Placeholder para bug futuro.)_
+  Toggle **"Automatically delete head branches"** en Settings del repo automatiza el caso de PRs mergeados (activado 18 abr 2026).
+- **Fecha detección:** 18 abr 2026.
 
 ---
 
