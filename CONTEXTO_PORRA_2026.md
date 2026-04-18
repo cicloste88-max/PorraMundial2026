@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-17 | Fuente: sesión limpieza repo + revisión profunda
+> Actualizado: 2026-04-18 | Fuente: checkpoint tras Vista Directo + simulacros + feature no-admin crea porras
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -12,7 +12,7 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable** | `2600c1a` (bracket-results móvil) |
+| **Último commit estable** | `34c3532` (feat ligas: no-admin crea porras, límite 3) |
 
 ---
 
@@ -25,6 +25,8 @@
 | Cinta tabs ronda no se visualiza completa en móvil (eliminatorias) | 🟡 |
 | Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido | 🟡 |
 | Botón simular eliminatorias visible para todos (actualmente solo admin) | 🟢 |
+| Auto-completar Pichichi del torneo sumando goleadores seleccionados en pronósticos | 🟢 |
+| Enganche final de frases IA para pronóstico signo partido (lógica incorporada, falta wiring) | 🟢 |
 
 ### Antes del 11 junio 2026
 | # | Tarea | Estado |
@@ -32,8 +34,8 @@
 | 1 | Migrar WhatsApp sandbox → Meta Business (error 63016, parked) | ⏳ |
 | 2 | Activar `pg_cron` para `update-results` | ⏳ 11 jun |
 | 3 | Cargar convocatorias reales (`EQUIPOS[].players`) | ⏳ jun |
-| 4 | Email confirmación al cerrar porra (Resend + EF) | ⏳ |
-| 5 | Desactivar signup público | ⏳ |
+| 4 | Email confirmación al cerrar porra (Resend + EF) **con copia de pronósticos al usuario** | ⏳ |
+| 5 | ~~Desactivar signup público~~ | ✅ innecesario (no-admin crea porras, límite 3) |
 | 6 | Verificar estructura JSON `_results.ko_results` con update-results real | ⏳ 11 jun |
 | 7 | IDs SofaScore de KO (disponibles ~28 jun) | ⏳ 28 jun |
 
@@ -69,6 +71,9 @@ Añadido a `.gitignore`: `apify-actors/*/node_modules/`
 | Header eliminatorias responsive | 43d466c (17 abr) |
 | Bracket-results móvil (columnas min-width) | ef82fea (17 abr) |
 | Rediseño bracket: timeline vertical + live hero | 2600c1a (17 abr) |
+| Pipeline live definitivo async+webhook + actor Webshare | 6aeb470 (17 abr) |
+| Vista Directo + sección simulacros admin + fix checkIsAdmin async (ERR-14) | 614b5ef (17 abr PM) |
+| Usuarios no-admin pueden crear porras (límite 3) vía EF `create-league` | 34c3532 (18 abr AM) |
 
 ---
 
@@ -147,6 +152,8 @@ pg_cron (cada minuto durante partido)
 - `events` — array JSON de incidents (goles, tarjetas, sustituciones)
 - `poll_active` — si el cron debe seguir llamando
 - `had_overtime`, `had_penalties` — para contextualizar mensaje de fin
+- `is_historic BOOLEAN DEFAULT false` — `true` = trial runs / simulacros. **Filtrar `WHERE is_historic=false`** en scoring y UI live del Mundial
+- `home_team_name`, `away_team_name`, `competition` — usado por simulacros (partidos fuera del Mundial). Para el Mundial, los nombres se resuelven vía `EQUIPOS` a partir de `match_key`
 
 ---
 
@@ -155,6 +162,7 @@ pg_cron (cada minuto durante partido)
 | EF | Versión | Estado | Descripción |
 |---|---|---|---|
 | `admin-actions` | v7 | ✅ | Gestión admin. Requiere JWT admin |
+| `create-league` | v1 | ✅ | Crear liga para cualquier user autenticado. Límite 3 ligas si no-admin. Admins ilimitados. |
 | `update-results` | v4 | ⏳ | Sync football-data.org → `results`. Activar pg_cron el 11 jun 2026 |
 | `porra-orchestrator` | v3 | ✅ | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v4 | ✅ | Patches search/replace + commit GitHub |
@@ -165,6 +173,28 @@ pg_cron (cada minuto durante partido)
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
 | `porra-sofascore-proxy` | v8 | ❌ | Obsoleta, sustituida por actor propio |
 | `porra-github-pusher` | v6 | ❌ | PLACEHOLDER — ignorar |
+
+---
+
+## 🔧 Funciones DB helpers
+
+| Función | Descripción |
+|---|---|
+| `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` | Genera los dos crons de un partido: **prematch T-45min** (1 call) + **polling `*/3 * * * *` durante 150min** desde `start_ts`. Ambos invocan `porra-match-live`. |
+| `unschedule_match_crons(match_key TEXT)` | Elimina los crons `prematch_<match_key>` y `poll_<match_key>`. Uso: limpieza tras cambio de fecha o cancelación. |
+
+**Regla:** para programar crons de partidos usar **siempre** `schedule_match_crons`. Nunca duplicar crons manualmente (evita huérfanos).
+
+---
+
+## 🧪 Simulacros (testing live)
+
+Probar el pipeline live con partidos reales fuera del Mundial antes del 11 jun, sin contaminar datos del torneo.
+
+- **Activación:** insert en `live_scores` con `is_historic = true` y `home_team_name`/`away_team_name`/`competition` rellenos; luego `SELECT schedule_match_crons(...)`.
+- **Visibilidad:** sólo admin (`profiles.is_admin = true`) ve la sección **🧪 Simulacros activos** en la vista Directo.
+- **Activo ahora:** `copadelrey_final_atm_rso` — Atlético de Madrid vs Real Sociedad, 18 abr 19:00 UTC, `sofascore_event_id = 15664537`. Polling ampliado manualmente a 3 h (19–22 UTC) para cubrir prórroga + penaltis.
+- **Detalle completo:** ver `CLAUDE.md` sección *Simulacros (testing live)*.
 
 ---
 
@@ -311,7 +341,11 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-15 PM | Fix auth persistencia, boost UI, botonera KO móvil. Diagnóstico bug webhook datasetId | 12e6c6c |
 | 2026-04-16 | Fix `porra-apify-webhook` datasetId (v7). Migración actor a Webshare (~$0.001/run, ~$13 torneo) | — |
 | 2026-04-17 AM | Fix 404 linear-gradient, header eliminatorias responsive, bracket móvil, rediseño bracket timeline | 2600c1a |
-| 2026-04-17 PM | Revisión profunda del código (crítica constructiva). Limpieza repo: 24 ficheros eliminados, docs reescritas | pendiente |
+| 2026-04-17 PM | Revisión profunda del código + limpieza repo (24 ficheros eliminados) | — |
+| 2026-04-17 PM | Pipeline live definitivo async+webhook + actor Webshare. Helpers DB `schedule_match_crons`. Flag `is_historic` | 6aeb470 |
+| 2026-04-17 PM | Persistencia histórica: `errores_conocidos_porra.md` + `migration-log.md` en repo (PR #1) | 549746e |
+| 2026-04-17 PM | Vista Directo + sección simulacros admin (PR #3). Fix `checkIsAdmin` async con retries (ERR-14) | 614b5ef |
+| 2026-04-18 AM | EF `create-league` v1 + frontend `leagues.js`: no-admin puede crear hasta 3 porras (PR #5) | 34c3532 |
 
 ---
 
@@ -337,6 +371,8 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 **Vite + public/ colisión de rutas:** si hay un fichero en raíz y otro en `public/` con la misma URL, **raíz gana en dev, sólo public/ existe en build**. Causa desincronización silenciosa dev vs prod. Aprendido tras descubrir que `js/bracket-results.js` (raíz, viejo) ganaba en dev sobre `public/js/bracket-results.js` (nuevo).
 
 **Shims inline en index.html:** `handleCTA()` y `openAuthModal()` están inline (líneas 1440-1445) como fallback para onclick HTML que dispara antes de que `auth.js` cargue vía loadScript chain.
+
+**Chequeos async que condicionan render (ERR-14):** cualquier chequeo asíncrono que decida si una sección del DOM se pinta debe (1) reintentarse si recursos *upstream* (auth, BD) no están listos, (2) disparar re-render al completar, (3) tener guard anti-loop comparando con el último valor renderizado. Aplicado en `checkIsAdmin` (`public/js/ui-directo.js`).
 
 ---
 
