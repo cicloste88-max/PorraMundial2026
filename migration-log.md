@@ -758,3 +758,28 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
     - **PART 2 — Smart boost row**: `matchLabelFromKey`, `refreshBoostRowsInFocus` (recorre `.boost-row` en focus, añade/quita `.boost-blocked` según conflicto con `boostPicks[date]`), `__mobileBoostRowClickHandler` delegado capture-phase en `#mobile-focus-body` con `stopImmediatePropagation` + `confirm()` cuando hay conflicto, llama a `tickerBoostToggle(matchKey, date)` existente (ui-groups.js L372).
   - **Decisión autónoma del parent agent:** spec pedía 4 agentes paralelos, pero B y C escriben al mismo fichero con una dependencia cruzada (C inserta `refreshBoostRowsInFocus()` dentro del `openMobileFocus` que B reescribe). Para evitar race al último write, fusionados B+C en un solo agente que hace ambas partes en secciones bien separadas. Agentes A y D corrieron en paralelo como estaba previsto.
   - **Desktop inalterado:** todo el layer vive tras `IS_MOBILE()` y dentro del `@media (max-width: 640px)`.
+
+[HH:MM] COMMIT 4/4 grupos-mobile: slide 7 clasificación + guardar/deshacer con persistencia BD
+  - **Migración BD ya aplicada por Claude.ai (18 abr 19:22 UTC):** `ALTER TABLE league_members ADD COLUMN groups_saved JSONB DEFAULT '{}'`. Claude Code sólo toca código cliente — no ha ejecutado SQL.
+  - `css/base.css` (+15 líneas, agente A): `.mobile-summary-slide`, `.mobile-summary-wrap`, `.mobile-save-btn[.disabled|.saved]`, `.mobile-save-note[.ok]`, `.card.mobile-locked` + pseudo-elemento "✓ Guardado", `.mobile-toast[.show|.error]`, `.mobile-dot.summary.ready`. Todo dentro del `@media (max-width: 640px)` existente.
+  - `public/js/ui-groups-mobile.js` (+258 líneas, agente B):
+    - Helpers: `hasValidScorer(match)` (valida `predictions[key].gol` no vacío), `canSaveGroup(letra)` (6 partidos con pronóstico + goleador).
+    - `buildSummarySlide(letra)`: crea `<div.mobile-carousel-slide.mobile-summary-slide>` con wrap + botón + nota. **Decisión arquitectónica:** `renderGroupTableCard(letra)` NO devuelve HTML, escribe en `#gtable-${letra}` existente. Solución → MOVER el elemento desde su grupo original al slide 7 (mismo patrón que las cards), guardar `__mobileOriginalGtable` para restaurar en `closeMobileFocus`. Antes de mostrar, `renderGroupTableCard` se llama para repintar.
+    - `updateSaveBtnState(letra)`: 4 estados (saved / ready / falta goleadores / falta pronósticos). Reescribe texto, clases, `disabled`, `onclick`.
+    - `saveGroup(letra)` / `unsaveGroup(letra)`: async, `UPDATE league_members SET groups_saved = ...` vía `window._porraDb`, con rollback del cache local en caso de error + toast.
+    - `lockCardsInFocus` / `unlockCardsInFocus`: toggles `.mobile-locked` en `.card[data-grupo="${letra}"]` dentro del focus.
+    - `showMobileToast(msg, type)`: crea `#mobile-toast` idempotente, auto-dismiss 2200ms, tipo `error` cambia color.
+    - **Integración** `openMobileFocus`: tras insertar las 6 cards, añade slide 7 + lock si `groupSaved[letra]` + `updateSaveBtnState`.
+    - **Integración** `closeMobileFocus`: restaura `#gtable-${letra}` al parent original antes de limpiar wrappers.
+    - **Integración** `gotoSlide`: clamp ampliado a `[0, 6]`. Al entrar en slide 6, re-renderiza tabla + `updateSaveBtnState`.
+    - **Integración** `updateFocusUI`: renderiza dot 7 (`🏁` con clase `.summary`, `.ready` si `canSaveGroup`), arrow-right disabled cuando `slide === 6`.
+  - `public/js/auth.js` (+14/−1 líneas, agente C): `loadUserData(userId)` extiende `Promise.all` con una 4ª query `db.from('league_members').select('groups_saved').eq('user_id', userId).eq('league_id', leagueId).maybeSingle()` (sin `leagueId` → `{data: null}`). Destructura `{ data: lmData, error: lmErr }` (único destructure con `error` — los 3 anteriores no lo destructuraban, para no tocar su comportamiento). Nuevo bloque: hidrata `window.groupSaved = lmData.groups_saved` o fallback defensivo `{}` si `null`/error.
+  - **Decisiones autónomas del parent agent:**
+    - 3 agentes paralelos reales (ficheros distintos) — sin merge manual esta vez.
+    - Para el slide 7 / tabla de clasificación se eligió el patrón "mover `#gtable-${letra}`" en vez de clonar HTML. Motivo: `renderGroupTableCard` está cableada a `getElementById` — clonar requeriría refactor de scoring.js; moverla es zero-touch en scoring.
+    - Agent C añadió destructure de `error` sólo en el 4º resultado. Semánticamente equivalente a las 3 originales (que ignoran `error`) pero permite warn log sin bloquear bootstrap.
+  - **Pendiente de QA visual:**
+    - RLS de `league_members` debe permitir `SELECT` + `UPDATE` al user autenticado sobre su propia fila (se asume por analogía con `award_picks`).
+    - Verificar que el tap en slide 6 (summary) repaginta correctamente la tabla con los últimos pronósticos.
+    - Probar el toast + lock/unlock en ciclo completo: save → lock → unsave → unlock.
+    - Verificar que tras cerrar focus y reabrir, `groupSaved` persiste entre dispositivos (login en otro móvil).
