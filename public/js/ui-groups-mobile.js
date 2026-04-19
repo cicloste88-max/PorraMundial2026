@@ -163,59 +163,87 @@ function ensureFocusLayer() {
 }
 
 function openMobileFocus(letra) {
-  ensureFocusLayer();
-  __mobileFocusState.letra = letra;
-  __mobileFocusState.slide = 0;
+  // FIX ERR-19: wrap defensivo para iPhone Safari.
+  // body.overflow se pone AL FINAL, y cualquier excepción muestra toast visible.
+  const __prevBodyOverflow = document.body.style.overflow;
+  let __openedLayerOk = false;
+  try {
+    ensureFocusLayer();
+    __mobileFocusState.letra = letra;
+    __mobileFocusState.slide = 0;
 
-  const gridEl = document.getElementById('grid-' + letra);
-  if (!gridEl) {
-    console.log('[mobile-grupos] openMobileFocus: grid no encontrado', letra);
-    return;
-  }
-  const cards = Array.prototype.slice.call(gridEl.querySelectorAll('.card'));
+    const gridEl = document.getElementById('grid-' + letra);
+    if (!gridEl) {
+      if (typeof showMobileToast === 'function') showMobileToast('✗ [DEBUG] grid-' + letra + ' no existe', 'error');
+      console.log('[mobile-grupos] openMobileFocus: grid no encontrado', letra);
+      return;
+    }
+    const cards = Array.prototype.slice.call(gridEl.querySelectorAll('.card'));
 
-  __mobileOriginalGrid.letra = letra;
-  __mobileOriginalGrid.gridEl = gridEl;
-  __mobileOriginalGrid.cards = cards.slice();
+    __mobileOriginalGrid.letra = letra;
+    __mobileOriginalGrid.gridEl = gridEl;
+    __mobileOriginalGrid.cards = cards.slice();
 
-  const carousel = document.getElementById('mobile-carousel');
-  if (carousel) {
-    // Limpiar por si quedase algo de una apertura previa
+    const carousel = document.getElementById('mobile-carousel');
+    if (!carousel) {
+      if (typeof showMobileToast === 'function') showMobileToast('✗ [DEBUG] carousel no existe', 'error');
+      return;
+    }
     while (carousel.firstChild) carousel.removeChild(carousel.firstChild);
     cards.forEach(function (card) {
       const slide = document.createElement('div');
       slide.className = 'mobile-carousel-slide';
-      slide.appendChild(card); // mueve el nodo (no clone)
+      slide.appendChild(card);
       carousel.appendChild(slide);
     });
-    // Slide 7: resumen con tabla de clasificación + botón guardar/deshacer
-    const summary = buildSummarySlide(letra);
-    carousel.appendChild(summary);
+
+    // Slide 7 — puede fallar aquí en Safari iOS si hay quirk
+    try {
+      const summary = buildSummarySlide(letra);
+      carousel.appendChild(summary);
+    } catch (errSummary) {
+      if (typeof showMobileToast === 'function') showMobileToast('✗ [DEBUG] summary: ' + (errSummary && errSummary.message || errSummary), 'error');
+      // Continuamos sin slide 7
+    }
+
     carousel.style.transform = 'translateX(0%)';
-  }
 
-  const title = document.getElementById('mobile-focus-title');
-  if (title) title.textContent = 'Grupo ' + letra;
+    const title = document.getElementById('mobile-focus-title');
+    if (title) title.textContent = 'Grupo ' + letra;
 
-  updateFocusUI();
+    try { updateFocusUI(); } catch (e) { console.warn('updateFocusUI error:', e); }
 
-  document.body.style.overflow = 'hidden';
-  const layer = document.getElementById('mobile-focus-layer');
-  if (layer) {
+    const layer = document.getElementById('mobile-focus-layer');
+    if (!layer) {
+      if (typeof showMobileToast === 'function') showMobileToast('✗ [DEBUG] layer no existe tras ensureFocusLayer', 'error');
+      return;
+    }
+    // PRIMERO abrir el layer, DESPUÉS bloquear scroll
     layer.classList.add('open');
     layer.setAttribute('aria-hidden', 'false');
+    __openedLayerOk = true;
+
+    // Solo AHORA bloqueamos scroll del body
+    document.body.style.overflow = 'hidden';
+
+    if (window.groupSaved[letra]) {
+      try { lockCardsInFocus(letra); } catch (e) { console.warn('lockCards error:', e); }
+    }
+    try { updateSaveBtnState(letra); } catch (e) { console.warn('updateSaveBtn error:', e); }
+    try { refreshBoostRowsInFocus(); } catch (e) { console.warn('refreshBoost error:', e); }
+
+    console.log('[mobile-grupos] openMobileFocus OK', letra);
+  } catch (err) {
+    // Excepción no capturada en cascada: restauramos estado
+    if (!__openedLayerOk) {
+      document.body.style.overflow = __prevBodyOverflow;
+    }
+    const msg = (err && err.message) ? err.message : String(err);
+    console.error('[mobile-grupos] openMobileFocus EXCEPTION', msg, err);
+    if (typeof showMobileToast === 'function') {
+      showMobileToast('✗ [DEBUG] ' + msg.slice(0, 60), 'error');
+    }
   }
-
-  // Si el grupo estaba guardado, bloquear tarjetas
-  if (window.groupSaved[letra]) {
-    lockCardsInFocus(letra);
-  }
-  updateSaveBtnState(letra);
-
-  // Refrescar estado visual de las boost-rows tras inyectar cards
-  refreshBoostRowsInFocus();
-
-  console.log('[mobile-grupos] openMobileFocus', letra);
 }
 
 function closeMobileFocus() {
