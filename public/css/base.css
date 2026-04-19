@@ -459,6 +459,32 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
    Rediseño móvil fase de grupos (commit 1/4)
    Placeholders — implementación en commits 2-4
    ============================================ */
+
+/* Focus layer móvil — reglas base fuera del @media para que position:fixed aplique siempre
+   y el layer no aparezca como bloque inline al final del body en viewports >640px.
+   visibility:hidden es clave en iPhone Safari: sin ella, el layer cerrado sigue en el
+   árbol de hit-testing táctil y bloquea el scroll del body debajo. */
+.mobile-focus-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #0a0a0b;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(.4,0,.2,1), visibility 0s linear 0.32s;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.mobile-focus-layer.open {
+  transform: translateX(0);
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transition: transform 0.32s cubic-bezier(.4,0,.2,1), visibility 0s linear 0s;
+}
+
 @media (max-width: 640px) {
   .group-section.mobile-collapsed .group-layout { display: none; }
   .group-section.mobile-collapsed .group-header,
@@ -496,8 +522,6 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
     white-space: nowrap;
     padding-right: 8px;
   }
-  .mobile-focus-layer { position: fixed; inset: 0; z-index: 100; background: #0a0a0b; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.32s cubic-bezier(.4,0,.2,1); pointer-events: none; opacity: 0; }
-  .mobile-focus-layer.open { transform: translateX(0); pointer-events: auto; opacity: 1; }
   .mobile-focus-header { padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #0a0a0b; }
   .mobile-focus-header-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .mobile-back-btn { background: transparent; border: none; color: #a1a1a6; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 0; font-family: inherit; }
