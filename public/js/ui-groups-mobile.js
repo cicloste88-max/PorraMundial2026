@@ -3,6 +3,15 @@
 
 const IS_MOBILE = () => window.matchMedia('(max-width: 640px)').matches;
 
+// FIX ERR-20: recuperación defensiva — si una ejecución previa dejó
+// body.overflow bloqueado, restaurarlo al cargar el módulo. iPhone Safari
+// a veces persiste este estado entre navegaciones del SPA.
+if (typeof document !== 'undefined' && document.body) {
+  if (document.body.style.overflow === 'hidden') {
+    document.body.style.overflow = '';
+  }
+}
+
 if (!window.groupSaved) window.groupSaved = {};
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -164,8 +173,7 @@ function ensureFocusLayer() {
 
 function openMobileFocus(letra) {
   // FIX ERR-19: wrap defensivo para iPhone Safari.
-  // body.overflow se pone AL FINAL, y cualquier excepción muestra toast visible.
-  const __prevBodyOverflow = document.body.style.overflow;
+  // FIX ERR-20: eliminado body.overflow=hidden — bloqueaba scroll persistente.
   let __openedLayerOk = false;
   try {
     ensureFocusLayer();
@@ -223,8 +231,9 @@ function openMobileFocus(letra) {
     layer.setAttribute('aria-hidden', 'false');
     __openedLayerOk = true;
 
-    // Solo AHORA bloqueamos scroll del body
-    document.body.style.overflow = 'hidden';
+    // FIX ERR-20: NO bloqueamos body.overflow — en iPhone Safari causa bloqueo
+    // persistente de scroll si algo falla. El layer position:fixed ya cubre
+    // la pantalla visualmente.
 
     if (window.groupSaved[letra]) {
       try { lockCardsInFocus(letra); } catch (e) { console.warn('lockCards error:', e); }
@@ -234,10 +243,7 @@ function openMobileFocus(letra) {
 
     console.log('[mobile-grupos] openMobileFocus OK', letra);
   } catch (err) {
-    // Excepción no capturada en cascada: restauramos estado
-    if (!__openedLayerOk) {
-      document.body.style.overflow = __prevBodyOverflow;
-    }
+    // FIX ERR-20: sin restore de body.overflow — no lo tocamos nunca
     const msg = (err && err.message) ? err.message : String(err);
     console.error('[mobile-grupos] openMobileFocus EXCEPTION', msg, err);
     if (typeof showMobileToast === 'function') {
@@ -283,7 +289,7 @@ function closeMobileFocus() {
     layer.classList.remove('done');
     layer.setAttribute('aria-hidden', 'true');
   }
-  document.body.style.overflow = '';
+  // FIX ERR-20: no tocamos body.overflow aquí tampoco
 
   __mobileFocusState.letra = null;
   __mobileFocusState.slide = 0;
