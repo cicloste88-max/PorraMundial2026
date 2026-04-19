@@ -277,3 +277,31 @@ function escapeHtml(str) {
     .replace(/`/g, '&#x60;');
 }
 
+window.PHRASES_GRUPO = {
+  empty: [
+    "Cada quiniela empieza con un primer marcador.",
+    "La porra te espera. Pon el primer pronóstico.",
+    "Empieza el arte de la predicción."
+  ],
+  low: [
+    "Cuidado, que la cosa se pone seria.",
+    "Afinando el olfato futbolero…",
+    "Intuición de experto en marcha."
+  ],
+  mid: [
+    "Ya hueles a ojeador de cantera.",
+    "Tu clarividencia impresiona.",
+    "La banqueta del Madrid te querría."
+  ],
+  high: [
+    "Una más y este grupo es tuyo.",
+    "Estás a un pronóstico de la gloria.",
+    "Queda la última — no falles."
+  ],
+  done: [
+    "Grupo completo. Pura casta quinielera.",
+    "Pronósticos dignos de todo un ojeador de fútbol.",
+    "Clínico. El Mundial te lo sabes."
+  ]
+};
+

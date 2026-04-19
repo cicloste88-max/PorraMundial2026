@@ -635,6 +635,7 @@ function createMatchCard(match, idx) {
   const card = document.createElement('div');
   card.className = 'card';
   card.setAttribute('data-match-idx', String(idx));
+  card.setAttribute('data-grupo', match.group);
 
   // Use dataset to store slug for kit/flag click handlers
   card.innerHTML = [
@@ -738,7 +739,7 @@ function createMatchCard(match, idx) {
       '<div id="btn-row-'+idx+'"><button class="btn-save" disabled data-idx="'+idx+'">Guardar</button></div>',
     '</div>',
     /* ── Fila Boost (dentro de card-inner, encima del footer) ── */
-    '<div class="boost-row" id="boost-row-'+idx+'">',
+    '<div class="boost-row" id="boost-row-'+idx+'" data-jornada-date="'+match.date.slice(0,10)+'" data-match-key="'+matchKey+'">',
       '<label class="boost-label" for="boost-chk-'+idx+'">',
         '<div class="boost-chk-wrap">',
           '<input type="checkbox" id="boost-chk-'+idx+'" class="boost-chk">',
@@ -1203,6 +1204,9 @@ function renderAll(onComplete) {
     renderGroupTableCard(grupo.letra);
     // Bloquear tarjetas si porra cerrada, justo después de renderizar
     if (window._porraCerrada) requestAnimationFrame(() => lockAllCardsIfCerrada());
+    if (typeof window.applyMobileGroupCollapse === 'function') {
+      window.applyMobileGroupCollapse(section, grupo.letra);
+    }
     setTimeout(renderNextGroup, 0); // cede control al navegador entre grupos
   }
   renderNextGroup();

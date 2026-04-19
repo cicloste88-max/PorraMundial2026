@@ -56,7 +56,7 @@ async function loadUserData(userId) {
   const YOUNG_P = window.YOUNG_PLAYERS_NXGN || [];
   const allPlayers = [...AW_P, ...YOUNG_P];
   const leagueId = getActiveLeagueId();
-  const [{ data: preds }, { data: koPreds }, { data: awData }] = await Promise.all([
+  const [{ data: preds }, { data: koPreds }, { data: awData }, { data: lmData, error: lmErr }] = await Promise.all([
     leagueId
       ? db.from('predictions').select('*').eq('user_id', userId).eq('league_id', leagueId)
       : db.from('predictions').select('*').eq('user_id', userId).limit(0), // sin liga, sin datos
@@ -65,6 +65,9 @@ async function loadUserData(userId) {
       : db.from('ko_predictions').select('*').eq('user_id', userId).limit(0),
     leagueId
       ? db.from('award_picks').select('*').eq('user_id', userId).eq('league_id', leagueId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    leagueId
+      ? db.from('league_members').select('groups_saved').eq('user_id', userId).eq('league_id', leagueId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   if (preds && preds.length > 0) {
@@ -108,6 +111,16 @@ async function loadUserData(userId) {
     // Marcar como guardado y refrescar UI
     window._awPicksSaved = true;
     if (typeof window._renderBox4 === 'function') window._renderBox4();
+  }
+
+  // Sincronizar groups_saved (tarjetas bloqueadas en vista focus móvil) desde BD
+  if (lmErr) {
+    console.warn('Error cargando league_members.groups_saved:', lmErr.message || lmErr);
+    window.groupSaved = window.groupSaved || {};
+  } else if (lmData && lmData.groups_saved && typeof lmData.groups_saved === 'object') {
+    window.groupSaved = lmData.groups_saved;
+  } else {
+    window.groupSaved = window.groupSaved || {};
   }
 
   // Tras cargar todos los datos, re-evaluar la sección de cerrar porra
