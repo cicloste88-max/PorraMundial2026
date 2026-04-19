@@ -783,3 +783,5 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
     - Verificar que el tap en slide 6 (summary) repaginta correctamente la tabla con los últimos pronósticos.
     - Probar el toast + lock/unlock en ciclo completo: save → lock → unsave → unlock.
     - Verificar que tras cerrar focus y reabrir, `groupSaved` persiste entre dispositivos (login en otro móvil).
+
+[19-04-2026 14:04] FIX ERR-18 — Movidos css/*.css → public/css/*.css (git mv, preserva historia). Causa: Vite solo copia public/ al dist/, los <link href="/css/xxx.css"> de index.html fallaban en prod. Verificado con npm run build (dist/css/*.css presente + contiene .mobile-collapsed + @media 640px) y npm run preview (fetch /css/base.css devuelve 200). No se tocó index.html — los paths siguen válidos porque Vite sirve public/ desde raíz. Ramas modificadas: directo main.
