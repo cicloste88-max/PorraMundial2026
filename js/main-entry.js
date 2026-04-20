@@ -70,8 +70,12 @@ loadScript('/js/leagues.js')
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
     // ya llamo a initWelcome, la segunda llamada solo reconstruye los
     // contenedores con el mismo contenido (no-op visible).
+    // v2.11 (capa 1): safety-net solo si no hay pagina pendiente de restaurar.
+    // Impide que main-entry meta welcome cuando el flujo de auth va a hacer
+    // el restore. Coordina con v2.10 (capa 2: CSS lock en ui-nav showPage).
     if (typeof window.initWelcome === 'function') window.initWelcome();
-    if (typeof window.showPage === 'function') window.showPage('welcome');
+    if (!window._pendingPageRestore &&
+        typeof window.showPage === 'function') window.showPage('welcome');
     if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
 
     // Arrancar sincronización live. Si _porraDb aún no existe (usuario no
