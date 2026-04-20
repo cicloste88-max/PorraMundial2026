@@ -262,6 +262,7 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Síntoma:** la UI móvil del rediseño de grupos (mobile-collapsed, mobile-focus-layer, etc.) se veía bien en `npm run dev` pero quedaba sin estilos en producción tras merge del PR #9. Los `<link rel="stylesheet" href="/css/xxx.css">` daban 404 en Vercel.
 - **Causa:** Vite sólo copia el contenido de `public/` a `dist/` automáticamente. Los ficheros que están en la raíz (`css/`) son ignorados por el build salvo que se importen desde un JS que forme parte del bundle. En dev, el dev-server de Vite sí sirve desde la raíz, lo que enmascara el problema hasta la primera publicación.
 - **Fix aplicado (18 abr 2026):** `git mv css/*.css public/css/*.css` (preserva historial). Paths en `index.html` siguen siendo válidos porque Vite sirve `public/` desde la raíz del dominio tanto en dev como en build. Commit `b4a52e6`.
+- **⚠️ RESUELTO 19 abr noche via refactor CSS (commit `9e93fe8`, ver ERR-22).** El fix inicial (`css/` → `public/css/`) no era suficiente — el problema real era que `index.html` nunca había enlazado esos ficheros porque tenía los 4 bloques `<style>` inline sin migrar (ver ERR-22). La cadena de fixes ERR-18/19/20/21 atacaba síntomas; la causa raíz era ERR-22.
 - **Patrón preventivo:** cualquier asset servido bajo `/xxx` en la SPA **debe** vivir en `public/xxx/` o ser importado desde un módulo del bundle. Verificación obligatoria tras cambios que añaden `<link>` nuevos: `npm run build && ls dist/` y `npm run preview` con `curl` al asset esperado.
 - **Fecha detección:** 18 abr 2026.
 
@@ -296,3 +297,25 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Fix aplicado (19 abr 2026):** sacar las reglas base de `.mobile-focus-layer` **fuera** del `@media` para que apliquen siempre (el layer nunca es visible hasta `.open`, da igual el viewport). Añadir `visibility: hidden` + transición con delay `0.32s` en el cierre para que el layer salga del hit-testing táctil cuando está cerrado (y `visibility: visible` con transición `0s` al abrir). Las reglas de contenido (header, dots, carousel, etc.) sí quedan dentro del `@media`. Commit `82b4753`.
 - **Patrón preventivo:** cualquier reglas de **posicionamiento/visibilidad** de layers overlay deben aplicar en todos los viewports, no sólo en móvil. El media query debe contener sólo estilos de contenido (tamaños, paddings, fuentes). Para layers cerrados con `opacity:0`/`transform`, añadir siempre `visibility: hidden` explícito para sacarlos del hit-testing.
 - **Fecha detección:** 19 abr 2026.
+
+---
+
+## ERR-22 — `index.html` con `<style>` inline nunca migrados a ficheros CSS (causa raíz real de ERR-18/19/20/21)
+
+- **Síntoma:** la feature móvil de grupos (rediseño PR #9, 4 commits con reglas `mobile-collapsed`, `mobile-focus-layer`, `slide-summary`, etc. añadidas a `public/css/base.css`) no aplicaba ninguno de esos estilos en producción. En iPhone Safari el layer aparecía sin formato y el scroll se bloqueaba; en Chrome Android salían elementos como bloque inline al final del body. La cascada de fixes ERR-19/20/21 tocaba código JS/CSS pero los estilos afectados simplemente nunca se servían al navegador.
+- **Diagnóstico definitivo:** `getComputedStyle(document.querySelector('.mobile-focus-layer')).position` devolvía `'static'` (valor por defecto) cuando debería ser `'fixed'`. **Eso prueba que ninguna regla CSS con esa clase estaba aplicándose**. Inspección de `<head>`: sólo 3 `<link rel="stylesheet">` (bracket-results, boost, directo). `base.css`, `welcome.css`, `ko.css`, `admin.css` NO estaban enlazados.
+- **Causa:** `index.html` tenía 4 bloques `<style>` inline gigantes (~1925 LOC total) con comentarios `<!-- Archivo destino : X.css -->` desde el refactor Vite inicial, pero la migración real nunca se ejecutó. Los comentarios eran TODOs sin acción. Por tanto:
+  - Los estilos originales seguían vivos vía `<style>` inline en el HTML.
+  - Los ficheros `public/css/base.css`, `welcome.css`, `ko.css`, `admin.css` existían pero no tenían efecto (ningún `<link>` los traía).
+  - Cualquier regla añadida a esos ficheros (como las del rediseño móvil) se perdía silenciosamente en producción.
+- **Fix aplicado (19 abr 2026 noche, commit `9e93fe8`):**
+  1. Prepend del contenido de cada `<style>` a su fichero destino (al principio, para que las reglas nuevas del rediseño móvil queden al final y ganen por cascada si algún selector coincidiese).
+  2. Eliminar los 4 bloques `<style>` de `index.html` (reemplazados por comentarios marcadores `<!-- CSS externo: X.css -->`).
+  3. Añadir los 4 `<link rel="stylesheet">` faltantes en `<head>`: base → welcome → ko → admin → (3 existentes: bracket-results, boost, directo).
+  - `index.html` pasó de 2970 a 1008 líneas. `dist/index.html` de 169 kB a 60 kB gzipeado.
+- **Lección (meta-patrón):** los fixes ERR-19/20/21 atacaban síntomas de un problema cuyo root cause estaba dos capas más arriba. Se podrían haber ahorrado 3 commits con un `getComputedStyle()` inicial en producción: si devuelve el valor default/initial, **el CSS no está llegando al elemento** — no es fallo de lógica JS ni de reglas CSS incorrectas, es fallo de entrega.
+- **Patrón preventivo (obligatorio tras este commit):**
+  - Tras modificar CSS, verificar en producción con `getComputedStyle(elementoAfectado).propiedadRelevante`. Valor default/initial = CSS no aplicándose.
+  - Antes de mergear cambios de diseño a `main`: `npm run build && ls dist/css/ && grep -l "<selector-esperado>" dist/css/*.css` — si el selector no aparece en ningún CSS del `dist/`, abortar merge.
+  - Si `index.html` tiene `<style>` inline con comentarios `Archivo destino : X.css`, significa que hay migración pendiente — ejecutar ANTES de añadir reglas nuevas a los ficheros destino.
+- **Fecha detección:** 19 abr 2026 noche.

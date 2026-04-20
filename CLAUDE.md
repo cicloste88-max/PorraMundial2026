@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit estable: **9e93fe8** (refactor CSS: extraer `<style>` inline de index.html a `public/css/`)
+Rama activa: **main** | Último commit en main: **9e93fe8** (refactor CSS extracción inline→ficheros). Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -376,11 +376,15 @@ apify push --actor-id N8vUChlhok5JU3cnL
 - **Actualizar migration-log.md** tras cada acción importante
 - **NO usar addEventListener DOMContentLoaded** en classic scripts cargados via loadScript
 - Actor Azzouzana `VzKtdb1t0Qnc07X8V` tiene caché CDN — NO usar para datos live
-- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-20) antes de debuggear
+- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-22) antes de debuggear
 - **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
 - dice.js se mantiene dentro de admin.js (no separar)
 - **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo
 - **Para programar crons de partidos usar `schedule_match_crons(match_key, start_ts)`**, nunca duplicar crons manualmente
+- **Verificación CSS/build obligatoria tras modificar CSS** (aprendido en ERR-22):
+  - Si un estilo no se ve en producción, primer diagnóstico: `getComputedStyle(elementoAfectado).propiedadRelevante`. Valor default/initial = el CSS no está aplicándose (no es bug de lógica). Entonces buscar si ese fichero CSS está enlazado en `index.html`.
+  - Antes de mergear cambios de diseño a `main`: `npm run build && ls dist/css/ && grep -l "<selector-esperado>" dist/css/*.css`. Si el selector no aparece en ningún CSS del `dist/`, abortar merge.
+  - Si `index.html` tiene `<style>` inline con comentarios `Archivo destino : X.css`, es migración pendiente — ejecutarla ANTES de añadir reglas nuevas a los ficheros destino.
 
 ---
 
