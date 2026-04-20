@@ -4,19 +4,18 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **9e93fe8** (refactor CSS extracción inline→ficheros). Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **8bc7f30** (cleanup MutationObserver DIAG; persistencia última página al F5 estable tras saga v2.1→v2.11). Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
 ## 🔴 Pendientes abiertos
 
 ### Bugs UI
-1. **Parpadeo botón envío porra** — pendiente diagnóstico
-2. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
-3. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
-4. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
-5. **Auto-completar Pichichi torneo** sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
-6. **Enganche final frases IA** para pronóstico signo partido (lógica incorporada, falta wiring final)
+1. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
+2. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
+3. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
+4. **Auto-completar Pichichi torneo** sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
+5. **Enganche final frases IA** para pronóstico signo partido (lógica incorporada, falta wiring final)
 
 ### Antes del 11 junio 2026
 1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked)
@@ -61,6 +60,29 @@ Rama activa: **main** | Último commit en main: **9e93fe8** (refactor CSS extrac
   - `82b4753` — ERR-21: reglas base de `.mobile-focus-layer` fuera del `@media` + `visibility:hidden/visible` (evita layer fantasma en hit-testing Safari).
 - **Refactor CSS extracción `<style>` inline ✅** (commit `9e93fe8`)
   - Los 4 bloques `<style>` de `index.html` con comentario "Archivo destino : X.css" nunca se habían migrado. Commits 2/3/4 del rediseño móvil añadían reglas a `public/css/base.css` pero `index.html` no enlazaba `base.css`. Fix: contenido `<style>` prepended a cada fichero destino (para que reglas nuevas al final ganen por cascada), bloques eliminados de `index.html` (de 2970 a 1008 líneas), 4 `<link>` nuevos en cabecera.
+- **Persistencia última página al F5 ✅** (saga v2.1 → v2.11, 20 abr, HEAD `8bc7f30`)
+  - F5/Ctrl+R en cualquier página (Grupos / Eliminatorias / Score / Admin) restaura la página donde el user estaba, sin flash welcome ni splash. Solo afecta a refresh con sesión válida; login fresco va a welcome por semántica.
+  - **Diagnóstico final** (caza con MutationObserver, ver ERR-23): `#page-welcome` mutaba a `display:block` en T=612ms y volvía a `display:none` en T=1115ms — 503ms de flash. Causa: `main-entry.js:74` safety-net llamaba `showPage('welcome')` sin guard, lo que disparaba la lógica que retiraba el CSS lock de v2.9 antes de tiempo.
+  - **Solución belt & suspenders en 3 capas:**
+    - **Capa 0 — `index.html` `<head>` (v2.6 + v2.8 + v2.9):** script inline síncrono lee `localStorage.porra_lastPage`, setea `window._pendingPageRestore`, salta el splash si hay restore, e inyecta `<style id="restore-lock-css">#page-welcome{display:none !important}</style>`.
+    - **Capa 1 — `main-entry.js:74-78` (v2.11):** safety-net con guard `if (!window._pendingPageRestore) showPage('welcome')`. Impide flash desde el chain.
+    - **Capa 2 — `public/js/ui-nav.js` `showPage()` (v2.10):** `if (lock && page==='welcome') return; if (lock && page!=='welcome') lock.remove()`. Hace que el lock sea self-healing: rogue `showPage('welcome')` no rompe el restore; `showPage(target)` retira el lock al pintar la página real.
+    - **Plus — `public/js/auth.js:325-339` (v2.1):** `onAuthStateChange` consume `_pendingPageRestore` solo en `INITIAL_SESSION` (no `SIGNED_IN`), revalidación admin explícita, ruta única `setTimeout(100) → showPage(finalPage)`.
+    - **Plus — `auth.js:349` (v2.7):** guard `if (!window._pendingPageRestore) showPage('welcome')` en arranque inicial + fallback en rama `else` por si la sesión está caducada.
+    - **Plus — `index.html:251` (v2.4):** `<div id="page-welcome" style="display:none">` (las otras 4 páginas ya lo tenían; welcome era la única visible por defecto).
+  - **Limpieza key:** `porra_lastPage` con underscore — entra en barrido de `doLogout` (`auth.js:286`, `.includes('porra_')`).
+  - **Diagrama del flujo de arranque con restore:**
+    ```
+    T=0    HTML parse → <script inline> setea _pendingPageRestore + CSS lock + skip splash
+    T=~50  module bundle + chain → main-entry safety-net guard skipea welcome (capa 1)
+    T=~50  auth.js runAuthInit → guard skipea welcome (v2.7) + onAuthStateChange registrado
+    T=~60  Supabase emite INITIAL_SESSION → handler arranca await loadUserData
+    T=~500 loadUserData resuelve → consume _pendingPageRestore=null → setTimeout(100)
+    T=~600 showPage(target) → capa 2 retira lock + display:block en target
+    ```
+  - **Limitación aceptada:** ~500-600ms de pantalla oscura (background body) entre T=0 y `showPage(target)`. Aceptable porque no es welcome y no llama la atención. Si se queja en 3G, v3 con hidratación optimista de `currentUser` + `_activeLeague` desde localStorage.
+  - **Limitaciones conocidas (sin resolver):** sub-tab Vista Directo no se preserva (vuelve a Grupos), scroll position no se preserva, URL siempre `/`. Multi-tab: `localStorage` compartido, gana último que escribe.
+  - **Saga ruidosa pero documentada:** 11 iteraciones (v2.1 → v2.11) con varios reverts intermedios. Historia git no se squashea — los reverts documentan el aprendizaje.
 
 ---
 

@@ -12,7 +12,7 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable** | `9e93fe8` (refactor CSS: extraer `<style>` inline a `public/css/`) |
+| **Último commit estable** | `8bc7f30` (cleanup MutationObserver DIAG; persistencia última página al F5 estable tras saga v2.1→v2.11) |
 
 ---
 
@@ -352,6 +352,7 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-19 | Rediseño móvil fase de grupos (PR #9): 4 commits acordeón + focus layer + carrusel + slide-7 | 9d651d5 |
 | 2026-04-19 | Fixes producción iPhone (ERR-18/19/20/21): css→public, openFocus defensivo, no body.overflow, layer fuera @media | 82b4753 |
 | 2026-04-19 | Extracción `<style>` inline de index.html a `public/css/` (hace aplicar commits 2/3/4 de PR #9) | 9e93fe8 |
+| 2026-04-20 noche | Persistencia última página al F5 + skip splash. Saga v2.1→v2.11 (3 capas defensivas: HTML script inline, main-entry guard, ui-nav lock guard). ERR-23 documentado | 8bc7f30 |
 
 ---
 

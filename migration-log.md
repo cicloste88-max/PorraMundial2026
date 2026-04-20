@@ -814,3 +814,28 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
     2. **Sub-tab Vista Directo:** NO se preserva. Probable primera queja post-merge cuando San use la app durante partidos. v2.2 con clave auxiliar `porra_lastGrupoView` si hace falta.
     3. **Scroll position:** no se preserva.
     4. **URL siempre `/`:** no compartible. v3 requeriría hash-routing.
+
+[20-04-2026 noche] CHECKPOINT FIN SESIÓN — Persistencia última página al F5, ESTABLE. HEAD `8bc7f30`. Saga v2.1→v2.11 (11 iteraciones con varios reverts intermedios; aceptamos historia git ruidosa porque los reverts documentan el aprendizaje). San confirma "está arreglado" tras v2.10+v2.11.
+
+  **Estado defensivo final (3 capas + plus):**
+  - **Capa 0 — `index.html` `<head>` (v2.6/v2.8/v2.9):** script inline síncrono lee `localStorage.porra_lastPage`, setea `window._pendingPageRestore`, salta el splash de 4s si hay restore (no esperar animación), e inyecta `<style id="restore-lock-css">#page-welcome{display:none !important}</style>`. Commits `e28f447` + `5ef545f` + `7689bcc`.
+  - **Capa 1 — `js/main-entry.js:74-78` (v2.11, commit `d4a0047`):** safety-net del `.then()` final con guard `if (!window._pendingPageRestore) showPage('welcome')`. Impide que el chain meta welcome cuando el flujo de auth va a hacer restore.
+  - **Capa 2 — `public/js/ui-nav.js` `showPage()` (v2.10, commit `4214bfe`):** `if (lock && page==='welcome') return; if (lock && page!=='welcome') lock.remove()`. Lock self-healing: rogue `showPage('welcome')` no rompe el restore; `showPage(target)` retira el lock al pintar la página real.
+  - **Plus — `public/js/auth.js:325-339` (v2.1, commit `aade8d0`):** `onAuthStateChange` consume `_pendingPageRestore` solo en `INITIAL_SESSION` (no `SIGNED_IN`), revalidación admin explícita, ruta única `setTimeout(100) → showPage(finalPage)`.
+  - **Plus — `auth.js:349` (v2.7, commit `951922a`):** guard `if (!window._pendingPageRestore) showPage('welcome')` en arranque inicial + fallback en rama `else` por sesión caducada.
+  - **Plus — `index.html:251` (v2.4, commit `caaf0a0`):** `<div id="page-welcome" style="display:none">` consistente con las otras 4 páginas (welcome era la única visible por defecto del browser).
+
+  **Diagnóstico definitivo (cazado con MutationObserver, ERR-23):** `#page-welcome` mutaba a `display:block` en T=612ms y volvía a `display:none` en T=1115ms — 503ms de flash. Causa: `main-entry.js:74` safety-net llamaba `showPage('welcome')` sin guard, y eso disparaba la lógica de v2.9 parte 2 que retiraba el CSS lock antes de tiempo. Capas 1+2 lo eliminan en dos frentes complementarios.
+
+  **Limitaciones conocidas (sin resolver, aceptadas):**
+  - Sub-tab Vista Directo no se preserva (vuelve a Grupos genérico).
+  - Scroll position no se preserva (vuelve al top).
+  - Multi-tab: `localStorage` compartido, gana último que escribe.
+  - URL siempre `/`. No compartible. Migración a hash-routing es v3 si hace falta.
+  - Pantalla oscura ~500-600ms entre arranque y `showPage(target)` cuando hay restore. Aceptable porque no es welcome blanco; es body background dark. Si molesta en 3G, v3 con hidratación optimista de `currentUser` + `_activeLeague`.
+
+  **Ficheros modificados (estado VIGENTE en HEAD `8bc7f30`):** `index.html` (head + L251), `js/main-entry.js` (L7-18 + L74-78), `public/js/auth.js` (L325-339 + L349), `public/js/ui-nav.js` (showPage `try` block).
+
+  **No vigentes (revertidos durante la saga, registrados aquí solo para historia):** v2.2 (`63dbb01`+`b672eaf` revertidos en `187c824`+`d4ac43b`), v2.3 (`5974296`+`0d10bbd` revertidos en `f221673`+`d4ac43b`), v2.5 (`3857c1e` revertido en `6154053`), v2.9 parte 2 (`2ba045b` reemplazado por v2.10), MutationObserver de diag (`78e45e7` retirado en `8bc7f30`).
+
+  **Docs actualizadas en este checkpoint:** `CLAUDE.md` (cabecera + bugs UI cierra "parpadeo botón envío" + sección "Persistencia última página al F5" en bugs resueltos), `CONTEXTO_PORRA_2026.md` (cabecera + entrada en historial), `errores_conocidos_porra.md` (ERR-23 nuevo — `ERR-22` ya estaba ocupado por la migración CSS inline de la sesión 19abr), `ESQUEMA_SISTEMA_PORRA2026.xlsx` (cadena de carga JS actualizada con scripts inline head + module bundle + loadScript chain).
