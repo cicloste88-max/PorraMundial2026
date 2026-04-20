@@ -257,18 +257,42 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
-## ERR-18 — _reservado_
+## ERR-18 — Vite build no incluye `css/*.css` en `dist/` (CSS perdido en producción)
 
-_(Placeholder para bug futuro.)_
-
----
-
-## ERR-19 — _reservado_
-
-_(Placeholder para bug futuro.)_
+- **Síntoma:** la UI móvil del rediseño de grupos (mobile-collapsed, mobile-focus-layer, etc.) se veía bien en `npm run dev` pero quedaba sin estilos en producción tras merge del PR #9. Los `<link rel="stylesheet" href="/css/xxx.css">` daban 404 en Vercel.
+- **Causa:** Vite sólo copia el contenido de `public/` a `dist/` automáticamente. Los ficheros que están en la raíz (`css/`) son ignorados por el build salvo que se importen desde un JS que forme parte del bundle. En dev, el dev-server de Vite sí sirve desde la raíz, lo que enmascara el problema hasta la primera publicación.
+- **Fix aplicado (18 abr 2026):** `git mv css/*.css public/css/*.css` (preserva historial). Paths en `index.html` siguen siendo válidos porque Vite sirve `public/` desde la raíz del dominio tanto en dev como en build. Commit `b4a52e6`.
+- **Patrón preventivo:** cualquier asset servido bajo `/xxx` en la SPA **debe** vivir en `public/xxx/` o ser importado desde un módulo del bundle. Verificación obligatoria tras cambios que añaden `<link>` nuevos: `npm run build && ls dist/` y `npm run preview` con `curl` al asset esperado.
+- **Fecha detección:** 18 abr 2026.
 
 ---
 
-## ERR-20 — _reservado_
+## ERR-19 — `openMobileFocus` dejaba `body.overflow=hidden` colgado en iPhone Safari
 
-_(Placeholder para bug futuro.)_
+- **Síntoma:** en iPhone real, al tappear la cabecera de un grupo en la vista móvil, la lista se plegaba pero el focus layer no aparecía y el scroll de toda la pantalla quedaba bloqueado de forma persistente.
+- **Causa:** `openMobileFocus` aplicaba `document.body.style.overflow = 'hidden'` **antes** de `layer.classList.add('open')`. Si algo fallaba entre medias (p. ej. `buildSummarySlide` por quirk de Safari iOS), el body se quedaba bloqueado sin que el layer llegase a mostrarse. Sin devtools en iPhone el fallo era invisible.
+- **Fix aplicado (19 abr 2026):** envolver `openMobileFocus` entera en `try/catch` con restauración de `body.overflow` en caso de excepción antes de `__openedLayerOk=true`; mover el `body.overflow='hidden'` al final (después de `layer.classList.add('open')`); añadir `showMobileToast('✗ [DEBUG] ...', 'error')` con `err.message.slice(0,60)` para diagnosticar sin devtools. Commit `0aa78a9`.
+- **Patrón preventivo:** efectos colaterales sobre el DOM global (`body.style`, `window.scrollTo`, etc.) deben ir **al final** de la función, sólo tras confirmar que el resto ha tenido éxito. En móvil, toda operación que pueda fallar debe contar con visibilidad sin devtools (toast + `console.error` redundantes).
+- **Fecha detección:** 19 abr 2026.
+
+---
+
+## ERR-20 — `body.style.overflow='hidden'` bloquea scroll persistente en iPhone Safari (patrón scroll-lock)
+
+- **Síntoma:** incluso tras ERR-19, el scroll de la página de grupos seguía bloqueándose en iPhone Safari al interactuar con la vista móvil de grupos. No en Chrome Android, no en Chrome desktop.
+- **Causa:** Safari iOS aplica `overflow:hidden` en `<body>` de forma "pegajosa" — incluso cuando el código lo restaura a `''`, a veces el motor de layout mantiene la restricción de scroll, especialmente si la tab ha estado en background o si la navegación SPA atraviesa estados.
+- **Fix aplicado (19 abr 2026):** eliminar por completo el patrón scroll-lock. `openMobileFocus` y `closeMobileFocus` ya no tocan `document.body.style.overflow`. El layer `position:fixed inset:0` cubre visualmente la pantalla sin necesidad de bloquear el scroll del fondo. Añadida recuperación defensiva al cargar el módulo: si se encuentra `body.overflow === 'hidden'` (residuo de ejecuciones anteriores atascadas), se limpia. Commit `40c0fe2`.
+- **Patrón preventivo:** NO usar `body.style.overflow='hidden'` como scroll-lock en iOS Safari. Alternativas: layer `position:fixed` cubriendo pantalla completa, o `overscroll-behavior: none` en el propio layer.
+- **Fecha detección:** 19 abr 2026.
+
+---
+
+## ERR-21 — `.mobile-focus-layer` dentro del `@media` dejaba layer fantasma en Safari y bloque inline en Chrome
+
+- **Síntoma:** (1) en iPhone Safari el scroll seguía bloqueándose al tappear cabecera de grupo, pese al fix ERR-20. (2) En Chrome Android con viewport CSS >640px aparecían "botones rotos" al final de la página cuando se abría el focus layer.
+- **Causa:** las reglas base del `.mobile-focus-layer` (`position:fixed`, `inset:0`, `transform:translateX(100%)`, `opacity:0`, etc.) estaban **dentro** del `@media (max-width: 640px)`. Por tanto:
+  - En viewports >640px el layer no tenía `position:fixed` → aparecía como `<div>` inline al final del body con dimensiones enormes.
+  - En iPhone Safari con viewport ≤640px el layer cerrado (`transform:translateX(100%)` + `opacity:0`) seguía participando en el hit-testing táctil, bloqueando el scroll del body detrás.
+- **Fix aplicado (19 abr 2026):** sacar las reglas base de `.mobile-focus-layer` **fuera** del `@media` para que apliquen siempre (el layer nunca es visible hasta `.open`, da igual el viewport). Añadir `visibility: hidden` + transición con delay `0.32s` en el cierre para que el layer salga del hit-testing táctil cuando está cerrado (y `visibility: visible` con transición `0s` al abrir). Las reglas de contenido (header, dots, carousel, etc.) sí quedan dentro del `@media`. Commit `82b4753`.
+- **Patrón preventivo:** cualquier reglas de **posicionamiento/visibilidad** de layers overlay deben aplicar en todos los viewports, no sólo en móvil. El media query debe contener sólo estilos de contenido (tamaños, paddings, fuentes). Para layers cerrados con `opacity:0`/`transform`, añadir siempre `visibility: hidden` explícito para sacarlos del hit-testing.
+- **Fecha detección:** 19 abr 2026.

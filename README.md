@@ -284,6 +284,7 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Bracket de resultados reales (timeline vertical + live hero)
 - Vista Directo con pipeline live realtime (72 tarjetas Mundial + sección **🧪 Simulacros activos** sólo admin para testing con partidos fuera del torneo)
 - Usuarios no-admin pueden crear sus propias porras (hasta 3, admin ilimitado) vía EF `create-league`
+- Rediseño móvil de fase de grupos (acordeón por grupo + focus layer pantalla completa + carrusel 6 partidos + slide clasificación + botón Guardar/Deshacer con persistencia en BD)
 
 ### Antes del 11 de junio de 2026
 
@@ -302,7 +303,7 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - [ ] Refactor `scoring.js`: separar lógica pura del render
 - [ ] Tests unitarios del motor de puntuación (Vitest)
 - [ ] Migrar `onclick=` inline a event delegation
-- [ ] Consolidar CSS inline restante en ficheros separados
+- [x] ~~Consolidar CSS inline restante en ficheros separados~~ (resuelto 19 abr, commit `9e93fe8`)
 - [ ] Migración completa a ES modules (eliminar `loadScript` chain)
 
 ---

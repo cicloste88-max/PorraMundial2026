@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit estable: **34c3532** (feat ligas: no-admin crea porras)
+Rama activa: **main** | Último commit estable: **9e93fe8** (refactor CSS: extraer `<style>` inline de index.html a `public/css/`)
 
 ---
 
@@ -49,6 +49,18 @@ Rama activa: **main** | Último commit estable: **34c3532** (feat ligas: no-admi
   - Banner superior `🧪 SIMULACRO · PARTIDO FUERA DEL MUNDIAL` (no se solapa con nombre equipo)
   - `checkIsAdmin` async con retries hasta 5s + re-render anti-loop (ver ERR-14)
   - Causa raíz original: `match_key` renombrado por error matinal `wc2026_gA_15186710` → `_historic_..._trial`. Revertido.
+- **Rediseño móvil fase de grupos ✅** (PR #9 mergeado en `9d651d5`, 4 commits `871592b`+`b812f41`+`c69f7de`+`e114c02`)
+  - Commit 1/4: infra + `ui-groups-mobile.js` + `PHRASES_GRUPO` + placeholder `@media` + script en loadScript chain.
+  - Commit 2/4: acordeón lista + barra progreso por grupo + helper `applyMobileGroupCollapse`.
+  - Commit 3/4: focus layer + carrusel 6 slides + swipe + smart boost row (conflicto jornada).
+  - Commit 4/4: slide 7 clasificación + botón Guardar/Deshacer + lock cards + persistencia BD (`league_members.groups_saved` JSONB).
+- **Fixes producción móvil ✅** (19 abr, 4 commits a `main`):
+  - `b4a52e6` — ERR-18: `css/` → `public/css/` (Vite sólo copia `public/` a `dist/`).
+  - `0aa78a9` — ERR-19: `openMobileFocus` defensivo con `try/catch` + toast para debug sin devtools en iPhone.
+  - `40c0fe2` — ERR-20: eliminar `body.style.overflow='hidden'` (bloqueo persistente en Safari iOS).
+  - `82b4753` — ERR-21: reglas base de `.mobile-focus-layer` fuera del `@media` + `visibility:hidden/visible` (evita layer fantasma en hit-testing Safari).
+- **Refactor CSS extracción `<style>` inline ✅** (commit `9e93fe8`)
+  - Los 4 bloques `<style>` de `index.html` con comentario "Archivo destino : X.css" nunca se habían migrado. Commits 2/3/4 del rediseño móvil añadían reglas a `public/css/base.css` pero `index.html` no enlazaba `base.css`. Fix: contenido `<style>` prepended a cada fichero destino (para que reglas nuevas al final ganen por cascada), bloques eliminados de `index.html` (de 2970 a 1008 líneas), 4 `<link>` nuevos en cabecera.
 
 ---
 
@@ -108,35 +120,41 @@ js/
   main-entry.js       <- entry point Vite (type=module)
 
 public/js/
-  data.js             <- datos torneo + estado global + boostPicks
-  scoring.js          <- motor puntos + tarjetas + premios
-  ui-groups.js        <- grupos + vista Jornada completa
-  ko.js               <- bracket KO + IA pronósticos
-  ui-nav.js           <- SPA nav + modal + welcome
-  auth.js             <- auth Supabase
-  leagues.js          <- ligas y selección de porra
-  misc.js             <- utils UI
-  scoreboard.js       <- clasificación multi-usuario
-  close-porra.js      <- cierre de pronósticos
-  admin.js            <- panel admin + dados/simulador (dice.js integrado)
-  bracket-results.js  <- vista resultados reales bracket KO
+  data.js              <- datos torneo + estado global + boostPicks + PHRASES_GRUPO
+  scoring.js           <- motor puntos + tarjetas + premios
+  ui-groups.js         <- grupos + vista Jornada completa
+  ui-groups-mobile.js  <- rediseño móvil fase grupos (acordeón + focus layer + slide 7)
+  ko.js                <- bracket KO + IA pronósticos
+  ui-nav.js            <- SPA nav + modal + welcome
+  ui-directo.js        <- vista Directo + sección simulacros admin
+  live-sync.js         <- realtime live_scores (postgres_changes + simulacros)
+  auth.js              <- auth Supabase + bootstrap (predictions/ko/awards/groups_saved)
+  leagues.js           <- ligas y selección de porra
+  misc.js              <- utils UI
+  scoreboard.js        <- clasificación multi-usuario
+  close-porra.js       <- cierre de pronósticos
+  admin.js             <- panel admin + dados/simulador (dice.js integrado)
+  bracket-results.js   <- vista resultados reales bracket KO
 
-css/ (raíz, no en public/)
-  base.css
-  admin.css
-  ko.css
+public/css/          <- TODOS los CSS viven aquí (Vite sólo copia public/ a dist/)
+  base.css           <- reset, layout, match-cards, header, ligas + rediseño móvil @media 640px
   welcome.css
+  ko.css             <- bracket KO + modal + awards (pendiente split awards.css)
+  admin.css          <- panel admin + dado + responsive admin
   boost.css
   bracket-results.css
+  directo.css        <- vista Directo + tarjetas simulacro admin
 ```
 
-**Referencias CSS en index.html:** `/css/fichero.css`
+**Referencias CSS en index.html:** `/css/fichero.css` (7 `<link rel="stylesheet">` en `<head>`; los `<style>` inline se extrajeron en commit `9e93fe8`).
+
+**Regla crítica assets:** TODO lo que se sirva bajo `/xxx` debe vivir en `public/xxx/` o ser importado desde el bundle JS. Si pones algo en la raíz del repo (como estaba `css/` antes), Vite lo ignora en el build (ver ERR-18).
 
 **Cadena de carga (main-entry.js):**
 ```
 misc.js (paralelo)
-leagues → data → scoring → ui-groups → ko → bracket-results → ui-nav
-  → auth → scoreboard → close-porra → admin
+leagues → data → scoring → ui-groups → ui-groups-mobile → ko → bracket-results
+  → ui-nav → auth → scoreboard → close-porra → admin → ui-directo → live-sync
 ```
 
 **Shims inline en index.html (líneas 1440-1445):** `handleCTA()`, `openAuthModal()` — previene error si onclick HTML dispara antes de que auth.js cargue.

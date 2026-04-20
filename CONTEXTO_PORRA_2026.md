@@ -12,7 +12,7 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable** | `34c3532` (feat ligas: no-admin crea porras, límite 3) |
+| **Último commit estable** | `9e93fe8` (refactor CSS: extraer `<style>` inline a `public/css/`) |
 
 ---
 
@@ -74,6 +74,9 @@ Añadido a `.gitignore`: `apify-actors/*/node_modules/`
 | Pipeline live definitivo async+webhook + actor Webshare | 6aeb470 (17 abr) |
 | Vista Directo + sección simulacros admin + fix checkIsAdmin async (ERR-14) | 614b5ef (17 abr PM) |
 | Usuarios no-admin pueden crear porras (límite 3) vía EF `create-league` | 34c3532 (18 abr AM) |
+| Rediseño móvil fase de grupos (PR #9): acordeón + focus layer + carrusel + slide-7 + persistencia BD | 9d651d5 (19 abr) |
+| Fixes producción iPhone: ERR-18 css→public, ERR-19 openFocus defensivo, ERR-20 no body.overflow, ERR-21 layer fuera @media | b4a52e6 · 0aa78a9 · 40c0fe2 · 82b4753 (19 abr) |
+| Extracción `<style>` inline de index.html a `public/css/` (commits 2/3/4 de PR #9 no aplicaban en prod) | 9e93fe8 (19 abr) |
 
 ---
 
@@ -346,6 +349,9 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-17 PM | Persistencia histórica: `errores_conocidos_porra.md` + `migration-log.md` en repo (PR #1) | 549746e |
 | 2026-04-17 PM | Vista Directo + sección simulacros admin (PR #3). Fix `checkIsAdmin` async con retries (ERR-14) | 614b5ef |
 | 2026-04-18 AM | EF `create-league` v1 + frontend `leagues.js`: no-admin puede crear hasta 3 porras (PR #5) | 34c3532 |
+| 2026-04-19 | Rediseño móvil fase de grupos (PR #9): 4 commits acordeón + focus layer + carrusel + slide-7 | 9d651d5 |
+| 2026-04-19 | Fixes producción iPhone (ERR-18/19/20/21): css→public, openFocus defensivo, no body.overflow, layer fuera @media | 82b4753 |
+| 2026-04-19 | Extracción `<style>` inline de index.html a `public/css/` (hace aplicar commits 2/3/4 de PR #9) | 9e93fe8 |
 
 ---
 
@@ -380,7 +386,7 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 
 | Área | Detalle | Prioridad |
 |---|---|---|
-| CSS | 4 bloques `<style>` inline en index.html (~1925 LOC) duplicados con `css/*.css` (~2347 LOC) | Alta |
+| ~~CSS~~ | ~~4 bloques `<style>` inline en index.html duplicados con `css/*.css`~~ → ✅ **resuelto** 19 abr (`9e93fe8`) | — |
 | Tests | 0 tests. Motor de puntuación sin cobertura | Alta |
 | JS | 70 `onclick=` inline en index.html — fuerza funciones globales | Media |
 | JS | Estado global sin contrato: `EQUIPOS` es globals implícito, `AWARDS_CFG` explícito, `window.BRACKET` mixto | Media |
