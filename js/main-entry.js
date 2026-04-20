@@ -6,10 +6,6 @@ window.supabase = { createClient }
 
 // 1b. Leer síncronamente la última página persistida (antes del chain).
 //    La consume auth.js en onAuthStateChange (event === 'INITIAL_SESSION').
-// v2.3: flag global de booting. Suprime redirects automaticos a welcome
-// (ej. requireLeagueId) durante el arranque, para evitar flash.
-window._booting = true;
-
 const VALID_PAGES = new Set(['grupos', 'elim', 'score', 'admin']);
 try {
   const v = localStorage.getItem('porra_lastPage');
@@ -74,12 +70,8 @@ loadScript('/js/leagues.js')
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
     // ya llamo a initWelcome, la segunda llamada solo reconstruye los
     // contenedores con el mismo contenido (no-op visible).
-    // v2.2: safety net solo si no hay pagina pendiente de restaurar.
-    // Sin este condicional el showPage(welcome) pisaria el skip de auth.js.
-    if (!window._pendingPageRestore) {
-      if (typeof window.initWelcome === 'function') window.initWelcome();
-      if (typeof window.showPage === 'function') window.showPage('welcome');
-    }
+    if (typeof window.initWelcome === 'function') window.initWelcome();
+    if (typeof window.showPage === 'function') window.showPage('welcome');
     if (typeof window.renderAuthBar === 'function') window.renderAuthBar();
 
     // Arrancar sincronización live. Si _porraDb aún no existe (usuario no
@@ -88,8 +80,5 @@ loadScript('/js/leagues.js')
     if (typeof window.liveSyncInit === 'function') {
       window.liveSyncInit();
     }
-    // v2.3: fin del booting inicial. Dar tiempo a que onAuthStateChange
-    // termine su setTimeout(100) antes de desactivar el flag.
-    setTimeout(() => { window._booting = false; }, 500);
   })
   .catch(e => console.error('Error cargando modulos:', e))
