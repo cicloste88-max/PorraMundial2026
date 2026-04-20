@@ -326,12 +326,8 @@ function leagueCloseModals(e) {
 // ─────────────────────────────────────────────────────────────
 function requireLeagueId() {
   if (!_activeLeague?.id) {
-    console.warn('[leagues] No hay liga activa');
-    // v2.3: durante booting inicial no redirigir. onAuthStateChange decidira
-    // la pagina final una vez loadUserData haya poblado _activeLeague.
-    if (!window._booting) {
-      showPage('welcome');
-    }
+    console.warn('[leagues] No hay liga activa — redirigiendo a welcome');
+    showPage('welcome');
     return null;
   }
   return _activeLeague.id;
