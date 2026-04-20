@@ -531,6 +531,9 @@ function koInit() {
 /* ══ NAVEGACIÓN SPA ══ */
 let _gruposInited = false;
 function showPage(page) {
+  // v2.5: durante arranque con restore pendiente, bloquear showPage(welcome).
+  // auth.js llamara al target correcto en su setTimeout(100).
+  if (page === 'welcome' && window._pendingPageRestore) return;
   if ((page === 'grupos' || page === 'elim' || page === 'score') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
@@ -587,6 +590,9 @@ function updateKOPts() {
 /* ══ INIT ══ */
 /* ══ WELCOME INIT ══ */
 function initWelcome() {
+  // v2.5: si hay pagina pendiente de restaurar tras F5, NO ejecutar la animacion.
+  // El flow de auth.js llamara a showPage(target) directamente.
+  if (window._pendingPageRestore) return;
   // Idempotente: safety net en main-entry.js puede llamarlo despues de auth.js
   if (window._welcomeInited) return;
   window._welcomeInited = true;
