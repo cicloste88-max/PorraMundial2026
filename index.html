@@ -80,6 +80,16 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 (function(){
   var splash = document.getElementById('splash-screen');
   if (!splash) return;
+  // v2.6: si el usuario esta volviendo a una pagina (F5 tras navegar), saltar el splash.
+  // Solo se muestra en la primera visita o tras logout (cuando porra_lastPage no existe).
+  try {
+    if (localStorage.getItem('porra_lastPage')) {
+      splash.style.display = 'none';
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+      window.splashDone = function(){};
+      return;
+    }
+  } catch(_) {}
   var msgs = ['Cargando tu porra...', 'Preparando los grupos...', '¡A predecir!'];
   var i = 0;
   var txtEl = document.getElementById('spl-prog-txt');
