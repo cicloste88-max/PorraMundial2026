@@ -30,6 +30,23 @@
 function handleCTA()        { window._pendingCTA = true; }
 function openAuthModal(tab) { window._pendingAuth = tab; }
 
+// DIAG: logger temporal de mutaciones en page-welcome
+window.__pwLog = [];
+window.__pwT0 = performance.now();
+new MutationObserver(function(muts){
+  muts.forEach(function(m){
+    if (m.target && m.target.id === 'page-welcome' && m.attributeName === 'style') {
+      window.__pwLog.push({
+        t: Math.round(performance.now() - window.__pwT0),
+        display: m.target.style.display,
+        stack: (new Error()).stack.split('\n').slice(1,4).join(' | ')
+      });
+    }
+  });
+}).observe(document.documentElement, {attributes: true, subtree: true, attributeFilter: ['style']});
+// Log tambien quien añade elementos con id relevantes
+window.__pwReady = true;
+
 // v2.9: si hay pagina pendiente de restaurar, inyectar CSS que oculte welcome
 // hasta que el flow de auth.js haga showPage(target). El CSS tiene !important
 // y especificidad maxima, gana a cualquier showPage(welcome) rogue durante arranque.
