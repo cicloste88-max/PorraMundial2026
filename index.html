@@ -29,6 +29,20 @@
 // Los onclick del HTML pueden llamar a estas funciones antes de que cargue el auth script
 function handleCTA()        { window._pendingCTA = true; }
 function openAuthModal(tab) { window._pendingAuth = tab; }
+
+// v2.9: si hay pagina pendiente de restaurar, inyectar CSS que oculte welcome
+// hasta que el flow de auth.js haga showPage(target). El CSS tiene !important
+// y especificidad maxima, gana a cualquier showPage(welcome) rogue durante arranque.
+try {
+  var lp = localStorage.getItem('porra_lastPage');
+  if (lp && ['grupos','elim','score','admin'].indexOf(lp) !== -1) {
+    window._pendingPageRestore = lp;
+    var st = document.createElement('style');
+    st.id = 'restore-lock-css';
+    st.textContent = '#page-welcome{display:none !important}';
+    document.head.appendChild(st);
+  }
+} catch(_) {}
 </script>
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/welcome.css">
