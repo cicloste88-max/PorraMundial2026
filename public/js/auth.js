@@ -341,13 +341,24 @@ const runAuthInit = async () => {
     } else {
       currentUser = null;
       window._porraToken = null; sessionStorage.removeItem("porra_token");
+      // v2.2: si skipeamos welcome esperando restaurar pero no hay sesion valida,
+      // mostrar welcome ahora como fallback.
+      if (window._pendingPageRestore) {
+        window._pendingPageRestore = null;
+        showPage('welcome');
+        initWelcome();
+      }
     }
     renderAuthBar();
     updateCTAs();
   });
 
-  showPage('welcome');
-  initWelcome();
+  // v2.2: si hay página pendiente de restaurar, NO mostrar welcome al arranque.
+  // Evita flash + animación. onAuthStateChange decidirá qué mostrar.
+  if (!window._pendingPageRestore) {
+    showPage('welcome');
+    initWelcome();
+  }
   renderAuthBar();
   updateCTAs();
 };
