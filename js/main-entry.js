@@ -6,6 +6,10 @@ window.supabase = { createClient }
 
 // 1b. Leer síncronamente la última página persistida (antes del chain).
 //    La consume auth.js en onAuthStateChange (event === 'INITIAL_SESSION').
+// v2.3: flag global de booting. Suprime redirects automaticos a welcome
+// (ej. requireLeagueId) durante el arranque, para evitar flash.
+window._booting = true;
+
 const VALID_PAGES = new Set(['grupos', 'elim', 'score', 'admin']);
 try {
   const v = localStorage.getItem('porra_lastPage');
@@ -84,5 +88,8 @@ loadScript('/js/leagues.js')
     if (typeof window.liveSyncInit === 'function') {
       window.liveSyncInit();
     }
+    // v2.3: fin del booting inicial. Dar tiempo a que onAuthStateChange
+    // termine su setTimeout(100) antes de desactivar el flag.
+    setTimeout(() => { window._booting = false; }, 500);
   })
   .catch(e => console.error('Error cargando modulos:', e))
