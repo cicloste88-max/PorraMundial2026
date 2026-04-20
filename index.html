@@ -80,10 +80,13 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 (function(){
   var splash = document.getElementById('splash-screen');
   if (!splash) return;
-  // v2.6: si el usuario esta volviendo a una pagina (F5 tras navegar), saltar el splash.
-  // Solo se muestra en la primera visita o tras logout (cuando porra_lastPage no existe).
+  // v2.6 + v2.8: si el usuario esta volviendo a una pagina (F5 tras navegar), saltar el splash
+  // Y ademas setear _pendingPageRestore aqui mismo (sincrono, antes del module bundle).
+  // El modulo bundle puede tardar en cargarse y auth.js guard necesita el flag YA.
   try {
-    if (localStorage.getItem('porra_lastPage')) {
+    var lastPage = localStorage.getItem('porra_lastPage');
+    if (lastPage && ['grupos','elim','score','admin'].indexOf(lastPage) !== -1) {
+      window._pendingPageRestore = lastPage;
       splash.style.display = 'none';
       if (splash.parentNode) splash.parentNode.removeChild(splash);
       window.splashDone = function(){};
