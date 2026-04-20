@@ -531,6 +531,9 @@ function koInit() {
 /* ══ NAVEGACIÓN SPA ══ */
 let _gruposInited = false;
 function showPage(page) {
+  // v2.9: al primer showPage real tras arranque, quitar el CSS lock si existe
+  var _lockCss = document.getElementById('restore-lock-css');
+  if (_lockCss) _lockCss.remove();
   if ((page === 'grupos' || page === 'elim' || page === 'score') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
