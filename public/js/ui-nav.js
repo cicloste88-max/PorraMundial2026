@@ -531,9 +531,11 @@ function koInit() {
 /* ══ NAVEGACIÓN SPA ══ */
 let _gruposInited = false;
 function showPage(page) {
-  // v2.9: al primer showPage real tras arranque, quitar el CSS lock si existe
+  // v2.10: si hay CSS lock activo y alguien intenta mostrar welcome, IGNORAR.
+  // El lock solo se quita cuando se navega a una pagina real (grupos/elim/score/admin).
   var _lockCss = document.getElementById('restore-lock-css');
-  if (_lockCss) _lockCss.remove();
+  if (_lockCss && page === 'welcome') return;
+  if (_lockCss && page !== 'welcome') _lockCss.remove();
   if ((page === 'grupos' || page === 'elim' || page === 'score') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
