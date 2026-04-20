@@ -324,7 +324,19 @@ const runAuthInit = async () => {
       currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         await loadUserData(session.user.id);
-        setTimeout(() => showPage('welcome'), 100);
+
+        // Restaurar última página SOLO en refresh (INITIAL_SESSION).
+        // En login fresco (SIGNED_IN) vamos a welcome por semántica.
+        let target = null;
+        if (event === 'INITIAL_SESSION') {
+          target = window._pendingPageRestore;
+          window._pendingPageRestore = null;
+        }
+
+        const finalPage = (target === 'admin' && !currentUser.is_admin)
+          ? 'welcome'
+          : (target || 'welcome');
+        setTimeout(() => showPage(finalPage), 100);
       }
     } else {
       currentUser = null;

@@ -4,6 +4,19 @@ import { createClient } from '@supabase/supabase-js'
 // 1. Exponer Supabase ANTES de cargar auth.js y leagues.js
 window.supabase = { createClient }
 
+// 1b. Leer síncronamente la última página persistida (antes del chain).
+//    La consume auth.js en onAuthStateChange (event === 'INITIAL_SESSION').
+const VALID_PAGES = new Set(['grupos', 'elim', 'score', 'admin']);
+try {
+  const v = localStorage.getItem('porra_lastPage');
+  window._pendingPageRestore = VALID_PAGES.has(v) ? v : null;
+  if (v && !VALID_PAGES.has(v)) {
+    console.debug('[nav] porra_lastPage inválida, ignorada:', v);
+  }
+} catch (_) {
+  window._pendingPageRestore = null;
+}
+
 // 2. Exponer credenciales QA solo en dev
 if (import.meta.env.DEV) {
   window.__QA_EMAIL = import.meta.env.VITE_QA_EMAIL

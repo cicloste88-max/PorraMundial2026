@@ -565,6 +565,16 @@ function showPage(page) {
   if(page === 'welcome') window.scrollTo(0,0);
   if(page === 'score')  { window.scrollTo(0,0); sbLoad(); }
   if(page === 'admin')  { window.scrollTo(0,0); admInit(); }
+
+  // Persistir última página (excepto welcome) para restaurar al recargar.
+  // Key con underscore para entrar en el barrido de doLogout (auth.js:286).
+  try {
+    if (page !== 'welcome') {
+      localStorage.setItem('porra_lastPage', page);
+    } else {
+      localStorage.removeItem('porra_lastPage');
+    }
+  } catch (_) {}
 }
 function goToEliminatoria() { showPage('elim'); }
 function updateKOPts() {

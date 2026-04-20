@@ -804,3 +804,13 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
 [19-04-2026 23:15] CHECKPOINT final — feature `feat/mobile-grupos-focus` LIVE en producción, verificada en iPhone Safari y Chrome móvil. Cadena de 6 commits (`b4a52e6` ERR-18 · `0aa78a9` ERR-19 · `40c0fe2` ERR-20 · `82b4753` ERR-21 · `9e93fe8` refactor CSS) resolvió una chain de bugs cuya causa raíz real era **ERR-22** (CSS inline no migrado en `index.html`). Lección meta-patrón: los fixes ERR-19/20/21 atacaban síntomas cuyo root cause estaba dos capas más arriba; `getComputedStyle` inicial en producción habría ahorrado 3 commits. `main` = `9e93fe8`. Pendientes menores (bug ya conocido reportado por San) para próxima sesión.
 
 [20-04-2026 00:46] XLSX — Esquema actualizado con 2 hojas nuevas (Frontend Mobile + Errores ERR-01..22) y versiones EFs puestas al día. Completa protocolo end-of-session. Script `scripts/update_xlsx.py` añadido al repo para regeneraciones futuras (openpyxl).
+
+[20-04-2026 15:02] FEAT nav — Persistir última página al recargar (event-driven, INITIAL_SESSION only). Reportado por San: F5/Ctrl+R volvía siempre a welcome. Implementación v2.1 tras 2 iteraciones de challenge del plan.
+  - `js/main-entry.js`: lectura síncrona de `porra_lastPage` al inicio, expone `window._pendingPageRestore` con whitelist `Set(['grupos','elim','score','admin'])`. `console.debug` si valor inválido.
+  - `public/js/ui-nav.js`: `showPage()` persiste `porra_lastPage` (underscore → entra en barrido de `doLogout` L286 con `.includes('porra_')`). Borra la key al volver a welcome.
+  - `public/js/auth.js`: `onAuthStateChange` consume `_pendingPageRestore` **solo en INITIAL_SESSION** (refresh) — en SIGNED_IN (login fresco) va a welcome por semántica. Ruta de salida única con `setTimeout(100)`, revalidación admin explícita (si perdió rol → welcome sin borrar key).
+  - Limitaciones conocidas documentadas:
+    1. **Multi-tab:** `localStorage` compartido → gana último que escribe.
+    2. **Sub-tab Vista Directo:** NO se preserva. Probable primera queja post-merge cuando San use la app durante partidos. v2.2 con clave auxiliar `porra_lastGrupoView` si hace falta.
+    3. **Scroll position:** no se preserva.
+    4. **URL siempre `/`:** no compartible. v3 requeriría hash-routing.
