@@ -5,14 +5,17 @@
 // el service_role client para cruzar el user_id extraído del JWT contra
 // profiles.is_admin.
 //
-// Cron auth: header `X-Cron-Key` vs `IA_CRON_KEY` del Vault, comparado con
-// constant-time equality para evitar timing attacks.
+// Bypasses que otorgan nivel admin:
+//   - Bearer == SUPABASE_SERVICE_ROLE_KEY (flow desde Claude.ai / SQL — ver
+//     nota abajo). Constant-time compare contra env.
+//   - Header X-Cron-Key == IA_CRON_KEY del Vault (para pg_cron). trim() previo
+//     para evitar ERR-04 (whitespace en Vault).
 
 // deno-lint-ignore no-explicit-any
 type SupabaseClient = any;
 
 export interface AuthContext {
-  user_id: string;     // "cron:system" si el caller es el cron
+  user_id: string;     // "cron:system" si el caller es el cron; "service:system" si service_role
   is_admin: boolean;
   is_cron: boolean;
 }
@@ -64,35 +67,53 @@ async function checkIsAdmin(
   return data.is_admin === true;
 }
 
+// ─── Service role bypass ───────────────────────────────────────────────────
+// Los flujos desde Claude.ai (SQL + Supabase MCP) pasan el service_role key
+// como Bearer. No es un JWT de user — trattarlo equivale a "admin" para fines
+// operativos (lo hacen otras EFs del proyecto).
+export function isServiceRole(req: Request): boolean {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+    return false;
+  }
+  const token = authHeader.slice(7).trim();
+  const srk = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  if (!token || !srk) return false;
+  return constantTimeEq(token, srk);
+}
+
 // ─── Exports ────────────────────────────────────────────────────────────────
 
-// Cualquier user logueado. Devuelve user_id. Lanza "unauthorized" si no.
+// Cualquier user logueado (o service_role). Devuelve user_id.
+// Lanza "unauthorized" si no.
 export async function requireAuth(
   req: Request,
   supa: SupabaseClient,
 ): Promise<string> {
+  if (isServiceRole(req)) return "service:system";
   const userId = await extractUserId(req, supa);
   if (!userId) throw new Error("unauthorized");
   return userId;
 }
 
-// User con profiles.is_admin = true. Lanza "forbidden" si no.
+// User con profiles.is_admin = true (o service_role). Lanza "forbidden" si no.
 export async function requireAdmin(
   req: Request,
   supa: SupabaseClient,
 ): Promise<string> {
+  if (isServiceRole(req)) return "service:system";
   const userId = await requireAuth(req, supa);
   const isAdmin = await checkIsAdmin(supa, userId);
   if (!isAdmin) throw new Error("forbidden");
   return userId;
 }
 
-// Admin JWT O cron key correcto. Devuelve AuthContext con flags.
-// Primero comprueba cron key (path barato), si no cae al flow admin.
+// Admin JWT O cron key correcto O service role. Devuelve AuthContext con flags.
 export async function requireAdminOrCron(
   req: Request,
   supa: SupabaseClient,
 ): Promise<AuthContext> {
+  // Cron path primero (más barato si viene con header).
   const cronHeader = req.headers.get("x-cron-key");
   if (cronHeader) {
     // trim() obligatorio (patrón ERR-04 whitespace en Vault secrets).
@@ -101,7 +122,9 @@ export async function requireAdminOrCron(
       return { user_id: "cron:system", is_admin: true, is_cron: true };
     }
   }
-  // Fallback: JWT de admin.
+  if (isServiceRole(req)) {
+    return { user_id: "service:system", is_admin: true, is_cron: false };
+  }
   const userId = await requireAuth(req, supa);
   const isAdmin = await checkIsAdmin(supa, userId);
   if (!isAdmin) throw new Error("forbidden");

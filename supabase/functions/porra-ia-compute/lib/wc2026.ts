@@ -118,3 +118,23 @@ export function displayName(iso3: string): string {
   const row = WC2026_TEAMS.find((t) => t[0] === iso3);
   return row ? row[3] : iso3;
 }
+
+// Lookup inverso nombre → iso3. Prueba el display_name (columna 4) primero,
+// luego opposition_name (columna 3), luego alias conocidos de divergencias
+// reales entre public/data/worldcup-2026-matches.json y WC2026_TEAMS.
+// Devuelve null si no encuentra — el caller decide si es warning o blocker.
+const NAME_ALIASES_TO_ISO3: Record<string, string> = {
+  // matches JSON usa "&", WC2026_TEAMS usa "and".
+  "Bosnia & Herzegovina": "BIH",
+};
+
+export function resolveIso3(name: string): string | null {
+  if (!name) return null;
+  const alias = NAME_ALIASES_TO_ISO3[name];
+  if (alias) return alias;
+  const byDisplay = WC2026_TEAMS.find((t) => t[3] === name);
+  if (byDisplay) return byDisplay[0];
+  const byOpposition = WC2026_TEAMS.find((t) => t[2] === name);
+  if (byOpposition) return byOpposition[0];
+  return null;
+}

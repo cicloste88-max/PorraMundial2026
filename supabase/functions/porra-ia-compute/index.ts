@@ -1,10 +1,97 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import {
+  PREDICTOR_CONFIG,
+  predict,
+  type H2HData,
+  type Prediction,
+} from "./lib/predictor.ts";
+import {
+  buildRachaData,
+  findCachedPrediction,
+  getActiveSnapshot,
+  invalidateCache,
+  loadCache,
+  lookupElo,
+  lookupH2H,
+  type SnapshotCache,
+  upsertPrediction,
+} from "./lib/repository.ts";
+import {
+  readVaultSecret,
+  requireAdmin,
+  requireAdminOrCron,
+  requireAuth,
+} from "./lib/auth.ts";
+import { generateQuip } from "./lib/quipGenerator.ts";
+import {
+  resolveIso3,
+  WC2026_ISO3,
+  WC2026_TEAMS,
+} from "./lib/wc2026.ts";
+
+// ─── CORS whitelist ────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = new Set([
+  "https://porramundial2026-seven.vercel.app",
+  "http://localhost:5173",
+]);
+
+function cors(origin: string | null): Record<string, string> {
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Headers":
+        "authorization, content-type, x-cron-key, x-client-info, apikey",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    };
+  }
+  return {};
+}
+
+// Headers para respuestas internas (scraping / cron / compute_groups).
+// Mantiene los headers anchos que se usaban antes para que los calls SQL
+// desde Supabase MCP sigan funcionando si no mandan Origin.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// ─── Rate limit en memoria (spec §8.4) ─────────────────────────────────────
+const RATE_LIMITS = new Map<string, { count: number; window_start: number }>();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = RATE_LIMITS.get(userId);
+  if (!entry || now - entry.window_start > RATE_LIMIT_WINDOW_MS) {
+    RATE_LIMITS.set(userId, { count: 1, window_start: now });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// ─── Cache del JSON de partidos del Mundial ────────────────────────────────
+// El EF no tiene acceso al FS del proyecto Vite. Se sirve vía Vercel.
+// Se cachea entre invocaciones calientes; se invalida implícitamente al frío.
+// deno-lint-ignore no-explicit-any
+let MATCHES_CACHE: Record<string, any> | null = null;
+const MATCHES_URL =
+  "https://porramundial2026-seven.vercel.app/data/worldcup-2026-matches.json";
+
+// deno-lint-ignore no-explicit-any
+async function loadMatches(): Promise<Record<string, any>> {
+  if (MATCHES_CACHE) return MATCHES_CACHE;
+  const res = await fetch(MATCHES_URL, {
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) throw new Error(`matches_fetch:HTTP ${res.status}`);
+  MATCHES_CACHE = await res.json();
+  return MATCHES_CACHE!;
+}
 
 const ALIAS_MAP: Record<string, string> = {
   "United States": "USA",
@@ -41,85 +128,94 @@ const MONTHS_ABBR: Record<string, string> = {
   Sep: "09", Oct: "10", Nov: "11", Dec: "12",
 };
 
-const WC2026_TEAMS: Array<[string, string, string, string]> = [
-  // [iso3, owner_slug (kebab-lowercase), opposition_name (capitalizado con espacios), display_name]
-  ["ALG", "algeria", "Algeria", "Algeria"],
-  ["ARG", "argentina", "Argentina", "Argentina"],
-  ["AUS", "australia", "Australia", "Australia"],
-  ["AUT", "austria", "Austria", "Austria"],
-  ["BEL", "belgium", "Belgium", "Belgium"],
-  ["BIH", "bosnia-and-herzegovina", "Bosnia and Herzegovina", "Bosnia and Herzegovina"],
-  ["BRA", "brazil", "Brazil", "Brazil"],
-  ["CPV", "cape-verde-islands", "Cape Verde Islands", "Cabo Verde"],
-  ["CAN", "canada", "Canada", "Canada"],
-  ["COL", "colombia", "Colombia", "Colombia"],
-  ["CIV", "ivory-coast", "Ivory Coast", "Côte d'Ivoire"],
-  ["CRO", "croatia", "Croatia", "Croatia"],
-  ["CUW", "curacao", "Curacao", "Curaçao"],
-  ["CZE", "czech-republic", "Czech Republic", "Czechia"],
-  ["COD", "congo-dr", "Congo DR", "DR Congo"],
-  ["ECU", "ecuador", "Ecuador", "Ecuador"],
-  ["EGY", "egypt", "Egypt", "Egypt"],
-  ["ENG", "england", "England", "England"],
-  ["FRA", "france", "France", "France"],
-  ["GER", "germany", "Germany", "Germany"],
-  ["GHA", "ghana", "Ghana", "Ghana"],
-  ["HAI", "haiti", "Haiti", "Haiti"],
-  ["IRN", "iran", "Iran", "Iran"],
-  ["IRQ", "iraq", "Iraq", "Iraq"],
-  ["JPN", "japan", "Japan", "Japan"],
-  ["JOR", "jordan", "Jordan", "Jordan"],
-  ["MEX", "mexico", "Mexico", "Mexico"],
-  ["MAR", "morocco", "Morocco", "Morocco"],
-  ["NED", "netherlands", "Netherlands", "Netherlands"],
-  ["NZL", "new-zealand", "New Zealand", "New Zealand"],
-  ["NOR", "norway", "Norway", "Norway"],
-  ["PAN", "panama", "Panama", "Panama"],
-  ["PAR", "paraguay", "Paraguay", "Paraguay"],
-  ["POR", "portugal", "Portugal", "Portugal"],
-  ["QAT", "qatar", "Qatar", "Qatar"],
-  ["KSA", "saudi-arabia", "Saudi Arabia", "Saudi Arabia"],
-  ["SCO", "scotland", "Scotland", "Scotland"],
-  ["SEN", "senegal", "Senegal", "Senegal"],
-  ["RSA", "south-africa", "South Africa", "South Africa"],
-  ["KOR", "korea-republic", "Korea Republic", "South Korea"],
-  ["ESP", "spain", "Spain", "Spain"],
-  ["SWE", "sweden", "Sweden", "Sweden"],
-  ["SUI", "switzerland", "Switzerland", "Switzerland"],
-  ["TUN", "tunisia", "Tunisia", "Tunisia"],
-  ["TUR", "turkey", "Turkey", "Türkiye"],
-  ["URU", "uruguay", "Uruguay", "Uruguay"],
-  ["USA", "usa", "USA", "USA"],
-  ["UZB", "uzbekistan", "Uzbekistan", "Uzbekistan"],
-];
+// WC2026_TEAMS ahora vive en ./lib/wc2026.ts (importado arriba).
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  const corsH = cors(origin);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsH });
+
+  // Supabase client con service_role para que las EFs internas puedan leer
+  // de tablas con RLS restringida. La auth del caller se valida aparte abajo.
+  let supa: any;
   try {
-    const supa = createClient(
+    supa = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const body = await req.json().catch(() => ({}));
-    const action = body?.action;
+  } catch (e) {
+    console.error("supa_init_error:", String((e as any)?.message || e));
+    return errJson("internal", 500, origin);
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const action = body?.action;
+
+  try {
     switch (action) {
+      // ── Existentes (Fases A-D.2 + C) ──────────────────────────────────
       case "status":
-        return json(await handleStatus(supa));
+        // Spec §8.1 marca "status: user" pero handler existente no tenía auth.
+        // Mantengo el comportamiento previo (no auth) para no romper flows SQL.
+        return json(await handleStatus(supa), 200, corsH);
+
       case "scrape_elo":
-        return json(await handleScrapeElo(supa, body));
-      case "scrape_last5":
-        return json(await handleScrapeLast5(supa, body));
+        await requireAdmin(req, supa);
+        return json(await handleScrapeElo(supa, body), 200, corsH);
+
       case "scrape_h2h":
-        return json(await handleScrapeH2h(supa, body));
-      case "compute":
-        return json({ status: "not_implemented", phase: "E" });
+        await requireAdmin(req, supa);
+        return json(await handleScrapeH2h(supa, body), 200, corsH);
+
+      case "scrape_last5":
+        await requireAdmin(req, supa);
+        return json(await handleScrapeLast5(supa, body), 200, corsH);
+
+      // ── Nuevas Fase E ─────────────────────────────────────────────────
+      case "freeze_snapshot":
+        await requireAdminOrCron(req, supa);
+        return json(await handleFreezeSnapshot(supa, body), 200, corsH);
+
+      case "compute_groups":
+        await requireAdminOrCron(req, supa);
+        return json(await handleComputeGroups(supa), 200, corsH);
+
+      case "compute_match": {
+        const userId = await requireAuth(req, supa);
+        if (!checkRateLimit(userId)) {
+          return errJson("rate_limit", 429, origin);
+        }
+        return json(await handleComputeMatch(supa, body), 200, corsH);
+      }
+
       default:
-        return json({ error: "unknown_action", valid: ["status","scrape_elo","scrape_last5","scrape_h2h","compute"] }, 400);
+        return errJson("unknown_action", 400, origin);
     }
   } catch (e) {
-    return json({ error: String((e as any)?.message || e) }, 500);
+    const msg = String((e as any)?.message || e);
+    if (msg === "unauthorized") return errJson("unauthorized", 401, origin);
+    if (msg === "forbidden") return errJson("forbidden", 403, origin);
+    if (msg === "bad_input") return errJson("bad_input", 400, origin);
+    if (msg.startsWith("not_found:")) return errJson("not_found", 404, origin);
+    console.error(`action_${action}_error:`, msg);
+    return errJson("internal", 500, origin);
   }
 });
+
+// ─── Helper error responses (sin leaking de stack / internals) ──────────────
+function errJson(
+  code: string,
+  status: number,
+  origin: string | null,
+): Response {
+  return new Response(
+    JSON.stringify({ error: code }),
+    {
+      status,
+      headers: { "content-type": "application/json", ...cors(origin) },
+    },
+  );
+}
 
 async function handleStatus(supa: any) {
   const [elo, last5, h2h, preds] = await Promise.all([
@@ -542,9 +638,433 @@ async function handleScrapeLast5(supa: any, body: any) {
   }
 }
 
-function json(body: any, status = 200) {
+function json(
+  body: any,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+) {
+  // Si el caller pasó CORS del origen del request, lo mergeamos encima del
+  // corsHeaders ancho (que sigue sirviendo para calls SQL sin Origin header).
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "content-type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      ...extraHeaders,
+      "content-type": "application/json",
+    },
   });
+}
+
+// ─── Nuevos handlers Fase E ────────────────────────────────────────────────
+
+// handleFreezeSnapshot (spec §8.2)
+// Dispara scrape_elo + scrape_h2h + scrape_last5 en serie (NO paralelo —
+// 11v11.com no lo tolera), cuenta registros, inserta en ia_snapshots,
+// activa si corresponde, invalida cache, envía WhatsApp al admin.
+async function handleFreezeSnapshot(supa: any, body: any) {
+  const label: string = typeof body?.label === "string" && body.label.trim()
+    ? body.label.trim()
+    : `snapshot_${new Date().toISOString().slice(0, 10)}`;
+  const activate: boolean = body?.activate !== false; // default true
+
+  const startedAt = Date.now();
+  const errors: Array<{ step: string; error: string }> = [];
+
+  // ── 1. scrape_elo ───────────────────────────────────────────────────
+  try {
+    const r = await handleScrapeElo(supa, {});
+    if (r?.ok === false) {
+      errors.push({ step: "scrape_elo", error: `${r.step}:${r.error}` });
+    }
+  } catch (e) {
+    errors.push({ step: "scrape_elo", error: String((e as any)?.message || e) });
+  }
+
+  // ── 2. scrape_h2h ───────────────────────────────────────────────────
+  try {
+    const r = await handleScrapeH2h(supa, {});
+    if (r?.ok === false) {
+      errors.push({ step: "scrape_h2h", error: `${r.step}:${r.error}` });
+    }
+  } catch (e) {
+    errors.push({ step: "scrape_h2h", error: String((e as any)?.message || e) });
+  }
+
+  // ── 3. scrape_last5 ─────────────────────────────────────────────────
+  try {
+    const r = await handleScrapeLast5(supa, {});
+    if (r?.ok === false) {
+      errors.push({ step: "scrape_last5", error: `${r.step}:${r.error}` });
+    }
+  } catch (e) {
+    errors.push({
+      step: "scrape_last5",
+      error: String((e as any)?.message || e),
+    });
+  }
+
+  // ── 4. Contadores resultantes ───────────────────────────────────────
+  const [eloCnt, h2hCnt, last5Cnt] = await Promise.all([
+    supa.from("ia_elo_fifa").select("team_code", { count: "exact", head: true }),
+    supa.from("ia_h2h").select("team_a_code", { count: "exact", head: true }),
+    supa.from("ia_last5_results").select("team_code", {
+      count: "exact",
+      head: true,
+    }),
+  ]);
+  const elo_count = eloCnt.count ?? 0;
+  const h2h_count = h2hCnt.count ?? 0;
+  const last5_count = last5Cnt.count ?? 0;
+
+  // ── 5. Insert ia_snapshots ──────────────────────────────────────────
+  const { data: insData, error: insErr } = await supa
+    .from("ia_snapshots")
+    .insert({
+      label,
+      elo_count,
+      h2h_count,
+      last5_count,
+      is_active: false,
+      created_by: "freeze_snapshot",
+    })
+    .select("id")
+    .single();
+
+  if (insErr || !insData) {
+    errors.push({
+      step: "insert_snapshot",
+      error: insErr?.message || "insert_returned_null",
+    });
+    return {
+      ok: false,
+      errors,
+      duration_ms: Date.now() - startedAt,
+    };
+  }
+
+  const snapshot_id = insData.id;
+
+  // ── 6. Activar (transacción: desactivar anterior, activar nuevo) ────
+  let activated = false;
+  if (activate) {
+    const { error: deactErr } = await supa
+      .from("ia_snapshots")
+      .update({ is_active: false })
+      .eq("is_active", true);
+    if (deactErr) {
+      errors.push({ step: "deactivate_previous", error: deactErr.message });
+    } else {
+      const { error: actErr } = await supa
+        .from("ia_snapshots")
+        .update({ is_active: true })
+        .eq("id", snapshot_id);
+      if (actErr) {
+        errors.push({ step: "activate", error: actErr.message });
+      } else {
+        activated = true;
+        invalidateCache();
+      }
+    }
+  }
+
+  // ── 7. WhatsApp fire-and-forget ─────────────────────────────────────
+  let whatsapp_sent = false;
+  try {
+    const payload = {
+      text:
+        `🧊 IA snapshot "${label}" creado (id=${snapshot_id}). ELO ${elo_count} · H2H ${h2h_count} · last5 ${last5_count}. ${
+          activated ? "Activo ahora." : "NO activado."
+        }`,
+    };
+    const whRes = await fetch(
+      `${Deno.env.get("SUPABASE_URL")}/functions/v1/porra-whatsapp-send`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization":
+            `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(4000),
+      },
+    );
+    whatsapp_sent = whRes.ok;
+    if (!whRes.ok) {
+      console.warn(`whatsapp_send HTTP ${whRes.status}`);
+    }
+  } catch (e) {
+    console.warn(`whatsapp_send failed: ${String((e as any)?.message || e)}`);
+  }
+
+  return {
+    ok: errors.length === 0,
+    snapshot_id,
+    elo_count,
+    h2h_count,
+    last5_count,
+    activated,
+    errors,
+    notifications: { whatsapp_sent },
+    duration_ms: Date.now() - startedAt,
+  };
+}
+
+// Concurrency limit para llamadas a Anthropic API en compute_groups.
+async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) break;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = [];
+  for (let i = 0; i < Math.min(concurrency, items.length); i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  return results;
+}
+
+// handleComputeGroups (spec §8.3)
+// Procesa los 72 partidos de fase de grupos del Mundial y hace UPSERT en
+// ia_predictions con el snapshot activo.
+async function handleComputeGroups(supa: any) {
+  const startedAt = Date.now();
+
+  // Cache fresco (force=true) — el caller típico es cron/admin y queremos
+  // los datos más recientes tras freeze.
+  const cache: SnapshotCache = await loadCache(supa, true);
+
+  const matches = await loadMatches();
+  const matchIds = Object.keys(matches);
+
+  if (matchIds.length === 0) {
+    return {
+      ok: false,
+      step: "matches_empty",
+      error: "worldcup-2026-matches.json vacío",
+      duration_ms: Date.now() - startedAt,
+    };
+  }
+
+  const anthropicKey = await readVaultSecret(supa, "ANTHROPIC_API_KEY");
+
+  const errors: Array<{ match_id: string; error: string }> = [];
+
+  // Precomputar predictions (barato, in-memory), después quips en paralelo (5x).
+  type WorkItem = {
+    match_id: string;
+    home_code: string;
+    away_code: string;
+    prediction: Prediction;
+    eloHome: number;
+    eloAway: number;
+    h2h: H2HData | null;
+    isHostMatch: boolean;
+  };
+
+  const workItems: WorkItem[] = [];
+  for (const match_id of matchIds) {
+    try {
+      const m = matches[match_id];
+      const home_name = m.home_en;
+      const away_name = m.away_en;
+      const home_code = resolveIso3(home_name);
+      const away_code = resolveIso3(away_name);
+      if (!home_code || !away_code) {
+        errors.push({
+          match_id,
+          error: `resolve_iso3:home=${home_name}|away=${away_name}`,
+        });
+        continue;
+      }
+
+      const eloHome = lookupElo(cache, home_code);
+      const eloAway = lookupElo(cache, away_code);
+      const h2h = lookupH2H(cache, home_code, away_code);
+      const racha = buildRachaData(cache, home_code, away_code);
+
+      // En grupos, los hosts juegan en casa → is_host_match si home es host.
+      const isHostMatch = PREDICTOR_CONFIG.HOST_COUNTRIES.has(home_code);
+
+      const prediction = predict(
+        { elo_home: eloHome, elo_away: eloAway, is_host_match: isHostMatch, home_code },
+        h2h,
+        racha,
+      );
+
+      workItems.push({
+        match_id,
+        home_code,
+        away_code,
+        prediction,
+        eloHome,
+        eloAway,
+        h2h,
+        isHostMatch,
+      });
+    } catch (e) {
+      errors.push({ match_id, error: String((e as any)?.message || e) });
+    }
+  }
+
+  // Quip generation con concurrency 5 (spec §8.3 — saturación Anthropic).
+  const QUIP_CONCURRENCY = 5;
+  const quips = await mapConcurrent(workItems, QUIP_CONCURRENCY, (w) =>
+    generateQuip(
+      w.home_code,
+      w.away_code,
+      w.prediction,
+      w.eloHome,
+      w.eloAway,
+      w.h2h,
+      w.isHostMatch,
+      anthropicKey,
+    )
+  );
+
+  // UPSERTs secuenciales (baratos, <30s total para 72 filas).
+  let predictions_upserted = 0;
+  for (let i = 0; i < workItems.length; i++) {
+    const w = workItems[i];
+    try {
+      await upsertPrediction(
+        supa,
+        w.match_id,
+        w.home_code,
+        w.away_code,
+        w.prediction,
+        cache.snapshot_id,
+        false,
+        quips[i],
+      );
+      predictions_upserted++;
+    } catch (e) {
+      errors.push({
+        match_id: w.match_id,
+        error: String((e as any)?.message || e),
+      });
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    snapshot_id: cache.snapshot_id,
+    predictions_upserted,
+    predictions_failed: errors.length,
+    errors: errors.slice(0, 20), // no inflar response
+    duration_ms: Date.now() - startedAt,
+  };
+}
+
+// handleComputeMatch (spec §8.4)
+// Una predicción on-demand. Si ya está cacheada en BD con el snapshot activo
+// la devuelve. Si no, computa + UPSERT con is_ko_ondemand=true.
+async function handleComputeMatch(supa: any, body: any) {
+  const home = typeof body?.home === "string" ? body.home.toUpperCase() : null;
+  const away = typeof body?.away === "string" ? body.away.toUpperCase() : null;
+
+  if (!home || !away || home === away) throw new Error("bad_input");
+  if (!WC2026_ISO3.has(home) || !WC2026_ISO3.has(away)) {
+    throw new Error("bad_input");
+  }
+
+  const active = await getActiveSnapshot(supa);
+  const snapshot_id = active.id;
+
+  // Cache hit en BD → devolvemos directamente.
+  const cached = await findCachedPrediction(supa, home, away, snapshot_id);
+  if (cached) {
+    const p = cached.prediction;
+    return {
+      ok: true,
+      prediction: {
+        p_home: p.p_home,
+        p_draw: p.p_draw,
+        p_away: p.p_away,
+        sign: p.sign,
+        p_max: p.p_max,
+        margin: p.margin,
+        is_dudoso: p.is_dudoso,
+        used_fallback: p.used_fallback,
+      },
+      quip: cached.quip,
+      snapshot_id,
+      cached: true,
+    };
+  }
+
+  // Miss → cargar cache + computar.
+  const cache = await loadCache(supa);
+
+  let eloHome: number;
+  let eloAway: number;
+  try {
+    eloHome = lookupElo(cache, home);
+    eloAway = lookupElo(cache, away);
+  } catch (e) {
+    throw new Error(`not_found:elo:${String((e as any)?.message || e)}`);
+  }
+  const h2h = lookupH2H(cache, home, away);
+  const racha = buildRachaData(cache, home, away);
+
+  // compute_match: spec §8.4.6 → always is_host_match=false (KO en sedes
+  // rotativas/neutras). Los grupos se computan vía compute_groups.
+  const prediction = predict(
+    { elo_home: eloHome, elo_away: eloAway, is_host_match: false, home_code: home },
+    h2h,
+    racha,
+  );
+
+  const anthropicKey = await readVaultSecret(supa, "ANTHROPIC_API_KEY");
+  const quip = await generateQuip(
+    home,
+    away,
+    prediction,
+    eloHome,
+    eloAway,
+    h2h,
+    false,
+    anthropicKey,
+  );
+
+  // match_id sintético para compute_match on-demand. Formato distinto de los
+  // de grupos (wc2026_gX_<sofascore_id>) para no colisionar.
+  const match_id = `ondemand_${home}_${away}_${snapshot_id}`;
+
+  await upsertPrediction(
+    supa,
+    match_id,
+    home,
+    away,
+    prediction,
+    snapshot_id,
+    true, // is_ko_ondemand
+    quip,
+  );
+
+  return {
+    ok: true,
+    prediction: {
+      p_home: prediction.p_home,
+      p_draw: prediction.p_draw,
+      p_away: prediction.p_away,
+      sign: prediction.sign,
+      p_max: prediction.p_max,
+      margin: prediction.margin,
+      is_dudoso: prediction.is_dudoso,
+      used_fallback: prediction.used_fallback,
+    },
+    quip,
+    snapshot_id,
+    cached: false,
+  };
 }
