@@ -208,3 +208,218 @@ window._trace = (selector, attr = 'style') => {
 ```
 
 **Esfuerzo:** 30 min. **ROI:** ahorra el coste de la próxima saga de debug visual.
+
+---
+
+## Medio — performance y UX <a id="medio"></a>
+
+### 9. Bundle único sin code splitting
+
+`dist/assets/index-Un5jEkqd.js` = **188 kB (49 kB gzip)**. Todo en un chunk: Supabase, admin, KO, live-sync, ui-directo, mobile. Un user que sólo mira el score igual se descarga 188 kB.
+
+**Fix propuesto:** dynamic imports condicionales. Candidatos obvios:
+
+- `admin.js` — sólo si `currentUser.is_admin`
+- `ko.js` + `bracket-results.js` — sólo al entrar en Eliminatorias
+- `ui-directo.js` + `live-sync.js` — sólo al entrar en Directo
+
+Requiere convertir la `loadScript` chain en `await import('/js/admin.js')` condicional. Complejo porque son classic scripts — pero mezclable con un wrapper que haga `loadScript` bajo demanda cuando el user abre esa pestaña.
+
+**Esfuerzo:** 1 día. **ROI:** bundle inicial ~140 kB vs 188 kB (-26%). Notable en móvil 3G.
+
+---
+
+### 10. `loadScript` chain secuencial — 14 requests HTTP en serie
+
+`js/main-entry.js` encadena `.then(() => loadScript(...))` **14 veces**. Cada loadScript espera al `onload` del anterior antes de pedir el siguiente. En red lenta esto puede ser 2-3 segundos sólo del waterfall.
+
+El orden real de dependencias es:
+
+```
+leagues → data → scoring → ui-groups → ui-groups-mobile → ko
+       → bracket-results → ui-nav → auth → scoreboard
+       → close-porra → admin → ui-directo → live-sync
+```
+
+`misc.js` ya se carga en paralelo (correcto). Varios otros son hojas sin interdependencia que podrían paralelizarse:
+
+- `scoreboard`, `close-porra`, `admin`, `bracket-results` → paralelos tras `scoring.js`
+- `ui-directo`, `live-sync` → paralelos entre sí (ambos dependen de `ui-nav`)
+
+**Fix propuesto:** reemplazar la chain estricta por una DAG con `Promise.all` por capas. O radicalmente: convertir todos los scripts a ES modules y dejar que Vite los bundlee / code-splittee. Esto último elimina la chain entera pero es más invasivo.
+
+**Esfuerzo:** 1-2 horas la versión conservadora (DAG), 2-3 días la radical (ES modules). **ROI:** tiempo de arranque -30-50% en redes lentas.
+
+---
+
+### 11. `setTimeout(N)` con **27 números mágicos**
+
+`setTimeout(..., 100)`, `..., 200`, `..., 500`, `..., 600`, `..., 2200`, `..., 4000`, `..., 10200`... dispersos. Frágiles frente a redes lentas. Parte del motivo de la saga v2.1→v2.11 fue timings asumidos.
+
+**Fix propuesto:** `public/js/timings.js`:
+
+```js
+window.TIMINGS = {
+  AUTH_HYDRATION_MS: 100,      // tras INITIAL_SESSION, delay antes de showPage
+  CARD_RENDER_DELAY_MS: 200,   // DOM settle tras render
+  GROUP_TABLES_REFRESH_MS: 600,// segunda pasada refreshGroupTables
+  TOAST_DISMISS_MS: 2200,
+  SPLASH_MIN_MS: 4000,
+  SPLASH_HARD_CAP_MS: 10200,
+  CHECK_ADMIN_RETRY_MS: 500,
+  CHECK_ADMIN_MAX_ATTEMPTS: 10,
+  // ...
+};
+```
+
+Al menos los timings son buscables cuando haga falta tuning. Requisito previo a cualquier migración a `Promise`/`await` de los `setTimeout`.
+
+**Esfuerzo:** 1 hora centralizar, migración perezosa. **ROI:** medio.
+
+---
+
+### 12. Splash hardcoded 4s — penaliza al user nuevo
+
+Tras la saga v2.1→v2.11, el splash se skipea si hay `porra_lastPage`. Pero el user anónimo que llega por primera vez ve 4 segundos de animación antes de poder interactuar más allá del botón "Saltar →".
+
+Cuando los amigos de San lleguen por link de invitación el 11 jun, verán 4s obligatorios cada primera visita por dispositivo.
+
+**Fix propuesto (opciones):**
+
+- (a) Mostrar splash sólo en la primera visita absoluta (cookie/localStorage `porra_splashed=1`). Simplísimo.
+- (b) Reducir a 1.5s — sigue habiendo animación pero breve.
+- (c) Hacer que `splashDone()` se dispare con evento `authReady` real en vez de timer fijo. Más trabajo, UX mejor.
+
+**Esfuerzo:** (a) 15 min, (b) 5 min, (c) medio día. **ROI:** reduce fricción de los amigos nuevos.
+
+---
+
+### 13. Supabase auth tokens en `localStorage`
+
+`auth.js:17-21` custom storage → `localStorage`. Cualquier XSS lee el token y se hace pasar por el user. Para un proyecto de amigos, tolerable. Si crece en features que procesan input externo o embeben contenido third-party, el riesgo sube.
+
+**Fix inmediato:** auditar los ~70 `innerHTML` del código. Verificar que todos pasan por `escapeHtml` cuando incluyen datos del usuario (nombres de liga, nombres de user, quips de IA cuando se activen). Empezar por los campos que leen input directo del usuario.
+
+**Fix mejor (v3 futuro):** migrar a session cookies `httpOnly` via Supabase Auth Helpers. Requiere backend como proxy (Vercel Edge Functions). Sobredimensionado para ahora.
+
+**Esfuerzo:** auditoría 1-2 horas. **ROI:** bajo-medio preventivo.
+
+---
+
+## Bajo — cosmético / infraestructura <a id="bajo"></a>
+
+### 14. `console.log/warn/error` — **56 ocurrencias en producción**
+
+Útil para debug; ruidoso en consola del user. Empresa seria: parece roto aunque no lo esté.
+
+**Fix:** `public/js/logger.js`:
+
+```js
+const DEBUG = import.meta?.env?.DEV ?? (location.hostname === 'localhost');
+export const log  = (...a) => DEBUG && console.log(...a);
+export const warn = (...a) => console.warn(...a);   // warns sí en prod
+export const err  = (...a) => console.error(...a);  // errors siempre
+```
+
+Migración incremental. No urgente.
+
+---
+
+### 15. Sin CSP / SRI
+
+El `<link>` a Google Fonts no tiene `integrity="sha384-..."`. Sin `Content-Security-Policy` header. Higiene para cuando se haga público.
+
+---
+
+### 16. Sin analytics / error tracking
+
+No hay Sentry, Plausible, ni equivalente. Cuando San reporte "se me ha quedado colgado el móvil" no hay forma de saber qué pasó. Con 10-15 usuarios durante el Mundial, los errores se van a perder en el ruido.
+
+**Fix mínimo:** Sentry gratuito (5k errores/mes) en 15 líneas:
+
+```js
+import * as Sentry from "@sentry/browser";
+Sentry.init({ dsn: "...", tracesSampleRate: 0.1 });
+```
+
+**Esfuerzo:** 2 horas. **ROI:** alto durante los 38 días del Mundial.
+
+---
+
+### 17. Documentación: fortaleza infravalorada
+
+Punto positivo del proyecto. `CLAUDE.md`, `migration-log.md`, `errores_conocidos_porra.md` (ERR-01..ERR-23), `CONTEXTO_PORRA_2026.md`, `ESQUEMA_SISTEMA_PORRA2026.xlsx`, `README.md`. Esta disciplina documental es atípica en proyectos personales.
+
+Mantener el protocolo end-of-session es clave para que el conocimiento no se pierda entre sesiones de Claude.
+
+---
+
+## Plan recomendado antes del 11 jun <a id="plan"></a>
+
+8 semanas disponibles. Ordenado por **ROI** (impacto ÷ esfuerzo):
+
+### Semanas 1-2 — fundamentos (4 días efectivos)
+
+| # | Acción | Esfuerzo | ROI |
+|---|---|---|---|
+| 1 | **Tests del motor de puntuación** (Vitest, 30 tests de `calc*Points`) | 2 días | Máximo — evita disputas reales por puntos mal calculados |
+| 2 | **GitHub Action CI básica** (build + node --check + tests cuando haya) | 2 horas | Bloquea regresiones obvias antes de merge |
+| 3 | **EF `porra-ia-predict`** (mueve fetch Anthropic a EF con API key en Vault + cache en tabla) | medio día | Activa feature IA que ahora es fake + elimina landmine de seguridad |
+
+### Semanas 3-4 — escala (3 días)
+
+| # | Acción | Esfuerzo | ROI |
+|---|---|---|---|
+| 4 | **Code splitting `admin.js`** (dynamic import bajo `is_admin`) | medio día | Bundle -25% para user común |
+| 5 | **Logger con gate por env** | 1 hora | Consola limpia en producción |
+| 6 | **Sentry error tracking** | 2 horas | Descubres errores móvil reales antes que los reporten |
+| 7 | **Auditoría `innerHTML` + `escapeHtml`** | 1-2 horas | Preventivo XSS con nombres de liga / user |
+
+### Semanas 5-6 — refactor opcional (3-4 días)
+
+Pre-requisito: tests del paso 1 completos. Sin ellos NO tocar scoring.
+
+| # | Acción | Esfuerzo | ROI |
+|---|---|---|---|
+| 8 | **Split `scoring.js`** en engine + render + assets | 2 días | Mantenibilidad a largo plazo |
+| 9 | **Consolidación `ui-groups` + `ui-groups-mobile`** (helpers compartidos) | medio día | Menos riesgo divergencia desktop/móvil |
+| 10 | **Event delegation** (eliminar 62 onclicks) | 1 tarde | Menos superficie de ReferenceError silenciosos |
+
+### Semanas 7-8 — buffer y herramientas (2-3 días)
+
+| # | Acción | Esfuerzo | ROI |
+|---|---|---|---|
+| 11 | **`window._trace` helper debug** | 30 min | Ahorra coste de la próxima saga visual |
+| 12 | **Splash acortado / condicional** | 15-30 min | UX primera visita amigos |
+| 13 | **`AppState` proxy + `TIMINGS`** | 1 día | Higiene de estado y timings |
+
+### Semanas NO hacer antes del Mundial
+
+- Migración a TypeScript (overkill sin tests previos)
+- Hash routing / v3 de persistencia página (funciona sin eso)
+- Service Worker / PWA offline (no es la fricción real)
+- Redux u otro state management completo (`AppState` proxy basta)
+- Migración a session cookies `httpOnly` (sobredimensionado)
+
+---
+
+## Resumen en una frase
+
+> El código **funciona para 10 amigos ahora mismo**. Para funcionar sostenidamente durante **38 días del Mundial con 15-30 usuarios concurrentes en los partidos live**, las tres inversiones críticas son: **tests del motor de puntos**, **EF para la IA real** y **CI básica**. Total: 4 días. Sin ellas, el 11 de junio se estará haciendo hot-fix en vez de features.
+
+---
+
+## Seguimiento
+
+Este doc se actualiza conforme se completen acciones. Formato esperado de actualización:
+
+```
+### ✅ Completado
+
+- **N. Título** (fecha, commit `abcdef0`): resumen del cambio y validación.
+```
+
+Acciones individuales también referenciables desde:
+- `CLAUDE.md` → sección "Pendientes abiertos"
+- `CONTEXTO_PORRA_2026.md` → sección "Deuda técnica identificada"
+- `migration-log.md` → entrada del día en que se completen
