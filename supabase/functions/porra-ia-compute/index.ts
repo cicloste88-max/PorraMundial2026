@@ -35,56 +35,56 @@ const MONTHS: Record<string, string> = {
   September: "09", October: "10", November: "11", December: "12",
 };
 
-const WC2026_TEAMS: Array<[string, string, string]> = [
-  // [iso3, wikipedia_slug, display_name]
-  ["ALG", "Algeria", "Algeria"],
-  ["ARG", "Argentina", "Argentina"],
-  ["AUS", "Australia", "Australia"],
-  ["AUT", "Austria", "Austria"],
-  ["BEL", "Belgium", "Belgium"],
-  ["BIH", "Bosnia_and_Herzegovina", "Bosnia and Herzegovina"],
-  ["BRA", "Brazil", "Brazil"],
-  ["CPV", "Cape_Verde", "Cabo Verde"],
-  ["CAN", "Canada", "Canada"],
-  ["COL", "Colombia", "Colombia"],
-  ["CIV", "Ivory_Coast", "Côte d'Ivoire"],
-  ["CRO", "Croatia", "Croatia"],
-  ["CUW", "Curaçao", "Curaçao"],
-  ["CZE", "Czech_Republic", "Czechia"],
-  ["COD", "DR_Congo", "DR Congo"],
-  ["ECU", "Ecuador", "Ecuador"],
-  ["EGY", "Egypt", "Egypt"],
-  ["ENG", "England", "England"],
-  ["FRA", "France", "France"],
-  ["GER", "Germany", "Germany"],
-  ["GHA", "Ghana", "Ghana"],
-  ["HAI", "Haiti", "Haiti"],
-  ["IRN", "Iran", "Iran"],
-  ["IRQ", "Iraq", "Iraq"],
-  ["JPN", "Japan", "Japan"],
-  ["JOR", "Jordan", "Jordan"],
-  ["MEX", "Mexico", "Mexico"],
-  ["MAR", "Morocco", "Morocco"],
-  ["NED", "Netherlands", "Netherlands"],
-  ["NZL", "New_Zealand", "New Zealand"],
-  ["NOR", "Norway", "Norway"],
-  ["PAN", "Panama", "Panama"],
-  ["PAR", "Paraguay", "Paraguay"],
-  ["POR", "Portugal", "Portugal"],
-  ["QAT", "Qatar", "Qatar"],
-  ["KSA", "Saudi_Arabia", "Saudi Arabia"],
-  ["SCO", "Scotland", "Scotland"],
-  ["SEN", "Senegal", "Senegal"],
-  ["RSA", "South_Africa", "South Africa"],
-  ["KOR", "South_Korea", "South Korea"],
-  ["ESP", "Spain", "Spain"],
-  ["SWE", "Sweden", "Sweden"],
-  ["SUI", "Switzerland", "Switzerland"],
-  ["TUN", "Tunisia", "Tunisia"],
-  ["TUR", "Turkey", "Türkiye"],
-  ["URU", "Uruguay", "Uruguay"],
-  ["USA", "United_States", "USA"],
-  ["UZB", "Uzbekistan", "Uzbekistan"],
+const WC2026_TEAMS: Array<[string, string, string, string]> = [
+  // [iso3, owner_slug (kebab-lowercase), opposition_name (capitalizado con espacios), display_name]
+  ["ALG", "algeria", "Algeria", "Algeria"],
+  ["ARG", "argentina", "Argentina", "Argentina"],
+  ["AUS", "australia", "Australia", "Australia"],
+  ["AUT", "austria", "Austria", "Austria"],
+  ["BEL", "belgium", "Belgium", "Belgium"],
+  ["BIH", "bosnia-and-herzegovina", "Bosnia and Herzegovina", "Bosnia and Herzegovina"],
+  ["BRA", "brazil", "Brazil", "Brazil"],
+  ["CPV", "cape-verde-islands", "Cape Verde Islands", "Cabo Verde"],
+  ["CAN", "canada", "Canada", "Canada"],
+  ["COL", "colombia", "Colombia", "Colombia"],
+  ["CIV", "ivory-coast", "Ivory Coast", "Côte d'Ivoire"],
+  ["CRO", "croatia", "Croatia", "Croatia"],
+  ["CUW", "curacao", "Curacao", "Curaçao"],
+  ["CZE", "czech-republic", "Czech Republic", "Czechia"],
+  ["COD", "congo-dr", "Congo DR", "DR Congo"],
+  ["ECU", "ecuador", "Ecuador", "Ecuador"],
+  ["EGY", "egypt", "Egypt", "Egypt"],
+  ["ENG", "england", "England", "England"],
+  ["FRA", "france", "France", "France"],
+  ["GER", "germany", "Germany", "Germany"],
+  ["GHA", "ghana", "Ghana", "Ghana"],
+  ["HAI", "haiti", "Haiti", "Haiti"],
+  ["IRN", "iran", "Iran", "Iran"],
+  ["IRQ", "iraq", "Iraq", "Iraq"],
+  ["JPN", "japan", "Japan", "Japan"],
+  ["JOR", "jordan", "Jordan", "Jordan"],
+  ["MEX", "mexico", "Mexico", "Mexico"],
+  ["MAR", "morocco", "Morocco", "Morocco"],
+  ["NED", "netherlands", "Netherlands", "Netherlands"],
+  ["NZL", "new-zealand", "New Zealand", "New Zealand"],
+  ["NOR", "norway", "Norway", "Norway"],
+  ["PAN", "panama", "Panama", "Panama"],
+  ["PAR", "paraguay", "Paraguay", "Paraguay"],
+  ["POR", "portugal", "Portugal", "Portugal"],
+  ["QAT", "qatar", "Qatar", "Qatar"],
+  ["KSA", "saudi-arabia", "Saudi Arabia", "Saudi Arabia"],
+  ["SCO", "scotland", "Scotland", "Scotland"],
+  ["SEN", "senegal", "Senegal", "Senegal"],
+  ["RSA", "south-africa", "South Africa", "South Africa"],
+  ["KOR", "korea-republic", "Korea Republic", "South Korea"],
+  ["ESP", "spain", "Spain", "Spain"],
+  ["SWE", "sweden", "Sweden", "Sweden"],
+  ["SUI", "switzerland", "Switzerland", "Switzerland"],
+  ["TUN", "tunisia", "Tunisia", "Tunisia"],
+  ["TUR", "turkey", "Turkey", "Türkiye"],
+  ["URU", "uruguay", "Uruguay", "Uruguay"],
+  ["USA", "usa", "USA", "USA"],
+  ["UZB", "uzbekistan", "Uzbekistan", "Uzbekistan"],
 ];
 
 serve(async (req) => {
@@ -234,25 +234,34 @@ async function handleScrapeH2h(supa: any, _body: any) {
     if (WC2026_TEAMS.length !== 48) {
       return { ok: false, step: "config", error: `WC2026_TEAMS has ${WC2026_TEAMS.length} teams, expected 48` };
     }
-    const wcCodes = new Set<string>(WC2026_TEAMS.map((t) => t[0]));
+
+    // nombre_lower → iso3 para filtrar rivales mundialistas por el texto que 11v11
+    // usa en <td class="opposition">.
+    const nameToIso = new Map<string, string>();
+    for (const [iso3, , opposition_name] of WC2026_TEAMS) {
+      nameToIso.set(opposition_name.toLowerCase(), iso3);
+    }
+
     const now = new Date().toISOString();
-
     const missing_pages: Array<{ team: string; status: number | string }> = [];
-    const missing_sections: string[] = [];
     const allRows: any[] = [];
-    let teams_with_section = 0;
+    const unmatchedSet = new Set<string>();
+    let teams_parsed = 0;
 
-    const rowRegex = /\{\{fb\|([A-Z]{2,3})\}\}\s*\n\|[^\n]*\n\|align=center\|\s*(\d+)\s*\n\|align=center\|\s*(\d+)\s*\n\|\|(\d+)\|\|(\d+)\|\|(\d+)\|\|(\d+)/g;
+    const rowRegex = /<td class="opposition">([^<]+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>/g;
 
-    for (const [iso3, slug] of WC2026_TEAMS) {
-      const page = `${slug}_national_football_team_all-time_record`;
-      const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(page)}&prop=wikitext&format=json`;
+    const fetchHeaders = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    };
+
+    for (const [iso3, owner_slug] of WC2026_TEAMS) {
+      const url = `https://www.11v11.com/teams/${owner_slug}/tab/stats/`;
 
       let res: Response;
       try {
-        res = await fetch(url, {
-          headers: { "User-Agent": "pm26-ia-predictor/1.0", "Accept": "application/json" },
-        });
+        res = await fetch(url, { headers: fetchHeaders });
       } catch (e: any) {
         missing_pages.push({ team: iso3, status: `fetch_error:${String(e?.message || e)}` });
         await new Promise((r) => setTimeout(r, 500));
@@ -264,51 +273,42 @@ async function handleScrapeH2h(supa: any, _body: any) {
         continue;
       }
 
-      let data: any;
+      let html: string;
       try {
-        data = await res.json();
+        html = await res.text();
       } catch {
         missing_pages.push({ team: iso3, status: "parse_error" });
         await new Promise((r) => setTimeout(r, 500));
         continue;
       }
-      const wikitext: string = data?.parse?.wikitext?.["*"];
-      if (typeof wikitext !== "string" || wikitext.length === 0) {
-        missing_pages.push({ team: iso3, status: "empty_wikitext" });
+      if (!html || html.length === 0) {
+        missing_pages.push({ team: iso3, status: "empty_html" });
         await new Promise((r) => setTimeout(r, 500));
         continue;
       }
 
-      const header = "==Head-to-head record==";
-      const sectionStart = wikitext.indexOf(header);
-      if (sectionStart === -1) {
-        missing_sections.push(iso3);
-        await new Promise((r) => setTimeout(r, 500));
-        continue;
-      }
-      const afterStart = sectionStart + header.length;
-      const nextHeader = wikitext.indexOf("\n==", afterStart);
-      const sectionEnd = nextHeader === -1 ? wikitext.length : nextHeader;
-      const section = wikitext.slice(sectionStart, sectionEnd);
-
-      teams_with_section++;
-
+      let rowsParsed = 0;
       rowRegex.lastIndex = 0;
       let m: RegExpExecArray | null;
-      while ((m = rowRegex.exec(section)) !== null) {
-        const oppIso3 = m[1];
-        if (!wcCodes.has(oppIso3)) continue;
-        if (oppIso3 === iso3) continue;
+      while ((m = rowRegex.exec(html)) !== null) {
+        rowsParsed++;
+        const oppName = m[1].trim();
+        const opp_iso3 = nameToIso.get(oppName.toLowerCase());
+        if (!opp_iso3) {
+          unmatchedSet.add(oppName);
+          continue;
+        }
+        if (opp_iso3 === iso3) continue;
 
-        const fromYear = Number(m[2]);
-        const toYear = Number(m[3]);
-        const P = Number(m[4]);
-        const W = Number(m[5]);
-        const D = Number(m[6]);
-        const L = Number(m[7]);
+        const P = Number(m[2]);
+        const W = Number(m[3]);
+        const D = Number(m[4]);
+        const L = Number(m[5]);
+        const GF = Number(m[6]);
+        const GA = Number(m[7]);
 
-        const team_a = iso3 < oppIso3 ? iso3 : oppIso3;
-        const team_b = iso3 < oppIso3 ? oppIso3 : iso3;
+        const team_a = iso3 < opp_iso3 ? iso3 : opp_iso3;
+        const team_b = iso3 < opp_iso3 ? opp_iso3 : iso3;
         const thisIsA = iso3 === team_a;
         const team_a_wins = thisIsA ? W : L;
         const team_b_wins = thisIsA ? L : W;
@@ -320,19 +320,26 @@ async function handleScrapeH2h(supa: any, _body: any) {
           team_a_wins,
           team_b_wins,
           draws,
-          last_played: `${toYear}-12-31`,
+          last_played: null,
           scraped_at: now,
-          matches: { first_year: fromYear, last_year: toYear, total: P, source_team: iso3 },
+          matches: {
+            total: P,
+            gf_team_a: thisIsA ? GF : GA,
+            ga_team_a: thisIsA ? GA : GF,
+            source_team: iso3,
+            source: "11v11.com/stats",
+          },
         });
       }
+
+      if (rowsParsed > 0) teams_parsed++;
 
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    // Dedup por pair (Postgres ON CONFLICT no permite afectar la misma fila dos veces
-    // en un batch). Cada pair llega hasta 2 veces (una por página). Mantenemos la
-    // primera ocurrencia; la segunda sirvió como validación cruzada implícita al
-    // procesar y puede auditarse comparando source_team en futuras runs.
+    // Dedup por pair (Postgres ON CONFLICT no permite afectar la misma fila dos
+    // veces en un batch). Cada pair llega hasta 2 veces — una por cada página de
+    // los dos mundialistas implicados. Mantenemos la primera ocurrencia.
     const pairMap = new Map<string, any>();
     for (const row of allRows) {
       const key = `${row.team_a_code}|${row.team_b_code}`;
@@ -353,13 +360,13 @@ async function handleScrapeH2h(supa: any, _body: any) {
 
     return {
       ok: true,
-      source: "wikipedia:all-time_record",
+      source: "11v11.com/stats",
       teams_fetched: WC2026_TEAMS.length,
-      teams_with_section,
+      teams_parsed,
       missing_pages,
-      missing_sections,
       pairs_upserted,
       rows_processed: allRows.length,
+      unmatched_opponents: Array.from(unmatchedSet).slice(0, 20),
     };
   } catch (e: any) {
     return { ok: false, step: "unknown", error: String(e?.message || e) };
