@@ -35,6 +35,12 @@ const MONTHS: Record<string, string> = {
   September: "09", October: "10", November: "11", December: "12",
 };
 
+const MONTHS_ABBR: Record<string, string> = {
+  Jan: "01", Feb: "02", Mar: "03", Apr: "04",
+  May: "05", Jun: "06", Jul: "07", Aug: "08",
+  Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+};
+
 const WC2026_TEAMS: Array<[string, string, string, string]> = [
   // [iso3, owner_slug (kebab-lowercase), opposition_name (capitalizado con espacios), display_name]
   ["ALG", "algeria", "Algeria", "Algeria"],
@@ -102,7 +108,7 @@ serve(async (req) => {
       case "scrape_elo":
         return json(await handleScrapeElo(supa, body));
       case "scrape_last5":
-        return json({ status: "not_implemented", phase: "C" });
+        return json(await handleScrapeLast5(supa, body));
       case "scrape_h2h":
         return json(await handleScrapeH2h(supa, body));
       case "compute":
@@ -367,6 +373,169 @@ async function handleScrapeH2h(supa: any, _body: any) {
       pairs_upserted,
       rows_processed: allRows.length,
       unmatched_opponents: Array.from(unmatchedSet).slice(0, 20),
+    };
+  } catch (e: any) {
+    return { ok: false, step: "unknown", error: String(e?.message || e) };
+  }
+}
+
+async function handleScrapeLast5(supa: any, body: any) {
+  try {
+    if (WC2026_TEAMS.length !== 48) {
+      return { ok: false, step: "config", error: `WC2026_TEAMS has ${WC2026_TEAMS.length} teams, expected 48` };
+    }
+
+    const rawLimit = Number(body?.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(20, Math.max(1, Math.floor(rawLimit)))
+      : 8;
+
+    // opposition_name.toLowerCase() → iso3. Mismo map que Fase D.2: sirve tanto
+    // para detectar al owner (home/away) como para resolver al rival.
+    const nameToIso = new Map<string, string>();
+    for (const [iso3, , opposition_name] of WC2026_TEAMS) {
+      nameToIso.set(opposition_name.toLowerCase(), iso3);
+    }
+
+    const now = new Date().toISOString();
+    const missing_pages: Array<{ team: string; status: number | string }> = [];
+    let teams_parsed = 0;
+    let rows_upserted = 0;
+
+    // 6 grupos: (1) date, (2) match "Home v Away", (3) W|D|L, (4) home_score,
+    // (5) away_score, (6) competition (opcional). <a> envolviendo el match name
+    // también opcional para tolerar variaciones entre equipos.
+    const rowRegex = /<td[^>]*>\s*([^<]+)<\/td>\s*<td[^>]*>(?:<a[^>]*>)?([^<]+?)(?:<\/a>)?<\/td>\s*<td[^>]*><span[^>]*>([WDL])<\/span><\/td>\s*<td[^>]*>\s*(\d+)-(\d+)[^<]*<\/td>(?:\s*<td[^>]*>([^<]*)<\/td>)?/g;
+
+    const fetchHeaders = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    };
+
+    for (const [iso3, owner_slug, opposition_name] of WC2026_TEAMS) {
+      const url = `https://www.11v11.com/teams/${owner_slug}/tab/matches/`;
+      const ownerNameLower = opposition_name.toLowerCase();
+
+      let res: Response;
+      try {
+        res = await fetch(url, { headers: fetchHeaders });
+      } catch (e: any) {
+        missing_pages.push({ team: iso3, status: `fetch_error:${String(e?.message || e)}` });
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      if (!res.ok) {
+        missing_pages.push({ team: iso3, status: res.status });
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      let html: string;
+      try {
+        html = await res.text();
+      } catch {
+        missing_pages.push({ team: iso3, status: "parse_error" });
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      if (!html || html.length === 0) {
+        missing_pages.push({ team: iso3, status: "empty_html" });
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      const allMatches: any[] = [];
+      rowRegex.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = rowRegex.exec(html)) !== null) {
+        const dateStr = m[1].trim();
+        const matchStr = m[2].trim();
+        const result = m[3] as "W" | "D" | "L";
+        const homeScore = Number(m[4]);
+        const awayScore = Number(m[5]);
+        const competition = (m[6] || "").trim() || null;
+
+        // "04 Sep 2025" → "2025-09-04"
+        const dateParts = dateStr.split(/\s+/);
+        if (dateParts.length !== 3) continue;
+        const [d, monAbbr, y] = dateParts;
+        const monNum = MONTHS_ABBR[monAbbr];
+        if (!monNum) continue;
+        const date_iso = `${y}-${monNum}-${d.padStart(2, "0")}`;
+
+        // "Home v Away"
+        const vIdx = matchStr.indexOf(" v ");
+        if (vIdx === -1) continue;
+        const home_name = matchStr.slice(0, vIdx).trim();
+        const away_name = matchStr.slice(vIdx + 3).trim();
+
+        let owner_is_home: boolean;
+        if (home_name.toLowerCase() === ownerNameLower) owner_is_home = true;
+        else if (away_name.toLowerCase() === ownerNameLower) owner_is_home = false;
+        else continue; // owner not found en ninguno de los dos lados — skip
+
+        const opponent_name = owner_is_home ? away_name : home_name;
+        const opponent_iso3 = nameToIso.get(opponent_name.toLowerCase()) ?? null;
+        const gf = owner_is_home ? homeScore : awayScore;
+        const ga = owner_is_home ? awayScore : homeScore;
+
+        allMatches.push({
+          date: date_iso,
+          opponent_name,
+          opponent_iso3,
+          venue: owner_is_home ? "H" : "A",
+          result,
+          gf,
+          ga,
+          competition,
+        });
+      }
+
+      if (allMatches.length === 0) {
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      teams_parsed++;
+
+      // HTML llega en orden ASCENDENTE por fecha (más antiguo primero). Los
+      // últimos N = más recientes. Mantenemos el orden ascendente al guardar
+      // para que el JSONB siga el mismo criterio que 11v11.
+      const lastN = allMatches.slice(-limit);
+      let wins = 0, draws = 0, losses = 0;
+      for (const match of lastN) {
+        if (match.result === "W") wins++;
+        else if (match.result === "D") draws++;
+        else if (match.result === "L") losses++;
+      }
+
+      const { error: upsertError } = await supa
+        .from("ia_last5_results")
+        .upsert(
+          {
+            team_code: iso3,
+            results: lastN,
+            wins,
+            draws,
+            losses,
+            scraped_at: now,
+          },
+          { onConflict: "team_code" }
+        );
+      if (!upsertError) rows_upserted++;
+
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    return {
+      ok: true,
+      source: "11v11.com/matches",
+      teams_fetched: WC2026_TEAMS.length,
+      teams_parsed,
+      limit,
+      missing_pages,
+      rows_upserted,
     };
   } catch (e: any) {
     return { ok: false, step: "unknown", error: String(e?.message || e) };
