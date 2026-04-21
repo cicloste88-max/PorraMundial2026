@@ -839,3 +839,19 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   **No vigentes (revertidos durante la saga, registrados aquí solo para historia):** v2.2 (`63dbb01`+`b672eaf` revertidos en `187c824`+`d4ac43b`), v2.3 (`5974296`+`0d10bbd` revertidos en `f221673`+`d4ac43b`), v2.5 (`3857c1e` revertido en `6154053`), v2.9 parte 2 (`2ba045b` reemplazado por v2.10), MutationObserver de diag (`78e45e7` retirado en `8bc7f30`).
 
   **Docs actualizadas en este checkpoint:** `CLAUDE.md` (cabecera + bugs UI cierra "parpadeo botón envío" + sección "Persistencia última página al F5" en bugs resueltos), `CONTEXTO_PORRA_2026.md` (cabecera + entrada en historial), `errores_conocidos_porra.md` (ERR-23 nuevo — `ERR-22` ya estaba ocupado por la migración CSS inline de la sesión 19abr), `ESQUEMA_SISTEMA_PORRA2026.xlsx` (cadena de carga JS actualizada con scripts inline head + module bundle + loadScript chain).
+
+[21-04-2026 09:33] SANITY CHECK documentado. Tras la sesión del 20 abr noche, se realizó un barrido estructurado del proyecto (~8.626 LOC JS + 4.700 CSS + 1.035 HTML + 16 módulos) y se documentaron hallazgos priorizados para invertir antes del 11 jun 2026.
+
+  **Entregables de este bloque (4 commits pequeños por robustez ante timeouts de stream):**
+  - `34e5dba` — `docs: sanity check 20abr — parte 1/3 (crítico)`. Creación de `docs/sanity-check-20abr2026.md` con 3 hallazgos críticos: (1) IA fake — `fetch api.anthropic.com` en `scoring.js:941` y `ui-nav.js:49` sin `x-api-key` → 401 → fallback hardcoded; (2) zero tests sobre 8.626 LOC; (3) sin CI/CD (`.github/workflows/` vacío).
+  - `fae982e` — `parte 2/3 (alto)`. 5 hallazgos de mantenibilidad: estado global sin contrato (105 símbolos `window.*`, 59 escape hatches), 62 `onclick=` inline, `scoring.js` 1.438 LOC mezclando responsabilidades, `ui-groups.js` + `ui-groups-mobile.js` paralelos con riesgo de divergencia, saga meta F5 (v2.1→v2.11) como síntoma de falta de tooling de debug.
+  - `c774849` — `parte 3/3 (medio + bajo + plan)`. 5 hallazgos de performance/UX (bundle único 188KB, `loadScript` chain 14-secuencial, 27 `setTimeout` magic numbers, splash 4s hardcoded, tokens auth en localStorage) + 3 bajos (56 `console.*` sin gate env, sin CSP/SRI, sin Sentry/analytics) + plan 8 semanas priorizado por ROI.
+  - `48fd615` — `docs(claude): enlazar sanity-check 20abr + resumen inversiones priorizadas`. `CLAUDE.md` sección "🔬 Sanity check 20 abr 2026" al principio de Pendientes abiertos con 13 ítems agrupados por semana (S1-S2 fundamentos, S3-S4 escala, S5-S6 refactor, S7-S8 buffer) + lista NO-hacer.
+  - `c5029ac` — `docs(contexto): actualizar deuda tecnica con sanity check 20abr`. `CONTEXTO_PORRA_2026.md` sección "Deuda técnica identificada" reescrita por niveles (crítico / alto / medio / bajo), métricas actualizadas (62 onclicks, 1.438 LOC scoring, 70 innerHTML, 56 console, 188KB bundle), ✅ Resuelto incluye los 3 fixes CSS/persistencia de abr, Plan 6 fases histórico preservado como referencia.
+
+  **Tres inversiones críticas recomendadas para S1-S2 (4 días efectivos):**
+  1. Tests motor de puntuación (Vitest + 30 tests sobre `calc*Points`)
+  2. GitHub Action CI mínima (build + `node --check` + tests cuando haya)
+  3. EF `porra-ia-predict` con `ANTHROPIC_API_KEY` en Vault + cache en tabla `ia_cache`
+
+  **Meta-nota sobre la forma del trabajo:** este bloque se entregó en 4 commits pequeños (3 de doc + 2 de cross-ref) en lugar de uno grande monolítico. Motivo: mitigación de timeouts `API Error: Stream idle timeout - partial response received` observados ayer y hoy al intentar volcar ~6k tokens en una sola respuesta. Cada turno bajo ~1.500 tokens, commit tras cada uno, state preservado en disco ante cualquier corte. Patrón recomendado para futuras tareas de documentación extensa en sesiones largas.
