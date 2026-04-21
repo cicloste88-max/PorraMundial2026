@@ -94,3 +94,117 @@ jobs:
 ```
 
 **Esfuerzo:** 2 horas. **ROI:** bloqueas regresiones obvias antes de merge.
+
+---
+
+## Alto — mantenibilidad y escala <a id="alto"></a>
+
+### 4. Estado global sin contrato — 105 símbolos en `window.*`, 59 escape hatches
+
+Contado con `grep`: 105 globals distintos leídos, 59 asignaciones explícitas `window.X = ...`. No hay un módulo de estado definido; cualquier fichero puede crear o leer globals. Ejemplos reales identificados durante esta sesión:
+
+`_pendingPageRestore`, `_porraDb`, `_porraQueryDb`, `_porraToken`, `_activeLeague`, `_myLeagues`, `groupSaved`, `_liveScoresByMatchKey`, `_simulacrosByKey`, `_isAdminCached`, `_porraCerrada`, `_awPicksSaved`, `_sbPrevPage`, `_pendingCTA`, `_pendingAuth`, `_currentLeagueId`, `_porraSplashed`...
+
+Cada iteración añade uno más. El debug "¿quién cambia esta variable?" tiende a `O(n)` ficheros.
+
+**Fix propuesto:** `public/js/state.js` con un objeto `AppState` que encapsule las globals críticas. No hace falta Redux — un `Proxy` con logging de cambios ya es suficiente:
+
+```js
+window.AppState = new Proxy({}, {
+  set(target, key, value) {
+    if (import.meta?.env?.DEV) console.debug(`[state] ${key} =`, value);
+    target[key] = value;
+    return true;
+  }
+});
+```
+
+Migración incremental: las vars nuevas entran por `AppState.X`; las existentes se migran cuando toque el fichero por otra razón. No requiere big-bang refactor.
+
+**Esfuerzo:** 1 día crearlo, migración opcional y perezosa. **ROI:** reduce drásticamente el coste de debug en bugs de estado.
+
+---
+
+### 5. 62 `onclick=` inline en `index.html`
+
+`grep -c 'onclick=' index.html` → **62**. Cada uno obliga a que su handler sea global: `doLogin`, `doLogout`, `doRegister`, `openAuthModal`, `closeAuthModal`, `leagueSelectById`, `goToEliminatoria`, `undoKO`, `switchAuthTab`, `handleCTA`, etc. Si renombras uno o rompes uno, el botón se convierte en `ReferenceError` silencioso y el user ve "no pasa nada".
+
+Ya estaba documentado como deuda técnica en `CONTEXTO_PORRA_2026.md` (Prioridad Media). Sigue ahí.
+
+**Fix propuesto:** event delegation con `data-action="doLogin"`. Un listener raíz en `document.body` que rutea. Elimina los 62 `onclick` + ~20 de los globals escape hatches.
+
+```html
+<!-- antes -->
+<button onclick="doLogin()">Entrar</button>
+<!-- después -->
+<button data-action="doLogin">Entrar</button>
+```
+
+```js
+document.body.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const fn = actionRegistry[btn.dataset.action];
+  if (fn) fn(e, btn);
+});
+```
+
+**Esfuerzo:** 1 tarde cuando haya tests (sin tests, riesgo de romper algo no detectado). **ROI:** elimina una clase entera de bugs (ReferenceError silenciosos).
+
+---
+
+### 6. `scoring.js` 1.438 LOC — mezcla reglas puras con render DOM y fetch IA
+
+Contenido actual:
+
+- `calcMatchPoints`, `calcKOMatchPoints`, `calcGroupsAdvancePoints`, `calcAwardPoints`, `calcClassificationPoints`, `calcTotalUserPoints` — **puras, testeables**
+- `calcGroupTableAdvanced`, `getBestThirdsAll`, `renderGroupTableCard` — mezcla (la última escribe DOM)
+- `createMatchCard`, `updateCardUI` — render DOM puro
+- `KIT_OVERRIDES`, `STICKER_POOL`, `WHITE_KITS`, `TALL_STICKERS`, `WIDE_STICKERS` — datos de configuración
+- `kitUrl`, `getStickerForMatch`, `isWhiteKit`, `isTallSticker`, `isWideSticker` — helpers de datos
+- `_iaEnqueue` + fetch a Anthropic — la llamada muerta del punto 1
+
+Cinco responsabilidades en un fichero. Cualquier cambio en puntuación te obliga a leer 1.438 líneas para estar seguro de no romper render.
+
+**Fix propuesto (requiere tests del punto 2 como pre-requisito):**
+
+- `public/js/scoring-engine.js` — sólo puras, sin `document`, sin `fetch`. Exporta todo para Vitest.
+- `public/js/match-card.js` — `createMatchCard`, `updateCardUI`, handlers de tarjeta.
+- `public/js/group-table.js` — `calcGroupTableAdvanced`, `getBestThirdsAll`, `renderGroupTableCard`.
+- `public/js/assets-config.js` — `KIT_OVERRIDES`, `STICKER_POOL` y helpers asociados.
+- `public/js/ia-client.js` — cliente de IA (llama a la EF `porra-ia-predict` del punto 1).
+
+**Esfuerzo:** 2 días. **ROI:** cada fichero pasa de 1.438 a 200-400 LOC. Testear y modificar scoring deja de ser caro.
+
+---
+
+### 7. `ui-groups.js` + `ui-groups-mobile.js` en paralelo — riesgo de divergencia
+
+17 funciones en uno, 19 en otro. Ambos manipulan `predictions`, renderizan grupos, reaccionan a cambios de boost. El móvil se añadió sin refactor del desktop → lógica duplicada que se desincroniza con facilidad.
+
+Visto dos veces en las últimas 2 sesiones: reglas del móvil (`mobile-collapsed`, `mobile-focus-layer`) tardaron en aparecer porque venían de commits que esperaban CSS que `index.html` no linkeaba (ERR-22). La misma clase de fallo silencioso ocurrirá en la capa JS cuando toque tocar la lógica de boost y alguien olvide actualizar los dos ficheros.
+
+**Fix propuesto:** extraer helpers compartidos a `public/js/groups-shared.js` (`getGroupCompleted`, `hasValidScorer`, `canSaveGroup`, etc. — algunos ya viven en `ui-groups-mobile.js`). Los dos renderers llaman a los mismos helpers. Single source of truth para las validaciones.
+
+**Esfuerzo:** medio día. **ROI:** medio — no urgente pero alto valor a largo plazo.
+
+---
+
+### 8. Saga v2.1 → v2.11 como síntoma meta
+
+11 iteraciones para persistir una página. Varios reverts. El diagnóstico real llegó con MutationObserver en la iteración 11. **Root cause meta:** no había forma rápida de saber "qué cambia `#page-welcome.style.display` y cuándo".
+
+**Fix propuesto — tooling de debug reutilizable:** un helper global `window._trace(selector, attribute)` que instrumenta con MutationObserver + `console.trace` en cada cambio. Se activa en consola durante debug, cero impacto en producción (sólo se ejecuta si el user lo llama explícitamente). Habría ahorrado 8 de los 11 commits de la saga F5.
+
+```js
+window._trace = (selector, attr = 'style') => {
+  const el = document.querySelector(selector);
+  if (!el) return console.warn('no element');
+  new MutationObserver(muts => {
+    muts.forEach(m => console.trace(`[trace] ${selector}.${m.attributeName} = ${el.getAttribute(m.attributeName)}`));
+  }).observe(el, { attributes: true, attributeFilter: [attr] });
+  console.log(`[trace] watching ${selector}[${attr}]`);
+};
+```
+
+**Esfuerzo:** 30 min. **ROI:** ahorra el coste de la próxima saga de debug visual.
