@@ -13,12 +13,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { action } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action;
     switch (action) {
       case "status":
         return json(await handleStatus(supa));
       case "scrape_elo":
-        return json({ status: "not_implemented", phase: "B" });
+        return json(await handleScrapeElo(supa, body));
       case "scrape_last5":
         return json({ status: "not_implemented", phase: "C" });
       case "scrape_h2h":
@@ -46,6 +47,73 @@ async function handleStatus(supa: any) {
     h2h: { count: h2h.count, last_scraped: h2h.data?.[0]?.scraped_at ?? null },
     predictions: { count: preds.count, last_computed: preds.data?.[0]?.computed_at ?? null },
   };
+}
+
+async function handleScrapeElo(supa: any, body: any) {
+  try {
+    let dateId: string | undefined = body?.date_id;
+
+    if (!dateId) {
+      const htmlRes = await fetch("https://inside.fifa.com/fifa-world-ranking/men", {
+        headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" },
+      });
+      if (!htmlRes.ok) {
+        return { ok: false, step: "fetch_html", error: `HTTP ${htmlRes.status}` };
+      }
+      const html = await htmlRes.text();
+      const m = html.match(/"(id\d{4,6})"/);
+      if (!m) {
+        return { ok: false, step: "parse_date", error: "id pattern not found in HTML" };
+      }
+      dateId = m[1];
+    }
+
+    const jsonUrl = `https://inside.fifa.com/api/ranking-overview?locale=en&dateId=${encodeURIComponent(dateId)}`;
+    const jsonRes = await fetch(jsonUrl, {
+      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+    });
+    if (!jsonRes.ok) {
+      return { ok: false, step: "fetch_json", error: `HTTP ${jsonRes.status}` };
+    }
+    const data = await jsonRes.json();
+    const rankings = Array.isArray(data?.rankings) ? data.rankings : [];
+    if (rankings.length === 0) {
+      return { ok: false, step: "fetch_json", error: "empty rankings, likely stale dateId" };
+    }
+
+    const fifaLastUpdate = rankings[0]?.lastUpdateDate ?? null;
+    const now = new Date().toISOString();
+    const rows = rankings
+      .map((r: any) => {
+        const item = r?.rankingItem;
+        if (!item) return null;
+        return {
+          team_code: item.countryCode,
+          team_name: item.name,
+          elo_points: item.totalPoints,
+          rank_position: item.rank,
+          scraped_at: now,
+          source: "fifa.com/api/ranking-overview",
+        };
+      })
+      .filter((x: any) => x && x.team_code && typeof x.elo_points === "number");
+
+    const { error: upsertError } = await supa
+      .from("ia_elo_fifa")
+      .upsert(rows, { onConflict: "team_code" });
+    if (upsertError) {
+      return { ok: false, step: "upsert", error: upsertError.message };
+    }
+
+    return {
+      ok: true,
+      date_id: dateId,
+      countries_upserted: rows.length,
+      fifa_last_update: fifaLastUpdate,
+    };
+  } catch (e: any) {
+    return { ok: false, step: "unknown", error: String(e?.message || e) };
+  }
 }
 
 function json(body: any, status = 200) {
