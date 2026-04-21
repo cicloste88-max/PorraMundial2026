@@ -96,10 +96,10 @@ Añadido a `.gitignore`: `apify-actors/*/node_modules/`
 
 | Componente | Versión | Estado | Notas |
 |---|---|---|---|
-| **Actor sofascore-webshare-proxy** | build 1.0.6 | ✅ **PRODUCCIÓN** | Proxy Webshare residencial rotativo. ~5-10s por run. ~$0.001/run |
+| **Actor sofascore-webshare-proxy** | build 1.0.7 | ✅ **PRODUCCIÓN** | Proxy Webshare residencial rotativo. ~5-10s por run. ~$0.001/run |
 | **Actor sofascore-live-proxy** | build 1.0.19 | ✅ FALLBACK | Playwright + proxy Apify RESIDENTIAL. ~44s por run. ~$0.03/run. Intacto como backup |
-| **porra-match-live EF** | v13 | ✅ FUNCIONA | Async (<1s), lanza actor + webhook |
-| **porra-apify-webhook EF** | v7 | ✅ FUNCIONA | Logging completo, detecta goles + status, llama Twilio directo |
+| **porra-match-live EF** | v16 | ✅ FUNCIONA | Async (<1s), lanza actor + webhook |
+| **porra-apify-webhook EF** | v7 | ⚠️ FUNCIONA con bug | Logging completo, detecta goles + status, llama Twilio directo. **Bug conocido:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | **porra-whatsapp-send EF** | v1 | ✅ FUNCIONA | Twilio sandbox, form-urlencoded |
 | **porra-whatsapp-webhook EF** | v4 | ✅ FUNCIONA | Captura WaId del suscriptor |
 | **Actor Azzouzana `VzKtdb1t0Qnc07X8V`** | — | ❌ NO USAR LIVE | Caché CDN ~15min |
@@ -170,8 +170,8 @@ pg_cron (cada minuto durante partido)
 | `porra-orchestrator` | v3 | ✅ | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v4 | ✅ | Patches search/replace + commit GitHub |
 | `porra-fix-encoding` | v5 | ✅ | Inspect/write ficheros en GitHub via API |
-| `porra-match-live` | v13 | ✅ | Async (<1s), lanza actor + webhook |
-| `porra-apify-webhook` | v7 | ✅ | Detecta goles + status, llama Twilio directo |
+| `porra-match-live` | v16 | ✅ | Async (<1s), lanza actor Webshare `N8vUChlhok5JU3cnL` build 1.0.7 (fallback `BYLtYcOxYkruVipwr` build 1.0.19) + webhook |
+| `porra-apify-webhook` | v7 | ⚠️ | Detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | ✅ | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
 | `porra-ia-compute` | v6 | ✅ | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. Fase E (compute) pendiente. `verify_jwt=false` |
@@ -411,7 +411,7 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 - **Webshare residential** (actor actual): IPs residenciales rotativas bypasean Cloudflare directamente
 - **Playwright + page.evaluate(fetch)** (fallback): fetch desde contexto browser real con el mismo origen
 
-**pg_net timeout:** llamadas que tardan >30s deben usar patrón async (lanzar + no esperar) y recoger resultado via webhook. Aplicado en `porra-match-live` v13.
+**pg_net timeout:** llamadas que tardan >30s deben usar patrón async (lanzar + no esperar) y recoger resultado via webhook. Aplicado en `porra-match-live` v16.
 
 **boost_picks upsert:** `onConflict:'user_id,league_id,match_date'` — no DELETE. Evita parpadeo UI.
 

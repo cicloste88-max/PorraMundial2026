@@ -27,8 +27,22 @@ border_thin = Border(
 highlight_fill = PatternFill('solid', start_color='E2EFDA')
 
 
-# ── 1. Edge Functions: añadir porra-ia-compute v6 ────────────────────────────
+# ── 1. Edge Functions: actualizar versiones + añadir porra-ia-compute v6 ─────
 ws_ef = wb['Edge Functions']
+for row in range(1, ws_ef.max_row + 1):
+    a = str(ws_ef.cell(row=row, column=1).value or '')
+    d = str(ws_ef.cell(row=row, column=4).value or '')
+    if 'porra-match-live' in a:
+        ws_ef.cell(row=row, column=1).value = 'porra-match-live v16'
+        if 'build 1.0.6' in d:
+            ws_ef.cell(row=row, column=4).value = d.replace('build 1.0.6', 'build 1.0.7')
+    elif 'porra-apify-webhook' in a and 'Bug conocido' not in d:
+        ws_ef.cell(row=row, column=4).value = (
+            d.rstrip('.') +
+            '. Bug conocido (pending v8): no persiste home_team_name/away_team_name/'
+            'competition/match_start_ts.'
+        )
+
 has_ia = any(
     'porra-ia-compute' in str(ws_ef.cell(row=r, column=1).value or '')
     for r in range(1, ws_ef.max_row + 1)

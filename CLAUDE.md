@@ -130,10 +130,10 @@ Añadido a `.gitignore`:
 
 | Componente | Versión | Estado |
 |---|---|---|
-| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.6 | ✅ **PRODUCCIÓN** — proxy Webshare residencial (~$0.001/run) |
+| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.7 | ✅ **PRODUCCIÓN** — proxy Webshare residencial (~$0.001/run) |
 | Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK — proxies Apify residenciales (~$0.03/run) |
-| `porra-match-live` EF | v13 | ✅ async + webhook |
-| `porra-apify-webhook` EF | v7 | ✅ logging completo, detecta goles + status, llama Twilio directo |
+| `porra-match-live` EF | v16 | ✅ async + webhook (Webshare principal `N8vUChlhok5JU3cnL` build 1.0.7 + fallback `BYLtYcOxYkruVipwr` build 1.0.19) |
+| `porra-apify-webhook` EF | v7 | ✅ logging completo, detecta goles + status, llama Twilio directo. **Bug conocido:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` EF | v1 | ✅ form-urlencoded via fetch |
 | `porra-whatsapp-webhook` EF | v4 | ✅ |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
@@ -256,8 +256,8 @@ whatsapp_subscribers (
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
 | `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main |
-| `porra-match-live` | v13 | Async + webhook, live scores |
-| `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo |
+| `porra-match-live` | v16 | Async + webhook, live scores. Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback |
+| `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
 | `porra-ia-compute` | v6 | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. `verify_jwt=false`. Fase E (compute) pendiente. Ver sección "🤖 IA Predictor" |
