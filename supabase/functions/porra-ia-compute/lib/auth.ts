@@ -117,7 +117,11 @@ export async function requireAdminOrCron(
   const cronHeader = req.headers.get("x-cron-key");
   if (cronHeader) {
     // trim() obligatorio (patrón ERR-04 whitespace en Vault secrets).
-    const vaultKey = await readVaultSecret(supa, "IA_CRON_KEY");
+    const vaultKey = await readVaultSecret(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      "IA_CRON_KEY",
+    );
     if (vaultKey && constantTimeEq(cronHeader.trim(), vaultKey.trim())) {
       return { user_id: "cron:system", is_admin: true, is_cron: true };
     }
@@ -131,22 +135,35 @@ export async function requireAdminOrCron(
   return { user_id: userId, is_admin: true, is_cron: false };
 }
 
-// Lee un secreto del Vault. Aplica trim() (ERR-04). Devuelve null si no existe.
-// NOTA: el schema `vault` NO está bajo `public` — `supa.from("vault.x")` falla
-// porque PostgREST lo interpreta literalmente. Hay que usar `.schema("vault")`
-// para que el client lo enrute al schema correcto (supabase-js v2 soporta esto
-// desde ~v2.25, funciona igual en Deno).
+// Lee un secreto del Vault vía RPC `get_vault_secrets(secret_names text[])`.
+// Patrón probado en porra-fix-encoding v6 (también consume Vault secrets así).
+//
+// Por qué no `.schema("vault").from("decrypted_secrets")`: el schema `vault`
+// no está expuesto en `api.schemas` del proyecto, así que PostgREST lo rechaza.
+// Por qué no `supa.rpc("get_vault_secrets", ...)`: se usa fetch directo para
+// mantener exactamente la misma firma que ya funciona en porra-fix-encoding,
+// con autenticación apikey + Authorization a partir del SERVICE_ROLE_KEY.
 export async function readVaultSecret(
-  supa: SupabaseClient,
+  supabaseUrl: string,
+  serviceRoleKey: string,
   name: string,
 ): Promise<string | null> {
-  const { data, error } = await supa
-    .schema("vault")
-    .from("decrypted_secrets")
-    .select("decrypted_secret")
-    .eq("name", name)
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) return null;
-  return (data.decrypted_secret || "").trim();
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_vault_secrets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceRoleKey,
+        "Authorization": `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ secret_names: [name] }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // deno-lint-ignore no-explicit-any
+    const row = Array.isArray(data) ? data.find((r: any) => r.name === name) : null;
+    return row ? (row.secret as string).trim() : null;
+  } catch {
+    return null;
+  }
 }
