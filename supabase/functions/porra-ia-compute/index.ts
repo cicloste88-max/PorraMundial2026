@@ -19,7 +19,6 @@ import {
   upsertPrediction,
 } from "./lib/repository.ts";
 import {
-  readVaultSecret,
   requireAdmin,
   requireAdminOrCron,
   requireAuth,
@@ -855,7 +854,7 @@ async function handleComputeGroups(supa: any) {
     };
   }
 
-  const anthropicKey = await readVaultSecret(supa, "ANTHROPIC_API_KEY");
+  const anthropicKey = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim() || null;
 
   const errors: Array<{ match_id: string; error: string }> = [];
 
@@ -1024,7 +1023,7 @@ async function handleComputeMatch(supa: any, body: any) {
     racha,
   );
 
-  const anthropicKey = await readVaultSecret(supa, "ANTHROPIC_API_KEY");
+  const anthropicKey = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim() || null;
   const quip = await generateQuip(
     home,
     away,
