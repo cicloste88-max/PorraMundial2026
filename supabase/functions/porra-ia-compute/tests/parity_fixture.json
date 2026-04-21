@@ -1,0 +1,2040 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-04-21",
+  "description": "WC2022 clean matches parity fixture (Python → TS)",
+  "n_cases": 46,
+  "tolerance": {
+    "probabilities": 0.001,
+    "p_max": 0.001,
+    "margin": 0.001,
+    "sign": "exact_match",
+    "used_fallback": "exact_match",
+    "is_dudoso": "exact_match"
+  },
+  "cases": [
+    {
+      "match_id": "wc2022_ga_QAT_ECU",
+      "stage": "GA",
+      "home": "QAT",
+      "away": "ECU",
+      "real_goals": {
+        "home": 0,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1454.96,
+        "elo_away": 1594.78,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 2,
+          "draws": 1,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 1,
+          "draws": 3,
+          "losses": 2,
+          "n_matches": 6
+        },
+        "racha_away": {
+          "wins": 2,
+          "draws": 6,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": true
+      },
+      "expected": {
+        "p_home": 0.278167,
+        "p_draw": 0.343336,
+        "p_away": 0.378497,
+        "sign": "2",
+        "p_max": 0.378497,
+        "margin": 0.03516,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ga_SEN_NED",
+      "stage": "GA",
+      "home": "SEN",
+      "away": "NED",
+      "real_goals": {
+        "home": 0,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1688.99,
+        "elo_away": 1757.87,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 1
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.28905,
+        "p_draw": 0.33079,
+        "p_away": 0.38016,
+        "sign": "2",
+        "p_max": 0.38016,
+        "margin": 0.04937,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ga_QAT_SEN",
+      "stage": "GA",
+      "home": "QAT",
+      "away": "SEN",
+      "real_goals": {
+        "home": 1,
+        "away": 3
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1454.96,
+        "elo_away": 1688.99,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 1
+        },
+        "racha_home": {
+          "wins": 1,
+          "draws": 3,
+          "losses": 2,
+          "n_matches": 6
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": true
+      },
+      "expected": {
+        "p_home": 0.232972,
+        "p_draw": 0.22758,
+        "p_away": 0.539448,
+        "sign": "2",
+        "p_max": 0.539448,
+        "margin": 0.306476,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ga_NED_ECU",
+      "stage": "GA",
+      "home": "NED",
+      "away": "ECU",
+      "real_goals": {
+        "home": 1,
+        "away": 1
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1757.87,
+        "elo_away": 1594.78,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 0,
+          "draws": 3,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 2,
+          "draws": 6,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.544143,
+        "p_draw": 0.212731,
+        "p_away": 0.243126,
+        "sign": "1",
+        "p_max": 0.544143,
+        "margin": 0.301017,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ga_ECU_SEN",
+      "stage": "GA",
+      "home": "ECU",
+      "away": "SEN",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1594.78,
+        "elo_away": 1688.99,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 2,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 2,
+          "draws": 6,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.25941,
+        "p_draw": 0.299147,
+        "p_away": 0.441444,
+        "sign": "2",
+        "p_max": 0.441444,
+        "margin": 0.142297,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ga_NED_QAT",
+      "stage": "GA",
+      "home": "NED",
+      "away": "QAT",
+      "real_goals": {
+        "home": 2,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1757.87,
+        "elo_away": 1454.96,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 1
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 1,
+          "draws": 3,
+          "losses": 2,
+          "n_matches": 6
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.757917,
+        "p_draw": 0.068664,
+        "p_away": 0.173418,
+        "sign": "1",
+        "p_max": 0.757917,
+        "margin": 0.584499,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gb_ENG_IRN",
+      "stage": "GB",
+      "home": "ENG",
+      "away": "IRN",
+      "real_goals": {
+        "home": 6,
+        "away": 2
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1825.97,
+        "elo_away": 1615.3,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 1
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.61907,
+        "p_draw": 0.154967,
+        "p_away": 0.225963,
+        "sign": "1",
+        "p_max": 0.61907,
+        "margin": 0.393107,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gb_ENG_USA",
+      "stage": "GB",
+      "home": "ENG",
+      "away": "USA",
+      "real_goals": {
+        "home": 0,
+        "away": 0
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1825.97,
+        "elo_away": 1673.13,
+        "h2h": {
+          "home_wins": 8,
+          "away_wins": 2,
+          "draws": 2,
+          "total": 12
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.55108,
+        "p_draw": 0.221629,
+        "p_away": 0.227291,
+        "sign": "1",
+        "p_max": 0.55108,
+        "margin": 0.32379,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gb_IRN_USA",
+      "stage": "GB",
+      "home": "IRN",
+      "away": "USA",
+      "real_goals": {
+        "home": 0,
+        "away": 1
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1615.3,
+        "elo_away": 1673.13,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 1,
+          "draws": 1,
+          "total": 3
+        },
+        "racha_home": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.288947,
+        "p_draw": 0.341602,
+        "p_away": 0.369451,
+        "sign": "2",
+        "p_max": 0.369451,
+        "margin": 0.027849,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gc_ARG_KSA",
+      "stage": "GC",
+      "home": "ARG",
+      "away": "KSA",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1874.81,
+        "elo_away": 1421.43,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 1,
+          "draws": 2,
+          "total": 5
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 1,
+          "losses": 4,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.867112,
+        "p_draw": 0.012973,
+        "p_away": 0.119915,
+        "sign": "1",
+        "p_max": 0.867112,
+        "margin": 0.747198,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gc_ARG_MEX",
+      "stage": "GC",
+      "home": "ARG",
+      "away": "MEX",
+      "real_goals": {
+        "home": 2,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1874.81,
+        "elo_away": 1681.03,
+        "h2h": {
+          "home_wins": 16,
+          "away_wins": 5,
+          "draws": 15,
+          "total": 36
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.603134,
+        "p_draw": 0.172949,
+        "p_away": 0.223918,
+        "sign": "1",
+        "p_max": 0.603134,
+        "margin": 0.379216,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gc_KSA_MEX",
+      "stage": "GC",
+      "home": "KSA",
+      "away": "MEX",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1421.43,
+        "elo_away": 1681.03,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 6,
+          "draws": 1,
+          "total": 7
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 1,
+          "losses": 4,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.181866,
+        "p_draw": 0.100561,
+        "p_away": 0.717574,
+        "sign": "2",
+        "p_max": 0.717574,
+        "margin": 0.535708,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gd_FRA_AUS",
+      "stage": "GD",
+      "home": "FRA",
+      "away": "AUS",
+      "real_goals": {
+        "home": 4,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1877.32,
+        "elo_away": 1580.67,
+        "h2h": {
+          "home_wins": 4,
+          "away_wins": 1,
+          "draws": 1,
+          "total": 6
+        },
+        "racha_home": {
+          "wins": 7,
+          "draws": 1,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 0,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.749895,
+        "p_draw": 0.073088,
+        "p_away": 0.177017,
+        "sign": "1",
+        "p_max": 0.749895,
+        "margin": 0.572878,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gd_TUN_AUS",
+      "stage": "GD",
+      "home": "TUN",
+      "away": "AUS",
+      "real_goals": {
+        "home": 0,
+        "away": 1
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1483.05,
+        "elo_away": 1580.67,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 2,
+          "draws": 0,
+          "total": 3
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 3,
+          "losses": 2,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 0,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.270198,
+        "p_draw": 0.296995,
+        "p_away": 0.432807,
+        "sign": "2",
+        "p_max": 0.432807,
+        "margin": 0.135811,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gd_TUN_FRA",
+      "stage": "GD",
+      "home": "TUN",
+      "away": "FRA",
+      "real_goals": {
+        "home": 1,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1483.05,
+        "elo_away": 1877.32,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 2,
+          "draws": 2,
+          "total": 6
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 3,
+          "losses": 2,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 7,
+          "draws": 1,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.15462,
+        "p_draw": 0.027279,
+        "p_away": 0.818101,
+        "sign": "2",
+        "p_max": 0.818101,
+        "margin": 0.66348,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_ge_GER_JPN",
+      "stage": "GE",
+      "home": "GER",
+      "away": "JPN",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1730.37,
+        "elo_away": 1660.43,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 2,
+          "draws": 1,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 7,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.397815,
+        "p_draw": 0.328017,
+        "p_away": 0.274168,
+        "sign": "1",
+        "p_max": 0.397815,
+        "margin": 0.069797,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_ge_ESP_GER",
+      "stage": "GE",
+      "home": "ESP",
+      "away": "GER",
+      "real_goals": {
+        "home": 1,
+        "away": 1
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1876.4,
+        "elo_away": 1730.37,
+        "h2h": {
+          "home_wins": 9,
+          "away_wins": 9,
+          "draws": 9,
+          "total": 27
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 7,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.478083,
+        "p_draw": 0.240194,
+        "p_away": 0.281722,
+        "sign": "1",
+        "p_max": 0.478083,
+        "margin": 0.196361,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_ge_JPN_ESP",
+      "stage": "GE",
+      "home": "JPN",
+      "away": "ESP",
+      "real_goals": {
+        "home": 2,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1660.43,
+        "elo_away": 1876.4,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.232771,
+        "p_draw": 0.150654,
+        "p_away": 0.616575,
+        "sign": "2",
+        "p_max": 0.616575,
+        "margin": 0.383803,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gf_MAR_CRO",
+      "stage": "GF",
+      "home": "MAR",
+      "away": "CRO",
+      "real_goals": {
+        "home": 0,
+        "away": 0
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1755.87,
+        "elo_away": 1717.07,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 1,
+          "draws": 2,
+          "total": 3
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.350236,
+        "p_draw": 0.358287,
+        "p_away": 0.291476,
+        "sign": "X",
+        "p_max": 0.358287,
+        "margin": 0.008051,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gf_BEL_CAN",
+      "stage": "GF",
+      "home": "BEL",
+      "away": "CAN",
+      "real_goals": {
+        "home": 1,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1734.71,
+        "elo_away": 1556.48,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.56466,
+        "p_draw": 0.194291,
+        "p_away": 0.241048,
+        "sign": "1",
+        "p_max": 0.56466,
+        "margin": 0.323612,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gf_BEL_MAR",
+      "stage": "GF",
+      "home": "BEL",
+      "away": "MAR",
+      "real_goals": {
+        "home": 0,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1734.71,
+        "elo_away": 1755.87,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 2,
+          "draws": 0,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.29467,
+        "p_draw": 0.370613,
+        "p_away": 0.334717,
+        "sign": "X",
+        "p_max": 0.370613,
+        "margin": 0.035895,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gf_CRO_CAN",
+      "stage": "GF",
+      "home": "CRO",
+      "away": "CAN",
+      "real_goals": {
+        "home": 4,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1717.07,
+        "elo_away": 1556.48,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 1
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.540163,
+        "p_draw": 0.215911,
+        "p_away": 0.243926,
+        "sign": "1",
+        "p_max": 0.540163,
+        "margin": 0.296238,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gf_CRO_BEL",
+      "stage": "GF",
+      "home": "CRO",
+      "away": "BEL",
+      "real_goals": {
+        "home": 0,
+        "away": 0
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1717.07,
+        "elo_away": 1734.71,
+        "h2h": {
+          "home_wins": 3,
+          "away_wins": 3,
+          "draws": 3,
+          "total": 9
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.3061,
+        "p_draw": 0.372941,
+        "p_away": 0.320959,
+        "sign": "X",
+        "p_max": 0.372941,
+        "margin": 0.051982,
+        "is_dudoso": true,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gf_CAN_MAR",
+      "stage": "GF",
+      "home": "CAN",
+      "away": "MAR",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1556.48,
+        "elo_away": 1755.87,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 3,
+          "draws": 1,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.227418,
+        "p_draw": 0.167451,
+        "p_away": 0.605132,
+        "sign": "2",
+        "p_max": 0.605132,
+        "margin": 0.377714,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gg_BRA_SUI",
+      "stage": "GG",
+      "home": "BRA",
+      "away": "SUI",
+      "real_goals": {
+        "home": 1,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1761.16,
+        "elo_away": 1649.4,
+        "h2h": {
+          "home_wins": 4,
+          "away_wins": 2,
+          "draws": 4,
+          "total": 10
+        },
+        "racha_home": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 3,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.440752,
+        "p_draw": 0.281453,
+        "p_away": 0.277795,
+        "sign": "1",
+        "p_max": 0.440752,
+        "margin": 0.1593,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gh_URU_KOR",
+      "stage": "GH",
+      "home": "URU",
+      "away": "KOR",
+      "real_goals": {
+        "home": 0,
+        "away": 0
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1673.07,
+        "elo_away": 1588.66,
+        "h2h": {
+          "home_wins": 7,
+          "away_wins": 1,
+          "draws": 2,
+          "total": 10
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.439338,
+        "p_draw": 0.308837,
+        "p_away": 0.251824,
+        "sign": "1",
+        "p_max": 0.439338,
+        "margin": 0.130501,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gh_POR_GHA",
+      "stage": "GH",
+      "home": "POR",
+      "away": "GHA",
+      "real_goals": {
+        "home": 3,
+        "away": 2
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1763.83,
+        "elo_away": 1346.31,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 1,
+          "losses": 4,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.853396,
+        "p_draw": 0.01969,
+        "p_away": 0.126914,
+        "sign": "1",
+        "p_max": 0.853396,
+        "margin": 0.726481,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gh_KOR_GHA",
+      "stage": "GH",
+      "home": "KOR",
+      "away": "GHA",
+      "real_goals": {
+        "home": 2,
+        "away": 3
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1588.66,
+        "elo_away": 1346.31,
+        "h2h": {
+          "home_wins": 5,
+          "away_wins": 5,
+          "draws": 1,
+          "total": 11
+        },
+        "racha_home": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 1,
+          "losses": 4,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.633085,
+        "p_draw": 0.125736,
+        "p_away": 0.241179,
+        "sign": "1",
+        "p_max": 0.633085,
+        "margin": 0.391905,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_gh_POR_URU",
+      "stage": "GH",
+      "home": "POR",
+      "away": "URU",
+      "real_goals": {
+        "home": 2,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1763.83,
+        "elo_away": 1673.07,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 1,
+          "draws": 1,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.426367,
+        "p_draw": 0.304671,
+        "p_away": 0.268962,
+        "sign": "1",
+        "p_max": 0.426367,
+        "margin": 0.121695,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gh_GHA_URU",
+      "stage": "GH",
+      "home": "GHA",
+      "away": "URU",
+      "real_goals": {
+        "home": 0,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1346.31,
+        "elo_away": 1673.07,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 1,
+          "draws": 1,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 3,
+          "draws": 1,
+          "losses": 4,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 3,
+          "draws": 4,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.180069,
+        "p_draw": 0.056121,
+        "p_away": 0.76381,
+        "sign": "2",
+        "p_max": 0.76381,
+        "margin": 0.583742,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_gh_KOR_POR",
+      "stage": "GH",
+      "home": "KOR",
+      "away": "POR",
+      "real_goals": {
+        "home": 2,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1588.66,
+        "elo_away": 1763.83,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 0,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.245102,
+        "p_draw": 0.198687,
+        "p_away": 0.556211,
+        "sign": "2",
+        "p_max": 0.556211,
+        "margin": 0.311109,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_r16_NED_USA",
+      "stage": "R16",
+      "home": "NED",
+      "away": "USA",
+      "real_goals": {
+        "home": 3,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1757.87,
+        "elo_away": 1673.13,
+        "h2h": {
+          "home_wins": 5,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 6
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.461266,
+        "p_draw": 0.304626,
+        "p_away": 0.234108,
+        "sign": "1",
+        "p_max": 0.461266,
+        "margin": 0.156641,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_r16_ARG_AUS",
+      "stage": "R16",
+      "home": "ARG",
+      "away": "AUS",
+      "real_goals": {
+        "home": 2,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1874.81,
+        "elo_away": 1580.67,
+        "h2h": {
+          "home_wins": 7,
+          "away_wins": 1,
+          "draws": 1,
+          "total": 9
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 0,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.753475,
+        "p_draw": 0.074,
+        "p_away": 0.172525,
+        "sign": "1",
+        "p_max": 0.753475,
+        "margin": 0.580951,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_r16_ENG_SEN",
+      "stage": "R16",
+      "home": "ENG",
+      "away": "SEN",
+      "real_goals": {
+        "home": 3,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1825.97,
+        "elo_away": 1688.99,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 2
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.48155,
+        "p_draw": 0.249414,
+        "p_away": 0.269036,
+        "sign": "1",
+        "p_max": 0.48155,
+        "margin": 0.212514,
+        "is_dudoso": false,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_r16_JPN_CRO",
+      "stage": "R16",
+      "home": "JPN",
+      "away": "CRO",
+      "real_goals": {
+        "home": 1,
+        "away": 1
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1660.43,
+        "elo_away": 1717.07,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 1,
+          "draws": 2,
+          "total": 4
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.283439,
+        "p_draw": 0.342201,
+        "p_away": 0.37436,
+        "sign": "2",
+        "p_max": 0.37436,
+        "margin": 0.032159,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_r16_BRA_KOR",
+      "stage": "R16",
+      "home": "BRA",
+      "away": "KOR",
+      "real_goals": {
+        "home": 4,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1761.16,
+        "elo_away": 1588.66,
+        "h2h": {
+          "home_wins": 8,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 9
+        },
+        "racha_home": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.580296,
+        "p_draw": 0.197065,
+        "p_away": 0.222639,
+        "sign": "1",
+        "p_max": 0.580296,
+        "margin": 0.357657,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_r16_MAR_ESP",
+      "stage": "R16",
+      "home": "MAR",
+      "away": "ESP",
+      "real_goals": {
+        "home": 0,
+        "away": 0
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1755.87,
+        "elo_away": 1876.4,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 5,
+          "draws": 3,
+          "total": 8
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.243637,
+        "p_draw": 0.264762,
+        "p_away": 0.491601,
+        "sign": "2",
+        "p_max": 0.491601,
+        "margin": 0.226838,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_r16_POR_SUI",
+      "stage": "R16",
+      "home": "POR",
+      "away": "SUI",
+      "real_goals": {
+        "home": 6,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1763.83,
+        "elo_away": 1649.4,
+        "h2h": {
+          "home_wins": 10,
+          "away_wins": 11,
+          "draws": 5,
+          "total": 26
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 3,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.440695,
+        "p_draw": 0.278651,
+        "p_away": 0.280654,
+        "sign": "1",
+        "p_max": 0.440695,
+        "margin": 0.16004,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_qf_CRO_BRA",
+      "stage": "QF",
+      "home": "CRO",
+      "away": "BRA",
+      "real_goals": {
+        "home": 1,
+        "away": 1
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1717.07,
+        "elo_away": 1761.16,
+        "h2h": {
+          "home_wins": 0,
+          "away_wins": 4,
+          "draws": 2,
+          "total": 6
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 4,
+          "draws": 1,
+          "losses": 3,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.27259,
+        "p_draw": 0.352205,
+        "p_away": 0.375205,
+        "sign": "2",
+        "p_max": 0.375205,
+        "margin": 0.023,
+        "is_dudoso": true,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_qf_NED_ARG",
+      "stage": "QF",
+      "home": "NED",
+      "away": "ARG",
+      "real_goals": {
+        "home": 2,
+        "away": 2
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1757.87,
+        "elo_away": 1874.81,
+        "h2h": {
+          "home_wins": 4,
+          "away_wins": 1,
+          "draws": 5,
+          "total": 10
+        },
+        "racha_home": {
+          "wins": 5,
+          "draws": 3,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.295746,
+        "p_draw": 0.277487,
+        "p_away": 0.426767,
+        "sign": "2",
+        "p_max": 0.426767,
+        "margin": 0.131022,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_qf_MAR_POR",
+      "stage": "QF",
+      "home": "MAR",
+      "away": "POR",
+      "real_goals": {
+        "home": 1,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1755.87,
+        "elo_away": 1763.83,
+        "h2h": {
+          "home_wins": 2,
+          "away_wins": 1,
+          "draws": 0,
+          "total": 3
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 5,
+          "draws": 2,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.314855,
+        "p_draw": 0.37727,
+        "p_away": 0.307875,
+        "sign": "X",
+        "p_max": 0.37727,
+        "margin": 0.062415,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_qf_ENG_FRA",
+      "stage": "QF",
+      "home": "ENG",
+      "away": "FRA",
+      "real_goals": {
+        "home": 1,
+        "away": 2
+      },
+      "real_sign": "2",
+      "inputs": {
+        "elo_home": 1825.97,
+        "elo_away": 1877.32,
+        "h2h": {
+          "home_wins": 17,
+          "away_wins": 10,
+          "draws": 5,
+          "total": 32
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 7,
+          "draws": 1,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.299622,
+        "p_draw": 0.348306,
+        "p_away": 0.352072,
+        "sign": "2",
+        "p_max": 0.352072,
+        "margin": 0.003765,
+        "is_dudoso": true,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_sf_ARG_CRO",
+      "stage": "SF",
+      "home": "ARG",
+      "away": "CRO",
+      "real_goals": {
+        "home": 3,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1874.81,
+        "elo_away": 1717.07,
+        "h2h": {
+          "home_wins": 3,
+          "away_wins": 2,
+          "draws": 1,
+          "total": 6
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.51743,
+        "p_draw": 0.22243,
+        "p_away": 0.26014,
+        "sign": "1",
+        "p_max": 0.51743,
+        "margin": 0.257291,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_sf_FRA_MAR",
+      "stage": "SF",
+      "home": "FRA",
+      "away": "MAR",
+      "real_goals": {
+        "home": 2,
+        "away": 0
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1877.32,
+        "elo_away": 1755.87,
+        "h2h": {
+          "home_wins": 4,
+          "away_wins": 0,
+          "draws": 4,
+          "total": 8
+        },
+        "racha_home": {
+          "wins": 7,
+          "draws": 1,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.490623,
+        "p_draw": 0.264014,
+        "p_away": 0.245363,
+        "sign": "1",
+        "p_max": 0.490623,
+        "margin": 0.22661,
+        "is_dudoso": false,
+        "used_fallback": false
+      }
+    },
+    {
+      "match_id": "wc2022_3p_CRO_MAR",
+      "stage": "3P",
+      "home": "CRO",
+      "away": "MAR",
+      "real_goals": {
+        "home": 2,
+        "away": 1
+      },
+      "real_sign": "1",
+      "inputs": {
+        "elo_home": 1717.07,
+        "elo_away": 1755.87,
+        "h2h": {
+          "home_wins": 1,
+          "away_wins": 0,
+          "draws": 2,
+          "total": 3
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 1,
+          "losses": 1,
+          "n_matches": 8
+        },
+        "racha_away": {
+          "wins": 6,
+          "draws": 2,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.291476,
+        "p_draw": 0.358287,
+        "p_away": 0.350236,
+        "sign": "X",
+        "p_max": 0.358287,
+        "margin": 0.008051,
+        "is_dudoso": true,
+        "used_fallback": true
+      }
+    },
+    {
+      "match_id": "wc2022_f_ARG_FRA",
+      "stage": "F",
+      "home": "ARG",
+      "away": "FRA",
+      "real_goals": {
+        "home": 3,
+        "away": 3
+      },
+      "real_sign": "X",
+      "inputs": {
+        "elo_home": 1874.81,
+        "elo_away": 1877.32,
+        "h2h": {
+          "home_wins": 6,
+          "away_wins": 3,
+          "draws": 4,
+          "total": 13
+        },
+        "racha_home": {
+          "wins": 6,
+          "draws": 0,
+          "losses": 1,
+          "n_matches": 7
+        },
+        "racha_away": {
+          "wins": 7,
+          "draws": 1,
+          "losses": 0,
+          "n_matches": 8
+        },
+        "is_host_match": false
+      },
+      "expected": {
+        "p_home": 0.319348,
+        "p_draw": 0.378729,
+        "p_away": 0.301923,
+        "sign": "X",
+        "p_max": 0.378729,
+        "margin": 0.059381,
+        "is_dudoso": true,
+        "used_fallback": false
+      }
+    }
+  ]
+}

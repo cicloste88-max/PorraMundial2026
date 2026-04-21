@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **bbad657** (fase D.2 scrape_h2h vía 11v11.com). IA Predictor Fases A–D.2 consolidadas en main; Fase C desplegada desde rama `claude/fase-c-last-n` (PR #15 abierto, EF v6 ACTIVE); Fases E/F pendientes. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **2904025** (fase C squash-mergeada, PR #15 cerrada). IA Predictor Fases A–D.2 + C en main; Fase E implementada en rama `claude/fase-e-motor` (PR abierto pendiente de deploy y paridad test). Fase F pendiente. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -260,7 +260,7 @@ whatsapp_subscribers (
 | `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
-| `porra-ia-compute` | v6 | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. `verify_jwt=false`. Fase E (compute) pendiente. Ver sección "🤖 IA Predictor" |
+| `porra-ia-compute` | v6 (v7 pending deploy) | IA Predictor. Actions funcionales: `status/scrape_elo/scrape_last5/scrape_h2h`. Fase E implementada en rama `claude/fase-e-motor` añadiendo `freeze_snapshot/compute_groups/compute_match` + motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX) + rate limit 30/min + quip Haiku + `ia_snapshots` + cron 11 jun. `verify_jwt=false`. Ver sección "🤖 IA Predictor" |
 | `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
 | `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
 
@@ -460,13 +460,22 @@ ia_predictions (
 | B.2 | scrape_elo via Wikipedia Module | `c845f3e` (PR #12) | ✅ merged + desplegada |
 | D | scrape_h2h via Wikipedia all-time_record | `cba5dcc` (PR #13) | ⚠️ deprecada por D.2 (ver ERR-24) |
 | D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
-| C | scrape_last_n via 11v11.com/matches | `5a87f1e` (rama `claude/fase-c-last-n`, PR #15 abierto) | 🟡 EF v6 desplegada desde rama; PR pendiente de merge |
-| E | compute + UPSERT `ia_predictions` | — | ⏳ pendiente |
+| C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada (EF v6) |
+| E | Motor IA log-odds+softmax + snapshots + compute_* | rama `claude/fase-e-motor` | 🟡 código listo, pendiente apply migration + deploy v7 + test paridad |
 | F | wiring frontend `scoring.js` / `ko.js` | — | ⏳ pendiente |
 
-**Estado tablas al cierre C (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_predictions` 0.
+**Estado tablas al cierre C (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_predictions` 0 · `ia_snapshots` (pendiente migración Fase E).
 
 **Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase).
+
+**Fórmula del motor IA (Fase E, decidida tras back-test WC2022 46 partidos):**
+- Pesos default: **ELO 75% + H2H 10% + Racha 15%**
+- Fallback (H2H con <5 partidos): **ELO 85% + Racha 15%**
+- Home advantage: +85 base hosts / +95 México (altitud), solo aplica si `home_code ∈ {MEX, USA, CAN}` en grupos. En eliminatorias siempre `is_host_match=false` (sedes rotativas/neutras).
+- Margen dudoso: `margin < 0.08` → flag `is_dudoso` para UI.
+- Back-test WC2022: accuracy 63.0%, log-loss 0.932, Brier 0.560 (supera baseline).
+- Snapshot fairness: la IA se congela con `freeze_snapshot` el 11 jun 00:00 UTC y NO se adapta al torneo. Misma predicción para todos los users siempre. `ia_snapshots` con invariante "1 activo" + FK desde `ia_predictions`.
+- Gate de merge: test de paridad Python↔TS (46 casos, tolerancia 1e-3) debe pasar.
 
 ---
 
