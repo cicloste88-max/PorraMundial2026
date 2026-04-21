@@ -383,16 +383,63 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 
 ---
 
-## 🔍 Deuda técnica identificada (abr 2026)
+## 🔍 Deuda técnica identificada (sanity check 20 abr 2026)
+
+> Detalle completo en **`docs/sanity-check-20abr2026.md`**. Resumen:
+
+### Crítico (invertir antes del 11 jun 2026)
 
 | Área | Detalle | Prioridad |
 |---|---|---|
-| ~~CSS~~ | ~~4 bloques `<style>` inline en index.html duplicados con `css/*.css`~~ → ✅ **resuelto** 19 abr (`9e93fe8`) | — |
-| Tests | 0 tests. Motor de puntuación sin cobertura | Alta |
-| JS | 70 `onclick=` inline en index.html — fuerza funciones globales | Media |
-| JS | Estado global sin contrato: `EQUIPOS` es globals implícito, `AWARDS_CFG` explícito, `window.BRACKET` mixto | Media |
-| JS | `scoring.js` 1446 LOC mezclando lógica pura y render (41 `document.*` calls) | Media |
-| JS | 86 `innerHTML=` total, uso irregular de `escapeHtml` | Media |
-| JS | 17 `console.log/warn/info` residuales en producción | Baja |
+| **IA fake** | `scoring.js:941` y `ui-nav.js:49` fetchean `api.anthropic.com` **sin `x-api-key`** → 401 silencioso → fallback hardcoded. La feature IA aparenta funcionar sin funcionar. | 🔴 Crítica |
+| **Tests** | 0 tests sobre 8.626 LOC JS. Motor de puntuación (`calc*Points`) decidirá quién gana el bote. Riesgo de disputas reales. | 🔴 Crítica |
+| **CI/CD** | `.github/workflows/` vacío. Cada push a `main` llega a Vercel sin gates. Origen directo del coste de la saga v2.1→v2.11 (11 iteraciones). | 🔴 Crítica |
 
-**Plan de 6 fases propuesto** (Fase 0 higiene · Fase 1 CSS · Fase 2 tests · Fase 3 onclick delegation · Fase 4 refactor scoring · Fase 5 ES modules). Fase 0 ejecutada 17 abr 2026.
+### Alto (mantenibilidad / escala)
+
+| Área | Detalle | Prioridad |
+|---|---|---|
+| Estado global | **105 símbolos** `window.*` leídos, **59 asignaciones** `window.X = ...`. Sin contrato, difícil debug. | 🟠 Alta |
+| `onclick=` inline | **62 ocurrencias** en `index.html` obligan a funciones globales. `ReferenceError` silenciosos al renombrar. | 🟠 Alta |
+| `scoring.js` mixto | 1.438 LOC mezcla reglas puras (testeables), render DOM (`createMatchCard`, `updateCardUI`), datos (`KIT_OVERRIDES`, `STICKER_POOL`) y la llamada muerta a IA. | 🟠 Alta |
+| `ui-groups.js` / `ui-groups-mobile.js` | Paralelos, ~36 funciones entre ambos. Riesgo de divergencia desktop/móvil ya visto dos veces (ERR-22). | 🟠 Alta |
+| Saga meta F5 | No había tooling rápido para diagnóstico visual (`MutationObserver` llegó en la iteración 11). Causa meta de ERR-23. | 🟠 Alta |
+
+### Medio (performance / UX)
+
+| Área | Detalle | Prioridad |
+|---|---|---|
+| Bundle único | `dist/assets/index-*.js` = 188 kB (49 kB gzip). Sin code splitting. Admin + KO + Live se descargan siempre. | 🟡 Media |
+| `loadScript` chain | **14 requests HTTP secuenciales** en `main-entry.js`. En 3G añade 2-3s al arranque. | 🟡 Media |
+| `setTimeout` magic | **27 números mágicos** dispersos. Parte del coste de la saga F5. | 🟡 Media |
+| Splash 4s hardcoded | Amigos nuevos esperan 4s fijos cada primera visita por dispositivo. | 🟡 Media |
+| Auth en localStorage | Tokens expuestos a XSS. Tolerable pero requiere auditoría de `innerHTML` (~70 usos) + `escapeHtml` en datos de usuario. | 🟡 Media |
+
+### Bajo (cosmético / infra)
+
+| Área | Detalle | Prioridad |
+|---|---|---|
+| `console.log/warn/error` | **56 ocurrencias** en producción sin gate por env. | 🟢 Baja |
+| CSP / SRI | Google Fonts sin `integrity`. Sin `Content-Security-Policy` header. | 🟢 Baja |
+| Analytics / errors | Sin Sentry, Plausible ni equivalente. Durante el Mundial los errores móviles se perderán. | 🟢 Baja |
+
+### ✅ Resuelto durante abr 2026
+
+- ~~4 bloques `<style>` inline en `index.html` duplicados con `css/*.css`~~ → ✅ 19 abr (`9e93fe8`)
+- ~~`css/` fuera de `public/` no llegaba al build de Vite~~ → ✅ 18 abr (`b4a52e6`)
+- ~~Flash welcome al F5 con sesión válida~~ → ✅ 20 abr saga v2.1→v2.11 (HEAD `8bc7f30`)
+
+### Plan 8 semanas (20 abr → 11 jun)
+
+- **S1-S2** — Tests motor puntuación · CI básica · EF `porra-ia-predict` (4 días)
+- **S3-S4** — Code splitting · Logger · Sentry · Auditoría innerHTML (3 días)
+- **S5-S6** — Split `scoring.js` · Consolidación `ui-groups*` · Event delegation (3-4 días, requiere tests S1)
+- **S7-S8** — Tooling debug · Splash condicional · `AppState` + `TIMINGS` (2-3 días)
+
+**Plan NO hacer antes del Mundial:** TypeScript, hash routing, Service Worker, Redux, cookies `httpOnly`. Todo ello sobredimensionado vs la inversión crítica.
+
+---
+
+### Plan de 6 fases histórico (mantenido como referencia)
+
+Fase 0 higiene · Fase 1 CSS · Fase 2 tests · Fase 3 onclick delegation · Fase 4 refactor scoring · Fase 5 ES modules. Fase 0 ejecutada 17 abr 2026. Fase 1 ejecutada 19 abr (`9e93fe8`). Fases 2-5 incorporadas al plan 8 semanas arriba.
