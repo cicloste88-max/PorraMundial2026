@@ -3,7 +3,7 @@
 Catálogo histórico de bugs detectados y patrones críticos de prevención.
 Cada entrada: **Síntoma**, **Causa**, **Fix aplicado**, **Patrón preventivo**, **Fecha detección**.
 
-Al debuggear un problema nuevo: **consultar primero este catálogo** (ERR-01 a ERR-26) por si coincide con un patrón ya resuelto.
+Al debuggear un problema nuevo: **consultar primero este catálogo** (ERR-01 a ERR-27) por si coincide con un patrón ya resuelto.
 
 ---
 
@@ -377,3 +377,18 @@ Tres fallos encadenados que requirieron solución combinada.
   - Desde Supabase/SQL solo se puede leer/postear/borrar vía HTTP — para PUT/PATCH hay que salir a otro entorno (Claude Code con MCP GitHub, cliente `gh`, UI web, o EF en Deno que sí soporta todos los métodos).
   - Cuando el MCP GitHub esté disponible, mergear el PR pendiente como cierre. Si el despliegue previo ya subió el código, el merge es administrativo (ya está en producción).
 - **Fecha detección:** 21 abr 2026 PM (durante cierre Fase C, con MCP GitHub desconectado y necesidad de desplegar la EF antes de que alguien tocase la rama).
+
+---
+
+## ERR-27 — `supabase-js` no enruta `from("vault.x")` al schema `vault`; `.schema("vault")` tampoco porque el schema no está expuesto vía PostgREST
+
+- **Síntoma:** `freeze_snapshot` (y toda action que llame `requireAdminOrCron`) devuelve **401** incluso cuando el header `X-Cron-Key` es correcto. Root cause: `readVaultSecret` devuelve `null` silenciosamente → el compare vs el valor del Vault falla → el flow cae a `requireAuth` sin JWT → 401.
+- **Causas en cascada (dos intentos fallidos antes del fix):**
+  1. Código inicial: `supa.from("vault.decrypted_secrets").select(...)`. PostgREST interpreta `"vault.decrypted_secrets"` como **nombre literal de tabla** en el schema `public` (que no existe), no como `decrypted_secrets` en schema `vault`. Devuelve `null`/`error`, no rompe el 200 OK de la llamada genérica, y `readVaultSecret` cae al `return null`.
+  2. Primer fix (`36ba6b3`): cambio a `supa.schema("vault").from("decrypted_secrets")`. `supabase-js` v2 sí soporta `.schema()` en Deno runtime. Pero **el schema `vault` no está expuesto en `api.schemas`** del proyecto Supabase, así que PostgREST responde `PGRST106 schema_not_exposed_via_api`. Mismo resultado: null, 401.
+- **Fix aplicado (`a210598`):** tirar del RPC `get_vault_secrets(secret_names text[])` ya existente en el proyecto (creado y consumido por `porra-fix-encoding` v6) vía `fetch` directo a `/rest/v1/rpc/get_vault_secrets` con headers `apikey` + `Authorization: Bearer` (ambos = `SUPABASE_SERVICE_ROLE_KEY`). Cambio de firma: `readVaultSecret(supa, name)` → `readVaultSecret(supabaseUrl, serviceRoleKey, name)`. Body: `{"secret_names": [name]}`. Respuesta: array con objetos `{name, secret}` — se busca por nombre y se devuelve `.trim()` (patrón ERR-04).
+- **Patrón preventivo:**
+  - Para leer Vault secrets desde una Edge Function, **usar RPC público explícito** (`get_vault_secrets` o similar) en lugar de `.from(...)` o `.schema("vault").from(...)`. Solo exponer el schema `vault` vía `api.schemas` si realmente quieres pagar ese blast radius (todos los endpoints REST pueden entonces hablarle a `vault`).
+  - Un auth path que depende de `readVaultSecret` debe **fail-loud al menos en dev/test**: añadir log warning cuando devuelve `null` para un secret que debería existir. Aquí el fallo silencioso retrasó el diagnóstico de 401 varios minutos.
+  - EF secrets vs Vault: **EF secrets via `Deno.env.get(...)`** es el patrón del proyecto para API keys externas (`ANTHROPIC_API_KEY`, `FOOTBALL_DATA_API_KEY`). **Vault** es para secrets operacionales (tokens GitHub, cron keys, credenciales Twilio). No mezclar.
+- **Fecha detección:** 21 abr 2026 noche (smoke tests post-deploy v7 → 401 en `freeze_snapshot` con X-Cron-Key correcto). Resuelto en v9 con RPC fix.

@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-21 PM | Fuente: checkpoint tras IA Predictor Fases A–D.2 + C merged + Fase E código listo en rama
+> Actualizado: 2026-04-21 noche | Fuente: checkpoint tras IA Predictor **Fases A–E cerradas y desplegadas** (EF v9 ACTIVE, paridad 46/46, smoke tests verdes)
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -12,7 +12,7 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable** | `2904025` (fase C squash-merge, PR #15 cerrado). IA Predictor Fases A–D.2 + C en main. Fase E implementada en rama `claude/fase-e-motor` (pendiente migration + deploy + test paridad). Fase F pendiente. |
+| **Último commit estable** | `8d8b667` (fase E squash-merge, PR #16 cerrado). IA Predictor **Fases A–E** en main, desplegadas y validadas (EF `porra-ia-compute` v9 ACTIVE, paridad Python↔TS 46/46, smoke tests verdes, snapshot activo `initial_test_21apr`). Fase F (wiring frontend) pendiente. |
 
 ---
 
@@ -174,7 +174,7 @@ pg_cron (cada minuto durante partido)
 | `porra-apify-webhook` | v7 | ⚠️ | Detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | ✅ | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
-| `porra-ia-compute` | v6 | ✅ | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. Fase E (compute) pendiente. `verify_jwt=false` |
+| `porra-ia-compute` | v9 | ✅ | IA Predictor (Fases A–E cerradas). 7 actions: `status / scrape_elo / scrape_h2h / scrape_last5 / freeze_snapshot / compute_groups / compute_match`. Motor log-odds+softmax, pesos 75/10/15 (fallback 85/0/15), home adv +85/+95 MEX. Rate limit 30/min. Quip Haiku 4.5. `verify_jwt=false` |
 | `porra-sofascore-proxy` | v8 | ❌ | Obsoleta, sustituida por actor propio |
 | `porra-github-pusher` | v6 | ❌ | PLACEHOLDER — ignorar |
 
@@ -215,15 +215,16 @@ Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si predicci�
 | `scrape_last5` | 11v11.com/teams/{slug}/tab/matches/ (HTML) | `ia_last5_results` | ✅ Fase C (en rama, EF desplegada) |
 | `compute` | Las 3 tablas anteriores | `ia_predictions` | ⏳ Fase E pendiente |
 
-**Capa 2 — Cómputo (Fase E, código listo en rama `claude/fase-e-motor`):** motor log-odds+softmax con fórmula **ELO 75% + H2H 10% + Racha 15%** (fallback **85/0/15** si H2H<5 partidos). Home advantage +85 base hosts / +95 MEX (solo en grupos). Sign = argmax; margen dudoso <0.08. Tabla `ia_snapshots` con invariante "1 activo" → fairness absoluta (misma predicción para todos los users). Back-test WC2022 46 partidos: accuracy 63.0%, log-loss 0.932, Brier 0.560. Pesos revisados tras análisis de colinealidad ELO↔Racha (previos 50/25/25 obsoletos).
+**Capa 2 — Cómputo (Fase E, cerrada y desplegada en EF v9):** motor log-odds+softmax con fórmula **ELO 75% + H2H 10% + Racha 15%** (fallback **85/0/15** si H2H<5 partidos). Home advantage +85 base hosts / +95 MEX (solo en grupos). Sign = argmax; margen dudoso <0.08. Tabla `ia_snapshots` con invariante "1 activo" → fairness absoluta (misma predicción para todos los users). Paridad Python↔TS validada 46/46 sobre WC2022 con tolerancia 1e-3. Back-test: accuracy 63.0%, log-loss 0.932, Brier 0.560. Pesos revisados tras análisis de colinealidad ELO↔Racha (previos 50/25/25 obsoletos).
 
 **Capa 3 — Consumo (Fase F, pendiente):** `scoring.js` / `ko.js` leen `ia_predictions` (RLS policy `ia_predictions_public_read` lo permite), pintan pronóstico + quip en tarjeta, calculan el bonus IA opuesta.
 
-**Estado tablas al 21 abr PM:**
+**Estado tablas al 21 abr noche:**
 - `ia_elo_fifa`: **211 filas** (FIFA actualizada al 2026-04-01).
 - `ia_h2h`: **815 pairs únicos** de los ~1.128 teóricos entre los 48 mundialistas (~72% cobertura).
 - `ia_last5_results`: **48 filas** (N=8 partidos por selección en `results JSONB`).
-- `ia_predictions`: **0** (pendiente Fase E).
+- `ia_snapshots`: **2 filas** (snapshot activo: `initial_test_21apr`, id=2).
+- `ia_predictions`: poblada por `compute_match` on-demand; batch completa prevista en cron `ia-compute-groups-mundial` 11 jun 00:10 UTC (72 filas de fase de grupos).
 
 **Profundidad racha dinámica:** `N=8` default, ampliable a `N=10` antes del 11 jun vía `{"action":"scrape_last5","limit":10}` cuando 11v11 publique el primer amistoso pre-Mundial. Activación manual.
 
@@ -395,7 +396,8 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-21 AM | Sanity check 20 abr — 4 commits pequeños a `docs/sanity-check-20abr2026.md` (13 hallazgos priorizados) + `CONTEXTO` deuda técnica reescrita por niveles | c5029ac |
 | 2026-04-21 AM→PM | **IA Predictor Fases A–D.2** en main (EF `porra-ia-compute` v6). Fase A migración + EF esqueleto (#10); Fase B.2 `scrape_elo` vía Wikipedia Module (#12, B #11 deprecada); Fase D.2 `scrape_h2h` vía 11v11.com/stats (#14, D #13 deprecada por Wikipedia inadecuada ERR-24). Estado tablas: ELO 211 · H2H 815 · last5 pendiente | bbad657 |
 | 2026-04-21 PM | **Fase C IA Predictor** — `scrape_last_n` vía 11v11.com/matches (N=8 default, ampliable). EF v6 desplegada desde rama (bypass merge por ERR-26) y PR #15 squash-mergeada localmente con `Closes #15` cuando MCP GitHub estaba disponible. Smoke: teams_parsed 48/48, rows_upserted 48/48 | 2904025 |
-| 2026-04-21 PM | **Fase E IA Predictor (código)** — motor log-odds+softmax en rama `claude/fase-e-motor`. 8 commits: migration `ia_snapshots` + alter `ia_predictions` + CHECK `ia_h2h`, `lib/predictor.ts` (port fiel de Python, paridad 1e-3), `lib/repository.ts` + `lib/wc2026.ts` + `TEAM_NAMES_ES`, `lib/auth.ts` (require + cron + service_role bypass) + `lib/quipGenerator.ts` (Claude Haiku + fallback), refactor `index.ts` con 3 nuevas actions (`freeze_snapshot/compute_groups/compute_match`) + rate limit 30/min + CORS whitelist, tests (13 unitarios + paridad 46 casos WC2022), cron 11 jun 00:00 UTC + 00:10, docs consolidados. Pendiente: apply migration + deploy v7 + test paridad verde + smoke tests. | rama claude/fase-e-motor |
+| 2026-04-21 PM | **Fase E IA Predictor (código)** — motor log-odds+softmax en rama `claude/fase-e-motor`. 8 commits: migration `ia_snapshots` + alter `ia_predictions` + CHECK `ia_h2h`, `lib/predictor.ts` (port fiel de Python, paridad 1e-3), `lib/repository.ts` + `lib/wc2026.ts` + `TEAM_NAMES_ES`, `lib/auth.ts` (require + cron + service_role bypass) + `lib/quipGenerator.ts` (Claude Haiku + fallback), refactor `index.ts` con 3 nuevas actions (`freeze_snapshot/compute_groups/compute_match`) + rate limit 30/min + CORS whitelist, tests (13 unitarios + paridad 46 casos WC2022), cron 11 jun 00:00 UTC + 00:10, docs consolidados. | rama claude/fase-e-motor |
+| 2026-04-21 noche | **Fase E IA Predictor — deploy + validación + merge.** 2 migraciones aplicadas, secrets `IA_CRON_KEY` (Vault 64 chars) + `ANTHROPIC_API_KEY` (EF secrets). 3 fixes sobre la rama durante smoke tests: (fa79699) `ANTHROPIC_API_KEY` via `Deno.env.get` en lugar de Vault — spec §3.1 erróneo, corregido; (36ba6b3) `.schema("vault")` en supabase-js v2 (no funciona en runtime porque el schema no está expuesto); (a210598) fix definitivo vía RPC `get_vault_secrets` con `fetch` directo (ver ERR-27). EF `porra-ia-compute` **v9 ACTIVE**. Paridad Python↔TS **46/46 verde** con tolerancia 1e-3 (ejecutada vía Node `--experimental-strip-types` porque `deno.land` bloqueado en sandbox). Smoke tests todos verdes. PR #16 squash-mergeada a main. | `8d8b667` |
 
 ---
 

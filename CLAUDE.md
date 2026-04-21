@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **2904025** (fase C squash-mergeada, PR #15 cerrada). IA Predictor Fases A–D.2 + C en main; Fase E implementada en rama `claude/fase-e-motor` (PR abierto pendiente de deploy y paridad test). Fase F pendiente. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **8d8b667** (fase E squash-mergeada, PR #16 cerrada). IA Predictor Fases A–E cerradas en main con EF `porra-ia-compute` v9 ACTIVE, paridad Python↔TS verde (46/46), smoke tests verdes. Fase F (wiring frontend) pendiente. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -260,7 +260,7 @@ whatsapp_subscribers (
 | `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
-| `porra-ia-compute` | v6 (v7 pending deploy) | IA Predictor. Actions funcionales: `status/scrape_elo/scrape_last5/scrape_h2h`. Fase E implementada en rama `claude/fase-e-motor` añadiendo `freeze_snapshot/compute_groups/compute_match` + motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX) + rate limit 30/min + quip Haiku + `ia_snapshots` + cron 11 jun. `verify_jwt=false`. Ver sección "🤖 IA Predictor" |
+| `porra-ia-compute` | v9 | IA Predictor (Fases A–E cerradas). 7 actions: `status/scrape_elo/scrape_h2h/scrape_last5/freeze_snapshot/compute_groups/compute_match`. Motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX). Rate limit 30/min (service_role inmune). Quip via Claude Haiku 4.5. `ia_snapshots` (1 activo). Cron 11 jun 00:00 freeze + 00:10 compute_groups. `verify_jwt=false`. Ver sección "🤖 IA Predictor" |
 | `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
 | `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
 
@@ -373,7 +373,7 @@ EF porra-ia-compute  →   ia_predictions  →        frontend
  (4 actions scraper)      (fórmula 50/25/25)      (scoring.js / ko.js)
 ```
 
-**Fórmula del pronóstico** (Fase E, pendiente):
+**Fórmula del pronóstico** (Fase E, cerrada — motor log-odds+softmax):
 
 | Señal | Peso | Fuente |
 |---|---|---|
@@ -460,13 +460,13 @@ ia_predictions (
 | B.2 | scrape_elo via Wikipedia Module | `c845f3e` (PR #12) | ✅ merged + desplegada |
 | D | scrape_h2h via Wikipedia all-time_record | `cba5dcc` (PR #13) | ⚠️ deprecada por D.2 (ver ERR-24) |
 | D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
-| C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada (EF v6) |
-| E | Motor IA log-odds+softmax + snapshots + compute_* | rama `claude/fase-e-motor` | 🟡 código listo, pendiente apply migration + deploy v7 + test paridad |
+| C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada |
+| E | Motor IA log-odds+softmax + snapshots + compute_* | `8d8b667` (PR #16) | ✅ merged + desplegada (EF v9). Paridad 46/46 verde. |
 | F | wiring frontend `scoring.js` / `ko.js` | — | ⏳ pendiente |
 
-**Estado tablas al cierre C (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_predictions` 0 · `ia_snapshots` (pendiente migración Fase E).
+**Estado tablas al cierre E (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` pobladas por compute_match on-demand (quedará batch-poblada al cron del 11 jun 00:10 UTC con los 72 partidos de grupos).
 
-**Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase).
+**Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase). ERR-27 (`supa.from("vault.decrypted_secrets")` no enruta al schema `vault`; `.schema("vault")` tampoco porque `vault` no está expuesto en `api.schemas`; fix: RPC `get_vault_secrets` vía `fetch`).
 
 **Fórmula del motor IA (Fase E, decidida tras back-test WC2022 46 partidos):**
 - Pesos default: **ELO 75% + H2H 10% + Racha 15%**
@@ -540,7 +540,7 @@ apify push --actor-id N8vUChlhok5JU3cnL
 - **Actualizar migration-log.md** tras cada acción importante
 - **NO usar addEventListener DOMContentLoaded** en classic scripts cargados via loadScript
 - Actor Azzouzana `VzKtdb1t0Qnc07X8V` tiene caché CDN — NO usar para datos live
-- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-26) antes de debuggear
+- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-27) antes de debuggear
 - **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
 - dice.js se mantiene dentro de admin.js (no separar)
 - **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo

@@ -924,3 +924,46 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   - Primer `freeze_snapshot` manual con `label: "initial_test_21apr"` para poblar snapshot y validar `compute_match` end-to-end.
   - Si todo verde → merge PR de `claude/fase-e-motor` a main.
   - Si smoke test descubre algún error no documentado, crear ERR-27+ siguiendo el patrón conocido (síntoma / causa / fix / patrón preventivo / fecha).
+
+[21-04-2026 noche] FASE E DESPLEGADA + VALIDADA + MERGEADA. Cierre del bloque IA Predictor backend.
+
+  **Pipeline ejecutado por San desde Claude.ai:**
+  1. Aplicadas las 2 migraciones Fase E vía MCP Supabase: `ia_snapshots` (unique index "1 activo"), alter `ia_predictions` (snapshot_id FK + is_ko_ondemand + idx lookup), CHECK `chk_h2h_canonical_order` en `ia_h2h`, cron nocturno `ia-snapshots-cleanup` (03:00 UTC), cron `ia-freeze-snapshot-mundial` (11 jun 00:00 UTC) y `ia-compute-groups-mundial` (11 jun 00:10 UTC).
+  2. Creado secreto `IA_CRON_KEY` en Vault (64 chars hex). Confirmado `ANTHROPIC_API_KEY` en Edge Function secrets (no Vault — patrón del proyecto).
+  3. Deploy EF `porra-ia-compute` desde rama `claude/fase-e-motor` con `--no-verify-jwt --use-api`. Subida vía CLI: 6 ficheros (index.ts + 5 lib/*.ts). La CLI omitió automáticamente `tests/*` (seguir imports).
+
+  **3 fixes descubiertos durante smoke tests** (aplicados sobre la rama con redeploy intermedio cada uno):
+  - **`fa79699`** — `fix(ia): ANTHROPIC_API_KEY via Deno.env (EF secrets) — readVaultSecret reservado para secrets operacionales`. El spec §3.1 decía Vault pero el patrón del proyecto es `Deno.env.get("ANTHROPIC_API_KEY")` (como `FOOTBALL_DATA_API_KEY`, `SUPABASE_*`). Corregido en `index.ts` L858 + L1027, import `readVaultSecret` eliminado del index (sigue en `auth.ts` para `IA_CRON_KEY`).
+  - **`36ba6b3`** — `fix(ia): readVaultSecret usa .schema("vault").from("decrypted_secrets")`. Primer intento de resolver 401 en `freeze_snapshot` con `X-Cron-Key`: el `supa.from("vault.decrypted_secrets")` original fallaba porque PostgREST interpreta el string literal como tabla en schema `public`. Probamos `.schema("vault").from("decrypted_secrets")` — no resolvió (schema `vault` no expuesto en `api.schemas`).
+  - **`a210598`** — `fix(ia): readVaultSecret via RPC get_vault_secrets (vault schema no expuesto)`. Fix definitivo: cambio de firma `readVaultSecret(supa, name)` → `readVaultSecret(supabaseUrl, serviceRoleKey, name)` + `fetch POST /rest/v1/rpc/get_vault_secrets` con `apikey` + `Authorization` Bearer. Mismo patrón probado en `porra-fix-encoding` v6. Caller `requireAdminOrCron` actualizado para pasar `Deno.env.get("SUPABASE_URL")` + `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")`. Lección documentada como **ERR-27**.
+
+  **Smoke tests ejecutados por San tras v9 ACTIVE:**
+  | Test | Resultado |
+  |---|---|
+  | `status` | ✅ |
+  | `freeze_snapshot` activate:false | ✅ snapshot_id=1 |
+  | `freeze_snapshot` activate:true label="initial_test_21apr" | ✅ snapshot_id=2 activo |
+  | Invariante ia_snapshots (1 activo) | ✅ |
+  | `compute_match ESP ARG` primera llamada | ✅ sign:X + quip Haiku + cached:false |
+  | `compute_match ESP ARG` segunda llamada | ✅ cached:true via BD |
+  | Rate limit 30/min | ✅ service_role inmune, users normales limitados |
+
+  **Gate de merge — paridad Python↔TS:** 46/46 casos pasan con tolerancia 1e-3 en `p_home/p_draw/p_away/p_max/margin` y exact match en `sign/used_fallback/is_dudoso`. Ejecutado desde el sandbox vía Node 22 `--experimental-strip-types` (como fallback al `deno test`, porque `deno.land` está bloqueado por proxy 403 desde el sandbox). Runner funcionalmente idéntico al `tests/backtest_parity.test.ts` original.
+
+  **Merge:** PR #16 abierto y squash-mergeado desde otra sesión de Claude Code con MCP GitHub vivo (el MCP de esta sesión estaba caído de forma intermitente). Merge SHA en main: **`8d8b667`**. Rama remota `claude/fase-e-motor` auto-borrada por la config del repo. Local limpiado.
+
+  **Estado tras merge:**
+  - `main` HEAD = `8d8b667`.
+  - EF `porra-ia-compute` v9 ACTIVE, `verify_jwt=false`.
+  - Tablas: `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (activo id=2 `initial_test_21apr`) · `ia_predictions` con entradas on-demand de smoke tests (ESP-ARG, etc.).
+  - Crons programados: `ia-snapshots-cleanup` (03:00 UTC nightly), `ia-freeze-snapshot-mundial` (11 jun 00:00 UTC), `ia-compute-groups-mundial` (11 jun 00:10 UTC).
+
+  **Residual pendiente (no bloquea):**
+  - `origin/claude/fase-c-last-n` sigue en remoto (el squash-merge local de Fase C con `Closes #15` cerró la PR pero no eliminó la rama — GitHub solo auto-borra cuando el merge pasa por API). Limpieza opcional: `git push origin --delete claude/fase-c-last-n`.
+  - `is_host_match` literal per spec (`home_code IN HOSTS`). 3 partidos del JSON tienen host como `away_en` y no reciben el bonus de +85/+95. Decisión abierta para Fase F si se quiere corregir.
+
+  **Siguiente paso — Fase F (wiring frontend):**
+  - Bootstrap: añadir fetch a `ia_predictions` en el `Promise.all` de `auth.js` (o `loadUserData` equivalente).
+  - Render: `scoring.js` `renderMatchCard` pinta hint "IA predice 1/X/2" + quip en tooltip. `ko.js` equivalente en bracket.
+  - Bonus: lógica en `calc*Points` — +1 pt si `user_sign !== ia_sign` AND `user_sign === real_sign`.
+  - Eliminatorias: `compute_match` on-demand con cache sessionStorage.
