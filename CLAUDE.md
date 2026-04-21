@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **8bc7f30** (cleanup MutationObserver DIAG; persistencia última página al F5 estable tras saga v2.1→v2.11). Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **bbad657** (fase D.2 scrape_h2h vía 11v11.com). IA Predictor Fases A–D.2 consolidadas en main; Fase C desplegada desde rama `claude/fase-c-last-n` (PR #15 abierto, EF v6 ACTIVE); Fases E/F pendientes. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -260,6 +260,7 @@ whatsapp_subscribers (
 | `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+| `porra-ia-compute` | v6 | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. `verify_jwt=false`. Fase E (compute) pendiente. Ver sección "🤖 IA Predictor" |
 | `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
 | `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
 
@@ -361,6 +362,114 @@ pg_cron (cada minuto durante partido)
 
 ---
 
+## 🤖 IA Predictor (Fases A–F)
+
+Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si la predicción del usuario es opuesta a la IA y acierta** del motor de puntuación.
+
+**Arquitectura 3 capas:**
+```
+Capa 1 — Ingesta         Capa 2 — Cómputo        Capa 3 — Consumo
+EF porra-ia-compute  →   ia_predictions  →        frontend
+ (4 actions scraper)      (fórmula 50/25/25)      (scoring.js / ko.js)
+```
+
+**Fórmula del pronóstico** (Fase E, pendiente):
+
+| Señal | Peso | Fuente |
+|---|---|---|
+| ELO FIFA | **50%** | `ia_elo_fifa` (Wikipedia `Module:SportsRankings/data/FIFA_World_Rankings`) |
+| H2H histórico | **25%** | `ia_h2h` (11v11.com/stats, RSSSF-backed, incluye amistosos) |
+| Racha últimos N | **25%** | `ia_last5_results` (11v11.com/matches, `N=8` default) |
+
+**Fallback sin H2H:** si el par no tiene partido histórico entre ambas selecciones, rebalancear a **ELO 66% + Racha 34%**.
+
+**Umbrales signo 1/X/2** sobre `raw_home_pct`:
+- `raw_home_pct > 60%` → signo **1** (local)
+- `40% ≤ raw_home_pct ≤ 60%` → signo **X** (empate)
+- `raw_home_pct < 40%` → signo **2** (visitante)
+
+**Profundidad racha dinámica:**
+- Default `N=8` (lo que 11v11 sirve actualmente en su tabla de últimos partidos).
+- Ampliable a `N=10` antes del 11 jun cuando se publique el primer amistoso pre-Mundial, vía `{"action":"scrape_last5","limit":10}`. Activación **manual** (no automática).
+
+**Headers obligatorios para 11v11.com** (ver ERR-25 — sin los 3 → 403):
+```ts
+const fetchHeaders = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+```
+
+**Tablas (migración `20260421_create_ia_predictor_tables.sql`, Fase A):**
+
+```sql
+ia_elo_fifa (
+  team_code TEXT PRIMARY KEY,     -- ISO-3
+  team_name TEXT,
+  elo_points NUMERIC(7,2),
+  rank_position INT,
+  scraped_at TIMESTAMPTZ,
+  source TEXT
+)
+
+ia_last5_results (
+  team_code TEXT PRIMARY KEY REFERENCES ia_elo_fifa(team_code),
+  results JSONB,                  -- array de N objects: {date, opponent_name, opponent_iso3, venue, result, gf, ga, competition}
+  wins INT, draws INT, losses INT,
+  scraped_at TIMESTAMPTZ
+)
+
+ia_h2h (
+  team_a_code TEXT,               -- alfabético: team_a < team_b
+  team_b_code TEXT,
+  matches JSONB,                  -- {total, gf_team_a, ga_team_a, source_team, source}
+  team_a_wins INT, team_b_wins INT, draws INT,
+  last_played DATE,               -- null en el origen 11v11/stats (agregado sin fecha)
+  scraped_at TIMESTAMPTZ,
+  PRIMARY KEY (team_a_code, team_b_code),
+  CONSTRAINT h2h_alphabetical CHECK (team_a_code < team_b_code)
+)
+
+ia_predictions (
+  match_id TEXT PRIMARY KEY,
+  home_code TEXT, away_code TEXT,
+  sign CHAR(1) CHECK (sign IN ('1','X','2')),
+  confidence SMALLINT CHECK (confidence BETWEEN 0 AND 100),
+  breakdown JSONB,                -- {elo_score, h2h_score, last5_score, raw_home_pct}
+  used_fallback BOOLEAN,          -- true si se aplicó ELO 66 / Racha 34
+  computed_at TIMESTAMPTZ
+)
+```
+
+**RLS:** las 4 tablas con RLS enabled. Única policy pública: `ia_predictions_public_read` (cualquier `authenticated` puede SELECT). El frontend la consume directamente. Resto de tablas solo accesibles por service role (las EFs del pipeline).
+
+**48 mundialistas — mapping `WC2026_TEAMS`** (en la EF, tipo `[iso3, owner_slug, opposition_name, display_name]`):
+
+- `owner_slug` = kebab-lowercase de 11v11 (ej. `bosnia-and-herzegovina`, `korea-republic`, `congo-dr`, `cape-verde-islands`, `usa`).
+- `opposition_name` = texto que 11v11 usa en `<td class="opposition">` para listar a esa selección cuando es rival (ej. "Korea Republic", "Congo DR", "Cape Verde Islands"). Se usa lowercased como clave del `Map<name, iso3>` para cruzar rivales entre páginas.
+- `display_name` = cómo se renderiza al usuario final (ej. "Türkiye", "Côte d'Ivoire", "Curaçao").
+- **Fuente de verdad:** la constante en `supabase/functions/porra-ia-compute/index.ts`. Si se cambia el nombre de una selección en 11v11, actualizar ahí y redesplegar.
+
+**Fases — estado y commits en main:**
+
+| Fase | Acción | Commit | Estado |
+|---|---|---|---|
+| A | Migración 4 tablas + EF esqueleto | `968332a` (PR #10) | ✅ merged + aplicada |
+| B | scrape_elo via `inside.fifa.com` | `4a32737` (PR #11) | ⚠️ deprecada por B.2 |
+| B.2 | scrape_elo via Wikipedia Module | `c845f3e` (PR #12) | ✅ merged + desplegada |
+| D | scrape_h2h via Wikipedia all-time_record | `cba5dcc` (PR #13) | ⚠️ deprecada por D.2 (ver ERR-24) |
+| D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
+| C | scrape_last_n via 11v11.com/matches | `5a87f1e` (rama `claude/fase-c-last-n`, PR #15 abierto) | 🟡 EF v6 desplegada desde rama; PR pendiente de merge |
+| E | compute + UPSERT `ia_predictions` | — | ⏳ pendiente |
+| F | wiring frontend `scoring.js` / `ko.js` | — | ⏳ pendiente |
+
+**Estado tablas al cierre C (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_predictions` 0.
+
+**Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase).
+
+---
+
 ## 🌍 Estructura torneo
 
 48 equipos, 12 grupos (A–L) de 4, 72 partidos grupos, 17 jornadas.
@@ -422,7 +531,7 @@ apify push --actor-id N8vUChlhok5JU3cnL
 - **Actualizar migration-log.md** tras cada acción importante
 - **NO usar addEventListener DOMContentLoaded** en classic scripts cargados via loadScript
 - Actor Azzouzana `VzKtdb1t0Qnc07X8V` tiene caché CDN — NO usar para datos live
-- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-22) antes de debuggear
+- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-26) antes de debuggear
 - **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
 - dice.js se mantiene dentro de admin.js (no separar)
 - **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo

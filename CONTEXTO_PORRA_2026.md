@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-18 | Fuente: checkpoint tras Vista Directo + simulacros + feature no-admin crea porras
+> Actualizado: 2026-04-21 | Fuente: checkpoint tras IA Predictor Fases A–D.2 + Fase C desplegada (PR abierto)
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -12,7 +12,7 @@
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
 | **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable** | `8bc7f30` (cleanup MutationObserver DIAG; persistencia última página al F5 estable tras saga v2.1→v2.11) |
+| **Último commit estable** | `bbad657` (fase D.2 scrape_h2h vía 11v11.com). IA Predictor Fases A–D.2 en main; Fase C desplegada desde rama `claude/fase-c-last-n` (PR #15 abierto); Fases E/F pendientes |
 
 ---
 
@@ -174,6 +174,7 @@ pg_cron (cada minuto durante partido)
 | `porra-apify-webhook` | v7 | ✅ | Detecta goles + status, llama Twilio directo |
 | `porra-whatsapp-send` | v1 | ✅ | Envía mensajes WhatsApp via Twilio |
 | `porra-whatsapp-webhook` | v4 | ✅ | Webhook entrada WhatsApp, captura WaId |
+| `porra-ia-compute` | v6 | ✅ | IA Predictor (Fases A–C). Router `status/scrape_elo/scrape_last5/scrape_h2h/compute`. Fase E (compute) pendiente. `verify_jwt=false` |
 | `porra-sofascore-proxy` | v8 | ❌ | Obsoleta, sustituida por actor propio |
 | `porra-github-pusher` | v6 | ❌ | PLACEHOLDER — ignorar |
 
@@ -198,6 +199,44 @@ Probar el pipeline live con partidos reales fuera del Mundial antes del 11 jun, 
 - **Visibilidad:** sólo admin (`profiles.is_admin = true`) ve la sección **🧪 Simulacros activos** en la vista Directo.
 - **Activo ahora:** `copadelrey_final_atm_rso` — Atlético de Madrid vs Real Sociedad, 18 abr 19:00 UTC, `sofascore_event_id = 15664537`. Polling ampliado manualmente a 3 h (19–22 UTC) para cubrir prórroga + penaltis.
 - **Detalle completo:** ver `CLAUDE.md` sección *Simulacros (testing live)*.
+
+---
+
+## 🤖 IA Predictor
+
+Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si predicción del usuario opuesta a IA y aciertas** del motor de puntuación. Arquitectura en 3 capas.
+
+**Capa 1 — Ingesta (EF `porra-ia-compute` v6 ACTIVE, 4 scrapers):**
+
+| Action | Fuente | Tabla destino | Estado |
+|---|---|---|---|
+| `scrape_elo` | Wikipedia `Module:SportsRankings/data/FIFA_World_Rankings` (MediaWiki API) | `ia_elo_fifa` | ✅ Fase B.2 |
+| `scrape_h2h` | 11v11.com/teams/{slug}/tab/stats/ (HTML) | `ia_h2h` | ✅ Fase D.2 |
+| `scrape_last5` | 11v11.com/teams/{slug}/tab/matches/ (HTML) | `ia_last5_results` | ✅ Fase C (en rama, EF desplegada) |
+| `compute` | Las 3 tablas anteriores | `ia_predictions` | ⏳ Fase E pendiente |
+
+**Capa 2 — Cómputo (Fase E, pendiente):** fórmula **ELO 50% + H2H 25% + Racha 25%** con fallback **ELO 66% + Racha 34%** si no hay H2H. Umbrales signo: `>60%` → 1, `40-60%` → X, `<40%` → 2.
+
+**Capa 3 — Consumo (Fase F, pendiente):** `scoring.js` / `ko.js` leen `ia_predictions` (RLS policy `ia_predictions_public_read` lo permite), pintan pronóstico en tarjeta, calculan el bonus IA opuesta.
+
+**Estado tablas al 21 abr PM:**
+- `ia_elo_fifa`: **211 filas** (FIFA actualizada al 2026-04-01).
+- `ia_h2h`: **815 pairs únicos** de los ~1.128 teóricos entre los 48 mundialistas (~72% cobertura).
+- `ia_last5_results`: **48 filas** (N=8 partidos por selección en `results JSONB`).
+- `ia_predictions`: **0** (pendiente Fase E).
+
+**Profundidad racha dinámica:** `N=8` default, ampliable a `N=10` antes del 11 jun vía `{"action":"scrape_last5","limit":10}` cuando 11v11 publique el primer amistoso pre-Mundial. Activación manual.
+
+**Headers obligatorios para 11v11.com** (sin los 3 → 403, ver ERR-25):
+```
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36
+Accept: text/html,application/xhtml+xml
+Accept-Language: en-US,en;q=0.9
+```
+
+**Mapping 48 mundialistas** (`WC2026_TEAMS` en la EF, tipo `[iso3, owner_slug, opposition_name, display_name]`): fuente de verdad en `supabase/functions/porra-ia-compute/index.ts`. Actualizar ahí si 11v11 renombra alguna selección.
+
+**Detalle completo:** ver `CLAUDE.md` sección *IA Predictor (Fases A–F)*. Historial de commits en `migration-log.md` entrada 21-04-2026.
 
 ---
 
@@ -353,6 +392,9 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-19 | Fixes producción iPhone (ERR-18/19/20/21): css→public, openFocus defensivo, no body.overflow, layer fuera @media | 82b4753 |
 | 2026-04-19 | Extracción `<style>` inline de index.html a `public/css/` (hace aplicar commits 2/3/4 de PR #9) | 9e93fe8 |
 | 2026-04-20 noche | Persistencia última página al F5 + skip splash. Saga v2.1→v2.11 (3 capas defensivas: HTML script inline, main-entry guard, ui-nav lock guard). ERR-23 documentado | 8bc7f30 |
+| 2026-04-21 AM | Sanity check 20 abr — 4 commits pequeños a `docs/sanity-check-20abr2026.md` (13 hallazgos priorizados) + `CONTEXTO` deuda técnica reescrita por niveles | c5029ac |
+| 2026-04-21 AM→PM | **IA Predictor Fases A–D.2** en main (EF `porra-ia-compute` v6). Fase A migración + EF esqueleto (#10); Fase B.2 `scrape_elo` vía Wikipedia Module (#12, B #11 deprecada); Fase D.2 `scrape_h2h` vía 11v11.com/stats (#14, D #13 deprecada por Wikipedia inadecuada ERR-24). Estado tablas: ELO 211 · H2H 815 · last5 pendiente | bbad657 |
+| 2026-04-21 PM | **Fase C IA Predictor** — `scrape_last_n` vía 11v11.com/matches (N=8 default, ampliable). En rama `claude/fase-c-last-n` (PR #15 abierto). EF v6 desplegada desde rama (bypass merge por ERR-26, `pg_net` sin PUT). Smoke: teams_parsed 48/48, rows_upserted 48/48 | 5a87f1e (rama) |
 
 ---
 
