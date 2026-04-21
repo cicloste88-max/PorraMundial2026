@@ -10,6 +10,30 @@ Rama activa: **main** | Último commit en main: **8bc7f30** (cleanup MutationObs
 
 ## 🔴 Pendientes abiertos
 
+### 🔬 Sanity check 20 abr 2026 — inversiones prioritarias antes del 11 jun
+> Detalle completo en **`docs/sanity-check-20abr2026.md`**. Resumen accionable:
+
+**Semanas 1-2 (crítico, 4 días):**
+1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
+2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
+3. **EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault. Actualmente esos fetches **siempre fallan 401** (sin `x-api-key`) y caen al fallback hardcoded: la IA es fake sin que nadie lo sepa.
+
+**Semanas 3-4 (escala):**
+4. Code splitting `admin.js` (dynamic import bajo `is_admin`) — bundle −25%.
+5. Logger con gate por env para los 56 `console.log/warn/error` en producción.
+6. Sentry error tracking — descubrir errores móvil reales.
+7. Auditoría `innerHTML` + `escapeHtml` (~70 usos).
+
+**Semanas 5-6 (refactor, pre-requisito: tests del paso 1):**
+8. Split `scoring.js` (1.438 LOC) en engine puro + render + assets.
+9. Consolidación `ui-groups.js` + `ui-groups-mobile.js` con helpers compartidos.
+10. Event delegation — eliminar los 62 `onclick=` inline de `index.html`.
+
+**Semanas 7-8 (buffer):**
+11. `window._trace` helper de debug (MutationObserver reutilizable).
+12. Splash 4s acortado o condicional por primera visita.
+13. `AppState` proxy + `TIMINGS` centralizados.
+
 ### Bugs UI
 1. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
 2. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
