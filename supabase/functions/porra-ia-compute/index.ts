@@ -6,6 +6,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALIAS_MAP: Record<string, string> = {
+  "United States": "USA",
+  "South Korea": "KOR",
+  "North Korea": "PRK",
+  "Turkey": "TUR",
+  "Ivory Coast": "CIV",
+  "Cape Verde": "CPV",
+  "DR Congo": "COD",
+  "Congo DR": "COD",
+  "Congo": "CGO",
+  "Czech Republic": "CZE",
+  "Czechia": "CZE",
+  "Bosnia and Herzegovina": "BIH",
+  "North Macedonia": "MKD",
+  "Saudi Arabia": "KSA",
+  "United Arab Emirates": "UAE",
+  "Trinidad and Tobago": "TRI",
+  "Antigua and Barbuda": "ATG",
+  "Saint Kitts and Nevis": "SKN",
+  "Saint Vincent and the Grenadines": "VIN",
+  "Saint Lucia": "LCA",
+};
+
+const MONTHS: Record<string, string> = {
+  January: "01", February: "02", March: "03", April: "04",
+  May: "05", June: "06", July: "07", August: "08",
+  September: "09", October: "10", November: "11", December: "12",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -49,54 +78,85 @@ async function handleStatus(supa: any) {
   };
 }
 
-async function handleScrapeElo(supa: any, body: any) {
+async function handleScrapeElo(supa: any, _body: any) {
   try {
-    let dateId: string | undefined = body?.date_id;
-
-    if (!dateId) {
-      const htmlRes = await fetch("https://inside.fifa.com/fifa-world-ranking/men", {
-        headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" },
-      });
-      if (!htmlRes.ok) {
-        return { ok: false, step: "fetch_html", error: `HTTP ${htmlRes.status}` };
-      }
-      const html = await htmlRes.text();
-      const m = html.match(/"(id\d{4,6})"/);
-      if (!m) {
-        return { ok: false, step: "parse_date", error: "id pattern not found in HTML" };
-      }
-      dateId = m[1];
-    }
-
-    const jsonUrl = `https://inside.fifa.com/api/ranking-overview?locale=en&dateId=${encodeURIComponent(dateId)}`;
-    const jsonRes = await fetch(jsonUrl, {
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+    const url = "https://en.wikipedia.org/w/api.php?action=parse&page=Module:SportsRankings/data/FIFA_World_Rankings&prop=wikitext&format=json";
+    const res = await fetch(url, {
+      headers: { "User-Agent": "pm26-ia-predictor/1.0", "Accept": "application/json" },
     });
-    if (!jsonRes.ok) {
-      return { ok: false, step: "fetch_json", error: `HTTP ${jsonRes.status}` };
-    }
-    const data = await jsonRes.json();
-    const rankings = Array.isArray(data?.rankings) ? data.rankings : [];
-    if (rankings.length === 0) {
-      return { ok: false, step: "fetch_json", error: "empty rankings, likely stale dateId" };
+    if (!res.ok) {
+      return { ok: false, step: "fetch_wikipedia", error: `HTTP ${res.status}` };
     }
 
-    const fifaLastUpdate = rankings[0]?.lastUpdateDate ?? null;
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (e: any) {
+      return { ok: false, step: "parse_response", error: String(e?.message || e) };
+    }
+    const wikitext: string = data?.parse?.wikitext?.["*"];
+    if (typeof wikitext !== "string" || wikitext.length === 0) {
+      return { ok: false, step: "parse_response", error: "wikitext missing in response" };
+    }
+
+    const dateMatch = wikitext.match(/data\.updated\s*=\s*\{\s*day\s*=\s*(\d+),\s*month\s*=\s*'(\w+)',\s*year\s*=\s*(\d+)/);
+    if (!dateMatch) {
+      return { ok: false, step: "parse_date", error: "updated pattern not found" };
+    }
+    const day = dateMatch[1].padStart(2, "0");
+    const monthName = dateMatch[2];
+    const year = dateMatch[3];
+    const monthNum = MONTHS[monthName];
+    if (!monthNum) {
+      return { ok: false, step: "parse_date", error: `unknown month: ${monthName}` };
+    }
+    const fifaUpdateDate = `${year}-${monthNum}-${day}`;
+
+    const rowRegex = /\{\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*([\d.]+)\s*\}/g;
+    const matches: Array<{ name: string; rank: number; points: number }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = rowRegex.exec(wikitext)) !== null) {
+      matches.push({ name: m[1], rank: Number(m[2]), points: Number(m[4]) });
+    }
+    if (matches.length === 0) {
+      return { ok: false, step: "parse_rankings", error: "no ranking rows matched" };
+    }
+
+    const { data: existing, error: selectError } = await supa
+      .from("ia_elo_fifa")
+      .select("team_code,team_name");
+    if (selectError) {
+      return { ok: false, step: "upsert", error: `select ia_elo_fifa: ${selectError.message}` };
+    }
+    const nameToCode = new Map<string, string>();
+    for (const r of existing || []) {
+      if (r?.team_name && r?.team_code) {
+        nameToCode.set(String(r.team_name).toLowerCase(), r.team_code);
+      }
+    }
+
     const now = new Date().toISOString();
-    const rows = rankings
-      .map((r: any) => {
-        const item = r?.rankingItem;
-        if (!item) return null;
-        return {
-          team_code: item.countryCode,
-          team_name: item.name,
-          elo_points: item.totalPoints,
-          rank_position: item.rank,
-          scraped_at: now,
-          source: "fifa.com/api/ranking-overview",
-        };
-      })
-      .filter((x: any) => x && x.team_code && typeof x.elo_points === "number");
+    const unmatched_names: string[] = [];
+    const seen = new Set<string>();
+    const rows: any[] = [];
+    for (const row of matches) {
+      let code = nameToCode.get(row.name.toLowerCase());
+      if (!code) code = ALIAS_MAP[row.name];
+      if (!code) {
+        code = row.name.slice(0, 3).toUpperCase();
+        unmatched_names.push(row.name);
+      }
+      if (seen.has(code)) continue;
+      seen.add(code);
+      rows.push({
+        team_code: code,
+        team_name: row.name,
+        elo_points: row.points,
+        rank_position: row.rank,
+        scraped_at: now,
+        source: "wikipedia:Module:SportsRankings",
+      });
+    }
 
     const { error: upsertError } = await supa
       .from("ia_elo_fifa")
@@ -107,9 +167,10 @@ async function handleScrapeElo(supa: any, body: any) {
 
     return {
       ok: true,
-      date_id: dateId,
+      source: "wikipedia:Module:SportsRankings",
+      fifa_update_date: fifaUpdateDate,
       countries_upserted: rows.length,
-      fifa_last_update: fifaLastUpdate,
+      unmatched_names,
     };
   } catch (e: any) {
     return { ok: false, step: "unknown", error: String(e?.message || e) };
