@@ -132,12 +132,17 @@ export async function requireAdminOrCron(
 }
 
 // Lee un secreto del Vault. Aplica trim() (ERR-04). Devuelve null si no existe.
+// NOTA: el schema `vault` NO está bajo `public` — `supa.from("vault.x")` falla
+// porque PostgREST lo interpreta literalmente. Hay que usar `.schema("vault")`
+// para que el client lo enrute al schema correcto (supabase-js v2 soporta esto
+// desde ~v2.25, funciona igual en Deno).
 export async function readVaultSecret(
   supa: SupabaseClient,
   name: string,
 ): Promise<string | null> {
   const { data, error } = await supa
-    .from("vault.decrypted_secrets")
+    .schema("vault")
+    .from("decrypted_secrets")
     .select("decrypted_secret")
     .eq("name", name)
     .limit(1)
