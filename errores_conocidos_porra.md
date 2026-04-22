@@ -84,7 +84,7 @@ Tres fallos encadenados que requirieron solución combinada.
 3. Llamadas síncronas `pg_net` > 30 s simplemente se cancelan.
 
 ### Solución arquitectónica conjunta
-- **(a)** Actor `sofascore-webshare-proxy N8vUChlhok5JU3cnL` (build 1.0.6) con **proxy Webshare residencial rotativo** + fetch directo a `api.sofascore.com` (~5-10 s, ~$0.001/run, ~$13 torneo total vs $318 estimados previos).
+- **(a)** Actor `sofascore-webshare-proxy N8vUChlhok5JU3cnL` (build 1.0.6 al aplicar este fix; actualmente 1.0.7, sin romper el patrón) con **proxy Webshare residencial rotativo** + fetch directo a `api.sofascore.com` (~5-10 s, ~$0.001/run, ~$13 torneo total vs $318 estimados previos).
 - **(b)** Pipeline **async + webhook**:
   ```
   pg_cron → net.http_post → porra-match-live EF
