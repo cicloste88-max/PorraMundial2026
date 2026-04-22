@@ -513,6 +513,27 @@ R32 → R16 → QF → SF → 3er puesto → Final = **104 partidos total**.
 
 **Canva MCP:** disponible (no usado en porra)
 
+### 🛠️ Cómo interactúa Claude Code con GitHub (sesiones de coding)
+
+- Usa **GitHub MCP** (`mcp__github__*`): suite oficial con `list_branches`, `list_pull_requests`, `pull_request_read`, `create_pull_request`, `merge_pull_request`, `list_commits`, `get_commit`, `issue_read/write`, `push_files`, `create_branch`, etc.
+- **Repo scope** restringido por config del host a `cicloste88-max/porramundial2026` — llamadas a otros repos se rechazan.
+- **`git push` / `git fetch`** NO van por el MCP: el harness monta un **proxy HTTP local** (`http://127.0.0.1:<puerto>/git/...`) que firma requests con el OAuth token. Por eso push puede funcionar incluso cuando el MCP de GitHub se cae — son componentes independientes del harness.
+- **Patrón de merge habitual:** `create_pull_request` → review (`pull_request_read get_diff` si hace falta) → `merge_pull_request` con `merge_method=squash`. GitHub auto-borra la rama remota al hacer squash via API (la config del repo lo tiene activado). Local se limpia con `git branch -D`.
+- **Plan B cuando el MCP de GitHub se desconecta** a mitad de sesión: (1) re-auth vía `mcp__github__authenticate` (abre URL, pega callback en `mcp__github__complete_authentication`); (2) si no revive, squash-merge local (`git merge --squash <rama> && git commit -m "... Closes #N" && git push origin main`) — cierra la PR por keyword match; (3) mergear desde UI GitHub. **Nunca inventar tokens** en el chat — el PAT queda en el transcript.
+- Los deploys de Edge Functions Supabase NO usan MCP desde Claude Code — requieren `SUPABASE_ACCESS_TOKEN` que vive solo en la máquina local de San o en Claude.ai con su MCP de Supabase.
+
+### 🖱️ Cómo Claude Desktop habla con Claude Code (vía MCP Chrome)
+
+- El canal es el **Chrome MCP**: Claude Desktop abre una sesión con Chrome, detecta en la pestaña activa el textarea de Claude Code y escribe ahí mis prompts.
+- **El editor de Claude Code es Tiptap** (wrapper encima de **ProseMirror**). NO es un `<textarea>` plano ni `contenteditable` crudo — tiene modelo interno de documento, parser Markdown, undo stack propio.
+- **Método de inyección:** `document.execCommand('insertText', false, <texto>)`. ProseMirror lo reconoce vía su plugin de DOM-observer y traduce a transacciones del schema. `insertText` preserva saltos de línea, no dispara las validaciones anti-XSS de ProseMirror, y mantiene el cursor en la posición esperada.
+- Alternativas descartadas: `textarea.value = ...` no aplica (no es textarea); `ClipboardEvent`/`paste` es frágil (depende del plugin `clipboardTextParser`); `Input` event manual requiere construir un `InputEvent('beforeinput', {inputType: 'insertText', data})` que ProseMirror sí admite pero obliga a replicar su state machine interna.
+- Para envío del prompt tras inyección: simular `Enter` con `KeyboardEvent('keydown', {key:'Enter'})` sobre el editor. Shift+Enter si se necesita salto de línea dentro del prompt.
+- **Failure modes conocidos:**
+  - Si Claude Code compila con una versión de ProseMirror que endurece el plugin anti-`execCommand`, esto se rompe — fallback a `InputEvent` manual.
+  - Si el textarea está en modo "slash command menu" abierto, `insertText` se traga el texto — hay que cerrar el menú con `Escape` antes.
+  - Tiptap tiene debouncing interno de ~16ms para batch de inputs — inyecciones muy rápidas seguidas (<10ms) se pueden perder; insertar chunks de ~200 chars con pausas de 50ms si el texto es largo.
+
 ---
 
 ## Comandos útiles
