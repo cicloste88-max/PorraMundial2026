@@ -401,6 +401,84 @@ const fetchHeaders = {
 };
 ```
 
+### 🗂️ Fuentes de datos externas
+
+Tabla centralizada de todo lo que scrapea/fetcha el proyecto. Incluye cómo se construye cada URL (slugs), qué devuelve, y puntos de rotura conocidos.
+
+#### 1. Wikipedia — Module:SportsRankings (ELO FIFA)
+
+- **URL:** `https://en.wikipedia.org/w/api.php?action=parse&page=Module:SportsRankings/data/FIFA_World_Rankings&prop=wikitext&format=json`
+- **Método:** `GET` · Headers: `User-Agent: pm26-ia-predictor/1.0`, `Accept: application/json`.
+- **Formato:** JSON con `data.parse.wikitext["*"]` = string Lua. Parseo con 2 regex:
+  - Fecha update: `/data\.updated\s*=\s*\{\s*day\s*=\s*(\d+),\s*month\s*=\s*'(\w+)',\s*year\s*=\s*(\d+)/` → ISO `YYYY-MM-DD`.
+  - Filas: `/\{\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*([\d.]+)\s*\}/g` → `(country_name, rank, movement, points)` × ~211.
+- **Mapping nombre → ISO3:** cadena DB (`ia_elo_fifa.team_name` lowercased) → `ALIAS_MAP` hardcoded → `slice(0,3).toUpperCase()` como último recurso (nombres no resueltos van a `unmatched_names`).
+- **Frecuencia de actualización:** FIFA publica ranking oficial cada ~2 meses. Próximo refresh público: **9 jun 2026** (justo antes del Mundial). Wikipedia suele reflejarlo en horas.
+- **Consume:** action `scrape_elo` de `porra-ia-compute`.
+- **Destino:** tabla `ia_elo_fifa` (~211 filas).
+
+#### 2. 11v11.com/teams/{owner_slug}/tab/stats/ (H2H agregado)
+
+- **URL patrón:** `https://www.11v11.com/teams/{owner_slug}/tab/stats/`
+- **`owner_slug`:** kebab-lowercase desde `WC2026_TEAMS[1]`. Ejemplos: `spain`, `korea-republic`, `bosnia-and-herzegovina`, `congo-dr`, `cape-verde-islands`, `usa`, `ivory-coast`.
+- **Método:** `GET` · Headers **obligatorios** (ver bloque arriba) — sin los 3 → HTTP 403.
+- **Formato:** HTML. Una sola tabla con TODOS los rivales históricos de la selección. Regex global:
+  ```
+  /<td class="opposition">([^<]+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>/g
+  ```
+  Grupos: `(oppName, P, W, D, L, GF, GA)` desde la perspectiva del `owner_slug`.
+- **Mapping oponente → ISO3:** lookup por `opposition_name.toLowerCase()` contra el mismo `WC2026_TEAMS[2]`. Si no matchea → se registra en `unmatched_opponents` del response (no-mundialistas se ignoran).
+- **Fuente subyacente:** RSSSF — incluye amistosos, no filtra por competición.
+- **Sin fecha:** el agregado no expone `last_played` — por eso `ia_h2h.last_played = null`.
+- **Validaciones cruzadas smoke test:** ARG-ESP 6W-2D-6L, ARG-BRA 44-27-45 en 116, ARG-URU 91-46-57 en 194.
+- **Consume:** action `scrape_h2h`. Loop secuencial 48 teams × delay 500ms (polite scraping) ~45s total.
+- **Destino:** tabla `ia_h2h` (~815 pairs únicos entre mundialistas, ~72% cobertura).
+
+#### 3. 11v11.com/teams/{owner_slug}/tab/matches/ (últimos N partidos)
+
+- **URL patrón:** `https://www.11v11.com/teams/{owner_slug}/tab/matches/` — mismo `owner_slug` que #2.
+- **Método + headers:** idénticos a #2 (mismos 3 headers obligatorios).
+- **Formato:** HTML. 8 partidos por selección (orden ascendente por fecha). Regex global de 6 grupos (el 6º `<td>` de competition es opcional):
+  ```
+  /<td[^>]*>\s*([^<]+)<\/td>\s*<td[^>]*>(?:<a[^>]*>)?([^<]+?)(?:<\/a>)?<\/td>\s*<td[^>]*><span[^>]*>([WDL])<\/span><\/td>\s*<td[^>]*>\s*(\d+)-(\d+)[^<]*<\/td>(?:\s*<td[^>]*>([^<]*)<\/td>)?/g
+  ```
+  Grupos: `(dateStr "04 Sep 2025", matchStr "Home v Away", W|D|L, home_score, away_score, competition?)`.
+- **Detección del owner:** `home_name.toLowerCase() === opposition_name.toLowerCase()` (o `away_name` en su defecto). Se remapea `gf/ga` y `venue` según lado.
+- **Caveat documentado:** Argentina devuelve 7 partidos en lugar de 8 por caché de 11v11.
+- **Ampliable:** body.limit 1-20 (default 8). Cuando 11v11 publique el primer amistoso pre-Mundial, bumpear manualmente a 10 vía `{"action":"scrape_last5","limit":10}`.
+- **Consume:** action `scrape_last5`.
+- **Destino:** tabla `ia_last5_results` (48 filas, `results JSONB` = array ascendente de `{date, opponent_name, opponent_iso3, venue H/A, result, gf, ga, competition}`).
+
+#### 4. SofaScore API — resultados live (motor de scoring, NO IA Predictor)
+
+Alimenta la tabla `live_scores` (no las tablas `ia_*`). Pipeline: `pg_cron → porra-match-live EF → actor Webshare → webhook → porra-apify-webhook EF → upsert live_scores`.
+
+- **IDs del torneo** (Wold Cup 2026):
+  - `tournamentId`: **16** · `seasonId`: **58210**.
+  - Listado completo de los 72 `eventId` de fase de grupos en **`apify-actors/sofascore-webshare-proxy/worldcup-2026-sofascore-ids.json`** (array de objetos `{sofascore_id, home, away, round, group, date, status, venue, city}`).
+  - IDs de KO disponibles ~**28 jun 2026** (tras finalizar fase de grupos).
+- **Construcción de URLs (lo que llama el actor Webshare):**
+  - Detalle del evento: `https://api.sofascore.com/api/v1/event/{sofascore_id}` → devuelve `{event: {status, homeTeam, awayTeam, homeScore, awayScore, ...}}`.
+  - Incidentes del evento: `https://api.sofascore.com/api/v1/event/{sofascore_id}/incidents` → devuelve `{incidents: [{incidentType, time, player, ...}]}` (goles, tarjetas, sustituciones).
+  - Endpoints opcionales (no todos se usan): `/lineups`, `/statistics`, `/managers`.
+- **URL pública de SofaScore** (no la scrapeamos, solo como referencia humana):
+  - Formato: `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`.
+  - Los slugs y `match-code` son determinados por SofaScore — no los construimos nosotros. Solo nos importa el `sofascore_id` numérico.
+- **Por qué actor Webshare en lugar de fetch directo:** Cloudflare Bot Management bloquea IPs datacenter con 403. Solución: proxy residencial Webshare rotativo vía actor Apify (ver ERR-05). El actor mantiene cookies SofaScore reutilizables entre requests (no IP-bound), latencia ~5-10s, coste ~$0.001/run (~$13 total torneo).
+- **`match_key` interno** (NO viene de SofaScore — nuestro): formato `wc2026_g{LETRA}_{sofascore_id}`. Ejemplo: `wc2026_gA_15186710`. Se usa como PK en `live_scores` y como clave en `public/data/worldcup-2026-matches.json`. El sufijo coincide con el `sofascore_id` del evento — rompe el secreto del formato para quien quiera sondear.
+- **Consume:** cron `prematch_<match_key>` (T-45min, 1 call) + cron `poll_<match_key>` (`*/3 * * * *` durante 150min desde kickoff). Orquestado por `schedule_match_crons()`.
+- **Destino:** tabla `live_scores` (PK `match_key`). No toca `ia_*`.
+
+#### Puntos de rotura conocidos (de todas las fuentes)
+
+- **Wikipedia Module:SportsRankings** — si el módulo Lua cambia la estructura `data.updated = {...}` o el formato de fila `{"name", rank, move, points}`, el regex rompe silenciosamente → `countries_upserted: 0`. Detectable al siguiente `scrape_elo`.
+- **11v11.com** — si cambian `<td class="opposition">` por otro nombre de clase, o reordenan columnas de la tabla, ambos regex rompen. Síntoma: `teams_parsed` cae bruscamente en smoke test. Sin canary automático — hay que re-lanzar scrape manualmente cada ~2 semanas si se detecta drift.
+- **11v11 renombra selección** (ej. "Turkey" → "Türkiye" en su propio HTML): el match por `opposition_name` falla silenciosamente, el team entra en `unmatched_opponents`. Fix: añadir alias al diccionario o actualizar `WC2026_TEAMS[2]` y redesplegar.
+- **SofaScore** cambia formato de respuesta de `/event/{id}` o `/incidents`: el `extractMatchState()` en `porra-apify-webhook` rompe. Detección: log de la EF con parse errors. Ya pasó una vez en abril 2026 (estructura `item.event.data.event.homeScore` vs `item.event.data.homeScore`).
+- **Cloudflare endurece detección** → el actor Webshare podría pasar de ~0% a ~30% de requests 403. Fallback: actor `sofascore-live-proxy` (Playwright + proxies Apify, más caro, ya existe).
+
+---
+
 **Tablas (migración `20260421_create_ia_predictor_tables.sql`, Fase A):**
 
 ```sql
