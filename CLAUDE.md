@@ -453,21 +453,41 @@ Tabla centralizada de todo lo que scrapea/fetcha el proyecto. Incluye cómo se c
 
 Alimenta la tabla `live_scores` (no las tablas `ia_*`). Pipeline: `pg_cron → porra-match-live EF → actor Webshare → webhook → porra-apify-webhook EF → upsert live_scores`.
 
-- **IDs del torneo** (Wold Cup 2026):
-  - `tournamentId`: **16** · `seasonId`: **58210**.
-  - Listado completo de los 72 `eventId` de fase de grupos en **`apify-actors/sofascore-webshare-proxy/worldcup-2026-sofascore-ids.json`** (array de objetos `{sofascore_id, home, away, round, group, date, status, venue, city}`).
-  - IDs de KO disponibles ~**28 jun 2026** (tras finalizar fase de grupos).
-- **Construcción de URLs (lo que llama el actor Webshare):**
-  - Detalle del evento: `https://api.sofascore.com/api/v1/event/{sofascore_id}` → devuelve `{event: {status, homeTeam, awayTeam, homeScore, awayScore, ...}}`.
-  - Incidentes del evento: `https://api.sofascore.com/api/v1/event/{sofascore_id}/incidents` → devuelve `{incidents: [{incidentType, time, player, ...}]}` (goles, tarjetas, sustituciones).
-  - Endpoints opcionales (no todos se usan): `/lineups`, `/statistics`, `/managers`.
-- **URL pública de SofaScore** (no la scrapeamos, solo como referencia humana):
-  - Formato: `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`.
-  - Los slugs y `match-code` son determinados por SofaScore — no los construimos nosotros. Solo nos importa el `sofascore_id` numérico.
-- **Por qué actor Webshare en lugar de fetch directo:** Cloudflare Bot Management bloquea IPs datacenter con 403. Solución: proxy residencial Webshare rotativo vía actor Apify (ver ERR-05). El actor mantiene cookies SofaScore reutilizables entre requests (no IP-bound), latencia ~5-10s, coste ~$0.001/run (~$13 total torneo).
-- **`match_key` interno** (NO viene de SofaScore — nuestro): formato `wc2026_g{LETRA}_{sofascore_id}`. Ejemplo: `wc2026_gA_15186710`. Se usa como PK en `live_scores` y como clave en `public/data/worldcup-2026-matches.json`. El sufijo coincide con el `sofascore_id` del evento — rompe el secreto del formato para quien quiera sondear.
-- **Consume:** cron `prematch_<match_key>` (T-45min, 1 call) + cron `poll_<match_key>` (`*/3 * * * *` durante 150min desde kickoff). Orquestado por `schedule_match_crons()`.
-- **Destino:** tabla `live_scores` (PK `match_key`). No toca `ia_*`.
+**Quién llama a `api.sofascore.com`:** el actor Webshare, **no nosotros**. Nuestro contrato con el actor es sólo el `eventId`. El actor construye internamente las URLs y las pasa por proxy residencial para evitar el 403 de Cloudflare (ver ERR-05). Nunca hacemos `fetch` directo a `api.sofascore.com` desde Supabase.
+
+- **Contrato con el actor Webshare:**
+  - Input: `{ "eventId": "15186710" }`.
+  - El actor construye internamente:
+    - `https://api.sofascore.com/api/v1/event/{eventId}` → `{event: {status, homeTeam, awayTeam, homeScore, awayScore, ...}}`.
+    - `https://api.sofascore.com/api/v1/event/{eventId}/incidents` → `{incidents: [{incidentType, time, player, ...}]}` (goles, tarjetas, sustituciones).
+  - Output al dataset Apify: `item.event={status,ok,data:{event:{...}}}` + `item.incidents={status,ok,data:{incidents:[]}}`.
+  - Endpoints que el actor NO consulta por defecto: `/lineups`, `/statistics`, `/managers` (existen en la API pero no los pedimos).
+
+- **IDs del torneo:**
+  - WC2026: `tournamentId: 16`, `seasonId: 58210` (referencia humana para sondear la API; la usa el actor si hace falta listar, no el flow normal).
+  - **Fase de grupos — 72 `sofascore_id` hardcodeados** en `apify-actors/sofascore-webshare-proxy/worldcup-2026-sofascore-ids.json` (array de `{sofascore_id, home, away, round, group, date, status, venue, city}`). Se conocen de antemano porque SofaScore los publica al sorteo.
+  - **Eliminatorias — IDs NO existen aún.** Se descubrirán ~**28 jun 2026** (tras cerrar fase de grupos y emparejarse R32). Hasta entonces el JSON queda incompleto.
+
+- **Cómo se descubre un `eventId` nuevo** (workflow para KO + simulacros):
+  1. **No se infiere programáticamente.** SofaScore no expone una API pública de "dame el id del partido X vs Y".
+  2. **Método manual probado:**
+     - `web_search` en Google con `site:sofascore.com <home> <away> <fecha>`.
+     - En el snippet de Google aparece el hash `#id:XXXXXXX` de la URL pública — copiar el número.
+     - Validar con el actor Webshare como fallback: `apify call N8vUChlhok5JU3cnL -i '{"eventId":"XXXXXXX"}' -t 30`. Si `event.homeTeam.name` y `event.awayTeam.name` cuadran con los equipos esperados, confirmado.
+  3. Añadir el ID al JSON (`worldcup-2026-sofascore-ids.json`) + a `live_scores` con `SELECT schedule_match_crons(...)` para programar los crons.
+  - **URL pública de SofaScore** (sólo como input de este workflow — nunca la construimos):
+    - Formato: `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`.
+    - Los slugs y el `match-code` los asigna SofaScore — no seguimos su patrón. Lo único que nos importa del hash es el número tras `#id:`.
+
+- **`match_key` interno** (**nuestro**, no de SofaScore): formato `wc2026_g{LETRA}_{sofascore_id}`. Ej. `wc2026_gA_15186710`. Se usa como PK en `live_scores` y clave en `public/data/worldcup-2026-matches.json`. El sufijo coincide con el `sofascore_id` a propósito — facilita cross-lookup entre nuestras estructuras y el actor.
+
+- **Simulacros** (`is_historic=true` en `live_scores`): mismo workflow que un partido del torneo — el `eventId` se descubre con el método manual, se inserta la fila con `schedule_match_crons`, y la única diferencia es el flag `is_historic` que filtra de la UI live del Mundial.
+
+- **Por qué actor Webshare en lugar de fetch directo:** Cloudflare Bot Management devuelve 403 a IPs datacenter. Webshare residencial rotativo bypasa (ver ERR-05). Latencia ~5-10s, coste ~$0.001/run, total torneo ~$13 vs $318 estimados previos con otros actores.
+
+- **Crons por partido:** `schedule_match_crons(match_key, start_ts)` programa automáticamente: `prematch_<match_key>` (1 call, T-45min) + `poll_<match_key>` (`*/3 * * * *` durante 150min desde kickoff). Ambos invocan `porra-match-live` con el `match_key`. Nunca duplicar manualmente (evita crons huérfanos).
+
+- **Consume:** cron → EF `porra-match-live` → actor. **Destino:** tabla `live_scores` (PK `match_key`). No toca `ia_*`.
 
 #### Puntos de rotura conocidos (de todas las fuentes)
 
