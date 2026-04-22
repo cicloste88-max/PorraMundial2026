@@ -602,7 +602,23 @@ Red de seguridad adicional en `main-entry.js`.
 
 - **Hosting:** Vercel (porramundial2026-seven.vercel.app) — autodeploy desde `main`
 - **DB + Auth:** Supabase (proyecto: `cmyfyswystjgzdwbqyyb`)
-- **Secrets Vault:** `GITHUB_TOKEN`, `GITHUB_REPO`, `ANTHROPIC_API_KEY`, `APIFY_TOKEN`, `PROXY_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`
+
+### Secrets — clasificación
+
+**Regla mental:** Vault = se consumen desde SQL / pg_net (EFs otras, crons, flows de Claude.ai vía MCP). EF secrets (`Deno.env.get`) = API keys externas consumidas directamente desde el código de una Edge Function.
+
+**Vault de Supabase** (`vault.decrypted_secrets`, acceso desde SQL o vía RPC `get_vault_secrets` — ver ERR-27):
+- `GITHUB_TOKEN`, `GITHUB_REPO` — usados por EFs `porra-patch-deploy`, `porra-fix-encoding` para escribir ficheros en el repo.
+- `APIFY_TOKEN` — lanza actor Webshare desde `porra-match-live`.
+- `PROXY_URL` — fallback scraping (legacy, `porra-sofascore-proxy` obsoleta).
+- `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET` — envío WhatsApp desde `porra-apify-webhook` y `porra-whatsapp-send`.
+- `IA_CRON_KEY` (añadido 21 abr, Fase E) — 64 chars hex. `X-Cron-Key` para autenticar pg_cron contra `porra-ia-compute` actions `freeze_snapshot` / `compute_groups`.
+- `SUPABASE_SERVICE_ROLE_KEY` (añadido 22 abr, mirror del EF secret) — **duplicado intencional** del secret que ya vive en EF secrets. Añadido para que calls SQL vía `net.http_post` puedan poner `Authorization: Bearer ${service_role}` en headers hacia EFs que validan auth (`compute_match`, rate limit test). **Al rotar el service_role, actualizar en AMBOS sitios** (EF secrets Dashboard → Settings → Functions + Vault).
+
+**Edge Function secrets** (`Deno.env.get(...)` desde el código, NO Vault):
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` — inyectadas automáticamente por Supabase en todas las EFs.
+- `ANTHROPIC_API_KEY` (Fase E) — usada por `porra-ia-compute` para el `quipGenerator` (Claude Haiku 4.5). Patrón del proyecto para API keys externas (igual que `FOOTBALL_DATA_API_KEY` de `update-results`).
+- `FOOTBALL_DATA_API_KEY` — usada por `update-results`.
 
 ---
 
