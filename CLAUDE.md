@@ -147,7 +147,7 @@ Añadido a `.gitignore`:
 
 ## 🤖 Actor Apify principal — sofascore-webshare-proxy
 
-**ID:** `N8vUChlhok5JU3cnL` | **Build:** 1.0.6 | **En producción**
+**ID:** `N8vUChlhok5JU3cnL` | **Build:** 1.0.7 | **En producción**
 
 **Cómo funciona:**
 - Proxy Webshare residencial rotativo

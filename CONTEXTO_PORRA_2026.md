@@ -246,7 +246,7 @@ Accept-Language: en-US,en;q=0.9
 | Campo | Valor |
 |---|---|
 | **Actor ID** | `N8vUChlhok5JU3cnL` |
-| **Build** | 1.0.6 |
+| **Build** | 1.0.7 |
 | **Repo** | `apify-actors/sofascore-webshare-proxy/` en GitHub |
 | **Input** | `{ "eventId": "15832749" }` |
 | **Output** | `{ eventId, event: {data:{event}}, incidents: {data:{incidents:[]}} }` |
