@@ -44,6 +44,32 @@ No es un leak de credenciales (no hay credencial en el código). Es peor: la fea
 
 ---
 
+#### 🔄 Actualización 21 abr 2026 — backend resuelto (Fases A–E cerradas, HEAD `8d8b667`)
+
+El fix real superó con mucho el esfuerzo estimado de "medio día" porque se escaló a un motor IA completo (no un wrapper Anthropic básico). Ahora el pronóstico IA es **determinista + auditable + validado estadísticamente**, no un prompt al vuelo.
+
+- **EF `porra-ia-compute` v9 ACTIVE** con motor log-odds+softmax (pesos 75/10/15; fallback 85/0/15 si H2H<5 partidos; home advantage +85 base / +95 México por altitud). Paridad Python↔TS 46/46 sobre back-test WC2022 (tolerancia 1e-3). Accuracy 63.0%, log-loss 0.932, Brier 0.560 — supera baseline.
+- **Pipeline ingesta:** 4 scrapers en la misma EF (ELO FIFA vía Wikipedia `Module:SportsRankings`; H2H vía `11v11.com/stats`; últimos N partidos vía `11v11.com/matches`). Tablas `ia_elo_fifa` (211) + `ia_h2h` (815) + `ia_last5_results` (48).
+- **Principio de producto "fairness":** `ia_snapshots` con invariante "1 activo a la vez" garantiza que todos los usuarios ven la misma predicción para el mismo cruce. Cron `ia-freeze-snapshot-mundial` (11 jun 00:00 UTC) congela el snapshot del torneo + `ia-compute-groups-mundial` (00:10 UTC) pre-computa los 72 partidos de grupos. KO se computa on-demand en `compute_match` con cache en `ia_predictions`.
+- **Quip jocoso (humor seco español, ≤15 palabras)** vía Claude Haiku 4.5 con lista de prohibidos explícita (política, guerras, tragedias) y fallback silencioso a plantilla neutra si la API falla.
+- **Auth:** `verify_jwt=false` + validación manual (service_role bypass, admin JWT, o `X-Cron-Key` contra Vault). Rate limit 30/min por user en runtime Map (service_role y cron inmunes).
+- **Lecciones documentadas durante deploy:** ERR-27 (PostgREST no enruta `from("vault.x")` al schema vault; fix: RPC `get_vault_secrets`).
+
+**Commits en main (cronológicos):** `968332a` Fase A migración + EF esqueleto (#10) · `c845f3e` B.2 scrape_elo Wikipedia (#12) · `bbad657` D.2 scrape_h2h 11v11 (#14) · `2904025` C scrape_last_n 11v11 matches (#15) · `8d8b667` E motor completo (#16).
+
+**Lo que falta (🟡 no crítico pero sí necesario antes del Mundial):**
+
+Los fetches rotos **siguen vivos** en `scoring.js:941` y `ui-nav.js:49`. La EF existe, los datos existen, la RLS policy `ia_predictions_public_read` ya permite lectura desde el cliente autenticado — pero **nadie los consume todavía**. **Fase F** es exactamente eso:
+1. Bootstrap: añadir fetch a `ia_predictions` en el `Promise.all` de `auth.js` (junto a `predictions`, `ko`, `awards`, `groups_saved`).
+2. Render: `scoring.js renderMatchCard` pinta hint "IA predice 1/X/2" + quip en tooltip. `ko.js` equivalente en bracket.
+3. Bonus: lógica en `calc*Points` — +1 pt si `user_sign !== ia_sign` y `user_sign === real_sign`.
+4. Eliminatorias: `compute_match` on-demand con cache en `sessionStorage`.
+5. **Limpieza:** borrar los `fetch('api.anthropic.com/...')` muertos en los dos archivos.
+
+**Esfuerzo Fase F estimado:** 1-2 días (alineado con las ~3 jornadas de S3-S4 del plan 8 semanas).
+
+---
+
 ### 2. Zero tests en 8.626 LOC de JS
 
 `find -name '*.test.*'` → 0 resultados. El motor de puntuación (`public/js/scoring.js:43-193`) codifica las reglas que decidirán quién gana el bote real entre San y sus amigos:

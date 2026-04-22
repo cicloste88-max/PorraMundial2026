@@ -16,7 +16,7 @@ Rama activa: **main** | Último commit en main: **8d8b667** (fase E squash-merge
 **Semanas 1-2 (crítico, 4 días):**
 1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. **EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault. Actualmente esos fetches **siempre fallan 401** (sin `x-api-key`) y caen al fallback hardcoded: la IA es fake sin que nadie lo sepa.
+3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` v9 (Fases A–E cerradas, `ia_predictions` pobladas on-demand + batch 11 jun). ⏳ **Pendiente frontend (Fase F)**: reemplazar los `fetch('api.anthropic.com/...')` muertos en `scoring.js:941` y `ui-nav.js:49` por lectura directa de `ia_predictions` (RLS policy `ia_predictions_public_read`) + llamada a `compute_match` on-demand para eliminatorias. Hasta entonces, esos dos fetches siguen cayendo al fallback hardcoded.
 
 **Semanas 3-4 (escala):**
 4. Code splitting `admin.js` (dynamic import bajo `is_admin`) — bundle −25%.

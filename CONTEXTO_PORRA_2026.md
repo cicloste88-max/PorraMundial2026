@@ -436,7 +436,7 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 
 | Área | Detalle | Prioridad |
 |---|---|---|
-| **IA fake** | `scoring.js:941` y `ui-nav.js:49` fetchean `api.anthropic.com` **sin `x-api-key`** → 401 silencioso → fallback hardcoded. La feature IA aparenta funcionar sin funcionar. | 🔴 Crítica |
+| **IA fake — frontend** | **Backend resuelto 21 abr** (EF `porra-ia-compute` v9, Fases A–E). Sin embargo `scoring.js:941` y `ui-nav.js:49` todavía fetchean `api.anthropic.com` **sin `x-api-key`** → 401 silencioso → fallback hardcoded. Fase F los reemplaza por lectura de `ia_predictions` + `compute_match` on-demand. | 🔴 Crítica (Fase F) |
 | **Tests** | 0 tests sobre 8.626 LOC JS. Motor de puntuación (`calc*Points`) decidirá quién gana el bote. Riesgo de disputas reales. | 🔴 Crítica |
 | **CI/CD** | `.github/workflows/` vacío. Cada push a `main` llega a Vercel sin gates. Origen directo del coste de la saga v2.1→v2.11 (11 iteraciones). | 🔴 Crítica |
 
@@ -473,11 +473,12 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 - ~~4 bloques `<style>` inline en `index.html` duplicados con `css/*.css`~~ → ✅ 19 abr (`9e93fe8`)
 - ~~`css/` fuera de `public/` no llegaba al build de Vite~~ → ✅ 18 abr (`b4a52e6`)
 - ~~Flash welcome al F5 con sesión válida~~ → ✅ 20 abr saga v2.1→v2.11 (HEAD `8bc7f30`)
+- ~~**IA fake — backend**: sin EF propia para el pronóstico~~ → ✅ 21 abr (Fases A–E, HEAD `8d8b667`). EF `porra-ia-compute` v9 ACTIVE con motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX), 4 scrapers (ELO Wikipedia · H2H + últimos N 11v11.com) + 3 actions cómputo (`freeze_snapshot` / `compute_groups` / `compute_match`), snapshot fairness (1 activo), quip Haiku 4.5, rate limit 30/min, crons 11 jun 00:00 freeze + 00:10 compute_groups. Paridad Python↔TS **46/46** verde. Tabla `ia_predictions` con RLS policy pública (`ia_predictions_public_read`). **Pendiente Fase F** (wiring frontend que cierra la deuda entera).
 
 ### Plan 8 semanas (20 abr → 11 jun)
 
-- **S1-S2** — Tests motor puntuación · CI básica · EF `porra-ia-predict` (4 días)
-- **S3-S4** — Code splitting · Logger · Sentry · Auditoría innerHTML (3 días)
+- **S1-S2** — ~~EF IA Predictor~~ ✅ hecho (Fases A-E, EF `porra-ia-compute` v9). · Tests motor puntuación · CI básica (4 días restantes).
+- **S3-S4** — **Fase F IA Predictor** (wiring frontend — pieza final para cerrar deuda "IA fake"). Code splitting · Logger · Sentry · Auditoría innerHTML (3 días).
 - **S5-S6** — Split `scoring.js` · Consolidación `ui-groups*` · Event delegation (3-4 días, requiere tests S1)
 - **S7-S8** — Tooling debug · Splash condicional · `AppState` + `TIMINGS` (2-3 días)
 
