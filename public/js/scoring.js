@@ -706,6 +706,7 @@ function createMatchCard(match, idx) {
           '<div class="ptc scorer" id="ptc-scorer-'+idx+'">⚽ +2pts goleador</div>',
           '<div class="ptc ia" id="ptc-ia-'+idx+'">🤖 +1pt vs IA</div>',
         '</div>',
+        '<div class="ia-hint" id="ia-hint-'+idx+'" style="display:none"></div>',
         '<div class="gol-row">',
           '<span class="gol-lbl">Goleador</span>',
           '<div class="gsel-wrap">',
@@ -766,7 +767,42 @@ function createMatchCard(match, idx) {
     fw.addEventListener('click', e => { e.stopPropagation(); /* TODO: team profile */ });
   });
 
+  // Render hint IA (Fase F) si ia_predictions ya esta en memoria (bootstrap auth.js).
+  // Tambien inicializa la ia-bar existente al estado "result" para evitar el spinner
+  // stuck "consultando oraculos..." cuando fetchIA hace early-return.
+  renderIAHint(card, idx, matchKey);
+
   return card;
+}
+
+// F.2 — Pinta el hint IA de un partido de grupos desde iaPredictions[matchKey].
+// Llamado desde renderMatchCard (render inicial) y desde updateCardUI (bootstrap
+// tardio via auth.js onAuthStateChange). Idempotente.
+function renderIAHint(card, idx, matchKey) {
+  const ia = iaPredictions[matchKey];
+  const hint = (card || document).querySelector ? (card || document).querySelector('#ia-hint-' + idx) : document.getElementById('ia-hint-' + idx);
+  if (!hint) return;
+  if (!ia || !ia.sign) { hint.style.display = 'none'; hint.textContent = ''; return; }
+  const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
+  const signLabel = signMap[ia.sign] || ia.sign;
+  const dudosoMark = ia.is_dudoso ? '<span class="ia-hint-dudoso" title="La IA duda entre varias opciones">*</span>' : '';
+  hint.innerHTML = '<span class="ia-hint-ico">🤖</span><span class="ia-hint-lbl">IA predice</span>' +
+                   '<strong class="ia-hint-sign">' + ia.sign + ' · ' + signLabel + '</strong>' + dudosoMark;
+  hint.title = ia.quip || '';
+  hint.style.display = 'flex';
+
+  // Hidratar la ia-bar existente si tenemos datos (evita spinner eterno)
+  const loadEl = document.getElementById('ia-loading-' + idx);
+  const resEl  = document.getElementById('ia-result-' + idx);
+  const predTxt = document.getElementById('ia-pred-txt-' + idx);
+  const detailTxt = document.getElementById('ia-detail-txt-' + idx);
+  if (loadEl && resEl && predTxt && detailTxt) {
+    const conf = Number.isFinite(ia.confidence) ? ia.confidence : Math.round((ia.sign === '1' ? ia.p_home : ia.sign === '2' ? ia.p_away : ia.p_draw) * 100 || 0);
+    predTxt.textContent = ia.sign + ' · ' + signLabel + (conf ? ' (' + conf + '%)' : '');
+    detailTxt.textContent = ia.quip || '';
+    loadEl.style.display = 'none';
+    resEl.style.display = 'flex';
+  }
 }
 
   // ─────────────────────────────────────────────────────────────
@@ -998,6 +1034,9 @@ function updateCardUI(idx, match) {
   const hasGoal = !!pred.gol;
   const ia = iaPredictions[matchKey];
   const mySign = getMySign(pred);
+
+  // Refrescar hint IA por si bootstrap lo ha rellenado tarde (auth.js post-login)
+  renderIAHint(null, idx, matchKey);
 
   const pill = document.getElementById(`spill-${idx}`);
   const stxt = document.getElementById(`stxt-${idx}`);

@@ -1158,3 +1158,10 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
   .mobile-toast.error { background: #dc2626; box-shadow: 0 10px 30px rgba(220,38,38,0.4); }
   .mobile-dot.summary.ready { border-color: #16a34a; color: #16a34a; background: rgba(22,163,74,0.12); border-style: solid; }
 }
+
+/* F.2 — pill compacta con el pronostico IA (bajo pts-row). Tooltip quip via title. */
+.ia-hint{display:none;align-items:center;gap:6px;margin:6px 0 0;padding:4px 10px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.22);border-radius:8px;font-size:11px;color:#c4b5fd;width:max-content;max-width:100%;cursor:help}
+.ia-hint-ico{font-size:11px;line-height:1}
+.ia-hint-lbl{font-size:9px;font-weight:700;color:#9a85e0;text-transform:uppercase;letter-spacing:.06em}
+.ia-hint-sign{font-weight:800;color:#c4b5fd;letter-spacing:.02em}
+.ia-hint-dudoso{color:#facc15;font-weight:800;font-size:12px;line-height:1;margin-left:1px}
