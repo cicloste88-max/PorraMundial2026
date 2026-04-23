@@ -50,13 +50,59 @@ window._porraDb = window._porraDb || null;
 
 let currentUser = null; // { id, email, nombre }
 
+/* ── Bootstrap IA Predictor (Fase F) ──
+   Lee el snapshot activo + predicciones de fase de grupos ya computadas
+   (cron 11 jun 00:10 o compute_match on-demand). Reindexa por legacyKey
+   (${group}_${home_es}_${away_es}) para que encaje con getMatchKey(match)
+   que usan scoring.js y data.js. */
+async function loadIAPredictions() {
+  try {
+    const { data: snap } = await db.from('ia_snapshots')
+      .select('id').eq('is_active', true).maybeSingle();
+    if (!snap?.id) return {};
+    const [{ data: preds }, matchesJson] = await Promise.all([
+      db.from('ia_predictions')
+        .select('match_id, sign, confidence, breakdown, used_fallback')
+        .eq('snapshot_id', snap.id),
+      fetch('/data/worldcup-2026-matches.json')
+        .then(r => r.ok ? r.json() : {})
+        .catch(() => ({})),
+    ]);
+    if (!preds || preds.length === 0) return {};
+    const legacyByMatchId = {};
+    for (const [mid, m] of Object.entries(matchesJson || {})) {
+      if (m?.group && m?.home_es && m?.away_es) {
+        legacyByMatchId[mid] = `${m.group}_${m.home_es}_${m.away_es}`;
+      }
+    }
+    const out = {};
+    for (const p of preds) {
+      const key = legacyByMatchId[p.match_id] || p.match_id;
+      const b = p.breakdown || {};
+      out[key] = {
+        sign: p.sign,
+        confidence: p.confidence,
+        quip: b.quip || '',
+        is_dudoso: !!b.is_dudoso,
+        p_home: b.p_home,
+        p_draw: b.p_draw,
+        p_away: b.p_away,
+      };
+    }
+    return out;
+  } catch (e) {
+    console.warn('[ia] loadIAPredictions:', e?.message || e);
+    return {};
+  }
+}
+
 /* ── Escucha cambios de sesión ── */
 async function loadUserData(userId) {
   const AW_P   = window.AW_PLAYERS        || [];
   const YOUNG_P = window.YOUNG_PLAYERS_NXGN || [];
   const allPlayers = [...AW_P, ...YOUNG_P];
   const leagueId = getActiveLeagueId();
-  const [{ data: preds }, { data: koPreds }, { data: awData }, { data: lmData, error: lmErr }] = await Promise.all([
+  const [{ data: preds }, { data: koPreds }, { data: awData }, { data: lmData, error: lmErr }, iaMap] = await Promise.all([
     leagueId
       ? db.from('predictions').select('*').eq('user_id', userId).eq('league_id', leagueId)
       : db.from('predictions').select('*').eq('user_id', userId).limit(0), // sin liga, sin datos
@@ -69,7 +115,15 @@ async function loadUserData(userId) {
     leagueId
       ? db.from('league_members').select('groups_saved').eq('user_id', userId).eq('league_id', leagueId).maybeSingle()
       : Promise.resolve({ data: null }),
+    loadIAPredictions(),
   ]);
+
+  // Fusionar predicciones IA en el store global (sobreescribe entradas previas
+  // del fallback api.anthropic.com; preserva entradas que la DB aún no tenga).
+  if (iaMap && Object.keys(iaMap).length > 0) {
+    Object.assign(iaPredictions, iaMap);
+    window.iaPredictions = iaPredictions;
+  }
   if (preds && preds.length > 0) {
     preds.forEach(p => { predictions[p.match_id] = { l:p.local, v:p.visitante, gol:p.scorer, saved:true, lockedByUser:true }; });
     try { localStorage.setItem('porra_predictions', JSON.stringify(predictions)); } catch(e) {}
