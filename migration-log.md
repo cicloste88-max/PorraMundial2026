@@ -984,3 +984,5 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   - C) user=2, ia=1, real=X → 0
   - D) user=1 (2-0), ia=null, real=1 (1-0) → 1 signo + 0 bonus
   El bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap 7 + boost ×2. `Math.min(pts, 7)` garantiza máx 7 antes del boost. No se añadió tests/ dir por no existir patrón — spec acepta comentario cuando no hay suite previa.
+
+[23-04-2026 F-close] FASE F CERRADA (pendiente merge). CLAUDE.md actualizado: (1) línea de estado: "Fase F implementada en rama `claude/wire-predictor-frontend-G2wic`, pendiente merge"; (2) sección "Sanity check 20 abr 2026 → inversiones prioritarias" ítem 3 marcado resuelto frontend (23 abr); (3) tabla de fases IA Predictor: F marcada ✅ con commits F.1–F.4 listados; (4) sección "🤖 IA Predictor" expandida con el detalle de los 4 entregables y el pendiente residual (eliminar `fetch('api.anthropic.com/...')` inertes en `scoring.js:941` y `ui-nav.js:49` — no aparecen en pantalla porque el wiring F llega antes, pero queda refactor post-merge). Smoke manual en localhost:5173 pendiente antes del merge a main.
