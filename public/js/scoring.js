@@ -38,8 +38,16 @@ const FINAL_CLASSIFICATION_PTS = {
 // +1 signo correcto (1·X·2)
 // +3 marcador exacto (incluye el signo, no acumula con +1)
 // +2 goleador correcto
-// +1 bonus vs IA (tu signo difiere de la IA y aciertas)
-// Máximo: 7 pts por partido
+// +1 bonus vs IA (tu signo difiere de la IA y aciertas)  ← Fase F.4
+// Máximo: 7 pts por partido (antes del boost ×2).
+//
+// Casos F.4 (ver iaBonusWillApply en data.js para la predicate):
+//   A) user 2-0 (signo 1), ia=1, real 1-0 (signo 1) → 1 signo + 0 bonus = 1
+//   B) user 1-2 (signo 2), ia=1, real 0-1 (signo 2) → 1 signo + 1 bonus = 2
+//   C) user 1-2 (signo 2), ia=1, real 1-1 (X)       → 0 signo + 0 bonus = 0
+//   D) user 2-0 (signo 1), ia=null, real 1-0 (1)    → 1 signo + 0 bonus = 1
+// Verificados via Node en F.4 commit. El bonus se aplica DESPUÉS de
+// signo/exacto/goleador y antes del cap de 7 y del boost ×2.
 function calcMatchPoints(pred, realL, realR, matchKey) {
   if(!pred || !pred.saved) return 0;
   let pts = 0;
@@ -61,10 +69,11 @@ function calcMatchPoints(pred, realL, realR, matchKey) {
     if(realScorer && pred.gol === realScorer) pts += 2;
   }
 
-  // Bonus vs IA
+  // Bonus vs IA (F.4). iaBonusWillApply valida que ia.sign !== null,
+  // user_sign !== ia_sign, y user_sign === real_sign.
   if(iaBonusWillApply(matchKey, pred, realL, realR)) pts += 1;
 
-  pts = Math.min(pts, 7);
+  pts = Math.min(pts, 7); // cap 7pt por partido (pre-boost)
 
   // Boost x2: si este partido es el boost del día Y se acertó el exacto
   if(isExact && matchKey) {

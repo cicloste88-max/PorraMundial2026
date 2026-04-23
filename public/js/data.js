@@ -248,14 +248,26 @@ async function loadBoostPicks() {
 // ========== FUNCIONES AUXILIARES ==========
 function getMatchKey(m) { return `${m.group}_${m.home}_${m.away}`; }
 function getMySign(pred) { if(pred.l===null||pred.v===null) return null; return pred.l>pred.v?'1':pred.l<pred.v?'2':'X'; }
+// F.4 — Bonus +1pt cuando el user predice en contra de la IA y acierta.
+// Condiciones (todas obligatorias):
+//   1. ia.sign !== null / undefined (la IA tiene pronóstico)
+//   2. mySign !== ia.sign            (user predice DIFERENTE de la IA)
+//   3. mySign === realSign           (user acierta el signo real)
+//
+// Casos documentados:
+//   A) user=1, ia=1, real=1 → false (user coincide con IA, sin bonus)
+//   B) user=2, ia=1, real=2 → true  (user contra-IA y acierta → +1pt)
+//   C) user=2, ia=1, real=X → false (user contra-IA pero falla → 0)
+//   D) user=1, ia=null, real=1 → false (sin IA no hay bonus)
 function iaBonusWillApply(matchKey, pred, realL, realR) {
   const ia = iaPredictions[matchKey];
-  if(!ia||!ia.sign) return false;
+  if (!ia || !ia.sign) return false;                      // caso D
+  if (ia.sign !== '1' && ia.sign !== 'X' && ia.sign !== '2') return false;
   const mySign = getMySign(pred);
-  if(!mySign) return false;
-  if(mySign===ia.sign) return false;
-  let realSign = (realL>realR)?'1':(realL<realR)?'2':'X';
-  return mySign===realSign;
+  if (!mySign) return false;
+  if (mySign === ia.sign) return false;                   // caso A
+  const realSign = (realL > realR) ? '1' : (realL < realR) ? '2' : 'X';
+  return mySign === realSign;                             // caso B (true) / caso C (false)
 }
 // ═══════════════════════════════════════════════════════════
 // MOTOR DE PUNTUACIÓN — Porra Mundial 2026
