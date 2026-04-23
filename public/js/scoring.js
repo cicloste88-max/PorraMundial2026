@@ -794,10 +794,8 @@ function renderIAHint(card, idx, matchKey) {
   if (!ia || !ia.sign) { hint.style.display = 'none'; hint.textContent = ''; return; }
   const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
   const signLabel = signMap[ia.sign] || ia.sign;
-  const dudosoMark = ia.is_dudoso ? '<span class="ia-hint-dudoso" title="La IA duda entre varias opciones">*</span>' : '';
-  hint.innerHTML = '<span class="ia-hint-ico">🤖</span><span class="ia-hint-lbl">IA predice</span>' +
-                   '<strong class="ia-hint-sign">' + ia.sign + ' · ' + signLabel + '</strong>' + dudosoMark;
-  hint.title = ia.quip || '';
+  hint.innerHTML = '<span class="ia-hint-ico">🤖</span><span class="ia-hint-lbl">vs IA</span>';
+  hint.removeAttribute('title');
   hint.style.display = 'flex';
 
   // Hidratar la ia-bar existente si tenemos datos (evita spinner eterno)
