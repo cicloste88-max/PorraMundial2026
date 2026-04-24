@@ -1,5 +1,5 @@
 # CONTEXTO MAESTRO — Porra Mundial 2026
-> Actualizado: 2026-04-24 noche | Fuente: checkpoint tras IA Predictor **Fases A–E + F completas**. EF v10 ACTIVE con `breakdown` enriquecido (9 raw-context fields), paridad 46/46, smoke verde en localhost, rama `claude/wire-predictor-frontend-G2wic` lista para merge a main.
+> Actualizado: 2026-04-24 tarde | Fuente: checkpoint tras IA Predictor **Fases A–F completas y mergeadas a main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a24001a`). EF v10 ACTIVE con `breakdown` enriquecido (9 raw-context fields), paridad 46/46, smoke verde.
 > Cargar este fichero al inicio de cada sesión para contexto completo inmediato.
 
 ---
@@ -10,9 +10,9 @@
 |---|---|
 | **Producción** | porramundial2026-seven.vercel.app |
 | **Repo** | github.com/cicloste88-max/PorraMundial2026 |
-| **Rama activa** | `main` · trabajo abierto en `claude/wire-predictor-frontend-G2wic` (Fase F + 3 post-F, ready-to-merge) |
+| **Rama activa** | `main` |
 | **Supabase proyecto** | `cmyfyswystjgzdwbqyyb` |
-| **Último commit estable en main** | `4c5e953`. IA Predictor Fases A–E en main; **Fase F + post-F en rama `claude/wire-predictor-frontend-G2wic`** (9 commits: F.1 `31f4dbb` · F.2 `68227dc` · F.3 `925ee21` · F.4 `f5e1273` · F.2b `eb729e7` · post-F.1 `fb22648` · post-F.2 `8dd691c` · post-F.3 `6e46d2b` · docs-fix `dbfd3a7`). EF `porra-ia-compute` **v10 ACTIVE** con 9 raw-context fields en breakdown. Snapshot activo `initial_test_21apr`, 72/72 partidos de grupos repoblados con raw context. |
+| **Último commit estable en main** | `a24001a`. **IA Predictor Fases A–F mergeadas a main** (PR #17 `6b06880` squash-merge de la rama `claude/wire-predictor-frontend-G2wic` con F.1 `31f4dbb` · F.2 `68227dc` · F.3 `925ee21` · F.4 `f5e1273` · F.2b `eb729e7` · post-F.1 `fb22648` · post-F.2 `8dd691c` · post-F.3 `6e46d2b` · docs-fix `dbfd3a7`; + doc sweep `a079fda / a24001a`). EF `porra-ia-compute` **v10 ACTIVE** con 9 raw-context fields en breakdown. Snapshot activo `initial_test_21apr`, 72/72 partidos de grupos repoblados con raw context. |
 
 ---
 
@@ -28,10 +28,12 @@
 | Auto-completar Pichichi del torneo sumando goleadores seleccionados en pronósticos | 🟢 |
 | ~~Enganche final de frases IA para pronóstico signo partido~~ | ✅ 23 abr (Fase F + post-F.3 tooltip) |
 
-### Rama abierta pendiente de merge
-| Rama | Commits | Estado | Pendiente |
-|---|---|---|---|
-| `claude/wire-predictor-frontend-G2wic` | 9 (F.1–F.4 + F.2b + post-F.1/2/3 + docs-fix) | Smoke verde, ready | Decisión de merge. Post-merge: limpiar 2 `fetch('api.anthropic.com/...')` inertes en `scoring.js` y `ui-nav.js:49` + opcionalmente replicar tooltip en KO cards. |
+### Cleanup post-merge Fase F (pendiente)
+| Tarea | Ficheros | Prioridad |
+|---|---|---|
+| Eliminar `fetch('api.anthropic.com/...')` muerto (legacy `fetchIA`) | `public/js/scoring.js:941`, `public/js/ui-nav.js:49` | 🟡 deuda técnica (ya inertes, no se ejecutan) |
+| Replicar tooltip explainer en KO cards (scope original limitado a grupos) | `public/js/ko.js::loadKOIAHint` + quizá `repository.ts` | 🟢 opcional |
+| Borrar rama remota `claude/wire-predictor-frontend-G2wic` (ya consumida) | GitHub UI | 🟢 housekeeping |
 
 ### Antes del 11 junio 2026
 | # | Tarea | Estado |
@@ -222,7 +224,7 @@ Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si predicci�
 
 **Capa 2 — Cómputo (Fase E cerrada + post-F commit 1 enriquecido, EF v10):** motor log-odds+softmax con fórmula **ELO 75% + H2H 10% + Racha 15%** (fallback **85/0/15** si H2H<5 partidos). Home advantage +85 base hosts / +95 MEX (solo en grupos). Sign = argmax; margen dudoso <0.08. Tabla `ia_snapshots` con invariante "1 activo" → fairness absoluta (misma predicción para todos los users). Paridad Python↔TS validada 46/46 sobre WC2022 con tolerancia 1e-3. Back-test: accuracy 63.0%, log-loss 0.932, Brier 0.560. Pesos revisados tras análisis de colinealidad ELO↔Racha (previos 50/25/25 obsoletos). **Post-F commit 1 (`fb22648`):** `upsertPrediction` acepta `rawContext` opcional con 9 campos crudos (`elo_home_raw`, `elo_away_raw`, `h2h_home_wins`, `h2h_away_wins`, `h2h_draws`, `h2h_total`, `form_home_ppg`, `form_away_ppg`, `is_host`) que se persisten en `breakdown` JSONB — el motor no cambia, sólo la persistencia se enriquece. Consumido por el tooltip explainer de la Capa 3.
 
-**Capa 3 — Consumo (Fase F completa, rama `claude/wire-predictor-frontend-G2wic`):**
+**Capa 3 — Consumo (Fase F completa, mergeada a main vía PR #17 `6b06880`):**
 - `auth.js::loadIAPredictions` (F.1 + post-F.3) — bootstrapea `ia_predictions` filtradas por snapshot activo en paralelo con `worldcup-2026-matches.json`, mapea `wc2026_gX_<id>` → legacy `${group}_${home_es}_${away_es}`, expone `window.iaPredictions` con signo + confianza + quip + raw context (9 fields).
 - `scoring.js::hydrateIABar(idx, matchKey, match)` (F.2 + post-F.2/3) — rellena la `.ia-bar` con `<sign> · <label> (<conf>%)` + quip. Si hay raw context, envuelve `(conf%)` en `<span class="ia-pct-trigger">` que abre popover.
 - `scoring.js::buildIAExplainer` + `setupIAExplainerOnce` (post-F.3) — popover singleton con narrativa corta (5-7 plantillas según sign/is_host/elo_diff) + lista ELO/H2H/Forma/is_host. Fallbacks: `h2h_total=0` → "Sin partidos previos entre ambas"; `form_ppg=1` en alguno → omite línea de forma. Hover desktop (`matchMedia('(hover:hover)')`), click mobile. Cierra en scroll >20 px, click fuera, resize, Enter/Espacio teclado.
@@ -414,7 +416,8 @@ IDs KO disponibles ~28 jun 2026 (tras finalizar fase de grupos).
 | 2026-04-23 noche | **Post-F commit 1 — breakdown enriquecido**. `repository.ts::upsertPrediction` acepta `rawContext?: PredictionRawContext` opcional (9 campos: `elo_*_raw`, `h2h_*`, `form_*_ppg`, `is_host`) que se persisten en `breakdown` JSONB sin tocar el motor. `index.ts::handleComputeGroups` + `handleComputeMatch` construyen rawContext desde el cache. Helper `computePpg` (redondeo 2 dec, fallback 1.0 si n_matches=0). Deploy v10 **bloqueado en MCP** (2 intentos Stream idle timeout con payload 77 KB) → **San deploya vía `npx supabase functions deploy` local**. Nuevo **ERR-29** documentando el blocker + workflow preventivo. `compute_groups` reejecutado: 72/72 upserted en 23.6 s, breakdown validado (`has_elo_home_raw 72/72`, host_matches=6, h2h_total=0 en 26 partidos, form_ppg=1.00 en 6). | `fb22648` + EF v10 ACTIVE |
 | 2026-04-23 noche | **Post-F commit 2 — eliminar chip `.ia-hint` + extraer `hydrateIABar`**. Redundancia definitiva confirmada (pill "+1pt vs IA" en `.pts-row` + `.ia-bar` con quip). Nodo `<div class="ia-hint">` eliminado de `createMatchCard`; función `renderIAHint` reemplazada por `hydrateIABar(idx, matchKey)` (solo la hidratación del `.ia-bar`). 5 reglas `.ia-hint*` borradas de `base.css` (intactas en `ko.css` bajo `.ko-ia-hint`). Smoke San verde (MEX-RSA + SUI-BIH). | `8dd691c` |
 | 2026-04-23 noche | **Post-F commit 3 — tooltip explainer** sobre el % de confianza. `auth.js::loadIAPredictions` mapea los 9 raw-context fields al store. `scoring.js::hydrateIABar` ahora `(idx, matchKey, match)`: wrapea `(conf%)` en `<span class="ia-pct-trigger">` con role/aria. Nueva `buildIAExplainer(ia, home, away)` → narrativa 5-7 plantillas + lista ELO/H2H/Forma/is_host con fallbacks del spec (`h2h_total=0` → "Sin partidos previos"; `form_ppg=1` → omitir forma). `setupIAExplainerOnce` singleton popover + event delegation: hover desktop (`matchMedia('(hover:hover)')`), click mobile, teclado Enter/Espacio, cierra en scroll>20px / click fuera / resize. 8 reglas CSS nuevas en `base.css`. **Fase F COMPLETA**, rama lista para merge. CLAUDE.md + CONTEXTO actualizados. | `6e46d2b` (+ `dbfd3a7` docs-fix) |
-| 2026-04-24 | **End-of-session doc sweep**. CLAUDE.md, CONTEXTO, migration-log actualizados para reflejar Fase F completa. Rama `claude/wire-predictor-frontend-G2wic` con 7 commits post-F listos para merge a main (en pausa: pendiente decisión de San + cleanup de los 2 `fetch('api.anthropic.com/...')` inertes post-merge). | doc-sweep |
+| 2026-04-24 | **End-of-session doc sweep**. CLAUDE.md, CONTEXTO, migration-log actualizados para reflejar Fase F completa. Rama `claude/wire-predictor-frontend-G2wic` con 7 commits post-F listos para merge a main. | `a079fda` |
+| 2026-04-24 tarde | **Merge Fase F a main + PR #17 squash** (`6b06880`). 30 commits incluyendo Fases A–E (que estaban en ramas sin mergear) + Fase F (F.1–F.4 + F.2b + post-F.1/2/3 + docs-fix) + doc sweep. Main local fast-forward `615e52a → a24001a`. Rama remota `claude/wire-predictor-frontend-G2wic` pendiente de borrado manual (push --delete devolvió 403 en el proxy). Cabeceras CLAUDE.md + CONTEXTO actualizadas a "Fase F en main". | `a24001a` |
 
 ---
 
@@ -453,7 +456,7 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 
 | Área | Detalle | Prioridad |
 |---|---|---|
-| **IA fake — frontend** | ✅ **Resuelto 23 abr** (Fase F + 3 post-F en rama `claude/wire-predictor-frontend-G2wic`, pending merge a main). EF `porra-ia-compute` v10 alimenta `ia_predictions` con breakdown enriquecido; `auth.js` bootstrapea el store; `scoring.js` hidrata `.ia-bar` + tooltip explainer sobre el %. Pendiente post-merge: limpiar los 2 `fetch('api.anthropic.com/...')` inertes en `scoring.js` y `ui-nav.js:49`. | 🟡 Baja (merge + cleanup) |
+| **IA fake — frontend** | ✅ **Resuelto 23–24 abr** (Fase F + 3 post-F **mergeadas a main** vía PR #17 `6b06880` + doc sweep `a24001a`). EF `porra-ia-compute` v10 alimenta `ia_predictions` con breakdown enriquecido; `auth.js` bootstrapea el store; `scoring.js` hidrata `.ia-bar` + tooltip explainer sobre el %. Pendiente cleanup: los 2 `fetch('api.anthropic.com/...')` inertes en `scoring.js` y `ui-nav.js:49`. | 🟢 Cleanup (inerte en producción) |
 | **Tests** | 0 tests sobre 8.626 LOC JS. Motor de puntuación (`calc*Points`) decidirá quién gana el bote. Riesgo de disputas reales. | 🔴 Crítica |
 | **CI/CD** | `.github/workflows/` vacío. Cada push a `main` llega a Vercel sin gates. Origen directo del coste de la saga v2.1→v2.11 (11 iteraciones). | 🔴 Crítica |
 
@@ -491,12 +494,12 @@ Cloudflare Bot Management detecta peticiones no-browser. Soluciones posibles:
 - ~~`css/` fuera de `public/` no llegaba al build de Vite~~ → ✅ 18 abr (`b4a52e6`)
 - ~~Flash welcome al F5 con sesión válida~~ → ✅ 20 abr saga v2.1→v2.11 (HEAD `8bc7f30`)
 - ~~**IA fake — backend**: sin EF propia para el pronóstico~~ → ✅ 21 abr (Fases A–E, HEAD `8d8b667`). EF `porra-ia-compute` v9 ACTIVE con motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX), 4 scrapers (ELO Wikipedia · H2H + últimos N 11v11.com) + 3 actions cómputo (`freeze_snapshot` / `compute_groups` / `compute_match`), snapshot fairness (1 activo), quip Haiku 4.5, rate limit 30/min, crons 11 jun 00:00 freeze + 00:10 compute_groups. Paridad Python↔TS **46/46** verde. Tabla `ia_predictions` con RLS policy pública (`ia_predictions_public_read`).
-- ~~**IA fake — frontend** (Fase F)~~ → ✅ 23 abr (rama `claude/wire-predictor-frontend-G2wic`, 4+3 post-F commits, ready-to-merge). `auth.js::loadIAPredictions` bootstrapea desde snapshot activo con raw context; `scoring.js::hydrateIABar` renderiza `.ia-bar` + tooltip explainer sobre el % (narrativa + ELO/H2H/Forma/is_host); `ko.js::loadKOIAHint` hint on-demand con cache sessionStorage; bonus +1pt vs IA cableado en `calcMatchPoints`. EF `porra-ia-compute` v10 con `rawContext` opcional en `upsertPrediction` para alimentar el tooltip. Deploy vía `supabase CLI` local (ERR-29 — MCP falla con payload >70 KB). 72/72 partidos de grupos con breakdown enriquecido tras `compute_groups` reejecución.
+- ~~**IA fake — frontend** (Fase F)~~ → ✅ 23–24 abr, **mergeada a main** vía PR #17 `6b06880` + doc sweep `a24001a` (4 F + F.2b + 3 post-F commits). `auth.js::loadIAPredictions` bootstrapea desde snapshot activo con raw context; `scoring.js::hydrateIABar` renderiza `.ia-bar` + tooltip explainer sobre el % (narrativa + ELO/H2H/Forma/is_host); `ko.js::loadKOIAHint` hint on-demand con cache sessionStorage; bonus +1pt vs IA cableado en `calcMatchPoints`. EF `porra-ia-compute` v10 con `rawContext` opcional en `upsertPrediction` para alimentar el tooltip. Deploy vía `supabase CLI` local (ERR-29 — MCP falla con payload >70 KB). 72/72 partidos de grupos con breakdown enriquecido tras `compute_groups` reejecución.
 
 ### Plan 8 semanas (20 abr → 11 jun)
 
 - **S1-S2** — ~~EF IA Predictor~~ ✅ hecho (Fases A-E + post-F commit 1, EF v10). · Tests motor puntuación · CI básica (4 días restantes).
-- **S3-S4** — ~~**Fase F IA Predictor** (wiring frontend)~~ ✅ 23 abr. Queda: code splitting · Logger · Sentry · Auditoría innerHTML · merge de la rama `claude/wire-predictor-frontend-G2wic` + cleanup de los 2 `fetch('api.anthropic.com/...')` inertes (3 días).
+- **S3-S4** — ~~**Fase F IA Predictor** (wiring frontend)~~ ✅ 23–24 abr, mergeada a main (PR #17). Queda: code splitting · Logger · Sentry · Auditoría innerHTML · cleanup de los 2 `fetch('api.anthropic.com/...')` inertes (2 días).
 - **S5-S6** — Split `scoring.js` · Consolidación `ui-groups*` · Event delegation (3-4 días, requiere tests S1)
 - **S7-S8** — Tooling debug · Splash condicional · `AppState` + `TIMINGS` (2-3 días)
 

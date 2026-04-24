@@ -354,7 +354,9 @@ function buildKOCard(match, size='normal') {
 
 // F.3 — Carga lazy (no bloqueante) del pronóstico IA de un cruce KO.
 // Orden: sessionStorage → iaKoPredictions (memoria sesión) → EF compute_match.
-function loadKOIAHint(matchId, homeCode, awayCode) {
+// onDone: callback opcional que se dispara tras poblar iaKoPredictions (úsalo
+// desde openModal para refrescar el modal sin duplicar el fetch).
+function loadKOIAHint(matchId, homeCode, awayCode, onDone) {
   if (!homeCode || !awayCode || homeCode === awayCode) return;
   const sKey = `ia_ko_${homeCode}_${awayCode}`;
   // 1) Cache sessionStorage
@@ -362,7 +364,12 @@ function loadKOIAHint(matchId, homeCode, awayCode) {
     const cached = sessionStorage.getItem(sKey);
     if (cached) {
       const obj = JSON.parse(cached);
-      if (obj && obj.sign) { paintKOIAHint(matchId, obj); recordKoPrediction(matchId, obj); return; }
+      if (obj && obj.sign) {
+        paintKOIAHint(matchId, obj);
+        recordKoPrediction(matchId, obj);
+        if (typeof onDone === 'function') onDone();
+        return;
+      }
     }
   } catch (_) {}
   // 2) Compute via EF (requiere sesión)
@@ -382,6 +389,7 @@ function loadKOIAHint(matchId, homeCode, awayCode) {
     try { sessionStorage.setItem(sKey, JSON.stringify(obj)); } catch (_) {}
     paintKOIAHint(matchId, obj);
     recordKoPrediction(matchId, obj);
+    if (typeof onDone === 'function') onDone();
   }).catch(() => { /* silencioso: sin hint es mejor que UI rota */ });
 }
 

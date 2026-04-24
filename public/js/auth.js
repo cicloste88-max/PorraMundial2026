@@ -130,8 +130,7 @@ async function loadUserData(userId) {
     loadIAPredictions(),
   ]);
 
-  // Fusionar predicciones IA en el store global (sobreescribe entradas previas
-  // del fallback api.anthropic.com; preserva entradas que la DB aún no tenga).
+  // Fusionar predicciones IA en el store global.
   if (iaMap && Object.keys(iaMap).length > 0) {
     Object.assign(iaPredictions, iaMap);
     window.iaPredictions = iaPredictions;

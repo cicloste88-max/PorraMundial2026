@@ -1,7 +1,7 @@
 // ui-nav.js - Porra Mundial 2026 / sub-bloque js-ui-nav
 // Navegacion SPA (showPage, goToEliminatoria, updateKOPts, initWelcome),
 // modal de partido (openModal, closeModal, undoKO, setView, refreshAllViews),
-// koInit, fetchIAforKO, updateAwardsFooter, renderPickerList.
+// koInit, updateAwardsFooter, renderPickerList.
 // Deps: data.js, scoring.js, ui-groups.js, ko.js, auth.js, leagues.js
 // Ultimo sub-bloque extraido de main.js — main.js se elimina tras esta extraccion.
 
@@ -15,6 +15,8 @@
      Notas           : Punto de entrada de la app. Inicializacion y navegacion.
 ================================================================ */
 /* ══ IA para partidos KO ══ */
+// Pinta en el modal la prediccion IA ya cacheada en iaKoPredictions.
+// La entrada se pobla desde ko.js::loadKOIAHint (sessionStorage o EF).
 function showIAresultInModal(matchId) {
   const ia = iaKoPredictions[matchId];
   if(!ia) return;
@@ -29,52 +31,11 @@ function showIAresultInModal(matchId) {
   loading.style.display = 'none';
   result.style.display  = 'block';
 }
-
-function fetchIAforKO(matchId, match, hName, aName, onDone) {
-  const prompt = hName+' vs '+aName+
-    ', partido eliminatorio '+match.id+', Mundial 2026 ('+match.venue+').'+
-    ' Busca estadísticas y forma reciente. Responde SOLO JSON sin markdown:'+
-    '{"sign":"1","confidence":72,"quip":"frase corta, graciosa o vacilona (máx 12 palabras)"}'+
-    ' sign: 1=local, X=empate, 2=visitante.';
-
-  const fallbacks = [
-    {sign:'1',confidence:75,quip:'El local tiene hambre de semifinal.'},
-    {sign:'2',confidence:70,quip:'El visitante viene a romper pronósticos.'},
-    {sign:'X',confidence:63,quip:'Empate técnico. Los dos tienen miedo.'},
-    {sign:'1',confidence:80,quip:'Favorito claro. La IA no tiene drama.'},
-    {sign:'2',confidence:68,quip:'Sorpresón estadístico. O fallo estadístico.'},
-  ];
-  const fb = fallbacks[matchId % fallbacks.length];
-
-  fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body: JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:200,
-      tools:[{type:'web_search_20250305',name:'web_search'}],
-      system:'Eres analista deportivo con humor. Usa web_search antes de predecir. Responde SOLO JSON puro.',
-      messages:[{role:'user',content:prompt}]
-    })
-  })
-  .then(r=>r.json())
-  .then(data=>{
-    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    if(!text) throw new Error('no text');
-    return JSON.parse(text.replace(/```json|```/g,'').trim());
-  })
-  .catch(()=> fb)
-  .then(pred=>{
-    iaKoPredictions[matchId] = {sign:pred.sign, confidence:pred.confidence, quip:pred.quip};
-    showIAresultInModal(matchId);
-    if(onDone) onDone(); // actualizar chip IA en updateModalUI
-  });
-}
 // undoKO: deshace el pronóstico de UN partido KO específico
 // Se llama desde el botón dentro del modal — solo afecta al matchId indicado
   // ─────────────────────────────────────────────────────────────
   // KO — MODAL: openModal, closeModal, undoKO, setView,
-  //   refreshAllViews, koInit, fetchIAforKO
+  //   refreshAllViews, koInit
   // ─────────────────────────────────────────────────────────────
 window.undoKO = function(id) {
   if (window._porraCerrada) return; // porra cerrada — no se puede deshacer
@@ -427,11 +388,17 @@ function openModal(match) {
   updateModalUI();
   document.getElementById('modal').classList.add('open');
 
-  // Lanzar IA para este partido KO si no se ha analizado aún
-  if(!iaKoPredictions[matchId]) {
-    fetchIAforKO(matchId, match, hName, aName, updateModalUI);
-  } else {
+  // Si ya hay prediccion IA cacheada (poblada por ko.js::loadKOIAHint al
+  // renderizar la tarjeta), pintar en el modal. Si no, disparar loadKOIAHint
+  // y refrescar el modal via callback cuando llegue (delegamos el fetch+cache
+  // en ko.js para evitar duplicar logica).
+  if(iaKoPredictions[matchId]) {
     showIAresultInModal(matchId);
+  } else if (typeof loadKOIAHint === 'function') {
+    loadKOIAHint(matchId, hTeam.flag, aTeam.flag, () => {
+      showIAresultInModal(matchId);
+      updateModalUI();
+    });
   }
 }
 
