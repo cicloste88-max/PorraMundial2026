@@ -68,6 +68,21 @@ Los fetches rotos **siguen vivos** en `scoring.js:941` y `ui-nav.js:49`. La EF e
 
 **Esfuerzo Fase F estimado:** 1-2 días (alineado con las ~3 jornadas de S3-S4 del plan 8 semanas).
 
+#### 🔄 Actualización 23 abr 2026 — Fase F CERRADA en rama (ready-to-merge)
+
+Fase F cumplida al día siguiente del sanity check inicial, en rama `claude/wire-predictor-frontend-G2wic` con **4 commits F.1–F.4 + 3 post-F + 1 docs-fix**. Smoke manual verde en localhost:5173.
+
+- **F.1 `31f4dbb`** — `auth.js::loadIAPredictions` en el `Promise.all` de `loadUserData`. Lee snapshot activo + filtra `ia_predictions` por `snapshot_id`. Mapea `wc2026_gX_<id>` → legacy `${group}_${home_es}_${away_es}` cruzando con `worldcup-2026-matches.json`. Expone `window.iaPredictions`.
+- **F.2 `68227dc`** — `scoring.js::renderIAHint` pill + quip tooltip en tarjeta grupos + hidrata la `.ia-bar` existente (mata el spinner stuck "consultando oráculos…").
+- **F.3 `925ee21`** — `ko.js::loadKOIAHint` en `buildKOCard` invoca `porra-ia-compute` action `compute_match` on-demand con cache sessionStorage `ia_ko_<home>_<away>`.
+- **F.4 `f5e1273`** — guard defensivo en `iaBonusWillApply` + 4 casos doc verificados (user=IA 0 bonus · user≠IA & acierta 1 bonus · user≠IA & falla 0 · user sin IA 0). Bonus aplicado DESPUÉS de signo/exacto/goleador y ANTES del cap 7 + boost ×2.
+- **F.2b `eb729e7`** — simplificación del chip `.ia-hint` a badge "🤖 vs IA" tras QA (redundancia con `.ia-bar`).
+- **Post-F.1 `fb22648`** — `upsertPrediction` acepta `rawContext?` opcional con 9 campos crudos (`elo_*_raw`, `h2h_*`, `form_*_ppg`, `is_host`) persistidos en `breakdown` JSONB. EF v10 ACTIVE deployada vía `supabase CLI` local (MCP falló con payload >70 KB → **ERR-29**). `compute_groups` reejecutado: 72/72 predicciones con breakdown enriquecido.
+- **Post-F.2 `8dd691c`** — eliminado chip `.ia-hint` completo (redundancia con `.pts-row` pill + `.ia-bar` quip) + extraída `hydrateIABar(idx, matchKey, match)`.
+- **Post-F.3 `6e46d2b`** — **tooltip explainer sobre el %** de la `.ia-bar`. `buildIAExplainer` (narrativa corta + lista ELO/H2H/Forma/is_host con fallbacks del spec) + `setupIAExplainerOnce` (singleton popover, hover desktop vía `matchMedia('(hover:hover)')` / click mobile, cierra en scroll>20px / click fuera / resize, accesible con Enter/Espacio). 8 reglas CSS nuevas en `base.css`.
+
+**Estado final:** rama ready-to-merge. Post-merge queda: (1) limpiar los 2 `fetch('api.anthropic.com/...')` **inertes** en `scoring.js` (legacy `fetchIA`) y `ui-nav.js:49` — ya no se ven en pantalla porque el wiring de Fase F llega antes; (2) opcionalmente replicar el tooltip en KO cards (scope limitado a grupos en commit 3).
+
 ---
 
 ### 2. Zero tests en 8.626 LOC de JS
@@ -390,7 +405,7 @@ Mantener el protocolo end-of-session es clave para que el conocimiento no se pie
 |---|---|---|---|
 | 1 | **Tests del motor de puntuación** (Vitest, 30 tests de `calc*Points`) | 2 días | Máximo — evita disputas reales por puntos mal calculados |
 | 2 | **GitHub Action CI básica** (build + node --check + tests cuando haya) | 2 horas | Bloquea regresiones obvias antes de merge |
-| 3 | **EF `porra-ia-predict`** (mueve fetch Anthropic a EF con API key en Vault + cache en tabla) | medio día | Activa feature IA que ahora es fake + elimina landmine de seguridad |
+| 3 | ~~**EF `porra-ia-predict`**~~ → ✅ **Resuelto**: backend 21 abr (EF `porra-ia-compute` v10 con motor log-odds+softmax), frontend 23 abr (Fase F + 3 post-F en rama `claude/wire-predictor-frontend-G2wic`, ready-to-merge). | — | Hecho |
 
 ### Semanas 3-4 — escala (3 días)
 
