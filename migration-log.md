@@ -1068,3 +1068,27 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   - Las cabeceras de CLAUDE.md / CONTEXTO son la primera referencia que lee el agente nuevo al arrancar — desactualizarlas es fácil cuando la sesión anterior cerró sin mergear y la siguiente sí lo hace. Añadir esta revisión cuando el prompt de arranque tenga "proceder al merge".
 
   Estado actual: main en `a24001a`, Fase F live en producción (Vercel autodeploy), rama G2wic remota pendiente de borrar (housekeeping). Deuda técnica restante (cleanup): eliminar `fetch('api.anthropic.com/...')` inertes en `scoring.js:941` y `ui-nav.js:49` + opcionalmente replicar tooltip IA en KO cards.
+
+[24-04-2026 TARDE — continuación] PR #19 MERGEADO: cleanup deuda técnica post-Fase F. 2 commits squash-mergeados a main (`87fd454`):
+  - Commit 1 `ecacf3a` (doc sync): ya cubierto en la entrada anterior.
+  - **Commit 2 `353976f` (cleanup)**: eliminación de los dos `fetch('api.anthropic.com/v1/messages')` muertos del flow legacy pre-Fase F. Net **-131 líneas**.
+    - **scoring.js (-127):** removidas `fetchIA(idx, match)` + queue `_iaEnqueue/_iaQueue/_iaActive/_iaNext` + IntersectionObserver que la disparaba. `.ia-bar` HTML ahora inicia con `display:none`; `hydrateIABar` la muestra al popular desde `iaPredictions` (snapshot activo bootstrapeado por `auth.js::loadIAPredictions`). Antes, si `loadIAPredictions` fallaba o tardaba, el spinner "consultando oráculos…" se quedaba forever Y el fetch CORS-fallaba cayendo a 6 quips hardcoded contaminando el store con fake data (fingerprint: siempre los mismos 6 textos rotando por `idx % 6`).
+    - **ui-nav.js (-40):** removida `fetchIAforKO` con sus 5 fallbacks hardcoded. `openModal` delega en `loadKOIAHint` (ko.js) vía callback `onDone`:
+      ```js
+      if(iaKoPredictions[matchId]) showIAresultInModal(matchId);
+      else loadKOIAHint(matchId, hTeam.flag, aTeam.flag, () => { showIAresultInModal(matchId); updateModalUI(); });
+      ```
+    - **ko.js (+4):** `loadKOIAHint(matchId, homeCode, awayCode, onDone?)` acepta callback opcional — se dispara tras poblar `iaKoPredictions` (cache sessionStorage hit síncrono o EF `compute_match` response async).
+    - **auth.js:** comentario de limpieza (ya no hay fallback api.anthropic.com en el store).
+  - **Gate de merge:** build verde (vite v8.0.8 ✓ 44 modules); `grep api.anthropic|fetchIA|_iaEnqueue` en `dist/js/*.js` → 0 hits; `grep hydrateIABar` → 4 hits preservado; `grep loadKOIAHint` → 2 hits preservado.
+  - **Housekeeping post-merge:**
+    - Rama remota `claude/review-predictor-merge-PUtqj` auto-borrada por GitHub al hacer squash-merge (config del repo).
+    - Rama remota `claude/wire-predictor-frontend-G2wic` ya borrada manualmente por San desde su máquina local (proxy git del harness devolvía 403 en `push --delete`).
+    - Local `main` fast-forward `a24001a → 87fd454`.
+    - Local review branch borrada tras prune.
+  - **Pendiente UX post-merge** (smoke en localhost:5173):
+    - Cards sin prediction IA → `.ia-bar` no renderiza (antes mostraba spinner + luego fake data). Para las 72 tarjetas de grupos no debería pasar (snapshot activo cubre todos), pero si pasa en algún caso edge, el card queda sin barra IA (UX aceptable).
+    - Modal KO abierto antes de que `loadKOIAHint` termine su first-call (carrera muy corta si usuario abre rápido) → modal muestra spinner hasta que el callback `onDone` dispare `showIAresultInModal`. Antes, fallaba a CORS y mostraba fake data. Ahora muestra spinner → real data.
+  - Estado actual: **main en `87fd454`**, Fase F COMPLETA + deuda técnica cerrada, ambas ramas G2wic y review-predictor-merge borradas.
+
+  Lección: al cerrar una Fase con sustitución de flow (ej. Fase F: `fetchIA` → `loadIAPredictions` + `hydrateIABar`), no dejar el path legacy como "fallback inerte" en el código. Los fallbacks hardcoded ESCONDEN los fallos reales del nuevo path (si `loadIAPredictions` falla silenciosamente, el legacy la tapa con datos fake). Eliminar el camino viejo **antes** de declarar la fase cerrada hubiera sido más limpio — aquí se hizo en commit separado (deuda técnica documentada + resuelta al día siguiente).
