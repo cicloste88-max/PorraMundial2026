@@ -777,7 +777,7 @@ function createMatchCard(match, idx) {
 
   // Hidrata la .ia-bar con el pronostico del bootstrap (auth.js) para evitar
   // el spinner "consultando oraculos..." cuando fetchIA hace early-return.
-  hydrateIABar(idx, matchKey);
+  hydrateIABar(idx, matchKey, match);
 
   return card;
 }
@@ -786,7 +786,10 @@ function createMatchCard(match, idx) {
 // Sustituye a renderIAHint (que tambien pintaba el chip .ia-hint, eliminado
 // por redundancia con la pill "+1pt vs IA" de .pts-row). Idempotente: llamado
 // desde renderMatchCard (render inicial) y updateCardUI (bootstrap tardio).
-function hydrateIABar(idx, matchKey) {
+// Post-F commit 3 — si la entry tiene raw context (elo_home_raw poblado), el
+// numero de confianza se envuelve en un <span class="ia-pct-trigger"> que
+// abre el tooltip explainer en hover (desktop) o click (mobile).
+function hydrateIABar(idx, matchKey, match) {
   const ia = iaPredictions[matchKey];
   if (!ia || !ia.sign) return;
   const loadEl = document.getElementById('ia-loading-' + idx);
@@ -797,10 +800,177 @@ function hydrateIABar(idx, matchKey) {
   const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
   const signLabel = signMap[ia.sign] || ia.sign;
   const conf = Number.isFinite(ia.confidence) ? ia.confidence : Math.round((ia.sign === '1' ? ia.p_home : ia.sign === '2' ? ia.p_away : ia.p_draw) * 100 || 0);
-  predTxt.textContent = ia.sign + ' · ' + signLabel + (conf ? ' (' + conf + '%)' : '');
+  const base = ia.sign + ' · ' + signLabel;
+  const hasExplainer = typeof ia.elo_home_raw === 'number' && match && conf;
+  if (hasExplainer) {
+    setupIAExplainerOnce();
+    // textContent + appendChild evita escape manual de base (sin HTML)
+    predTxt.textContent = base + ' ';
+    const pct = document.createElement('span');
+    pct.className = 'ia-pct-trigger';
+    pct.setAttribute('role', 'button');
+    pct.setAttribute('tabindex', '0');
+    pct.setAttribute('aria-label', 'Ver por qué la IA predice ' + signLabel);
+    pct.dataset.matchKey = matchKey;
+    pct.dataset.home = match.home || '';
+    pct.dataset.away = match.away || '';
+    pct.textContent = '(' + conf + '%)';
+    predTxt.appendChild(pct);
+  } else {
+    predTxt.textContent = base + (conf ? ' (' + conf + '%)' : '');
+  }
   detailTxt.textContent = ia.quip || '';
   loadEl.style.display = 'none';
   resEl.style.display = 'flex';
+}
+
+// Post-F commit 3 — HTML del tooltip explainer. Narrativa 1-2 frases segun
+// sign/is_host/diferencia ELO + lista de datos crudos. Fallbacks suaves:
+// h2h_total=0 → "Sin partidos previos" (en vez de "0W-0D-0L"); form_*_ppg
+// de alguno de los dos lados === 1 → omitir linea de forma (indicador del
+// fallback n_matches=0 del motor).
+function buildIAExplainer(ia, homeName, awayName) {
+  const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
+  const signLabel = signMap[ia.sign] || ia.sign;
+  const conf = ia.confidence || 0;
+  const eloH = ia.elo_home_raw;
+  const eloA = ia.elo_away_raw;
+  const eloDiff = eloH - eloA; // positivo = home mas fuerte
+  let narrative = '';
+  if (ia.sign === 'X') {
+    narrative = 'Partido igualado: ELO cercanos y fuerzas parejas.';
+  } else if (ia.sign === '1') {
+    if (ia.is_host && eloDiff > 0) {
+      narrative = 'Local parte con ventaja: juega en casa y ELO superior.';
+    } else if (ia.is_host) {
+      narrative = 'El local aprovecha jugar en casa pese a ELO parejo.';
+    } else if (eloDiff > 100) {
+      narrative = 'Local claro favorito por diferencia de nivel.';
+    } else {
+      narrative = 'Local favorito por poco margen en el modelo.';
+    }
+  } else { // '2'
+    if (eloDiff < -100) {
+      narrative = 'Visitante claro favorito por diferencia de nivel.';
+    } else {
+      narrative = 'Visitante parte ligeramente por encima en el modelo.';
+    }
+  }
+  const items = [];
+  const esc = (typeof escapeHtml === 'function') ? escapeHtml : ((s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+  items.push('<li>ELO: ' + esc(homeName) + ' ' + eloH + ' vs ' + esc(awayName) + ' ' + eloA + '</li>');
+  if (ia.h2h_total === 0) {
+    items.push('<li>Sin partidos previos entre ambas</li>');
+  } else {
+    items.push('<li>H2H: ' + ia.h2h_home_wins + 'W-' + ia.h2h_draws + 'D-' + ia.h2h_away_wins + 'L en ' + ia.h2h_total + ' partidos</li>');
+  }
+  const homeF = ia.form_home_ppg;
+  const awayF = ia.form_away_ppg;
+  if (typeof homeF === 'number' && typeof awayF === 'number' && homeF !== 1 && awayF !== 1) {
+    items.push('<li>Forma: ' + homeF.toFixed(2) + ' vs ' + awayF.toFixed(2) + ' pts/partido</li>');
+  }
+  if (ia.is_host) {
+    items.push('<li>Jugando en casa (' + esc(homeName) + ' es anfitrion)</li>');
+  }
+  return (
+    '<div class="ia-exp-title">Por qué ' + esc(signLabel) + ' (' + conf + '%)</div>' +
+    '<p class="ia-exp-narrative">' + esc(narrative) + '</p>' +
+    '<ul class="ia-exp-data">' + items.join('') + '</ul>'
+  );
+}
+
+// Post-F commit 3 — handlers globales del popover explainer. Singleton DOM
+// en <body>, event delegation por document. Hover en desktop (matchMedia
+// '(hover:hover)'), click en mobile. Cierre: click fuera, click en mismo
+// trigger, o scroll > 20px (gesture explicito del usuario).
+function setupIAExplainerOnce() {
+  if (window._iaExplainerReady) return;
+  window._iaExplainerReady = true;
+  const pop = document.createElement('div');
+  pop.className = 'ia-explainer';
+  pop.id = 'ia-explainer-popover';
+  pop.style.display = 'none';
+  document.body.appendChild(pop);
+  const mm = window.matchMedia && window.matchMedia('(hover: hover)');
+  const isHover = !!(mm && mm.matches);
+  let activeTrigger = null;
+  let startScrollY = 0;
+  function showFor(trigger) {
+    const key = trigger.dataset.matchKey;
+    const ia = (window.iaPredictions || iaPredictions)[key];
+    if (!ia) return;
+    pop.innerHTML = buildIAExplainer(ia, trigger.dataset.home, trigger.dataset.away);
+    pop.style.display = 'block';
+    positionPopover(pop, trigger);
+    activeTrigger = trigger;
+    startScrollY = window.scrollY;
+  }
+  function hide() {
+    pop.style.display = 'none';
+    pop.innerHTML = '';
+    activeTrigger = null;
+  }
+  function positionPopover(el, trigger) {
+    const r = trigger.getBoundingClientRect();
+    const maxW = 280;
+    const pad = 8;
+    const vw = window.innerWidth;
+    el.style.position = 'fixed';
+    el.style.maxWidth = maxW + 'px';
+    const left = Math.min(Math.max(pad, r.left + r.width / 2 - maxW / 2), vw - maxW - pad);
+    el.style.left = left + 'px';
+    el.style.top = (r.bottom + pad) + 'px';
+    // Si se sale por abajo, invertir hacia arriba
+    requestAnimationFrame(() => {
+      const pr = el.getBoundingClientRect();
+      if (pr.bottom > window.innerHeight - pad) {
+        el.style.top = Math.max(pad, r.top - pr.height - pad) + 'px';
+      }
+    });
+  }
+  if (isHover) {
+    // Desktop: hover para mostrar/ocultar
+    document.addEventListener('mouseover', (e) => {
+      const t = e.target && e.target.closest ? e.target.closest('.ia-pct-trigger') : null;
+      if (t && t !== activeTrigger) showFor(t);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const t = e.target && e.target.closest ? e.target.closest('.ia-pct-trigger') : null;
+      if (!t || !activeTrigger) return;
+      // Cerrar cuando el mouse sale del trigger a algo que no sea el popover
+      const rel = e.relatedTarget;
+      if (rel && (t.contains(rel) || pop.contains(rel))) return;
+      hide();
+    });
+  } else {
+    // Mobile: click toggle + click fuera cierra
+    document.addEventListener('click', (e) => {
+      const t = e.target && e.target.closest ? e.target.closest('.ia-pct-trigger') : null;
+      if (t) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeTrigger === t) hide();
+        else showFor(t);
+        return;
+      }
+      if (activeTrigger && !pop.contains(e.target)) hide();
+    }, true);
+  }
+  // Teclado accesibilidad: Enter/Espacio sobre trigger
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = e.target && e.target.closest ? e.target.closest('.ia-pct-trigger') : null;
+    if (!t) return;
+    e.preventDefault();
+    if (activeTrigger === t) hide();
+    else showFor(t);
+  });
+  // Scroll > 20px → cerrar (gesture explicito)
+  window.addEventListener('scroll', () => {
+    if (activeTrigger && Math.abs(window.scrollY - startScrollY) > 20) hide();
+  }, { passive: true });
+  // Resize también cierra para evitar posicionamiento stale
+  window.addEventListener('resize', () => { if (activeTrigger) hide(); });
 }
 
   // ─────────────────────────────────────────────────────────────
@@ -1034,7 +1204,7 @@ function updateCardUI(idx, match) {
   const mySign = getMySign(pred);
 
   // Refrescar .ia-bar por si el bootstrap la ha rellenado tarde (auth.js post-login)
-  hydrateIABar(idx, matchKey);
+  hydrateIABar(idx, matchKey, match);
 
   const pill = document.getElementById(`spill-${idx}`);
   const stxt = document.getElementById(`stxt-${idx}`);

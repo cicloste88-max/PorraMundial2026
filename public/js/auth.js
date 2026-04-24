@@ -87,6 +87,18 @@ async function loadIAPredictions() {
         p_home: b.p_home,
         p_draw: b.p_draw,
         p_away: b.p_away,
+        // Post-F commit 1: raw context para el tooltip explainer (commit 3).
+        // Opcional: entries computed pre-v10 no tendrán estos campos y el
+        // tooltip hará fallback a no mostrar trigger.
+        elo_home_raw: b.elo_home_raw,
+        elo_away_raw: b.elo_away_raw,
+        h2h_home_wins: b.h2h_home_wins,
+        h2h_away_wins: b.h2h_away_wins,
+        h2h_draws: b.h2h_draws,
+        h2h_total: b.h2h_total,
+        form_home_ppg: b.form_home_ppg,
+        form_away_ppg: b.form_away_ppg,
+        is_host: b.is_host,
       };
     }
     return out;
