@@ -1049,3 +1049,22 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   Estado entregado: rama `claude/wire-predictor-frontend-G2wic` con 10 commits pusheados (incluyendo doc-sweep), EF v10 ACTIVE en producción, 72/72 partidos de grupos con breakdown enriquecido, smoke manual localhost:5173 verde. Ready-to-merge bloqueado solo por decisión del usuario; post-merge queda cleanup de los 2 `fetch('api.anthropic.com/...')` inertes + opcional tooltip en KO cards.
 
   **Frase para arrancar mañana en Claude Desktop:** "Continuamos con la Porra Mundial 2026. Revisa CLAUDE.md y CONTEXTO_PORRA_2026.md, dime el estado actual y si proceder al merge de `claude/wire-predictor-frontend-G2wic` a main."
+
+[24-04-2026 TARDE] VERIFICACIÓN POST-MERGE + HOUSEKEEPING DOCS. San retomó sesión tras cierre de anoche. Diagnóstico arranque:
+  - `git fetch origin main` → `origin/main` ya en `a24001a` (sesión previa completó merge). Local `main` stale en `615e52a` (30 commits detrás).
+  - PR #17 `6b06880 Merge PR #17 - Fase F IA Predictor completa` squash-merge de `claude/wire-predictor-frontend-G2wic` consolidó las 30 commits (Fases A–E + F completa + doc sweep) sobre main.
+  - Rama actual de la sesión `claude/review-predictor-merge-PUtqj` = `a24001a` (idéntica a origin/main, no aporta nada nuevo).
+
+  Acciones ejecutadas:
+  1. **Fast-forward local main** `615e52a → a24001a`. ✅
+  2. **Borrado rama remota `claude/wire-predictor-frontend-G2wic`** → ❌ `git push origin --delete` devolvió HTTP 403 en el proxy git del harness. Pendiente borrado manual desde GitHub UI (la rama es ancestro de main, safe).
+  3. **Doc sweep de cabeceras** — 2 ficheros actualizados para reflejar "Fase F en main" en lugar de "ready-to-merge en rama":
+    - `CLAUDE.md` — header "Último commit en main" `4c5e953 → a24001a` con listado de commits mergeados; sanity-check bullet #3 (IA predict) resolución frontend reescrita para indicar merged a main; sección "Fase F COMPLETA en rama" → "COMPLETA y mergeada a main"; tabla de fases fila F actualizada con PR #17 `6b06880` squash-merge; "Pendiente post-merge a main" → "Cleanup pendiente (post-merge)".
+    - `CONTEXTO_PORRA_2026.md` — header actualizado "24-04 tarde" + "Fases A–F mergeadas a main"; tabla accesos rama activa `main` limpio (sin referencia a G2wic); commit estable `4c5e953 → a24001a`; sección "Rama abierta pendiente de merge" → "Cleanup post-merge Fase F (pendiente)" con 3 tareas priorizadas (cleanup 2 fetch, tooltip KO opcional, borrar G2wic); Capa 3 IA Predictor "rama G2wic" → "mergeada a main vía PR #17"; deuda técnica ítem "IA fake — frontend" resuelto pending merge → resuelto post-merge; plan 8 semanas S3-S4 reformulado.
+  4. **Esta entrada de migration-log.**
+
+  Lecciones:
+  - El git proxy del harness permite fetch y push de commits normales pero bloquea `push --delete`. Para housekeeping de ramas remotas, ir a GitHub UI o a máquina local del usuario.
+  - Las cabeceras de CLAUDE.md / CONTEXTO son la primera referencia que lee el agente nuevo al arrancar — desactualizarlas es fácil cuando la sesión anterior cerró sin mergear y la siguiente sí lo hace. Añadir esta revisión cuando el prompt de arranque tenga "proceder al merge".
+
+  Estado actual: main en `a24001a`, Fase F live en producción (Vercel autodeploy), rama G2wic remota pendiente de borrar (housekeeping). Deuda técnica restante (cleanup): eliminar `fetch('api.anthropic.com/...')` inertes en `scoring.js:941` y `ui-nav.js:49` + opcionalmente replicar tooltip IA en KO cards.

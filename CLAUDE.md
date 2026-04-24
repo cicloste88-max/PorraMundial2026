@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **4c5e953**. IA Predictor Fases A–E cerradas en main con paridad Python↔TS verde (46/46), smoke tests verdes. **Fase F (wiring frontend) COMPLETA en rama `claude/wire-predictor-frontend-G2wic`** (4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`, smoke verde en localhost:5173, lista para merge a main). EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **a24001a**. IA Predictor **Fases A–F cerradas y mergeadas en main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`), paridad Python↔TS verde (46/46), smoke tests verdes. EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -16,7 +16,7 @@ Rama activa: **main** | Último commit en main: **4c5e953**. IA Predictor Fases 
 **Semanas 1-2 (crítico, 4 días):**
 1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` **v10** (Fases A–E + post-F commit 1 con breakdown enriquecido) + ✅ **Resuelto frontend (23 abr)** vía Fase F COMPLETA (F.1–F.4 + 3 post-F) en rama `claude/wire-predictor-frontend-G2wic`, lista para merge a main. `auth.js` bootstrapea `ia_predictions` filtradas por snapshot activo con raw context; `scoring.js` hidrata la `.ia-bar` + tooltip explainer sobre el % con narrativa + ELO/H2H/forma/is_host; `ko.js` llama a `compute_match` on-demand con cache sessionStorage. Los dos `fetch('api.anthropic.com/...')` muertos siguen en `scoring.js` (fetchIA legacy) y `ui-nav.js:49` como fallback **inerte** — limpieza total = refactor post-merge.
+3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` **v10** (Fases A–E + post-F commit 1 con breakdown enriquecido) + ✅ **Resuelto frontend (23–24 abr)** vía Fase F COMPLETA (F.1–F.4 + 3 post-F) **mergeada a main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a24001a`). `auth.js` bootstrapea `ia_predictions` filtradas por snapshot activo con raw context; `scoring.js` hidrata la `.ia-bar` + tooltip explainer sobre el % con narrativa + ELO/H2H/forma/is_host; `ko.js` llama a `compute_match` on-demand con cache sessionStorage. Los dos `fetch('api.anthropic.com/...')` muertos siguen en `scoring.js` (fetchIA legacy) y `ui-nav.js:49` como fallback **inerte** — limpieza total = pendiente cleanup post-merge.
 
 **Semanas 3-4 (escala):**
 4. Code splitting `admin.js` (dynamic import bajo `is_admin`) — bundle −25%.
@@ -374,7 +374,7 @@ EF porra-ia-compute  →   ia_predictions  →        auth.js  (bootstrap snapsh
                                                   ko.js    (hint lazy compute_match)
 ```
 
-**Fase F — wiring frontend** COMPLETA (rama `claude/wire-predictor-frontend-G2wic`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`):
+**Fase F — wiring frontend** COMPLETA y **mergeada a main** (PR #17 `6b06880`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`):
 - `F.1` `auth.js`: helper `loadIAPredictions()` añadido al `Promise.all` de `loadUserData`. Lee `ia_snapshots.is_active=true` + `ia_predictions.select('match_id,sign,confidence,breakdown,used_fallback').eq('snapshot_id',id)` en paralelo con `public/data/worldcup-2026-matches.json` para mapear `wc2026_gX_<id>` → `${group}_${home_es}_${away_es}` (formato `getMatchKey()`). Expone `window.iaPredictions`.
 - `F.2` `scoring.js` + `base.css`: nuevo nodo `<div class="ia-hint">` entre `.pts-row` y `.gol-row`. `renderIAHint()` pinta "🤖 IA predice <sign>" con `title=quip` + asterisco amarillo si `is_dudoso`. Además hidrata la `.ia-bar` existente al render evitando el spinner stuck.
 - `F.3` `ko.js` + `ko.css`: en `buildKOCard`, si ambos equipos resueltos, `loadKOIAHint()` chequea sessionStorage `ia_ko_<home>_<away>` y si no hay hit invoca `porra-ia-compute` con `{action:'compute_match', home, away}` via `window._porraDb.functions.invoke`. Cachea en sessionStorage + espeja en `iaKoPredictions` para que `openModal` reutilice.
@@ -382,7 +382,7 @@ EF porra-ia-compute  →   ia_predictions  →        auth.js  (bootstrap snapsh
 
 **Tras Fase F (post-F, 23 abr noche):** F.2b deprecado tras QA → chip `.ia-hint` eliminado completo (commit 2 post-F) porque la pill "+1pt vs IA" de `.pts-row` + la `.ia-bar` con quip real ya cumplen. Breakdown de `ia_predictions` enriquecido con 9 raw-context fields (commit 1 post-F) y tooltip explainer (commit 3 post-F) sobre el % de la `.ia-bar` — narrativa corta + ELO/H2H/forma/is_host con fallbacks (h2h_total=0 → "Sin partidos previos entre ambas"; form_ppg=1 → omitir línea de forma). Deploy v10 bloqueado por MCP `deploy_edge_function` (payload >70 KB, ver ERR-29) — hecho vía `supabase CLI` local.
 
-**Pendiente post-merge a main:** eliminar los dos `fetch('api.anthropic.com/...')` muertos en `scoring.js` (antiguo `fetchIA`) y `ui-nav.js:49` (ya inertes — no aparecen en pantalla — pero son deuda técnica). Tooltip del % no está aún en KO cards (scope commit 3 se limitó a grupos; puede añadirse leyendo `iaKoPredictions` + `findCachedPrediction` con raw context tras deploy).
+**Cleanup pendiente (post-merge):** eliminar los dos `fetch('api.anthropic.com/...')` muertos en `scoring.js` (antiguo `fetchIA`) y `ui-nav.js:49` (ya inertes — no aparecen en pantalla — pero son deuda técnica). Tooltip del % no está aún en KO cards (scope commit 3 se limitó a grupos; puede añadirse leyendo `iaKoPredictions` + `findCachedPrediction` con raw context tras deploy).
 
 **Fórmula del pronóstico** (Fase E, cerrada — motor log-odds+softmax):
 
@@ -571,7 +571,7 @@ ia_predictions (
 | D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
 | C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada |
 | E | Motor IA log-odds+softmax + snapshots + compute_* | `8d8b667` (PR #16) | ✅ merged + desplegada (EF v9). Paridad 46/46 verde. |
-| F | wiring frontend `auth.js` + `scoring.js` + `ko.js` + `data.js` | `claude/wire-predictor-frontend-G2wic` (F.1–F.4) | ✅ cerrada en rama: F.1 bootstrap `ia_predictions` + snapshot activo en `auth.js` · F.2 hint pill + quip tooltip en tarjeta grupos + hidratación `ia-bar` existente · F.3 hint lazy + cache sessionStorage + invoke `compute_match` en `buildKOCard` · F.4 guard defensivo en `iaBonusWillApply` + 4 casos doc + verificación Node 4/4 |
+| F | wiring frontend `auth.js` + `scoring.js` + `ko.js` + `data.js` | PR #17 `6b06880` (squash-merge a main, F.1–F.4) | ✅ merged: F.1 bootstrap `ia_predictions` + snapshot activo en `auth.js` · F.2 hint pill + quip tooltip en tarjeta grupos + hidratación `ia-bar` existente · F.3 hint lazy + cache sessionStorage + invoke `compute_match` en `buildKOCard` · F.4 guard defensivo en `iaBonusWillApply` + 4 casos doc + verificación Node 4/4 |
 | F.2b | simplificar chip `.ia-hint` tras QA | `eb729e7` | ✅ (deprecado tras post-F.2) |
 | post-F.1 | enriquecer `breakdown` de `ia_predictions` con raw context (ELO/H2H/forma/is_host) | `fb22648` + EF v10 vía supabase CLI (ERR-29) + compute_groups 72/72 | ✅ merged en rama + desplegado |
 | post-F.2 | eliminar chip `.ia-hint` + extraer `hydrateIABar` + doc ERR-29 | `8dd691c` | ✅ smoke manual verde |
