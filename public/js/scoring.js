@@ -728,11 +728,10 @@ function createMatchCard(match, idx) {
         '</div>',
       '</div>',
     '</div>',
-    '<div class="ia-bar">',
+    '<div class="ia-bar" id="ia-bar-'+idx+'" style="display:none">',
       '<div class="ia-lbl">IA predice</div>',
       '<div class="ia-content" id="ia-content-'+idx+'">',
-        '<div id="ia-loading-'+idx+'" style="display:flex;align-items:center;gap:5px"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div><span style="font-size:11px;color:#6b7280;font-style:italic">consultando oráculos...</span></div>',
-        '<div id="ia-result-'+idx+'" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">',
+        '<div id="ia-result-'+idx+'" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">',
           '<span class="ia-prediction" id="ia-pred-txt-'+idx+'"></span>',
           '<span class="ia-detail ia-quip" id="ia-detail-txt-'+idx+'"></span>',
         '</div>',
@@ -775,8 +774,8 @@ function createMatchCard(match, idx) {
     fw.addEventListener('click', e => { e.stopPropagation(); /* TODO: team profile */ });
   });
 
-  // Hidrata la .ia-bar con el pronostico del bootstrap (auth.js) para evitar
-  // el spinner "consultando oraculos..." cuando fetchIA hace early-return.
+  // Hidrata la .ia-bar desde iaPredictions (bootstrap de auth.js); si aun no
+  // hay datos, la barra queda oculta hasta que updateCardUI reintente.
   hydrateIABar(idx, matchKey, match);
 
   return card;
@@ -792,11 +791,10 @@ function createMatchCard(match, idx) {
 function hydrateIABar(idx, matchKey, match) {
   const ia = iaPredictions[matchKey];
   if (!ia || !ia.sign) return;
-  const loadEl = document.getElementById('ia-loading-' + idx);
-  const resEl  = document.getElementById('ia-result-' + idx);
+  const barEl = document.getElementById('ia-bar-' + idx);
   const predTxt = document.getElementById('ia-pred-txt-' + idx);
   const detailTxt = document.getElementById('ia-detail-txt-' + idx);
-  if (!loadEl || !resEl || !predTxt || !detailTxt) return;
+  if (!barEl || !predTxt || !detailTxt) return;
   const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
   const signLabel = signMap[ia.sign] || ia.sign;
   const conf = Number.isFinite(ia.confidence) ? ia.confidence : Math.round((ia.sign === '1' ? ia.p_home : ia.sign === '2' ? ia.p_away : ia.p_draw) * 100 || 0);
@@ -804,7 +802,6 @@ function hydrateIABar(idx, matchKey, match) {
   const hasExplainer = typeof ia.elo_home_raw === 'number' && match && conf;
   if (hasExplainer) {
     setupIAExplainerOnce();
-    // textContent + appendChild evita escape manual de base (sin HTML)
     predTxt.textContent = base + ' ';
     const pct = document.createElement('span');
     pct.className = 'ia-pct-trigger';
@@ -820,8 +817,7 @@ function hydrateIABar(idx, matchKey, match) {
     predTxt.textContent = base + (conf ? ' (' + conf + '%)' : '');
   }
   detailTxt.textContent = ia.quip || '';
-  loadEl.style.display = 'none';
-  resEl.style.display = 'flex';
+  barEl.style.display = '';
 }
 
 // Post-F commit 3 — HTML del tooltip explainer. Narrativa 1-2 frases segun
@@ -974,7 +970,7 @@ function setupIAExplainerOnce() {
 }
 
   // ─────────────────────────────────────────────────────────────
-  // EVENTOS DE TARJETA — attachEvents, fetchIA, updateCardUI,
+  // EVENTOS DE TARJETA — attachEvents, updateCardUI,
   //   updateGlobalPoints, checkKitConflict
   // ─────────────────────────────────────────────────────────────
 function attachEvents(card, idx, match) {
@@ -1086,113 +1082,12 @@ function attachEvents(card, idx, match) {
     if(_hTeam && _aTeam) checkKitConflict(card, idx, _hTeam, _aTeam, _hType, _aType);
   }, 800);
 
-  // IA lazy-fetch: solo cuando la tarjeta entra en el viewport
-  // Evita lanzar 72 fetches simultáneos al cargar → elimina el freeze
-  if('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if(entry.isIntersecting) {
-          obs.disconnect();
-          // Pequeño delay para no saturar si muchas entran a la vez
-          setTimeout(() => fetchIA(idx, match), 150 + Math.random()*200);
-        }
-      });
-    }, { rootMargin: '200px' }); // prefetch 200px antes de ser visible
-    observer.observe(card);
-  } else {
-    // Fallback para navegadores sin IntersectionObserver
-    setTimeout(() => fetchIA(idx, match), 400 + idx * 280);
-  }
+  // La .ia-bar se hidrata desde iaPredictions (populado por loadIAPredictions
+  // en auth.js durante el bootstrap) via hydrateIABar en renderMatchCard y
+  // updateCardUI. No hay fetch del lado cliente.
   // Aplicar estado visual correcto desde el primer render (chips, botón, gsel)
   updateCardUI(idx, match);
 }
-
-// Control de concurrencia IA — máx 3 fetches simultáneos
-let _iaActive = 0;
-const _iaQueue = [];
-function _iaNext() {
-  if(_iaActive >= 3 || _iaQueue.length === 0) return;
-  const fn = _iaQueue.shift();
-  _iaActive++;
-  fn().finally(() => { _iaActive--; _iaNext(); });
-}
-function _iaEnqueue(fn) { _iaQueue.push(fn); _iaNext(); }
-
-function fetchIA(idx, match) {
-  const matchKey = getMatchKey(match);
-  if(iaPredictions[matchKey]) return; // ya analizado
-
-  const loadEl  = document.getElementById('ia-loading-'+idx);
-  const resEl   = document.getElementById('ia-result-'+idx);
-  if(!loadEl || !resEl) return;
-
-  loadEl.style.display = 'flex';
-  resEl.style.display  = 'none';
-
-  const prompt = match.home+' vs '+match.away+
-    ', Grupo '+match.group+', Mundial 2026 ('+match.stadium+').'+
-    ' Busca estadísticas recientes, forma actual, historial de enfrentamientos '+
-    'y cualquier dato relevante de este partido. '+
-    'Después haz tu predicción. Responde SOLO JSON sin markdown:\n'+
-    '{"sign":"1","confidence":73,"quip":"frase corta, graciosa o vacilona sobre el partido (máx 12 palabras)"}'+
-    '\nsign: 1=local gana, X=empate, 2=visitante gana. '+
-    'El quip debe ser ingenioso, irreverente, con humor futbolero. Ejemplos de tono: '+
-    '"España ganará con el mismo esfuerzo que respirar", '+
-    '"El empate es la forma más cobarde de no perder", '+
-    '"Marruecos tiene algo que decir. Varios algo.", '+
-    '"La IA ha consultado 47 bases de datos y sigue sin saber"';
-
-  _iaEnqueue(() => fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 200,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      system: 'Eres un analista deportivo con sentido del humor. Usas web_search para buscar datos reales del partido antes de predecir. Responde SIEMPRE con JSON puro, sin markdown, sin texto adicional.',
-      messages: [{ role: 'user', content: prompt }]
-    })
-  })
-  .then(r => r.json())
-  .then(data => {
-    // Extraer texto de la respuesta (puede haber tool_use blocks)
-    const textBlock = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    if(!textBlock) throw new Error('no text');
-    const clean = textBlock.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    return parsed;
-  })
-  .catch(() => {
-    // CORS en local / error de red → fallback con quips locales
-    const fallbacks = [
-      { sign:'1', confidence:78, quip:'El local siempre tiene razón. O eso dice su afición.' },
-      { sign:'2', confidence:71, quip:'El visitante viene con ganas de armar lío.' },
-      { sign:'X', confidence:64, quip:'El empate es la victoria del cobarde y del sabio.' },
-      { sign:'1', confidence:82, quip:'Favorito claro. La IA no tiene drama aquí.' },
-      { sign:'2', confidence:69, quip:'Sorpresa estadística. O error estadístico. Quién sabe.' },
-      { sign:'X', confidence:61, quip:'Los modelos se pelean. Resultado: tablas.' },
-    ];
-    // Deterministic by match index so it's consistent across reloads
-    return fallbacks[idx % fallbacks.length];
-  })
-  .then(pred => {
-    iaPredictions[matchKey] = { sign: pred.sign, confidence: pred.confidence, quip: pred.quip };
-
-    const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
-    const signLabel = signMap[pred.sign] || pred.sign;
-    const predTxt = document.getElementById('ia-pred-txt-'+idx);
-    const detailTxt = document.getElementById('ia-detail-txt-'+idx);
-
-    if(predTxt)  predTxt.textContent  = pred.sign+' · '+signLabel+' ('+pred.confidence+'%)';
-    if(detailTxt) detailTxt.textContent = pred.quip || '';
-
-    if(loadEl) loadEl.style.display = 'none';
-    if(resEl)  resEl.style.display  = 'flex';
-
-    updateCardUI(idx, match);
-  })); // cierre de _iaEnqueue
-}
-
 
 function updateCardUI(idx, match) {
   const matchKey = getMatchKey(match);
