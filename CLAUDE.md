@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **8d8b667** (fase E squash-mergeada, PR #16 cerrada). IA Predictor Fases A–E cerradas en main con EF `porra-ia-compute` v9 ACTIVE, paridad Python↔TS verde (46/46), smoke tests verdes. Fase F (wiring frontend) pendiente. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **4c5e953**. IA Predictor Fases A–E cerradas en main con paridad Python↔TS verde (46/46), smoke tests verdes. **Fase F (wiring frontend) COMPLETA en rama `claude/wire-predictor-frontend-G2wic`** (4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`, smoke verde en localhost:5173, lista para merge a main). EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -16,7 +16,7 @@ Rama activa: **main** | Último commit en main: **8d8b667** (fase E squash-merge
 **Semanas 1-2 (crítico, 4 días):**
 1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` v9 (Fases A–E cerradas, `ia_predictions` pobladas on-demand + batch 11 jun). ⏳ **Pendiente frontend (Fase F)**: reemplazar los `fetch('api.anthropic.com/...')` muertos en `scoring.js:941` y `ui-nav.js:49` por lectura directa de `ia_predictions` (RLS policy `ia_predictions_public_read`) + llamada a `compute_match` on-demand para eliminatorias. Hasta entonces, esos dos fetches siguen cayendo al fallback hardcoded.
+3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` **v10** (Fases A–E + post-F commit 1 con breakdown enriquecido) + ✅ **Resuelto frontend (23 abr)** vía Fase F COMPLETA (F.1–F.4 + 3 post-F) en rama `claude/wire-predictor-frontend-G2wic`, lista para merge a main. `auth.js` bootstrapea `ia_predictions` filtradas por snapshot activo con raw context; `scoring.js` hidrata la `.ia-bar` + tooltip explainer sobre el % con narrativa + ELO/H2H/forma/is_host; `ko.js` llama a `compute_match` on-demand con cache sessionStorage. Los dos `fetch('api.anthropic.com/...')` muertos siguen en `scoring.js` (fetchIA legacy) y `ui-nav.js:49` como fallback **inerte** — limpieza total = refactor post-merge.
 
 **Semanas 3-4 (escala):**
 4. Code splitting `admin.js` (dynamic import bajo `is_admin`) — bundle −25%.
@@ -260,7 +260,7 @@ whatsapp_subscribers (
 | `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
 | `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
-| `porra-ia-compute` | v9 | IA Predictor (Fases A–E cerradas). 7 actions: `status/scrape_elo/scrape_h2h/scrape_last5/freeze_snapshot/compute_groups/compute_match`. Motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX). Rate limit 30/min (service_role inmune). Quip via Claude Haiku 4.5. `ia_snapshots` (1 activo). Cron 11 jun 00:00 freeze + 00:10 compute_groups. `verify_jwt=false`. Ver sección "🤖 IA Predictor" |
+| `porra-ia-compute` | v10 | IA Predictor (Fases A–E + post-F commit 1). 7 actions: `status/scrape_elo/scrape_h2h/scrape_last5/freeze_snapshot/compute_groups/compute_match`. Motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX). `upsertPrediction` acepta `rawContext` opcional (9 campos crudos: elo_home/away_raw, h2h_home_wins/away_wins/draws/total, form_home/away_ppg, is_host) que persiste en `breakdown` para el tooltip explainer del frontend. Rate limit 30/min (service_role inmune). Quip via Claude Haiku 4.5. `ia_snapshots` (1 activo). Cron 11 jun 00:00 freeze + 00:10 compute_groups. `verify_jwt=false`. Deploy vía `supabase CLI` local (ERR-29). Ver sección "🤖 IA Predictor" |
 | `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
 | `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
 
@@ -368,10 +368,21 @@ Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si la predic
 
 **Arquitectura 3 capas:**
 ```
-Capa 1 — Ingesta         Capa 2 — Cómputo        Capa 3 — Consumo
-EF porra-ia-compute  →   ia_predictions  →        frontend
- (4 actions scraper)      (fórmula 50/25/25)      (scoring.js / ko.js)
+Capa 1 — Ingesta         Capa 2 — Cómputo        Capa 3 — Consumo (Fase F)
+EF porra-ia-compute  →   ia_predictions  →        auth.js  (bootstrap snapshot activo)
+ (4 actions scraper)      (fórmula 50/25/25)      scoring.js (hint grupos + bonus +1pt)
+                                                  ko.js    (hint lazy compute_match)
 ```
+
+**Fase F — wiring frontend** COMPLETA (rama `claude/wire-predictor-frontend-G2wic`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`):
+- `F.1` `auth.js`: helper `loadIAPredictions()` añadido al `Promise.all` de `loadUserData`. Lee `ia_snapshots.is_active=true` + `ia_predictions.select('match_id,sign,confidence,breakdown,used_fallback').eq('snapshot_id',id)` en paralelo con `public/data/worldcup-2026-matches.json` para mapear `wc2026_gX_<id>` → `${group}_${home_es}_${away_es}` (formato `getMatchKey()`). Expone `window.iaPredictions`.
+- `F.2` `scoring.js` + `base.css`: nuevo nodo `<div class="ia-hint">` entre `.pts-row` y `.gol-row`. `renderIAHint()` pinta "🤖 IA predice <sign>" con `title=quip` + asterisco amarillo si `is_dudoso`. Además hidrata la `.ia-bar` existente al render evitando el spinner stuck.
+- `F.3` `ko.js` + `ko.css`: en `buildKOCard`, si ambos equipos resueltos, `loadKOIAHint()` chequea sessionStorage `ia_ko_<home>_<away>` y si no hay hit invoca `porra-ia-compute` con `{action:'compute_match', home, away}` via `window._porraDb.functions.invoke`. Cachea en sessionStorage + espeja en `iaKoPredictions` para que `openModal` reutilice.
+- `F.4` `data.js` + `scoring.js`: guard defensivo en `iaBonusWillApply` (`ia.sign ∈ {'1','X','2'}`) + 4 casos doc A/B/C/D verificados via Node stdout 4/4. El bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap `Math.min(pts,7)` y del boost ×2.
+
+**Tras Fase F (post-F, 23 abr noche):** F.2b deprecado tras QA → chip `.ia-hint` eliminado completo (commit 2 post-F) porque la pill "+1pt vs IA" de `.pts-row` + la `.ia-bar` con quip real ya cumplen. Breakdown de `ia_predictions` enriquecido con 9 raw-context fields (commit 1 post-F) y tooltip explainer (commit 3 post-F) sobre el % de la `.ia-bar` — narrativa corta + ELO/H2H/forma/is_host con fallbacks (h2h_total=0 → "Sin partidos previos entre ambas"; form_ppg=1 → omitir línea de forma). Deploy v10 bloqueado por MCP `deploy_edge_function` (payload >70 KB, ver ERR-29) — hecho vía `supabase CLI` local.
+
+**Pendiente post-merge a main:** eliminar los dos `fetch('api.anthropic.com/...')` muertos en `scoring.js` (antiguo `fetchIA`) y `ui-nav.js:49` (ya inertes — no aparecen en pantalla — pero son deuda técnica). Tooltip del % no está aún en KO cards (scope commit 3 se limitó a grupos; puede añadirse leyendo `iaKoPredictions` + `findCachedPrediction` con raw context tras deploy).
 
 **Fórmula del pronóstico** (Fase E, cerrada — motor log-odds+softmax):
 
@@ -560,9 +571,13 @@ ia_predictions (
 | D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
 | C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada |
 | E | Motor IA log-odds+softmax + snapshots + compute_* | `8d8b667` (PR #16) | ✅ merged + desplegada (EF v9). Paridad 46/46 verde. |
-| F | wiring frontend `scoring.js` / `ko.js` | — | ⏳ pendiente |
+| F | wiring frontend `auth.js` + `scoring.js` + `ko.js` + `data.js` | `claude/wire-predictor-frontend-G2wic` (F.1–F.4) | ✅ cerrada en rama: F.1 bootstrap `ia_predictions` + snapshot activo en `auth.js` · F.2 hint pill + quip tooltip en tarjeta grupos + hidratación `ia-bar` existente · F.3 hint lazy + cache sessionStorage + invoke `compute_match` en `buildKOCard` · F.4 guard defensivo en `iaBonusWillApply` + 4 casos doc + verificación Node 4/4 |
+| F.2b | simplificar chip `.ia-hint` tras QA | `eb729e7` | ✅ (deprecado tras post-F.2) |
+| post-F.1 | enriquecer `breakdown` de `ia_predictions` con raw context (ELO/H2H/forma/is_host) | `fb22648` + EF v10 vía supabase CLI (ERR-29) + compute_groups 72/72 | ✅ merged en rama + desplegado |
+| post-F.2 | eliminar chip `.ia-hint` + extraer `hydrateIABar` + doc ERR-29 | `8dd691c` | ✅ smoke manual verde |
+| post-F.3 | tooltip explainer en el % (`buildIAExplainer`, hover desktop / click mobile) + cierre Fase F | `6e46d2b` | ✅ Fase F COMPLETA, lista merge a main |
 
-**Estado tablas al cierre E (21 abr PM):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` pobladas por compute_match on-demand (quedará batch-poblada al cron del 11 jun 00:10 UTC con los 72 partidos de grupos).
+**Estado tablas al cierre post-F (23 abr noche):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` 72 partidos de grupos poblados por `compute_groups` con breakdown enriquecido (elo_*_raw, h2h_*, form_*_ppg, is_host) + entradas on-demand KO residuales (se repoblarán al freeze del 11 jun).
 
 **Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase). ERR-27 (`supa.from("vault.decrypted_secrets")` no enruta al schema `vault`; `.schema("vault")` tampoco porque `vault` no está expuesto en `api.schemas`; fix: RPC `get_vault_secrets` vía `fetch`).
 

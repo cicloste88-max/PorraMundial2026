@@ -197,6 +197,23 @@ export function buildRachaData(
 
 // ─── Persistencia de predicciones ───────────────────────────────────────────
 
+// Datos crudos en unidades humanas (ELO absoluto, W-D-L absolutos, ppg real).
+// El motor trabaja con señales normalizadas en [-1,+1]; estos crudos se
+// persisten en breakdown sólo para que el frontend pueda construir el
+// tooltip explicativo del % de confianza sin tener que replicar la fórmula.
+// Opcional en upsertPrediction para no romper tests y calls históricas.
+export interface PredictionRawContext {
+  elo_home_raw: number;
+  elo_away_raw: number;
+  h2h_home_wins: number;
+  h2h_away_wins: number;
+  h2h_draws: number;
+  h2h_total: number;
+  form_home_ppg: number;
+  form_away_ppg: number;
+  is_host: boolean;
+}
+
 export async function upsertPrediction(
   supa: SupabaseClient,
   match_id: string,
@@ -206,31 +223,45 @@ export async function upsertPrediction(
   snapshot_id: number,
   is_ko_ondemand: boolean,
   quip: string | null,
+  rawContext?: PredictionRawContext,
 ): Promise<void> {
   const confidence = Math.round(prediction.p_max * 100);
+  // deno-lint-ignore no-explicit-any
+  const breakdown: Record<string, any> = {
+    elo_signal: prediction.breakdown.elo_signal,
+    h2h_signal: prediction.breakdown.h2h_signal,
+    racha_signal: prediction.breakdown.racha_signal,
+    draw_score: prediction.breakdown.draw_score,
+    home_advantage: prediction.breakdown.home_advantage,
+    weights_used: prediction.breakdown.weights_used,
+    scores: prediction.breakdown.scores,
+    raw_home_pct: prediction.p_home,
+    p_home: prediction.p_home,
+    p_draw: prediction.p_draw,
+    p_away: prediction.p_away,
+    p_max: prediction.p_max,
+    margin: prediction.margin,
+    is_dudoso: prediction.is_dudoso,
+    quip,
+  };
+  if (rawContext) {
+    breakdown.elo_home_raw = rawContext.elo_home_raw;
+    breakdown.elo_away_raw = rawContext.elo_away_raw;
+    breakdown.h2h_home_wins = rawContext.h2h_home_wins;
+    breakdown.h2h_away_wins = rawContext.h2h_away_wins;
+    breakdown.h2h_draws = rawContext.h2h_draws;
+    breakdown.h2h_total = rawContext.h2h_total;
+    breakdown.form_home_ppg = rawContext.form_home_ppg;
+    breakdown.form_away_ppg = rawContext.form_away_ppg;
+    breakdown.is_host = rawContext.is_host;
+  }
   const row = {
     match_id,
     home_code: home,
     away_code: away,
     sign: prediction.sign,
     confidence,
-    breakdown: {
-      elo_signal: prediction.breakdown.elo_signal,
-      h2h_signal: prediction.breakdown.h2h_signal,
-      racha_signal: prediction.breakdown.racha_signal,
-      draw_score: prediction.breakdown.draw_score,
-      home_advantage: prediction.breakdown.home_advantage,
-      weights_used: prediction.breakdown.weights_used,
-      scores: prediction.breakdown.scores,
-      raw_home_pct: prediction.p_home,
-      p_home: prediction.p_home,
-      p_draw: prediction.p_draw,
-      p_away: prediction.p_away,
-      p_max: prediction.p_max,
-      margin: prediction.margin,
-      is_dudoso: prediction.is_dudoso,
-      quip,
-    },
+    breakdown,
     used_fallback: prediction.used_fallback,
     snapshot_id,
     is_ko_ondemand,

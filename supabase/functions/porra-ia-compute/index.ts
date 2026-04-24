@@ -15,6 +15,7 @@ import {
   loadCache,
   lookupElo,
   lookupH2H,
+  type PredictionRawContext,
   type SnapshotCache,
   upsertPrediction,
 } from "./lib/repository.ts";
@@ -809,6 +810,20 @@ async function handleFreezeSnapshot(supa: any, body: any) {
   };
 }
 
+// ppg en unidades humanas para el breakdown del tooltip (commit 1 post-F).
+// Mismo criterio que predictor.ts::ppg (3*W + D) / n_matches con fallback 1.0
+// cuando no hay partidos. Redondeo a 2 decimales para display.
+function computePpg(form: {
+  wins: number;
+  draws: number;
+  losses: number;
+  n_matches: number;
+}): number {
+  if (form.n_matches === 0) return 1.0;
+  const raw = (3 * form.wins + form.draws) / form.n_matches;
+  return Math.round(raw * 100) / 100;
+}
+
 // Concurrency limit para llamadas a Anthropic API en compute_groups.
 async function mapConcurrent<T, R>(
   items: T[],
@@ -868,6 +883,7 @@ async function handleComputeGroups(supa: any) {
     eloAway: number;
     h2h: H2HData | null;
     isHostMatch: boolean;
+    rawContext: PredictionRawContext;
   };
 
   const workItems: WorkItem[] = [];
@@ -900,6 +916,18 @@ async function handleComputeGroups(supa: any) {
         racha,
       );
 
+      const rawContext: PredictionRawContext = {
+        elo_home_raw: eloHome,
+        elo_away_raw: eloAway,
+        h2h_home_wins: h2h?.home_wins ?? 0,
+        h2h_away_wins: h2h?.away_wins ?? 0,
+        h2h_draws: h2h?.draws ?? 0,
+        h2h_total: h2h?.total ?? 0,
+        form_home_ppg: computePpg(racha.home),
+        form_away_ppg: computePpg(racha.away),
+        is_host: isHostMatch,
+      };
+
       workItems.push({
         match_id,
         home_code,
@@ -909,6 +937,7 @@ async function handleComputeGroups(supa: any) {
         eloAway,
         h2h,
         isHostMatch,
+        rawContext,
       });
     } catch (e) {
       errors.push({ match_id, error: String((e as any)?.message || e) });
@@ -944,6 +973,7 @@ async function handleComputeGroups(supa: any) {
         cache.snapshot_id,
         false,
         quips[i],
+        w.rawContext,
       );
       predictions_upserted++;
     } catch (e) {
@@ -1039,6 +1069,18 @@ async function handleComputeMatch(supa: any, body: any) {
   // de grupos (wc2026_gX_<sofascore_id>) para no colisionar.
   const match_id = `ondemand_${home}_${away}_${snapshot_id}`;
 
+  const rawContext: PredictionRawContext = {
+    elo_home_raw: eloHome,
+    elo_away_raw: eloAway,
+    h2h_home_wins: h2h?.home_wins ?? 0,
+    h2h_away_wins: h2h?.away_wins ?? 0,
+    h2h_draws: h2h?.draws ?? 0,
+    h2h_total: h2h?.total ?? 0,
+    form_home_ppg: computePpg(racha.home),
+    form_away_ppg: computePpg(racha.away),
+    is_host: false, // KO on-demand: sedes neutras/rotativas (spec §8.4.6)
+  };
+
   await upsertPrediction(
     supa,
     match_id,
@@ -1048,6 +1090,7 @@ async function handleComputeMatch(supa: any, body: any) {
     snapshot_id,
     true, // is_ko_ondemand
     quip,
+    rawContext,
   );
 
   return {

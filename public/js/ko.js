@@ -336,12 +336,78 @@ function buildKOCard(match, size='normal') {
           <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);margin-top:3px;text-align:center;letter-spacing:.04em">${fmtTime(match.date)}</div>
       </div>
     </div>
+    <div class="ko-ia-hint" id="ko-ia-${match.id}" style="display:none"></div>
     <div class="ko-footer">
       <span class="ko-date">${fmtDate(match.date)}</span>
       <span class="ko-status ${statusCls}">${statusTxt}</span>
     </div>
   `;
+
+  // F.3 — Hint IA on-demand para KO cards. Solo si ambos equipos resueltos.
+  // Cache sessionStorage por par de equipos (robusto ante cambios de slots).
+  if (bothResolved && hTeam?.flag && aTeam?.flag) {
+    loadKOIAHint(match.id, hTeam.flag, aTeam.flag);
+  }
+
   return card;
+}
+
+// F.3 — Carga lazy (no bloqueante) del pronóstico IA de un cruce KO.
+// Orden: sessionStorage → iaKoPredictions (memoria sesión) → EF compute_match.
+function loadKOIAHint(matchId, homeCode, awayCode) {
+  if (!homeCode || !awayCode || homeCode === awayCode) return;
+  const sKey = `ia_ko_${homeCode}_${awayCode}`;
+  // 1) Cache sessionStorage
+  try {
+    const cached = sessionStorage.getItem(sKey);
+    if (cached) {
+      const obj = JSON.parse(cached);
+      if (obj && obj.sign) { paintKOIAHint(matchId, obj); recordKoPrediction(matchId, obj); return; }
+    }
+  } catch (_) {}
+  // 2) Compute via EF (requiere sesión)
+  if (!window._porraDb || !window._porraToken) return;
+  window._porraDb.functions.invoke('porra-ia-compute', {
+    body: { action: 'compute_match', home: homeCode, away: awayCode },
+  }).then(({ data, error }) => {
+    if (error || !data?.ok || !data?.prediction) return;
+    const p = data.prediction;
+    const obj = {
+      sign: p.sign,
+      confidence: Math.round((p.p_max || 0) * 100),
+      quip: data.quip || '',
+      is_dudoso: !!p.is_dudoso,
+      p_home: p.p_home, p_draw: p.p_draw, p_away: p.p_away,
+    };
+    try { sessionStorage.setItem(sKey, JSON.stringify(obj)); } catch (_) {}
+    paintKOIAHint(matchId, obj);
+    recordKoPrediction(matchId, obj);
+  }).catch(() => { /* silencioso: sin hint es mejor que UI rota */ });
+}
+
+function paintKOIAHint(matchId, ia) {
+  const el = document.getElementById('ko-ia-' + matchId);
+  if (!el || !ia?.sign) return;
+  const signMap = { '1': 'Local', 'X': 'Empate', '2': 'Visitante' };
+  const signLabel = signMap[ia.sign] || ia.sign;
+  const dudosoMark = ia.is_dudoso ? '<span class="ia-hint-dudoso" title="La IA duda entre varias opciones">*</span>' : '';
+  el.innerHTML = '<span class="ia-hint-ico">🤖</span><span class="ia-hint-lbl">IA</span>' +
+                 '<strong class="ia-hint-sign">' + ia.sign + ' · ' + signLabel + '</strong>' + dudosoMark;
+  el.title = ia.quip || '';
+  el.style.display = 'flex';
+}
+
+function recordKoPrediction(matchId, ia) {
+  // Espejo en iaKoPredictions (definido en ui-nav.js) para que el modal reuse
+  // el mismo dato sin dispararse otro fetch. Tolera carga fuera de orden.
+  try {
+    if (typeof iaKoPredictions === 'object' && iaKoPredictions) {
+      iaKoPredictions[matchId] = {
+        sign: ia.sign, confidence: ia.confidence, quip: ia.quip,
+        is_dudoso: ia.is_dudoso,
+      };
+    }
+  } catch (_) {}
 }
 
 

@@ -1158,3 +1158,59 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
   .mobile-toast.error { background: #dc2626; box-shadow: 0 10px 30px rgba(220,38,38,0.4); }
   .mobile-dot.summary.ready { border-color: #16a34a; color: #16a34a; background: rgba(22,163,74,0.12); border-style: solid; }
 }
+
+/* Post-F commit 3 — tooltip explainer sobre el % de confianza IA. */
+.ia-pct-trigger {
+  display: inline;
+  cursor: help;
+  text-decoration: underline dotted rgba(124, 58, 237, .6);
+  text-underline-offset: 2px;
+  color: inherit;
+  border-radius: 3px;
+  outline: none;
+  transition: background-color 120ms ease;
+}
+.ia-pct-trigger:hover,
+.ia-pct-trigger:focus-visible {
+  background: rgba(124, 58, 237, .14);
+}
+.ia-explainer {
+  /* position/top/left/zIndex los pone JS (fixed) */
+  max-width: 280px;
+  background: #1f1a35;
+  color: #e5e1f1;
+  border: 1px solid rgba(124, 58, 237, .45);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  font-size: 12px;
+  line-height: 1.45;
+  z-index: 9999;
+  pointer-events: auto;
+}
+.ia-exp-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: #c4b5fd;
+  margin: 0 0 6px;
+  letter-spacing: .01em;
+}
+.ia-exp-narrative {
+  margin: 0 0 8px;
+  color: #e5e1f1;
+  font-size: 12px;
+}
+.ia-exp-data {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  color: #cbc2e8;
+}
+.ia-exp-data li {
+  margin: 0;
+  padding: 3px 0;
+  border-top: 1px solid rgba(124, 58, 237, .18);
+}
+.ia-exp-data li:first-child { border-top: 0; }
+
