@@ -4,7 +4,7 @@
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
 **Producción: porramundial2026-seven.vercel.app**
 Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **4c5e953**. IA Predictor Fases A–E cerradas en main con paridad Python↔TS verde (46/46), smoke tests verdes. **Fase F (wiring frontend) COMPLETA en rama `claude/wire-predictor-frontend-G2wic`** (4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / <commit3>`, smoke verde en localhost:5173, lista para merge a main). EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Rama activa: **main** | Último commit en main: **4c5e953**. IA Predictor Fases A–E cerradas en main con paridad Python↔TS verde (46/46), smoke tests verdes. **Fase F (wiring frontend) COMPLETA en rama `claude/wire-predictor-frontend-G2wic`** (4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`, smoke verde en localhost:5173, lista para merge a main). EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
 
 ---
 
@@ -374,7 +374,7 @@ EF porra-ia-compute  →   ia_predictions  →        auth.js  (bootstrap snapsh
                                                   ko.js    (hint lazy compute_match)
 ```
 
-**Fase F — wiring frontend** COMPLETA (rama `claude/wire-predictor-frontend-G2wic`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / <commit3>`):
+**Fase F — wiring frontend** COMPLETA (rama `claude/wire-predictor-frontend-G2wic`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b`):
 - `F.1` `auth.js`: helper `loadIAPredictions()` añadido al `Promise.all` de `loadUserData`. Lee `ia_snapshots.is_active=true` + `ia_predictions.select('match_id,sign,confidence,breakdown,used_fallback').eq('snapshot_id',id)` en paralelo con `public/data/worldcup-2026-matches.json` para mapear `wc2026_gX_<id>` → `${group}_${home_es}_${away_es}` (formato `getMatchKey()`). Expone `window.iaPredictions`.
 - `F.2` `scoring.js` + `base.css`: nuevo nodo `<div class="ia-hint">` entre `.pts-row` y `.gol-row`. `renderIAHint()` pinta "🤖 IA predice <sign>" con `title=quip` + asterisco amarillo si `is_dudoso`. Además hidrata la `.ia-bar` existente al render evitando el spinner stuck.
 - `F.3` `ko.js` + `ko.css`: en `buildKOCard`, si ambos equipos resueltos, `loadKOIAHint()` chequea sessionStorage `ia_ko_<home>_<away>` y si no hay hit invoca `porra-ia-compute` con `{action:'compute_match', home, away}` via `window._porraDb.functions.invoke`. Cachea en sessionStorage + espeja en `iaKoPredictions` para que `openModal` reutilice.
@@ -575,7 +575,7 @@ ia_predictions (
 | F.2b | simplificar chip `.ia-hint` tras QA | `eb729e7` | ✅ (deprecado tras post-F.2) |
 | post-F.1 | enriquecer `breakdown` de `ia_predictions` con raw context (ELO/H2H/forma/is_host) | `fb22648` + EF v10 vía supabase CLI (ERR-29) + compute_groups 72/72 | ✅ merged en rama + desplegado |
 | post-F.2 | eliminar chip `.ia-hint` + extraer `hydrateIABar` + doc ERR-29 | `8dd691c` | ✅ smoke manual verde |
-| post-F.3 | tooltip explainer en el % (`buildIAExplainer`, hover desktop / click mobile) | `<commit3>` | ✅ Fase F COMPLETA, lista merge a main |
+| post-F.3 | tooltip explainer en el % (`buildIAExplainer`, hover desktop / click mobile) + cierre Fase F | `6e46d2b` | ✅ Fase F COMPLETA, lista merge a main |
 
 **Estado tablas al cierre post-F (23 abr noche):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` 72 partidos de grupos poblados por `compute_groups` con breakdown enriquecido (elo_*_raw, h2h_*, form_*_ppg, is_host) + entradas on-demand KO residuales (se repoblarán al freeze del 11 jun).
 
