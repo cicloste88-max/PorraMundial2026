@@ -1118,3 +1118,31 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
 2. Algunos Haikus alucinan: H2 (ia-predictor) inventó fórmulas matemáticas detalladas sin source; H7 (db-schema) inventó schema de `ia_snapshots`. Padre debe revisar output antes de Write.
 3. Idle timeouts en prompts grandes (>15KB inline source): chunkear en grupos de 3-4 evita timeouts.
 4. Hook pre-commit con enforcement de tamaños es crítico pero NO activarlo (`git config core.hooksPath`) hasta tener CLAUDE.md ya compactado, sino bloquea commits intermedios.
+
+---
+
+## 2026-04-25 mediodía — Cierre sesión refactor F0-F6 + cleanup obsoleto detectado
+
+**Eventos posteriores al commit `c64fd7a` (CHANGELOG completado en Wave 2)**:
+
+- `11e2a0e` chore: eliminar `CONTEXTO_PORRA_2026.md` + append migration-log refactor F0-F4 (37.7KB borrados; deltas absorbidos en `docs/architecture.md` historial sesiones + `docs/live-scoring.md` ficha actor fallback).
+- `45f1e79` docs: append migration-log entrada refactor F0-F4 (Read-before-Edit recovery del intento previo).
+- `7a33116` fix: add missing ERR-28 entry to tabla-índice de `CLAUDE.md` (slot vacío 27→29 cubierto, count tabla 28→29).
+- `49a46d3` fix: add ERR-28 entry to catalog `errores_conocidos_porra.md` (RLS `ia_snapshots_public_read_active` policy, con TODOs honestos para datos no inferibles).
+- `38e95d0` **squash-merge PR #20 a main** (25 abr 02:54Z) — 18 ficheros doc-only del refactor F4.
+- `414ea3a` fix(docs): `ia-predictor.md` cleanup item 1 ya estaba hecho en `87fd454` (PR #19, 24 abr) — detectado por self-audit cross-checking via GitHub MCP. El doc trasladaba "Cleanup pendiente" del CLAUDE.md fuente sin verificar contra el código post-PR-#19. Sandbox Code tenía main local en `615e52a` (pre-Fase-F), por eso el cleanup ya merged en remoto pasó desapercibido durante Wave 1.
+- `5914945` cherry-pick de `414ea3a` directo a main.
+
+**F5-lite tests T1-T4 PASS** (verificación documental, sin sesiones Code limpias separadas):
+- T1: frase arranque "Porra Mundial 2026. HEAD actual en main…" provoca sitrep correcto.
+- T2: `docs/` navegable desde síntoma sin keyword del dominio (test E8 contra 3 síntomas hipotéticos).
+- T3: `.claude/rules/` con frontmatter YAML + globs auto-cargan por path.
+- T4: `grep -r "ERR-" CLAUDE.md docs/` → todos los ERR localizables vía tabla-índice.
+
+**F6 ejecutado**:
+- Merge PR #20 squash + cherry-pick `5914945` para fix doc obsoleto.
+- Hook pre-commit activado localmente: `git config core.hooksPath .githooks` (enforcement 10KB CLAUDE.md / 30KB CHANGELOG.md operativo desde ahora).
+- userMemories Claude.ai actualizadas (4 edits).
+- PR #21 fantasma cerrado sin merge: la rama `claude/setup-todowrite-phases-KOGQU` fue recreada por el sandbox Code al pushear el fix-commit cuando el remote ya la había auto-borrado tras squash-merge de PR #20. Segunda eliminación tras cherry-pick.
+
+**Lección operacional para próximas sesiones Code**: tras squash-merge + auto-delete de la rama de trabajo, el sandbox local puede recrearla sin saberlo si pushea desde la rama vieja (genera PRs fantasma). **Protocolo obligatorio al arrancar nueva sesión**: `git checkout main && git pull origin main` ANTES del primer fix-commit. Refleja también: el clone del sandbox suele ir varios commits por detrás del main remoto (esta sesión arrancó con `615e52a`, 4 commits por detrás de `5914945`); siempre re-sincronizar antes de razonar sobre estado real.
