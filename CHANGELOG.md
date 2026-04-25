@@ -61,3 +61,61 @@ T=~600 showPage(target) → capa 2 retira lock + display:block en target
 **Estado tablas al cierre post-F (23 abr noche):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` 72 partidos de grupos poblados por `compute_groups` con breakdown enriquecido (`elo_*_raw`, `h2h_*`, `form_*_ppg`, `is_host`) + entradas on-demand KO residuales (se repoblarán al freeze del 11 jun).
 
 **Lecciones registradas en `errores_conocidos_porra.md`:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`); ERR-25 (3 headers obligatorios para 11v11.com); ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase); ERR-27 (`vault.decrypted_secrets` no enruta; fix vía RPC `get_vault_secrets`); ERR-29 (MCP `deploy_edge_function` rompe con payloads >70KB).
+
+### IA Predictor — Fase F wiring (cronología F.1 → post-F.3, 23-24 abr 2026)
+
+- **F.1 — `auth.js`**: helper `loadIAPredictions()` añadido al `Promise.all` de `loadUserData`. Lee `ia_snapshots.is_active=true` + `ia_predictions.select('match_id,sign,confidence,breakdown,used_fallback').eq('snapshot_id',id)` en paralelo con `public/data/worldcup-2026-matches.json` para mapear `wc2026_gX_<id>` → `${group}_${home_es}_${away_es}` (formato `getMatchKey()`). Expone `window.iaPredictions`.
+- **F.2 — `scoring.js` + `base.css`**: hidrata la `.ia-bar` existente al render, evita spinner stuck. Pinta signo + % + quip al usuario en cada tarjeta de partido de grupos.
+- **F.3 — `ko.js` + `ko.css`**: en `buildKOCard`, si ambos equipos resueltos, `loadKOIAHint()` chequea sessionStorage `ia_ko_<home>_<away>`; si no hay hit invoca `porra-ia-compute` con `{action:'compute_match', home, away}` via `window._porraDb.functions.invoke`. Cachea en sessionStorage + espeja en `iaKoPredictions` para que `openModal` reutilice.
+- **F.4 — `data.js` + `scoring.js`**: guard defensivo en `iaBonusWillApply` (`ia.sign ∈ {'1','X','2'}`) + 4 casos doc A/B/C/D verificados via Node stdout 4/4. El bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap `Math.min(pts,7)` y del boost ×2.
+- **post-F.1 — `fb22648`**: enriquecer `breakdown` de `ia_predictions` con 9 raw-context fields (`elo_home_raw`, `elo_away_raw`, `h2h_home_wins/away_wins/draws/total`, `form_home_ppg`, `form_away_ppg`, `is_host`). EF v10 desplegada vía `supabase CLI` local por ERR-29 (MCP `deploy_edge_function` payload >70KB).
+- **post-F.2 — `8dd691c`**: eliminar chip `.ia-hint` completo tras QA (pill "+1pt vs IA" + `.ia-bar` con quip ya cumplen). Función `renderIAHint` reemplazada por `hydrateIABar(idx, matchKey)`. 5 reglas `.ia-hint*` borradas de `base.css` (intactas en `ko.css` bajo `.ko-ia-hint`). Smoke verde (MEX-RSA + SUI-BIH).
+- **post-F.3 — `6e46d2b`**: tooltip explainer sobre el % de la `.ia-bar`. `auth.js::loadIAPredictions` mapea los 9 raw-context fields al store. `scoring.js::hydrateIABar(idx, matchKey, match)` wrapea `(conf%)` en `<span class="ia-pct-trigger">` con role/aria. Nueva `buildIAExplainer(ia, home, away)` → narrativa 5-7 plantillas + lista ELO/H2H/Forma/is_host con fallbacks del spec. `setupIAExplainerOnce` singleton popover + event delegation: hover desktop, click mobile, teclado Enter/Espacio. **Fase F COMPLETA**.
+
+### Bugs recientemente resueltos (abr 2026)
+
+- `updateCardUI` race condition tras login (commit `ee2e25a`, ver ERR-07).
+- CSS grid-areas roto en Vista Jornada (ver ERR-09).
+- 404 masivos en consola por `extractUrl(linear-gradient(...))` (ver ERR-08).
+- Header eliminatorias responsive en móvil (mismo patrón que fase grupos, ver ERR-10).
+- Bracket-results móvil (commit `2600c1a` — min-width 260px por columna activa).
+- Rediseño bracket: timeline vertical + live hero (commit `2600c1a`).
+- `pg_net` timeout en `porra-match-live` (resuelto vía async + webhook Apify; arquitectura final del live scoring).
+- **Vista Directo + sección simulacros admin** (PR #3, commits `d137d99` + `6d2c028` + `0421f0f`, merge `614b5ef`):
+  - Banner superior `SIMULACRO · PARTIDO FUERA DEL MUNDIAL` (no se solapa con nombre equipo).
+  - `checkIsAdmin` async con retries hasta 5s + re-render anti-loop (ver ERR-14).
+  - Causa raíz original: `match_key` renombrado por error matinal `wc2026_gA_15186710` → `_historic_..._trial`. Revertido.
+- **Rediseño móvil fase de grupos** (PR #9 mergeado en `9d651d5`, 4 commits `871592b` + `b812f41` + `c69f7de` + `e114c02`):
+  - Commit 1/4: infra + `ui-groups-mobile.js` + `PHRASES_GRUPO` + placeholder `@media` + script en loadScript chain.
+  - Commit 2/4: acordeón lista + barra progreso por grupo + helper `applyMobileGroupCollapse`.
+  - Commit 3/4: focus layer + carrusel 6 slides + swipe + smart boost row (conflicto jornada).
+  - Commit 4/4: slide 7 clasificación + botón Guardar/Deshacer + lock cards + persistencia BD (`league_members.groups_saved` JSONB).
+- **Fixes producción móvil** (19 abr, 4 commits a `main`):
+  - `b4a52e6` — ERR-18: `css/` → `public/css/` (Vite sólo copia `public/` a `dist/`).
+  - `0aa78a9` — ERR-19: `openMobileFocus` defensivo con `try/catch` + toast para debug sin devtools en iPhone.
+  - `40c0fe2` — ERR-20: eliminar `body.style.overflow='hidden'` (bloqueo persistente en Safari iOS).
+  - `82b4753` — ERR-21: reglas base de `.mobile-focus-layer` fuera del `@media` + `visibility:hidden/visible` (evita layer fantasma en hit-testing Safari).
+- **Refactor CSS extracción `<style>` inline** (commit `9e93fe8`): 4 bloques `<style>` de `index.html` con comentario "Archivo destino : X.css" nunca se habían migrado. Fix: contenido `<style>` prepended a cada fichero destino (para que reglas nuevas al final ganen por cascada), bloques eliminados de `index.html` (de 2970 a 1008 líneas), 4 `<link>` nuevos en cabecera. Causa raíz real de ERR-18/19/20/21.
+
+### Limpieza repo (17 abr 2026)
+
+Eliminados:
+
+- 5 backups `.bak`: `index.html.bak`, `js/main.js.bak{,2,3}`, `js/auth.js.bak`.
+- 3 duplicados bracket-results (raíz `.js/.css` + `js/bracket-results.js` viejo).
+- 6 patches Python one-shot (`patch_*.py`).
+- 5 markdowns de diseños ejecutados (`vista-jornada.md`, `jornada-redesign.md`, `fix-vista-jornada.md`, `boost-ticker-mejoras.md`, `new_bracket.txt`).
+- `js/utils.js` huérfano (shims ya están inline en `index.html` líneas 1440-1445).
+- `supabase-ef-patches/porra-apify-webhook-v6.ts` (producción en v7).
+- 3 scripts exploratorios Apify.
+
+Añadido a `.gitignore`: `apify-actors/*/node_modules/`.
+
+### Playoffs UEFA marzo 2026 — resueltos
+
+- Grupo A + República Checa
+- Grupo B + Bosnia
+- Grupo D + Turquía
+- Grupo F + Suecia
+- Grupo I + Irak
+- Grupo K + RD Congo
