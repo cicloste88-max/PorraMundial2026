@@ -395,6 +395,19 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
+## ERR-28 — RLS sobre `ia_snapshots` bloqueaba bootstrap del frontend (policy `ia_snapshots_public_read_active` requerida)
+
+- **Síntoma:** durante el bootstrap del frontend (Fase F del IA Predictor), `auth.js::loadIAPredictions` consulta `ia_snapshots.where(is_active=true)` para obtener el snapshot activo y luego cruzar con `ia_predictions`. La query devolvía array vacío desde el cliente Supabase aunque la fila existía en DB y era visible para `service_role`. <!-- TODO: confirmar con San si el síntoma exacto era array vacío silencioso vs error RLS explícito en la respuesta -->
+- **Causa:** las 4 tablas `ia_*` se crearon con RLS enabled en la migración Fase A. `ia_predictions` recibió la policy `ia_predictions_public_read` que permite `SELECT` al rol consumido por el frontend. Pero `ia_snapshots` no recibió policy análoga en el mismo migration, por lo que cualquier cliente que no fuera `service_role` veía 0 filas (RLS deny-by-default). El frontend usa el cliente Supabase con la `anon`/`authenticated` key, no `service_role`.
+- **Fix aplicado:** crear policy `ia_snapshots_public_read_active` que expone únicamente la fila con `is_active=true` al rol consumidor del frontend. <!-- TODO: confirmar con San si la policy aplica a `authenticated`, `anon`, o ambos, y la SQL exacta del USING clause (probablemente `USING (is_active = true)`) + commit donde se aplicó -->
+- **Patrón preventivo:**
+  - Al crear tablas con RLS enabled, definir las policies de `SELECT` para los roles consumidores **en el mismo migration** que crea la tabla. Olvidar la policy es equivalente a `DENY ALL` para clientes no-service_role.
+  - Si una tabla expone solo una "fila activa" (singleton lógico — como `ia_snapshots` con invariante "1 activo"), la policy debe reflejarlo: `USING (is_active = true)` minimiza el blast radius vs `USING (true)`.
+  - Smoke test obligatorio post-RLS: lanzar la query objetivo desde un cliente público (no `service_role`) antes de declarar la tabla "lista para frontend". Aquí el RLS mal configurado solo apareció al wiring de Fase F, no en las pruebas de Fase A.
+- **Fecha detección:** ~21-24 abr 2026 (durante wiring frontend Fase F del IA Predictor, antes de cerrar la fase). <!-- TODO: confirmar fecha exacta y commit del fix con San -->
+
+---
+
 ## ERR-29 — MCP `deploy_edge_function` rompe con payloads >70 KB (EFs con múltiples ficheros lib/)
 
 - **Síntoma:** al intentar deployar `porra-ia-compute` v10 (6 ficheros: `index.ts` 36 KB + `lib/{predictor,repository,auth,quipGenerator,wc2026}.ts` ~35 KB; total 77 KB), el MCP `deploy_edge_function` devuelve `API Error: Stream idle timeout - partial response received` tras ~100-250 s **tanto desde Claude Code como desde Claude.ai** (dos superficies distintas con transportes MCP distintos). El primer intento directo en Code también falló, y dos sub-agentes dedicados (uno lean con el payload ya pre-dumpeado a `/tmp/deploy_files.json`) hicieron timeout a los 23 tool uses sin completar.

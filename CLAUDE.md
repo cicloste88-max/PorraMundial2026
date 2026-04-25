@@ -1,744 +1,142 @@
 # Porra Mundial 2026 — Contexto para Claude Code
 
-## Proyecto
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
-**Producción: porramundial2026-seven.vercel.app**
-Repo: github.com/cicloste88-max/PorraMundial2026
-Rama activa: **main** | Último commit en main: **a24001a**. IA Predictor **Fases A–F cerradas y mergeadas en main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`), paridad Python↔TS verde (46/46), smoke tests verdes. EF `porra-ia-compute` **v10 ACTIVE** con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` **LIVE en producción** (verificada en iPhone Safari + Chrome móvil).
+Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-max/PorraMundial2026
 
----
+## Estado actual
 
-## 🔴 Pendientes abiertos
+Rama activa **main**, último commit **a24001a**. IA Predictor **Fases A–F cerradas y mergeadas en main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`), paridad Python↔TS verde 46/46, smoke tests verdes. EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción (verificada en iPhone Safari + Chrome móvil).
 
-### 🔬 Sanity check 20 abr 2026 — inversiones prioritarias antes del 11 jun
-> Detalle completo en **`docs/sanity-check-20abr2026.md`**. Resumen accionable:
+## Top-3 pendientes inmediatos
 
-**Semanas 1-2 (crítico, 4 días):**
+Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr2026.md`. Top-3 críticos:
+
 1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. ~~**EF `porra-ia-predict`** — mueve el `fetch('https://api.anthropic.com/...')` de `scoring.js:941` y `ui-nav.js:49` a una Edge Function con `ANTHROPIC_API_KEY` en Vault.~~ ✅ **Resuelto backend (21 abr)** vía EF `porra-ia-compute` **v10** (Fases A–E + post-F commit 1 con breakdown enriquecido) + ✅ **Resuelto frontend (23–24 abr)** vía Fase F COMPLETA (F.1–F.4 + 3 post-F) **mergeada a main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a24001a`). `auth.js` bootstrapea `ia_predictions` filtradas por snapshot activo con raw context; `scoring.js` hidrata la `.ia-bar` + tooltip explainer sobre el % con narrativa + ELO/H2H/forma/is_host; `ko.js` llama a `compute_match` on-demand con cache sessionStorage. Los dos `fetch('api.anthropic.com/...')` muertos siguen en `scoring.js` (fetchIA legacy) y `ui-nav.js:49` como fallback **inerte** — limpieza total = pendiente cleanup post-merge.
-
-**Semanas 3-4 (escala):**
-4. Code splitting `admin.js` (dynamic import bajo `is_admin`) — bundle −25%.
-5. Logger con gate por env para los 56 `console.log/warn/error` en producción.
-6. Sentry error tracking — descubrir errores móvil reales.
-7. Auditoría `innerHTML` + `escapeHtml` (~70 usos).
-
-**Semanas 5-6 (refactor, pre-requisito: tests del paso 1):**
-8. Split `scoring.js` (1.438 LOC) en engine puro + render + assets.
-9. Consolidación `ui-groups.js` + `ui-groups-mobile.js` con helpers compartidos.
-10. Event delegation — eliminar los 62 `onclick=` inline de `index.html`.
-
-**Semanas 7-8 (buffer):**
-11. `window._trace` helper de debug (MutationObserver reutilizable).
-12. Splash 4s acortado o condicional por primera visita.
-13. `AppState` proxy + `TIMINGS` centralizados.
-
-### Bugs UI
-1. **Cinta superior tabs ronda** no se visualiza completa en móvil (eliminatorias)
-2. **Añadir hora CEST** a píldora `Grupo · Estadio` en tarjeta de partido (datos FIFA ya publicados, conversión ET→CEST = +6h en jun-jul)
-3. **Botón simular eliminatorias** visible para todos los usuarios (actualmente solo admin)
-4. **Auto-completar Pichichi torneo** sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
-5. **Enganche final frases IA** para pronóstico signo partido (lógica incorporada, falta wiring final)
-
-### Antes del 11 junio 2026
-1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked)
-2. Activar pg_cron `update-results` el 11 jun
-3. Cargar convocatorias reales (`EQUIPOS[].players`)
-4. Email confirmación cierre porra (Resend + EF) **con copia de pronósticos al usuario** para que tenga registro
-5. Verificar estructura JSON `_results.ko_results` con update-results real (11 jun)
-6. ✅ ~~Desactivar signup público cuando entren todos los amigos~~ — innecesario desactivarlo para testear: no-admin puede crear sus propias porras (límite 3) vía EF `create-league`
-7. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos)
-
-### Playoffs UEFA marzo 2026 — resueltos
-- Grupo A + República Checa
-- Grupo B + Bosnia
-- Grupo D + Turquía
-- Grupo F + Suecia
-- Grupo I + Irak
-- Grupo K + RD Congo
-
----
-
-## ✅ Bugs recientemente resueltos
-- updateCardUI race condition ✅ (commit ee2e25a)
-- CSS grid-areas Vista Jornada ✅
-- 404 masivos consola (extractUrl linear-gradient) ✅
-- Header eliminatorias responsive ✅ (mismo patrón que fase grupos)
-- Bracket-results móvil ✅ (commit 2600c1a — min-width 260px por columna activa)
-- Rediseño bracket: timeline vertical + live hero ✅ (commit 2600c1a)
-- pg_net timeout en `porra-match-live` ✅ (async + webhook Apify)
-- **Vista Directo + sección simulacros admin ✅** (PR #3, commits `d137d99` + `6d2c028` + `0421f0f`, merge `614b5ef`)
-  - Banner superior `🧪 SIMULACRO · PARTIDO FUERA DEL MUNDIAL` (no se solapa con nombre equipo)
-  - `checkIsAdmin` async con retries hasta 5s + re-render anti-loop (ver ERR-14)
-  - Causa raíz original: `match_key` renombrado por error matinal `wc2026_gA_15186710` → `_historic_..._trial`. Revertido.
-- **Rediseño móvil fase de grupos ✅** (PR #9 mergeado en `9d651d5`, 4 commits `871592b`+`b812f41`+`c69f7de`+`e114c02`)
-  - Commit 1/4: infra + `ui-groups-mobile.js` + `PHRASES_GRUPO` + placeholder `@media` + script en loadScript chain.
-  - Commit 2/4: acordeón lista + barra progreso por grupo + helper `applyMobileGroupCollapse`.
-  - Commit 3/4: focus layer + carrusel 6 slides + swipe + smart boost row (conflicto jornada).
-  - Commit 4/4: slide 7 clasificación + botón Guardar/Deshacer + lock cards + persistencia BD (`league_members.groups_saved` JSONB).
-- **Fixes producción móvil ✅** (19 abr, 4 commits a `main`):
-  - `b4a52e6` — ERR-18: `css/` → `public/css/` (Vite sólo copia `public/` a `dist/`).
-  - `0aa78a9` — ERR-19: `openMobileFocus` defensivo con `try/catch` + toast para debug sin devtools en iPhone.
-  - `40c0fe2` — ERR-20: eliminar `body.style.overflow='hidden'` (bloqueo persistente en Safari iOS).
-  - `82b4753` — ERR-21: reglas base de `.mobile-focus-layer` fuera del `@media` + `visibility:hidden/visible` (evita layer fantasma en hit-testing Safari).
-- **Refactor CSS extracción `<style>` inline ✅** (commit `9e93fe8`)
-  - Los 4 bloques `<style>` de `index.html` con comentario "Archivo destino : X.css" nunca se habían migrado. Commits 2/3/4 del rediseño móvil añadían reglas a `public/css/base.css` pero `index.html` no enlazaba `base.css`. Fix: contenido `<style>` prepended a cada fichero destino (para que reglas nuevas al final ganen por cascada), bloques eliminados de `index.html` (de 2970 a 1008 líneas), 4 `<link>` nuevos en cabecera.
-- **Persistencia última página al F5 ✅** (saga v2.1 → v2.11, 20 abr, HEAD `8bc7f30`)
-  - F5/Ctrl+R en cualquier página (Grupos / Eliminatorias / Score / Admin) restaura la página donde el user estaba, sin flash welcome ni splash. Solo afecta a refresh con sesión válida; login fresco va a welcome por semántica.
-  - **Diagnóstico final** (caza con MutationObserver, ver ERR-23): `#page-welcome` mutaba a `display:block` en T=612ms y volvía a `display:none` en T=1115ms — 503ms de flash. Causa: `main-entry.js:74` safety-net llamaba `showPage('welcome')` sin guard, lo que disparaba la lógica que retiraba el CSS lock de v2.9 antes de tiempo.
-  - **Solución belt & suspenders en 3 capas:**
-    - **Capa 0 — `index.html` `<head>` (v2.6 + v2.8 + v2.9):** script inline síncrono lee `localStorage.porra_lastPage`, setea `window._pendingPageRestore`, salta el splash si hay restore, e inyecta `<style id="restore-lock-css">#page-welcome{display:none !important}</style>`.
-    - **Capa 1 — `main-entry.js:74-78` (v2.11):** safety-net con guard `if (!window._pendingPageRestore) showPage('welcome')`. Impide flash desde el chain.
-    - **Capa 2 — `public/js/ui-nav.js` `showPage()` (v2.10):** `if (lock && page==='welcome') return; if (lock && page!=='welcome') lock.remove()`. Hace que el lock sea self-healing: rogue `showPage('welcome')` no rompe el restore; `showPage(target)` retira el lock al pintar la página real.
-    - **Plus — `public/js/auth.js:325-339` (v2.1):** `onAuthStateChange` consume `_pendingPageRestore` solo en `INITIAL_SESSION` (no `SIGNED_IN`), revalidación admin explícita, ruta única `setTimeout(100) → showPage(finalPage)`.
-    - **Plus — `auth.js:349` (v2.7):** guard `if (!window._pendingPageRestore) showPage('welcome')` en arranque inicial + fallback en rama `else` por si la sesión está caducada.
-    - **Plus — `index.html:251` (v2.4):** `<div id="page-welcome" style="display:none">` (las otras 4 páginas ya lo tenían; welcome era la única visible por defecto).
-  - **Limpieza key:** `porra_lastPage` con underscore — entra en barrido de `doLogout` (`auth.js:286`, `.includes('porra_')`).
-  - **Diagrama del flujo de arranque con restore:**
-    ```
-    T=0    HTML parse → <script inline> setea _pendingPageRestore + CSS lock + skip splash
-    T=~50  module bundle + chain → main-entry safety-net guard skipea welcome (capa 1)
-    T=~50  auth.js runAuthInit → guard skipea welcome (v2.7) + onAuthStateChange registrado
-    T=~60  Supabase emite INITIAL_SESSION → handler arranca await loadUserData
-    T=~500 loadUserData resuelve → consume _pendingPageRestore=null → setTimeout(100)
-    T=~600 showPage(target) → capa 2 retira lock + display:block en target
-    ```
-  - **Limitación aceptada:** ~500-600ms de pantalla oscura (background body) entre T=0 y `showPage(target)`. Aceptable porque no es welcome y no llama la atención. Si se queja en 3G, v3 con hidratación optimista de `currentUser` + `_activeLeague` desde localStorage.
-  - **Limitaciones conocidas (sin resolver):** sub-tab Vista Directo no se preserva (vuelve a Grupos), scroll position no se preserva, URL siempre `/`. Multi-tab: `localStorage` compartido, gana último que escribe.
-  - **Saga ruidosa pero documentada:** 11 iteraciones (v2.1 → v2.11) con varios reverts intermedios. Historia git no se squashea — los reverts documentan el aprendizaje.
-
----
-
-## 🧹 Limpieza repo — sesión 17 abr 2026
-
-Eliminados del repo:
-- 5 backups `.bak`: `index.html.bak`, `js/main.js.bak{,2,3}`, `js/auth.js.bak`
-- 3 duplicados bracket-results (raíz `.js/.css` + `js/bracket-results.js` viejo)
-- 6 patches Python one-shot (`patch_*.py`)
-- 5 markdowns de diseños ejecutados (`vista-jornada.md`, `jornada-redesign.md`, `fix-vista-jornada.md`, `boost-ticker-mejoras.md`, `new_bracket.txt`)
-- `js/utils.js` huérfano (shims ya están inline en `index.html` líneas 1440-1445)
-- `supabase-ef-patches/porra-apify-webhook-v6.ts` (producción en v7)
-- 3 scripts exploratorios Apify
-
-Añadido a `.gitignore`:
-- `apify-actors/*/node_modules/`
-
----
-
-## 📊 Estado del sistema live
-
-| Componente | Versión | Estado |
-|---|---|---|
-| Actor **sofascore-webshare-proxy** `N8vUChlhok5JU3cnL` | build 1.0.7 | ✅ **PRODUCCIÓN** — proxy Webshare residencial (~$0.001/run) |
-| Actor sofascore-live-proxy `BYLtYcOxYkruVipwr` | build 1.0.19 | ✅ FALLBACK — proxies Apify residenciales (~$0.03/run) |
-| `porra-match-live` EF | v16 | ✅ async + webhook (Webshare principal `N8vUChlhok5JU3cnL` build 1.0.7 + fallback `BYLtYcOxYkruVipwr` build 1.0.19) |
-| `porra-apify-webhook` EF | v7 | ✅ logging completo, detecta goles + status, llama Twilio directo. **Bug conocido:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
-| `porra-whatsapp-send` EF | v1 | ✅ form-urlencoded via fetch |
-| `porra-whatsapp-webhook` EF | v4 | ✅ |
-| Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | ❌ Caché CDN ~15min, NO usar live |
-
-### Costes live scoring
-- **Actor Webshare (producción):** ~**$13 total** torneo completo
-- Fallback anterior: ~$318 estimados
-- Webshare: 1GB gratis/mes + $3.50/mes plan pagado
-
----
-
-## 🤖 Actor Apify principal — sofascore-webshare-proxy
-
-**ID:** `N8vUChlhok5JU3cnL` | **Build:** 1.0.7 | **En producción**
-
-**Cómo funciona:**
-- Proxy Webshare residencial rotativo
-- Fetch directo a `api.sofascore.com/api/v1/event/{id}` y `/incidents`
-- Cookies SofaScore reutilizables entre requests (no IP-bound)
-
-**Input:** `{ "eventId": "15832749" }`
-**Output JSON:** `item.event={status,ok,data:{event:{...}}}` y `item.incidents={status,ok,data:{incidents:[]}}`
-
----
-
-## 📁 Estructura ficheros JS
-
-```
-js/
-  main-entry.js       <- entry point Vite (type=module)
-
-public/js/
-  data.js              <- datos torneo + estado global + boostPicks + PHRASES_GRUPO
-  scoring.js           <- motor puntos + tarjetas + premios
-  ui-groups.js         <- grupos + vista Jornada completa
-  ui-groups-mobile.js  <- rediseño móvil fase grupos (acordeón + focus layer + slide 7)
-  ko.js                <- bracket KO + IA pronósticos
-  ui-nav.js            <- SPA nav + modal + welcome
-  ui-directo.js        <- vista Directo + sección simulacros admin
-  live-sync.js         <- realtime live_scores (postgres_changes + simulacros)
-  auth.js              <- auth Supabase + bootstrap (predictions/ko/awards/groups_saved)
-  leagues.js           <- ligas y selección de porra
-  misc.js              <- utils UI
-  scoreboard.js        <- clasificación multi-usuario
-  close-porra.js       <- cierre de pronósticos
-  admin.js             <- panel admin + dados/simulador (dice.js integrado)
-  bracket-results.js   <- vista resultados reales bracket KO
-
-public/css/          <- TODOS los CSS viven aquí (Vite sólo copia public/ a dist/)
-  base.css           <- reset, layout, match-cards, header, ligas + rediseño móvil @media 640px
-  welcome.css
-  ko.css             <- bracket KO + modal + awards (pendiente split awards.css)
-  admin.css          <- panel admin + dado + responsive admin
-  boost.css
-  bracket-results.css
-  directo.css        <- vista Directo + tarjetas simulacro admin
-```
-
-**Referencias CSS en index.html:** `/css/fichero.css` (7 `<link rel="stylesheet">` en `<head>`; los `<style>` inline se extrajeron en commit `9e93fe8`).
-
-**Regla crítica assets:** TODO lo que se sirva bajo `/xxx` debe vivir en `public/xxx/` o ser importado desde el bundle JS. Si pones algo en la raíz del repo (como estaba `css/` antes), Vite lo ignora en el build (ver ERR-18).
-
-**Cadena de carga (main-entry.js):**
-```
-misc.js (paralelo)
-leagues → data → scoring → ui-groups → ui-groups-mobile → ko → bracket-results
-  → ui-nav → auth → scoreboard → close-porra → admin → ui-directo → live-sync
-```
-
-**Shims inline en index.html (líneas 1440-1445):** `handleCTA()`, `openAuthModal()` — previene error si onclick HTML dispara antes de que auth.js cargue.
-
----
-
-## 🛢️ Base de datos — tablas live
-
-```sql
-live_scores (
-  match_key TEXT PRIMARY KEY,
-  sofascore_url TEXT,
-  sofascore_event_id TEXT,
-  status TEXT,               -- notstarted/inprogress/halftime/overtime/penalties/finished
-  status_code INT,
-  score_home INT,
-  score_away INT,
-  score_agg_home INT,
-  score_agg_away INT,
-  events JSONB,
-  lineups JSONB,
-  statistics JSONB,
-  referee TEXT,
-  venue TEXT,
-  poll_active BOOLEAN,
-  poll_interval INT,
-  had_overtime BOOLEAN,
-  had_penalties BOOLEAN,
-  match_start_ts BIGINT,
-  is_historic BOOLEAN DEFAULT false,  -- true = trial runs / pruebas, referencia consultiva de formatos. NO usar en scoring ni UI live (filtrar WHERE is_historic=false)
-  home_team_name TEXT,                -- usado por simulacros (partidos fuera del Mundial). Para el Mundial los nombres salen de EQUIPOS via match_key
-  away_team_name TEXT,                -- idem
-  competition TEXT,                   -- ej. "Copa del Rey 2026 · Final" — render en pie de tarjeta simulacro
-  updated_at TIMESTAMPTZ
-)
-
-whatsapp_subscribers (
-  phone TEXT,
-  active BOOLEAN,
-  wa_id TEXT
-)
-```
-
----
-
-## ⚙️ Edge Functions Supabase
-
-| EF | Versión | Descripción |
-|---|---|---|
-| `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
-| `create-league` | v2 | Crear liga para cualquier user autenticado. Límite 3 ligas si no-admin. Admins ilimitados. **`verify_jwt=false`** (plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` — validación manual con service_role dentro de la EF). Ver ERR-16. |
-| `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun |
-| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs |
-| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main |
-| `porra-match-live` | v16 | Async + webhook, live scores. Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback |
-| `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, llama Twilio directo. **Bug:** no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (pending v8) |
-| `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch) |
-| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
-| `porra-ia-compute` | v10 | IA Predictor (Fases A–E + post-F commit 1). 7 actions: `status/scrape_elo/scrape_h2h/scrape_last5/freeze_snapshot/compute_groups/compute_match`. Motor log-odds+softmax (pesos 75/10/15, fallback 85/0/15, home adv +85/+95 MEX). `upsertPrediction` acepta `rawContext` opcional (9 campos crudos: elo_home/away_raw, h2h_home_wins/away_wins/draws/total, form_home/away_ppg, is_host) que persiste en `breakdown` para el tooltip explainer del frontend. Rate limit 30/min (service_role inmune). Quip via Claude Haiku 4.5. `ia_snapshots` (1 activo). Cron 11 jun 00:00 freeze + 00:10 compute_groups. `verify_jwt=false`. Deploy vía `supabase CLI` local (ERR-29). Ver sección "🤖 IA Predictor" |
-| `porra-sofascore-proxy` | v8 | ❌ OBSOLETA |
-| `porra-github-pusher` | v6 | ❌ PLACEHOLDER — ignorar |
-
----
-
-## 🔧 Funciones DB helpers
-
-| Función | Descripción |
-|---|---|
-| `schedule_match_crons(match_key TEXT, start_ts TIMESTAMPTZ)` | Genera automáticamente los dos crons de un partido: **prematch T-45min** (1 call) + **polling `*/3 * * * *` durante 150min** desde `start_ts`. Ambos invocan `porra-match-live` con el `match_key`. |
-| `unschedule_match_crons(match_key TEXT)` | Elimina los crons `prematch_<match_key>` y `poll_<match_key>`. Uso: limpieza tras cambio de fecha o cancelación. |
-
-Ejemplo:
-```sql
-SELECT schedule_match_crons('wc_mex_rsa', '2026-06-11 20:00:00+00'::timestamptz);
--- ...si se cancela o se reprograma:
-SELECT unschedule_match_crons('wc_mex_rsa');
-```
-
-**Regla:** para programar crons de partidos usar **siempre** `schedule_match_crons`, nunca duplicar crons manualmente (evita crons huérfanos).
-
----
-
-## 🧪 Simulacros (testing live)
-
-**Propósito:** probar el pipeline live (Apify → webhook → live_scores → realtime → UI + WhatsApp) con partidos reales fuera del Mundial **antes del 11 jun**, sin contaminar datos del torneo.
-
-**Cómo activar un simulacro:**
-1. Crear fila en `live_scores` con `is_historic = true` y los campos necesarios:
-   ```sql
-   INSERT INTO live_scores (
-     match_key, sofascore_event_id,
-     home_team_name, away_team_name, competition,
-     match_start_ts, status, is_historic
-   ) VALUES (
-     'copadelrey_final_atm_rso', '15664537',
-     'Atlético de Madrid', 'Real Sociedad', 'Copa del Rey 2026 · Final',
-     extract(epoch FROM '2026-04-18 19:00:00+00'::timestamptz)::bigint,
-     'notstarted', true
-   );
-   ```
-2. Programar crons:
-   ```sql
-   SELECT schedule_match_crons('copadelrey_final_atm_rso', '2026-04-18 19:00:00+00'::timestamptz);
-   ```
-
-**Visibilidad:**
-- Sólo usuarios con `profiles.is_admin = true` ven la sección **🧪 Simulacros activos** dentro de la vista Directo.
-- La fila se sigue procesando por el pipeline normal (Apify, webhook, WhatsApp si está suscrito), pero **no aparece** en las 72 tarjetas del Mundial ni se considera para scoring (filtro `is_historic = false`).
-
-**Simulacro actualmente activo:**
-- `copadelrey_final_atm_rso` — Atlético de Madrid vs Real Sociedad, 18 abr 2026 19:00 UTC (21:00 CEST), `sofascore_event_id = 15664537`. Crons: `prematch_copadelrey_final_atm_rso` (18:15 UTC) + `poll_copadelrey_final_atm_rso` (cada 3 min, 19–22 UTC).
-
----
-
-## 🔄 Flujo live scores (async + webhook)
-
-```
-pg_cron (cada minuto durante partido)
-  → net.http_post → porra-match-live EF
-      → Apify API: lanzar actor N8vUChlhok5JU3cnL async (no espera)
-  → (Apify termina ~5-10s con Webshare)
-      → Apify webhook → porra-apify-webhook EF
-          → leer dataset: { event, incidents }
-          → detectar cambios vs DB
-          → detecta goles + cambios status
-          → Twilio directo (form-urlencoded fetch)
-          → upsert live_scores
-```
-
-**Pattern live cron:** Pre-match T-45min (1 call) → polling cada 3min durante partido → estados: `notstarted/inprogress/halftime/overtime/penalties/finished`
-
----
-
-## 📱 WhatsApp — Twilio sandbox
-
-- Número: +14155238886
-- Código de acceso: `join load-herd`
-- Credenciales Twilio (AccountSid, API Key SID + Secret): **solo en Supabase Vault** (nunca hardcodear en código ni docs)
-- Secrets en Vault: `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET`
-
-**Notificaciones:** 🟢 Arranca / ⏸ Descanso / 🟢 2ª parte / ⚽ Gol (jugador + minuto + marcador) / ⚡ Prórroga / 🤽 Penaltis / 🏁 Fin
-
----
-
-## 🏆 Motor de puntuación
-
-**Por partido (máx 7pts · 14pts con boost x2):**
-- Signo correcto (1/X/2): +1
-- Resultado exacto: +3 (no acumula con signo)
-- Goleador correcto: +2
-- Bonus vs IA (pronóstico opuesto a IA y aciertas): +1
-
-**KO avance por equipo:** Grupos→R32 +5 / R32→R16 +5 / R16→QF +10 / QF→SF +15 / SF→Final +20 / Campeón +25
-
-**Clasificación final:** Campeón +30 / Subcampeón +20 / 3º +15 / 4º +10
-
-**Premios individuales (AWARDS_CFG):** Balón/Bota/Guante Oro +15pts, Mejor Joven ≤21 +20pts
-
----
-
-## 🤖 IA Predictor (Fases A–F)
-
-Sistema de pronóstico IA por partido que alimenta el bonus **+1 pt si la predicción del usuario es opuesta a la IA y acierta** del motor de puntuación.
-
-**Arquitectura 3 capas:**
-```
-Capa 1 — Ingesta         Capa 2 — Cómputo        Capa 3 — Consumo (Fase F)
-EF porra-ia-compute  →   ia_predictions  →        auth.js  (bootstrap snapshot activo)
- (4 actions scraper)      (fórmula 50/25/25)      scoring.js (hint grupos + bonus +1pt)
-                                                  ko.js    (hint lazy compute_match)
-```
-
-**Fase F — wiring frontend** COMPLETA y **mergeada a main** (PR #17 `6b06880`, 4 commits F.1–F.4 + 3 post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`):
-- `F.1` `auth.js`: helper `loadIAPredictions()` añadido al `Promise.all` de `loadUserData`. Lee `ia_snapshots.is_active=true` + `ia_predictions.select('match_id,sign,confidence,breakdown,used_fallback').eq('snapshot_id',id)` en paralelo con `public/data/worldcup-2026-matches.json` para mapear `wc2026_gX_<id>` → `${group}_${home_es}_${away_es}` (formato `getMatchKey()`). Expone `window.iaPredictions`.
-- `F.2` `scoring.js` + `base.css`: nuevo nodo `<div class="ia-hint">` entre `.pts-row` y `.gol-row`. `renderIAHint()` pinta "🤖 IA predice <sign>" con `title=quip` + asterisco amarillo si `is_dudoso`. Además hidrata la `.ia-bar` existente al render evitando el spinner stuck.
-- `F.3` `ko.js` + `ko.css`: en `buildKOCard`, si ambos equipos resueltos, `loadKOIAHint()` chequea sessionStorage `ia_ko_<home>_<away>` y si no hay hit invoca `porra-ia-compute` con `{action:'compute_match', home, away}` via `window._porraDb.functions.invoke`. Cachea en sessionStorage + espeja en `iaKoPredictions` para que `openModal` reutilice.
-- `F.4` `data.js` + `scoring.js`: guard defensivo en `iaBonusWillApply` (`ia.sign ∈ {'1','X','2'}`) + 4 casos doc A/B/C/D verificados via Node stdout 4/4. El bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap `Math.min(pts,7)` y del boost ×2.
-
-**Tras Fase F (post-F, 23 abr noche):** F.2b deprecado tras QA → chip `.ia-hint` eliminado completo (commit 2 post-F) porque la pill "+1pt vs IA" de `.pts-row` + la `.ia-bar` con quip real ya cumplen. Breakdown de `ia_predictions` enriquecido con 9 raw-context fields (commit 1 post-F) y tooltip explainer (commit 3 post-F) sobre el % de la `.ia-bar` — narrativa corta + ELO/H2H/forma/is_host con fallbacks (h2h_total=0 → "Sin partidos previos entre ambas"; form_ppg=1 → omitir línea de forma). Deploy v10 bloqueado por MCP `deploy_edge_function` (payload >70 KB, ver ERR-29) — hecho vía `supabase CLI` local.
-
-**Cleanup pendiente (post-merge):** eliminar los dos `fetch('api.anthropic.com/...')` muertos en `scoring.js` (antiguo `fetchIA`) y `ui-nav.js:49` (ya inertes — no aparecen en pantalla — pero son deuda técnica). Tooltip del % no está aún en KO cards (scope commit 3 se limitó a grupos; puede añadirse leyendo `iaKoPredictions` + `findCachedPrediction` con raw context tras deploy).
-
-**Fórmula del pronóstico** (Fase E, cerrada — motor log-odds+softmax):
-
-| Señal | Peso | Fuente |
-|---|---|---|
-| ELO FIFA | **50%** | `ia_elo_fifa` (Wikipedia `Module:SportsRankings/data/FIFA_World_Rankings`) |
-| H2H histórico | **25%** | `ia_h2h` (11v11.com/stats, RSSSF-backed, incluye amistosos) |
-| Racha últimos N | **25%** | `ia_last5_results` (11v11.com/matches, `N=8` default) |
-
-**Fallback sin H2H:** si el par no tiene partido histórico entre ambas selecciones, rebalancear a **ELO 66% + Racha 34%**.
-
-**Umbrales signo 1/X/2** sobre `raw_home_pct`:
-- `raw_home_pct > 60%` → signo **1** (local)
-- `40% ≤ raw_home_pct ≤ 60%` → signo **X** (empate)
-- `raw_home_pct < 40%` → signo **2** (visitante)
-
-**Profundidad racha dinámica:**
-- Default `N=8` (lo que 11v11 sirve actualmente en su tabla de últimos partidos).
-- Ampliable a `N=10` antes del 11 jun cuando se publique el primer amistoso pre-Mundial, vía `{"action":"scrape_last5","limit":10}`. Activación **manual** (no automática).
-
-**Headers obligatorios para 11v11.com** (ver ERR-25 — sin los 3 → 403):
-```ts
-const fetchHeaders = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml",
-  "Accept-Language": "en-US,en;q=0.9",
-};
-```
-
-### 🗂️ Fuentes de datos externas
-
-Tabla centralizada de todo lo que scrapea/fetcha el proyecto. Incluye cómo se construye cada URL (slugs), qué devuelve, y puntos de rotura conocidos.
-
-#### 1. Wikipedia — Module:SportsRankings (ELO FIFA)
-
-- **URL:** `https://en.wikipedia.org/w/api.php?action=parse&page=Module:SportsRankings/data/FIFA_World_Rankings&prop=wikitext&format=json`
-- **Método:** `GET` · Headers: `User-Agent: pm26-ia-predictor/1.0`, `Accept: application/json`.
-- **Formato:** JSON con `data.parse.wikitext["*"]` = string Lua. Parseo con 2 regex:
-  - Fecha update: `/data\.updated\s*=\s*\{\s*day\s*=\s*(\d+),\s*month\s*=\s*'(\w+)',\s*year\s*=\s*(\d+)/` → ISO `YYYY-MM-DD`.
-  - Filas: `/\{\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*([\d.]+)\s*\}/g` → `(country_name, rank, movement, points)` × ~211.
-- **Mapping nombre → ISO3:** cadena DB (`ia_elo_fifa.team_name` lowercased) → `ALIAS_MAP` hardcoded → `slice(0,3).toUpperCase()` como último recurso (nombres no resueltos van a `unmatched_names`).
-- **Frecuencia de actualización:** FIFA publica ranking oficial cada ~2 meses. Próximo refresh público: **9 jun 2026** (justo antes del Mundial). Wikipedia suele reflejarlo en horas.
-- **Consume:** action `scrape_elo` de `porra-ia-compute`.
-- **Destino:** tabla `ia_elo_fifa` (~211 filas).
-
-#### 2. 11v11.com/teams/{owner_slug}/tab/stats/ (H2H agregado)
-
-- **URL patrón:** `https://www.11v11.com/teams/{owner_slug}/tab/stats/`
-- **`owner_slug`:** kebab-lowercase desde `WC2026_TEAMS[1]`. Ejemplos: `spain`, `korea-republic`, `bosnia-and-herzegovina`, `congo-dr`, `cape-verde-islands`, `usa`, `ivory-coast`.
-- **Método:** `GET` · Headers **obligatorios** (ver bloque arriba) — sin los 3 → HTTP 403.
-- **Formato:** HTML. Una sola tabla con TODOS los rivales históricos de la selección. Regex global:
-  ```
-  /<td class="opposition">([^<]+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>\s*<td>(\d+)<\/td>/g
-  ```
-  Grupos: `(oppName, P, W, D, L, GF, GA)` desde la perspectiva del `owner_slug`.
-- **Mapping oponente → ISO3:** lookup por `opposition_name.toLowerCase()` contra el mismo `WC2026_TEAMS[2]`. Si no matchea → se registra en `unmatched_opponents` del response (no-mundialistas se ignoran).
-- **Fuente subyacente:** RSSSF — incluye amistosos, no filtra por competición.
-- **Sin fecha:** el agregado no expone `last_played` — por eso `ia_h2h.last_played = null`.
-- **Validaciones cruzadas smoke test:** ARG-ESP 6W-2D-6L, ARG-BRA 44-27-45 en 116, ARG-URU 91-46-57 en 194.
-- **Consume:** action `scrape_h2h`. Loop secuencial 48 teams × delay 500ms (polite scraping) ~45s total.
-- **Destino:** tabla `ia_h2h` (~815 pairs únicos entre mundialistas, ~72% cobertura).
-
-#### 3. 11v11.com/teams/{owner_slug}/tab/matches/ (últimos N partidos)
-
-- **URL patrón:** `https://www.11v11.com/teams/{owner_slug}/tab/matches/` — mismo `owner_slug` que #2.
-- **Método + headers:** idénticos a #2 (mismos 3 headers obligatorios).
-- **Formato:** HTML. 8 partidos por selección (orden ascendente por fecha). Regex global de 6 grupos (el 6º `<td>` de competition es opcional):
-  ```
-  /<td[^>]*>\s*([^<]+)<\/td>\s*<td[^>]*>(?:<a[^>]*>)?([^<]+?)(?:<\/a>)?<\/td>\s*<td[^>]*><span[^>]*>([WDL])<\/span><\/td>\s*<td[^>]*>\s*(\d+)-(\d+)[^<]*<\/td>(?:\s*<td[^>]*>([^<]*)<\/td>)?/g
-  ```
-  Grupos: `(dateStr "04 Sep 2025", matchStr "Home v Away", W|D|L, home_score, away_score, competition?)`.
-- **Detección del owner:** `home_name.toLowerCase() === opposition_name.toLowerCase()` (o `away_name` en su defecto). Se remapea `gf/ga` y `venue` según lado.
-- **Caveat documentado:** Argentina devuelve 7 partidos en lugar de 8 por caché de 11v11.
-- **Ampliable:** body.limit 1-20 (default 8). Cuando 11v11 publique el primer amistoso pre-Mundial, bumpear manualmente a 10 vía `{"action":"scrape_last5","limit":10}`.
-- **Consume:** action `scrape_last5`.
-- **Destino:** tabla `ia_last5_results` (48 filas, `results JSONB` = array ascendente de `{date, opponent_name, opponent_iso3, venue H/A, result, gf, ga, competition}`).
-
-#### 4. SofaScore API — resultados live (motor de scoring, NO IA Predictor)
-
-Alimenta la tabla `live_scores` (no las tablas `ia_*`). Pipeline: `pg_cron → porra-match-live EF → actor Webshare → webhook → porra-apify-webhook EF → upsert live_scores`.
-
-**Quién llama a `api.sofascore.com`:** el actor Webshare, **no nosotros**. Nuestro contrato con el actor es sólo el `eventId`. El actor construye internamente las URLs y las pasa por proxy residencial para evitar el 403 de Cloudflare (ver ERR-05). Nunca hacemos `fetch` directo a `api.sofascore.com` desde Supabase.
-
-- **Contrato con el actor Webshare:**
-  - Input: `{ "eventId": "15186710" }`.
-  - El actor construye internamente:
-    - `https://api.sofascore.com/api/v1/event/{eventId}` → `{event: {status, homeTeam, awayTeam, homeScore, awayScore, ...}}`.
-    - `https://api.sofascore.com/api/v1/event/{eventId}/incidents` → `{incidents: [{incidentType, time, player, ...}]}` (goles, tarjetas, sustituciones).
-  - Output al dataset Apify: `item.event={status,ok,data:{event:{...}}}` + `item.incidents={status,ok,data:{incidents:[]}}`.
-  - Endpoints que el actor NO consulta por defecto: `/lineups`, `/statistics`, `/managers` (existen en la API pero no los pedimos).
-
-- **IDs del torneo:**
-  - WC2026: `tournamentId: 16`, `seasonId: 58210` (referencia humana para sondear la API; la usa el actor si hace falta listar, no el flow normal).
-  - **Fase de grupos — 72 `sofascore_id` hardcodeados** en `apify-actors/sofascore-webshare-proxy/worldcup-2026-sofascore-ids.json` (array de `{sofascore_id, home, away, round, group, date, status, venue, city}`). Se conocen de antemano porque SofaScore los publica al sorteo.
-  - **Eliminatorias — IDs NO existen aún.** Se descubrirán ~**28 jun 2026** (tras cerrar fase de grupos y emparejarse R32). Hasta entonces el JSON queda incompleto.
-
-- **Cómo se descubre un `eventId` nuevo** (workflow para KO + simulacros):
-  1. **No se infiere programáticamente.** SofaScore no expone una API pública de "dame el id del partido X vs Y".
-  2. **Método manual probado:**
-     - `web_search` en Google con `site:sofascore.com <home> <away> <fecha>`.
-     - En el snippet de Google aparece el hash `#id:XXXXXXX` de la URL pública — copiar el número.
-     - Validar con el actor Webshare como fallback: `apify call N8vUChlhok5JU3cnL -i '{"eventId":"XXXXXXX"}' -t 30`. Si `event.homeTeam.name` y `event.awayTeam.name` cuadran con los equipos esperados, confirmado.
-  3. Añadir el ID al JSON (`worldcup-2026-sofascore-ids.json`) + a `live_scores` con `SELECT schedule_match_crons(...)` para programar los crons.
-  - **URL pública de SofaScore** (sólo como input de este workflow — nunca la construimos):
-    - Formato: `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`.
-    - Los slugs y el `match-code` los asigna SofaScore — no seguimos su patrón. Lo único que nos importa del hash es el número tras `#id:`.
-
-- **`match_key` interno** (**nuestro**, no de SofaScore): formato `wc2026_g{LETRA}_{sofascore_id}`. Ej. `wc2026_gA_15186710`. Se usa como PK en `live_scores` y clave en `public/data/worldcup-2026-matches.json`. El sufijo coincide con el `sofascore_id` a propósito — facilita cross-lookup entre nuestras estructuras y el actor.
-
-- **Simulacros** (`is_historic=true` en `live_scores`): mismo workflow que un partido del torneo — el `eventId` se descubre con el método manual, se inserta la fila con `schedule_match_crons`, y la única diferencia es el flag `is_historic` que filtra de la UI live del Mundial.
-
-- **Por qué actor Webshare en lugar de fetch directo:** Cloudflare Bot Management devuelve 403 a IPs datacenter. Webshare residencial rotativo bypasa (ver ERR-05). Latencia ~5-10s, coste ~$0.001/run, total torneo ~$13 vs $318 estimados previos con otros actores.
-
-- **Crons por partido:** `schedule_match_crons(match_key, start_ts)` programa automáticamente: `prematch_<match_key>` (1 call, T-45min) + `poll_<match_key>` (`*/3 * * * *` durante 150min desde kickoff). Ambos invocan `porra-match-live` con el `match_key`. Nunca duplicar manualmente (evita crons huérfanos).
-
-- **Consume:** cron → EF `porra-match-live` → actor. **Destino:** tabla `live_scores` (PK `match_key`). No toca `ia_*`.
-
-#### Puntos de rotura conocidos (de todas las fuentes)
-
-- **Wikipedia Module:SportsRankings** — si el módulo Lua cambia la estructura `data.updated = {...}` o el formato de fila `{"name", rank, move, points}`, el regex rompe silenciosamente → `countries_upserted: 0`. Detectable al siguiente `scrape_elo`.
-- **11v11.com** — si cambian `<td class="opposition">` por otro nombre de clase, o reordenan columnas de la tabla, ambos regex rompen. Síntoma: `teams_parsed` cae bruscamente en smoke test. Sin canary automático — hay que re-lanzar scrape manualmente cada ~2 semanas si se detecta drift.
-- **11v11 renombra selección** (ej. "Turkey" → "Türkiye" en su propio HTML): el match por `opposition_name` falla silenciosamente, el team entra en `unmatched_opponents`. Fix: añadir alias al diccionario o actualizar `WC2026_TEAMS[2]` y redesplegar.
-- **SofaScore** cambia formato de respuesta de `/event/{id}` o `/incidents`: el `extractMatchState()` en `porra-apify-webhook` rompe. Detección: log de la EF con parse errors. Ya pasó una vez en abril 2026 (estructura `item.event.data.event.homeScore` vs `item.event.data.homeScore`).
-- **Cloudflare endurece detección** → el actor Webshare podría pasar de ~0% a ~30% de requests 403. Fallback: actor `sofascore-live-proxy` (Playwright + proxies Apify, más caro, ya existe).
-
----
-
-**Tablas (migración `20260421_create_ia_predictor_tables.sql`, Fase A):**
-
-```sql
-ia_elo_fifa (
-  team_code TEXT PRIMARY KEY,     -- ISO-3
-  team_name TEXT,
-  elo_points NUMERIC(7,2),
-  rank_position INT,
-  scraped_at TIMESTAMPTZ,
-  source TEXT
-)
-
-ia_last5_results (
-  team_code TEXT PRIMARY KEY REFERENCES ia_elo_fifa(team_code),
-  results JSONB,                  -- array de N objects: {date, opponent_name, opponent_iso3, venue, result, gf, ga, competition}
-  wins INT, draws INT, losses INT,
-  scraped_at TIMESTAMPTZ
-)
-
-ia_h2h (
-  team_a_code TEXT,               -- alfabético: team_a < team_b
-  team_b_code TEXT,
-  matches JSONB,                  -- {total, gf_team_a, ga_team_a, source_team, source}
-  team_a_wins INT, team_b_wins INT, draws INT,
-  last_played DATE,               -- null en el origen 11v11/stats (agregado sin fecha)
-  scraped_at TIMESTAMPTZ,
-  PRIMARY KEY (team_a_code, team_b_code),
-  CONSTRAINT h2h_alphabetical CHECK (team_a_code < team_b_code)
-)
-
-ia_predictions (
-  match_id TEXT PRIMARY KEY,
-  home_code TEXT, away_code TEXT,
-  sign CHAR(1) CHECK (sign IN ('1','X','2')),
-  confidence SMALLINT CHECK (confidence BETWEEN 0 AND 100),
-  breakdown JSONB,                -- {elo_score, h2h_score, last5_score, raw_home_pct}
-  used_fallback BOOLEAN,          -- true si se aplicó ELO 66 / Racha 34
-  computed_at TIMESTAMPTZ
-)
-```
-
-**RLS:** las 4 tablas con RLS enabled. Única policy pública: `ia_predictions_public_read` (cualquier `authenticated` puede SELECT). El frontend la consume directamente. Resto de tablas solo accesibles por service role (las EFs del pipeline).
-
-**48 mundialistas — mapping `WC2026_TEAMS`** (en la EF, tipo `[iso3, owner_slug, opposition_name, display_name]`):
-
-- `owner_slug` = kebab-lowercase de 11v11 (ej. `bosnia-and-herzegovina`, `korea-republic`, `congo-dr`, `cape-verde-islands`, `usa`).
-- `opposition_name` = texto que 11v11 usa en `<td class="opposition">` para listar a esa selección cuando es rival (ej. "Korea Republic", "Congo DR", "Cape Verde Islands"). Se usa lowercased como clave del `Map<name, iso3>` para cruzar rivales entre páginas.
-- `display_name` = cómo se renderiza al usuario final (ej. "Türkiye", "Côte d'Ivoire", "Curaçao").
-- **Fuente de verdad:** la constante en `supabase/functions/porra-ia-compute/index.ts`. Si se cambia el nombre de una selección en 11v11, actualizar ahí y redesplegar.
-
-**Fases — estado y commits en main:**
-
-| Fase | Acción | Commit | Estado |
-|---|---|---|---|
-| A | Migración 4 tablas + EF esqueleto | `968332a` (PR #10) | ✅ merged + aplicada |
-| B | scrape_elo via `inside.fifa.com` | `4a32737` (PR #11) | ⚠️ deprecada por B.2 |
-| B.2 | scrape_elo via Wikipedia Module | `c845f3e` (PR #12) | ✅ merged + desplegada |
-| D | scrape_h2h via Wikipedia all-time_record | `cba5dcc` (PR #13) | ⚠️ deprecada por D.2 (ver ERR-24) |
-| D.2 | scrape_h2h via 11v11.com/stats | `bbad657` (PR #14) | ✅ merged + desplegada |
-| C | scrape_last_n via 11v11.com/matches | `2904025` (squash-merge de PR #15) | ✅ merged + desplegada |
-| E | Motor IA log-odds+softmax + snapshots + compute_* | `8d8b667` (PR #16) | ✅ merged + desplegada (EF v9). Paridad 46/46 verde. |
-| F | wiring frontend `auth.js` + `scoring.js` + `ko.js` + `data.js` | PR #17 `6b06880` (squash-merge a main, F.1–F.4) | ✅ merged: F.1 bootstrap `ia_predictions` + snapshot activo en `auth.js` · F.2 hint pill + quip tooltip en tarjeta grupos + hidratación `ia-bar` existente · F.3 hint lazy + cache sessionStorage + invoke `compute_match` en `buildKOCard` · F.4 guard defensivo en `iaBonusWillApply` + 4 casos doc + verificación Node 4/4 |
-| F.2b | simplificar chip `.ia-hint` tras QA | `eb729e7` | ✅ (deprecado tras post-F.2) |
-| post-F.1 | enriquecer `breakdown` de `ia_predictions` con raw context (ELO/H2H/forma/is_host) | `fb22648` + EF v10 vía supabase CLI (ERR-29) + compute_groups 72/72 | ✅ merged en rama + desplegado |
-| post-F.2 | eliminar chip `.ia-hint` + extraer `hydrateIABar` + doc ERR-29 | `8dd691c` | ✅ smoke manual verde |
-| post-F.3 | tooltip explainer en el % (`buildIAExplainer`, hover desktop / click mobile) + cierre Fase F | `6e46d2b` | ✅ Fase F COMPLETA, lista merge a main |
-
-**Estado tablas al cierre post-F (23 abr noche):** `ia_elo_fifa` 211 · `ia_h2h` 815 · `ia_last5_results` 48 · `ia_snapshots` 2 (1 activo: `initial_test_21apr`) · `ia_predictions` 72 partidos de grupos poblados por `compute_groups` con breakdown enriquecido (elo_*_raw, h2h_*, form_*_ppg, is_host) + entradas on-demand KO residuales (se repoblarán al freeze del 11 jun).
-
-**Lecciones registradas:** ERR-24 (Wikipedia inadecuada para H2H masivo — sólo ~3/48 tienen página `_all-time_record`). ERR-25 (3 headers obligatorios para 11v11.com). ERR-26 (`pg_net` sin PUT — bloquea merge vía GitHub API desde Supabase). ERR-27 (`supa.from("vault.decrypted_secrets")` no enruta al schema `vault`; `.schema("vault")` tampoco porque `vault` no está expuesto en `api.schemas`; fix: RPC `get_vault_secrets` vía `fetch`).
-
-**Fórmula del motor IA (Fase E, decidida tras back-test WC2022 46 partidos):**
-- Pesos default: **ELO 75% + H2H 10% + Racha 15%**
-- Fallback (H2H con <5 partidos): **ELO 85% + Racha 15%**
-- Home advantage: +85 base hosts / +95 México (altitud), solo aplica si `home_code ∈ {MEX, USA, CAN}` en grupos. En eliminatorias siempre `is_host_match=false` (sedes rotativas/neutras).
-- Margen dudoso: `margin < 0.08` → flag `is_dudoso` para UI.
-- Back-test WC2022: accuracy 63.0%, log-loss 0.932, Brier 0.560 (supera baseline).
-- Snapshot fairness: la IA se congela con `freeze_snapshot` el 11 jun 00:00 UTC y NO se adapta al torneo. Misma predicción para todos los users siempre. `ia_snapshots` con invariante "1 activo" + FK desde `ia_predictions`.
-- Gate de merge: test de paridad Python↔TS (46 casos, tolerancia 1e-3) debe pasar.
-
----
-
-## 🌍 Estructura torneo
-
-48 equipos, 12 grupos (A–L) de 4, 72 partidos grupos, 17 jornadas.
-2 primeros + 8 mejores terceros = 32 equipos.
-R32 → R16 → QF → SF → 3er puesto → Final = **104 partidos total**.
-**Inicio:** 11 jun 2026 — México vs Sudáfrica en Azteca (eventId=15186710).
-
----
-
-## 🔑 SofaScore IDs
-
-| Torneo | tournament | season |
-|---|---|---|
-| UCL 2025/26 | 7 | 61644 |
-| World Cup 2026 | 16 | 58210 |
-
-- 72 partidos grupos mapeados en `worldcup-2026-sofascore-ids.json` (repo)
-- IDs KO disponibles ~28 jun 2026
-- Primer partido WC: eventId=15186710
-
----
-
-## 🔧 Herramientas disponibles en Claude.ai
-
-**Supabase MCP** (`cmyfyswystjgzdwbqyyb`):
-- `execute_sql`, `get_logs`, `list_edge_functions`, `get_edge_function`, `deploy_edge_function`
-
-**Claude in Chrome:**
-- QA autónomo en `localhost:5173` y producción
-- Login prod: `_porraDb.auth.signInWithPassword({email:'cicloste88@gmail.com', password:'910500'})`
-- Login local: usar `window.__QA_EMAIL` / `window.__QA_PASS` via `.env.local`
-
-**Canva MCP:** disponible (no usado en porra)
-
-### 🛠️ Cómo interactúa Claude Code con GitHub (sesiones de coding)
-
-- Usa **GitHub MCP** (`mcp__github__*`): suite oficial con `list_branches`, `list_pull_requests`, `pull_request_read`, `create_pull_request`, `merge_pull_request`, `list_commits`, `get_commit`, `issue_read/write`, `push_files`, `create_branch`, etc.
-- **Repo scope** restringido por config del host a `cicloste88-max/porramundial2026` — llamadas a otros repos se rechazan.
-- **`git push` / `git fetch`** NO van por el MCP: el harness monta un **proxy HTTP local** (`http://127.0.0.1:<puerto>/git/...`) que firma requests con el OAuth token. Por eso push puede funcionar incluso cuando el MCP de GitHub se cae — son componentes independientes del harness.
-- **Patrón de merge habitual:** `create_pull_request` → review (`pull_request_read get_diff` si hace falta) → `merge_pull_request` con `merge_method=squash`. GitHub auto-borra la rama remota al hacer squash via API (la config del repo lo tiene activado). Local se limpia con `git branch -D`.
-- **Plan B cuando el MCP de GitHub se desconecta** a mitad de sesión: (1) re-auth vía `mcp__github__authenticate` (abre URL, pega callback en `mcp__github__complete_authentication`); (2) si no revive, squash-merge local (`git merge --squash <rama> && git commit -m "... Closes #N" && git push origin main`) — cierra la PR por keyword match; (3) mergear desde UI GitHub. **Nunca inventar tokens** en el chat — el PAT queda en el transcript.
-- Los deploys de Edge Functions Supabase NO usan MCP desde Claude Code — requieren `SUPABASE_ACCESS_TOKEN` que vive solo en la máquina local de San o en Claude.ai con su MCP de Supabase.
-
-### 🖱️ Cómo Claude Desktop habla con Claude Code (vía MCP Chrome)
-
-- El canal es el **Chrome MCP**: Claude Desktop abre una sesión con Chrome, detecta en la pestaña activa el textarea de Claude Code y escribe ahí mis prompts.
-- **El editor de Claude Code es Tiptap** (wrapper encima de **ProseMirror**). NO es un `<textarea>` plano ni `contenteditable` crudo — tiene modelo interno de documento, parser Markdown, undo stack propio.
-- **Método de inyección:** `document.execCommand('insertText', false, <texto>)`. ProseMirror lo reconoce vía su plugin de DOM-observer y traduce a transacciones del schema. `insertText` preserva saltos de línea, no dispara las validaciones anti-XSS de ProseMirror, y mantiene el cursor en la posición esperada.
-- Alternativas descartadas: `textarea.value = ...` no aplica (no es textarea); `ClipboardEvent`/`paste` es frágil (depende del plugin `clipboardTextParser`); `Input` event manual requiere construir un `InputEvent('beforeinput', {inputType: 'insertText', data})` que ProseMirror sí admite pero obliga a replicar su state machine interna.
-- Para envío del prompt tras inyección: simular `Enter` con `KeyboardEvent('keydown', {key:'Enter'})` sobre el editor. Shift+Enter si se necesita salto de línea dentro del prompt.
-- **Failure modes conocidos:**
-  - Si Claude Code compila con una versión de ProseMirror que endurece el plugin anti-`execCommand`, esto se rompe — fallback a `InputEvent` manual.
-  - Si el textarea está en modo "slash command menu" abierto, `insertText` se traga el texto — hay que cerrar el menú con `Escape` antes.
-  - Tiptap tiene debouncing interno de ~16ms para batch de inputs — inyecciones muy rápidas seguidas (<10ms) se pueden perder; insertar chunks de ~200 chars con pausas de 50ms si el texto es largo.
-
----
+3. **Code splitting `admin.js`** (dynamic import bajo `is_admin`) — bundle −25%.
+
+## Pendientes — Bugs UI
+
+1. Cinta superior tabs ronda no se visualiza completa en móvil (eliminatorias).
+2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
+3. Botón simular eliminatorias visible para todos los usuarios (actualmente solo admin).
+4. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
+5. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
+
+## Pendientes — Antes del 11 junio 2026
+
+1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked).
+2. Activar pg_cron `update-results` el 11 jun.
+3. Cargar convocatorias reales (`EQUIPOS[].players`).
+4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos al usuario.
+5. Verificar estructura JSON `_results.ko_results` con `update-results` real (11 jun).
+6. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos).
+
+## Reglas CRÍTICAS
+
+- **NUNCA push a main sin validar en localhost:5173 primero**.
+- **Push inmediato tras cada commit** — nunca acumular.
+- **NO crear ni modificar `vercel.json`** (el wildcard corrompía MIME types de ES modules — ver ERR-06).
+- **Actualizar `migration-log.md`** tras cada acción importante.
+- **Consultar `errores_conocidos_porra.md`** antes de debuggear.
+- **`schedule_match_crons(match_key, start_ts)`** para crons de partidos — nunca duplicar manualmente.
+- **Verificación CSS/build obligatoria** tras modificar CSS: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ver ERR-22).
+- **E13 — Subagentes Task con Write NO heredan `.claude/rules/`** (GH#23478). Pasar contexto inline o recuperar Write al padre.
+- **Detectar decisiones autónomas** con `git diff --stat HEAD` antes de commit.
+- **`dice.js` se mantiene dentro de `admin.js`** (no separar).
+- **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo.
+- **NO `addEventListener('DOMContentLoaded')`** directo en classic scripts cargados via `loadScript` (ver ERR-01 + `.claude/rules/frontend-js.md`).
+- **Actor Azzouzana `VzKtdb1t0Qnc07X8V`** tiene caché CDN — NO usar para datos live.
 
 ## Comandos útiles
 
 ```bash
-npm run dev     # localhost:5173
-npm run build   # genera dist/
+npm run dev                                              # localhost:5173
+npm run build                                            # genera dist/
 git add -A && git commit -m "..." && git push origin main
 
 # Lanzar actor Apify manualmente:
 apify call N8vUChlhok5JU3cnL -i '{"eventId":"15832749"}' -t 90
-
-# Push actor Apify:
-cd apify-actors/sofascore-webshare-proxy
-apify push --actor-id N8vUChlhok5JU3cnL
 ```
 
----
+Activación one-time del hook pre-commit en clones nuevos: `git config core.hooksPath .githooks`.
 
-## Reglas CRÍTICAS
+## Mapa de la documentación
 
-- **NUNCA push a main sin validar en localhost:5173 primero**
-- **Push inmediato tras cada commit** — nunca acumular
-- **NO crear ni modificar vercel.json** (borrarlo fue el fix correcto; el wildcard `source: "/(.*)"` corrompía MIME types de ES modules)
-- **Actualizar migration-log.md** tras cada acción importante
-- **NO usar addEventListener DOMContentLoaded** en classic scripts cargados via loadScript
-- Actor Azzouzana `VzKtdb1t0Qnc07X8V` tiene caché CDN — NO usar para datos live
-- **Consultar `errores_conocidos_porra.md`** (ERR-01 a ERR-27) antes de debuggear
-- **Detectar decisiones autónomas de Claude Code** con `git diff --stat HEAD` antes de commit
-- dice.js se mantiene dentro de admin.js (no separar)
-- **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo
-- **Para programar crons de partidos usar `schedule_match_crons(match_key, start_ts)`**, nunca duplicar crons manualmente
-- **Verificación CSS/build obligatoria tras modificar CSS** (aprendido en ERR-22):
-  - Si un estilo no se ve en producción, primer diagnóstico: `getComputedStyle(elementoAfectado).propiedadRelevante`. Valor default/initial = el CSS no está aplicándose (no es bug de lógica). Entonces buscar si ese fichero CSS está enlazado en `index.html`.
-  - Antes de mergear cambios de diseño a `main`: `npm run build && ls dist/css/ && grep -l "<selector-esperado>" dist/css/*.css`. Si el selector no aparece en ningún CSS del `dist/`, abortar merge.
-  - Si `index.html` tiene `<style>` inline con comentarios `Archivo destino : X.css`, es migración pendiente — ejecutarla ANTES de añadir reglas nuevas a los ficheros destino.
+### `docs/` — referencia por dominio
 
----
+| Doc | Contenido | Cuándo consultarlo |
+|---|---|---|
+| `architecture.md` | Estructura JS, EFs, Stack, Secrets, tooling, historial dev | Cambios de organización del repo o tooling |
+| `ia-predictor.md` | Fórmula motor + 4 fuentes datos + mapping WC2026_TEAMS | Cambios IA Predictor o scrapers |
+| `live-scoring.md` | Pipeline async+webhook + actores Apify + SofaScore IDs | Bugs en live scores o nuevos eventIds |
+| `scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA | Cambios reglas de puntuación |
+| `db-schema.md` | Schemas SQL + RLS + helpers `schedule_match_crons` | Cambios en tablas o crons de partidos |
+| `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
+| `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
+| `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
 
-## Patrón DOMContentLoaded en classic scripts
+### `.claude/rules/` — auto-cargadas por path-scoping
 
-```js
-const runInit = () => { /* ... */ };
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', runInit);
-} else {
-  runInit();
-}
-```
-Red de seguridad adicional en `main-entry.js`.
+| Rule | Globs | Cubre |
+|---|---|---|
+| `edge-functions.md` | `supabase/functions/**` | verify_jwt, deploy CLI vs MCP, secrets, RPC vault |
+| `frontend-css.md` | `**/*.css`, `public/css/**` | Vite public, verificación post-build, migración inline |
+| `frontend-js.md` | `public/js/**`, `js/main-entry.js` | DOMContentLoaded, var/const, shims, badge-fallback |
+| `apify-actor.md` | `apify-actors/**` | Contrato I/O, push, eventId discovery, Cloudflare 403 |
 
----
+### Errores conocidos — tabla-índice
 
-## End-of-session protocol (OBLIGATORIO)
+Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 
-1. Actualizar **CLAUDE.md** + commit
-2. Actualizar **CONTEXTO_PORRA_2026.md** si hay cambios estructurales
-3. Generar/actualizar **ESQUEMA_SISTEMA_PORRA2026.xlsx** y push al repo
-4. Notificar a Claude.ai para actualizar memorias
+| ID | Título |
+|----|--------|
+| ERR-01 | DOMContentLoaded en classic scripts cargados async |
+| ERR-02 | `const` top-level no se expone en `window` |
+| ERR-03 | Vite public collision (dev vs prod sirven ficheros distintos) |
+| ERR-04 | Whitespace invisible en secrets del Vault |
+| ERR-05 | Cadena de fallos SofaScore live scoring (solución arquitectónica) |
+| ERR-06 | `vercel.json` wildcard corrompe MIME types de ES modules |
+| ERR-07 | `updateCardUI` race condition tras login |
+| ERR-08 | 404 masivos en consola por `extractUrl(linear-gradient(...))` |
+| ERR-09 | CSS grid-areas roto en Vista Jornada |
+| ERR-10 | Header eliminatorias no responsive en móvil |
+| ERR-11 | GitHub raw bloqueado por proxy de Claude.ai |
+| ERR-12 | Ficheros de persistencia referenciados pero no existentes |
+| ERR-13 | `porra-fix-encoding action:inspect` devuelve 404 erróneamente |
+| ERR-14 | `checkIsAdmin` async no completa, sección admin-only no renderiza |
+| ERR-15 | Sobrescritura de `encrypted_password` en QA es destructiva |
+| ERR-16 | Plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` |
+| ERR-17 | Claude Code no puede borrar ramas remotas (HTTP 403 proxy git) |
+| ERR-18 | Vite build no incluye `css/*.css` en `dist/` |
+| ERR-19 | `openMobileFocus` dejaba `body.overflow=hidden` colgado en iPhone |
+| ERR-20 | `body.style.overflow='hidden'` bloquea scroll persistente en iPhone Safari |
+| ERR-21 | `.mobile-focus-layer` dentro de `@media` dejaba layer fantasma |
+| ERR-22 | `index.html` `<style>` inline nunca migrados a CSS (causa raíz 18-21) |
+| ERR-23 | Flash de welcome al F5 con sesión válida + restore de página |
+| ERR-24 | Wikipedia inadecuada como fuente de H2H masivo entre selecciones |
+| ERR-25 | 11v11.com devuelve 403 sin los 3 headers obligatorios |
+| ERR-26 | `pg_net` no soporta HTTP PUT (bloquea merge PR vía GitHub API) |
+| ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
+| ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
+| ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
 
-**Frase inicio sesión:** "Continuamos con la Porra Mundial 2026. Revisa tus memorias y dime el estado actual del proyecto."
+### Otros ficheros de contexto
 
----
+- `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
+- `migration-log.md` — cronología append-only de acciones por sesión.
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..29 (síntoma/causa/fix/patrón).
 
-## Stack infraestructura
+## End-of-session protocol
 
-- **Hosting:** Vercel (porramundial2026-seven.vercel.app) — autodeploy desde `main`
-- **DB + Auth:** Supabase (proyecto: `cmyfyswystjgzdwbqyyb`)
+1. Actualizar `Estado actual` y top-3 pendientes en este `CLAUDE.md` + commit.
+2. Bugs resueltos durante la sesión → entrada en `CHANGELOG.md` (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB). NO en `CLAUDE.md`.
+3. Append `[HH:MM] ACCION: descripción — ficheros afectados` a `migration-log.md`.
+4. Verificar tamaños pre-commit con `.githooks/pre-commit` (enforcement: 10KB CLAUDE.md / 30KB CHANGELOG.md; **no activo aún en main** — activar one-time con `git config core.hooksPath .githooks`). Si CHANGELOG > 30KB, mover entradas antiguas a archive.
+5. Revisar política retención CHANGELOG el 20 jul 2026 (post-Mundial: revertir a 30d).
 
-### Secrets — clasificación
+## Frase inicio sesión
 
-**Regla mental:** Vault = se consumen desde SQL / pg_net (EFs otras, crons, flows de Claude.ai vía MCP). EF secrets (`Deno.env.get`) = API keys externas consumidas directamente desde el código de una Edge Function.
+`Porra Mundial 2026. HEAD actual en main. Fase activa y últimos 3 prioritarios.`
 
-**Vault de Supabase** (`vault.decrypted_secrets`, acceso desde SQL o vía RPC `get_vault_secrets` — ver ERR-27):
-- `GITHUB_TOKEN`, `GITHUB_REPO` — usados por EFs `porra-patch-deploy`, `porra-fix-encoding` para escribir ficheros en el repo.
-- `APIFY_TOKEN` — lanza actor Webshare desde `porra-match-live`.
-- `PROXY_URL` — fallback scraping (legacy, `porra-sofascore-proxy` obsoleta).
-- `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET` — envío WhatsApp desde `porra-apify-webhook` y `porra-whatsapp-send`.
-- `IA_CRON_KEY` (añadido 21 abr, Fase E) — 64 chars hex. `X-Cron-Key` para autenticar pg_cron contra `porra-ia-compute` actions `freeze_snapshot` / `compute_groups`.
-- `SUPABASE_SERVICE_ROLE_KEY` (añadido 22 abr, mirror del EF secret) — **duplicado intencional** del secret que ya vive en EF secrets. Añadido para que calls SQL vía `net.http_post` puedan poner `Authorization: Bearer ${service_role}` en headers hacia EFs que validan auth (`compute_match`, rate limit test). **Al rotar el service_role, actualizar en AMBOS sitios** (EF secrets Dashboard → Settings → Functions + Vault).
-
-**Edge Function secrets** (`Deno.env.get(...)` desde el código, NO Vault):
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` — inyectadas automáticamente por Supabase en todas las EFs.
-- `ANTHROPIC_API_KEY` (Fase E) — usada por `porra-ia-compute` para el `quipGenerator` (Claude Haiku 4.5). Patrón del proyecto para API keys externas (igual que `FOOTBALL_DATA_API_KEY` de `update-results`).
-- `FOOTBALL_DATA_API_KEY` — usada por `update-results`.
-
----
-
-## Log de cambios (OBLIGATORIO)
-
-Añadir línea a `migration-log.md` tras cada acción:
-```
-[HH:MM] ACCION: descripción — ficheros afectados
-```
-Nunca borrar entradas anteriores.
+Provoca la respuesta del slash command `/start-session` (ver `.claude/commands/start-session.md`): leer §"Estado actual" + reportar HEAD + fase + top-3 sin pedir confirmación.

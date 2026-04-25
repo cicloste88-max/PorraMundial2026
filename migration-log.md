@@ -1092,3 +1092,29 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
   - Estado actual: **main en `87fd454`**, Fase F COMPLETA + deuda técnica cerrada, ambas ramas G2wic y review-predictor-merge borradas.
 
   Lección: al cerrar una Fase con sustitución de flow (ej. Fase F: `fetchIA` → `loadIAPredictions` + `hydrateIABar`), no dejar el path legacy como "fallback inerte" en el código. Los fallbacks hardcoded ESCONDEN los fallos reales del nuevo path (si `loadIAPredictions` falla silenciosamente, el legacy la tapa con datos fake). Eliminar el camino viejo **antes** de declarar la fase cerrada hubiera sido más limpio — aquí se hizo en commit separado (deuda técnica documentada + resuelta al día siguiente).
+
+---
+
+## 2026-04-25 madrugada — Refactor CLAUDE.md F0-F4 completado
+
+**Resumen**: CLAUDE.md 51KB → 8.86KB (-83%). Documentación dispersa en `docs/` (7 ficheros nuevos, 38KB) + `.claude/rules/` (4 ficheros, 10.1KB) + `.claude/commands/start-session.md` + `.githooks/pre-commit` + `CHANGELOG.md` (11.75KB). `CONTEXTO_PORRA_2026.md` eliminado (deltas absorbidos en `docs/architecture.md` historial sesiones + `docs/live-scoring.md` ficha actor fallback).
+
+**Commits en rama `claude/setup-todowrite-phases-KOGQU`**:
+- `40efc60` F4 Wave 1 Grupo 1: docs/architecture, ia-predictor, live-scoring
+- `deb54dc` F4 Wave 1 Grupo 2: scoring-engine + whatsapp + simulacros + db-schema
+- `0301f91` F4 Wave 1 Grupo 3: 4 .claude/rules/ path-scoping
+- `6173db2` Grupo 4 parcial: commands + githook (CHANGELOG diferido)
+- `30b3b12` reescribir CLAUDE.md (51KB → ~7KB)
+- `67180f1` CHANGELOG.md inicial — Saga F5 + IA Predictor Fases A-F
+- `7d27d9e` CLAUDE.md ERR-XX tabla con prefijo + E13 explícito + EoS protocol
+- `c64fd7a` CHANGELOG.md — bugs + limpieza + playoffs + IA F wiring
+- `11e2a0e` eliminar CONTEXTO_PORRA_2026.md
+- (este append a migration-log)
+
+**Estado**: Wave 1 (14 ficheros nuevos, CHANGELOG diferido a Wave 2) + Wave 2 (CLAUDE.md reescrito + cleanup ERR/E13/EoS + CHANGELOG completo + CONTEXTO eliminado + esta entrada en migration-log) cerradas. PR pendiente Wave 3 (verificaciones + apertura PR sin merge). Tests F5 multi-sesión orquestados por Claude.ai Desktop tras merge.
+
+**Aprendizajes**:
+1. Subagentes Haiku con `Explore` (read-only) son seguros para generación de contenido — no pueden Write, evitan E13/GH#23478 por construcción.
+2. Algunos Haikus alucinan: H2 (ia-predictor) inventó fórmulas matemáticas detalladas sin source; H7 (db-schema) inventó schema de `ia_snapshots`. Padre debe revisar output antes de Write.
+3. Idle timeouts en prompts grandes (>15KB inline source): chunkear en grupos de 3-4 evita timeouts.
+4. Hook pre-commit con enforcement de tamaños es crítico pero NO activarlo (`git config core.hooksPath`) hasta tener CLAUDE.md ya compactado, sino bloquea commits intermedios.

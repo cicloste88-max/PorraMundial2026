@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+MAX_CLAUDE_BYTES=10240
+MAX_CHANGELOG_BYTES=30720
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+claude_md="${REPO_ROOT}/CLAUDE.md"
+changelog_md="${REPO_ROOT}/CHANGELOG.md"
+
+check_failed=0
+
+if [ -f "$claude_md" ]; then
+  claude_size=$(wc -c < "$claude_md")
+  if [ "$claude_size" -gt "$MAX_CLAUDE_BYTES" ]; then
+    echo "ERROR: CLAUDE.md ($claude_size bytes) supera 10KB. Mueve bloat a CHANGELOG.md o docs/ antes de commitear."
+    check_failed=1
+  fi
+fi
+
+if [ -f "$changelog_md" ]; then
+  changelog_size=$(wc -c < "$changelog_md")
+  if [ "$changelog_size" -gt "$MAX_CHANGELOG_BYTES" ]; then
+    echo "ERROR: CHANGELOG.md ($changelog_size bytes) supera 30KB. Mueve entradas antiguas a CHANGELOG-archive-YYYYMM.md."
+    check_failed=1
+  fi
+fi
+
+if [ "$check_failed" -eq 0 ]; then
+  claude_size=0
+  changelog_size=0
+
+  if [ -f "$claude_md" ]; then
+    claude_size=$(wc -c < "$claude_md")
+  fi
+
+  if [ -f "$changelog_md" ]; then
+    changelog_size=$(wc -c < "$changelog_md")
+  fi
+
+  echo "pre-commit: tamaños OK (CLAUDE.md $claude_size bytes / CHANGELOG.md $changelog_size bytes)"
+  exit 0
+else
+  exit 1
+fi
