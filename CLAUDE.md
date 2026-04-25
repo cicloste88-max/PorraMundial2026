@@ -118,6 +118,7 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-25 | 11v11.com devuelve 403 sin los 3 headers obligatorios |
 | ERR-26 | `pg_net` no soporta HTTP PUT (bloquea merge PR vía GitHub API) |
 | ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
+| ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
 
 ### Otros ficheros de contexto
