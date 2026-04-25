@@ -41,7 +41,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 - **Consultar `errores_conocidos_porra.md`** antes de debuggear.
 - **`schedule_match_crons(match_key, start_ts)`** para crons de partidos — nunca duplicar manualmente.
 - **Verificación CSS/build obligatoria** tras modificar CSS: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ver ERR-22).
-- **Subagentes Task con tool Write NO heredan `.claude/rules/`** (GH#23478, caveat E13). Si se delega escritura a un subagente, pasar contexto inline o recuperar Write al padre.
+- **E13 — Subagentes Task con Write NO heredan `.claude/rules/`** (GH#23478). Pasar contexto inline o recuperar Write al padre.
 - **Detectar decisiones autónomas** con `git diff --stat HEAD` antes de commit.
 - **`dice.js` se mantiene dentro de `admin.js`** (no separar).
 - **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo.
@@ -89,36 +89,36 @@ Activación one-time del hook pre-commit en clones nuevos: `git config core.hook
 
 Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 
-| ERR | Síntoma corto |
-|---|---|
-| 01 | DOMContentLoaded en classic scripts cargados async |
-| 02 | `const` top-level no se expone en `window` |
-| 03 | Vite public collision (dev vs prod sirven ficheros distintos) |
-| 04 | Whitespace invisible en secrets del Vault |
-| 05 | Cadena de fallos SofaScore live scoring (solución arquitectónica) |
-| 06 | `vercel.json` wildcard corrompe MIME types de ES modules |
-| 07 | `updateCardUI` race condition tras login |
-| 08 | 404 masivos en consola por `extractUrl(linear-gradient(...))` |
-| 09 | CSS grid-areas roto en Vista Jornada |
-| 10 | Header eliminatorias no responsive en móvil |
-| 11 | GitHub raw bloqueado por proxy de Claude.ai |
-| 12 | Ficheros de persistencia referenciados pero no existentes |
-| 13 | `porra-fix-encoding action:inspect` devuelve 404 erróneamente |
-| 14 | `checkIsAdmin` async no completa, sección admin-only no renderiza |
-| 15 | Sobrescritura de `encrypted_password` en QA es destructiva |
-| 16 | Plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` |
-| 17 | Claude Code no puede borrar ramas remotas (HTTP 403 proxy git) |
-| 18 | Vite build no incluye `css/*.css` en `dist/` |
-| 19 | `openMobileFocus` dejaba `body.overflow=hidden` colgado en iPhone |
-| 20 | `body.style.overflow='hidden'` bloquea scroll persistente en iPhone Safari |
-| 21 | `.mobile-focus-layer` dentro de `@media` dejaba layer fantasma |
-| 22 | `index.html` `<style>` inline nunca migrados a CSS (causa raíz 18-21) |
-| 23 | Flash de welcome al F5 con sesión válida + restore de página |
-| 24 | Wikipedia inadecuada como fuente de H2H masivo entre selecciones |
-| 25 | 11v11.com devuelve 403 sin los 3 headers obligatorios |
-| 26 | `pg_net` no soporta HTTP PUT (bloquea merge PR vía GitHub API) |
-| 27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
-| 29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
+| ID | Título |
+|----|--------|
+| ERR-01 | DOMContentLoaded en classic scripts cargados async |
+| ERR-02 | `const` top-level no se expone en `window` |
+| ERR-03 | Vite public collision (dev vs prod sirven ficheros distintos) |
+| ERR-04 | Whitespace invisible en secrets del Vault |
+| ERR-05 | Cadena de fallos SofaScore live scoring (solución arquitectónica) |
+| ERR-06 | `vercel.json` wildcard corrompe MIME types de ES modules |
+| ERR-07 | `updateCardUI` race condition tras login |
+| ERR-08 | 404 masivos en consola por `extractUrl(linear-gradient(...))` |
+| ERR-09 | CSS grid-areas roto en Vista Jornada |
+| ERR-10 | Header eliminatorias no responsive en móvil |
+| ERR-11 | GitHub raw bloqueado por proxy de Claude.ai |
+| ERR-12 | Ficheros de persistencia referenciados pero no existentes |
+| ERR-13 | `porra-fix-encoding action:inspect` devuelve 404 erróneamente |
+| ERR-14 | `checkIsAdmin` async no completa, sección admin-only no renderiza |
+| ERR-15 | Sobrescritura de `encrypted_password` en QA es destructiva |
+| ERR-16 | Plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` |
+| ERR-17 | Claude Code no puede borrar ramas remotas (HTTP 403 proxy git) |
+| ERR-18 | Vite build no incluye `css/*.css` en `dist/` |
+| ERR-19 | `openMobileFocus` dejaba `body.overflow=hidden` colgado en iPhone |
+| ERR-20 | `body.style.overflow='hidden'` bloquea scroll persistente en iPhone Safari |
+| ERR-21 | `.mobile-focus-layer` dentro de `@media` dejaba layer fantasma |
+| ERR-22 | `index.html` `<style>` inline nunca migrados a CSS (causa raíz 18-21) |
+| ERR-23 | Flash de welcome al F5 con sesión válida + restore de página |
+| ERR-24 | Wikipedia inadecuada como fuente de H2H masivo entre selecciones |
+| ERR-25 | 11v11.com devuelve 403 sin los 3 headers obligatorios |
+| ERR-26 | `pg_net` no soporta HTTP PUT (bloquea merge PR vía GitHub API) |
+| ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
+| ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
 
 ### Otros ficheros de contexto
 
@@ -129,9 +129,9 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 ## End-of-session protocol
 
 1. Actualizar `Estado actual` y top-3 pendientes en este `CLAUDE.md` + commit.
-2. Bugs resueltos durante la sesión → entrada en `CHANGELOG.md` (no en `CLAUDE.md`).
+2. Bugs resueltos durante la sesión → entrada en `CHANGELOG.md` (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB). NO en `CLAUDE.md`.
 3. Append `[HH:MM] ACCION: descripción — ficheros afectados` a `migration-log.md`.
-4. Verificar tamaños pre-commit (hook lo enforza si está activo): `wc -c CLAUDE.md` ≤ 10KB; `wc -c CHANGELOG.md` ≤ 30KB. Si CHANGELOG > 30KB, mover entradas antiguas a `CHANGELOG-archive-YYYYMM.md`.
+4. Verificar tamaños pre-commit con `.githooks/pre-commit` (enforcement: 10KB CLAUDE.md / 30KB CHANGELOG.md; **no activo aún en main** — activar one-time con `git config core.hooksPath .githooks`). Si CHANGELOG > 30KB, mover entradas antiguas a archive.
 5. Revisar política retención CHANGELOG el 20 jul 2026 (post-Mundial: revertir a 30d).
 
 ## Frase inicio sesión
