@@ -193,10 +193,7 @@ Constante global en `supabase/functions/porra-ia-compute/index.ts`. Cada entry e
 
 **Fuente de verdad**: la constante en `index.ts`. Si 11v11 renombra una selección o FIFA cambia afiliación oficial, actualizar aquí y redesplegar.
 
-## Cleanup pendiente
+## Cleanup
 
-1. **Dos `fetch('api.anthropic.com/...')` muertos**:
-   - `scoring.js` legacy `fetchIA` (nunca se invoca tras movido a `porra-ia-compute`).
-   - `ui-nav.js:49` fallback inerte.
-   - Acción: remover ambas líneas. No bloquean funcionalidad pero son deuda técnica.
-2. **Tooltip explainer del % en tarjetas KO**: Fase F limitó scope a partidos de grupos. Las predicciones KO se computan on-demand (sessionStorage cache), pero el tooltip narrativo aún no se renderiza. Acción: leer `iaKoPredictions` + `findCachedPrediction` con raw context y portarlo a `ko.js`. Baja prioridad post-torneo.
+1. **Dos `fetch('api.anthropic.com/...')` muertos** — ✅ resuelto en `87fd454` (PR #19, 24 abr 2026): `scoring.js::fetchIA` y `ui-nav.js::fetchIAforKO` eliminados. `iaPredictions` se puebla desde `loadIAPredictions` (auth.js); `iaKoPredictions` desde `loadKOIAHint` (ko.js) con callback `onDone`. Net -131 líneas.
+2. **Tooltip explainer del % en tarjetas KO** (pendiente): Fase F limitó scope a partidos de grupos. Las predicciones KO se computan on-demand (sessionStorage cache), pero el tooltip narrativo aún no se renderiza. Acción: leer `iaKoPredictions` + `findCachedPrediction` con raw context y portarlo a `ko.js`. Baja prioridad post-torneo.
