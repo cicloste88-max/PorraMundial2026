@@ -630,10 +630,9 @@ function createMatchCard(match, idx) {
   const hSk = getStickerForMatch(homeTeam.slug, idx);
   const aSk = getStickerForMatch(awayTeam.slug, idx);
   // Darwin and other tall stickers get extra CSS class to control height
-  const hExtra = isTallSticker(hSk) ? ' sticker-tall' : isWideSticker(hSk) ? ' sticker-wide' : '';
-  const aExtra = isTallSticker(aSk) ? ' sticker-tall' : isWideSticker(aSk) ? ' sticker-wide' : '';
-  const hStickerEl = hSk ? ('<img class="sticker sticker-L'+hExtra+'" src="'+SB+'/miniatures/'+hSk+'.png" alt="" onerror="this.remove()"/>') : '';
-  const aStickerEl = aSk ? ('<img class="sticker sticker-R'+aExtra+'" src="'+SB+'/miniatures/'+aSk+'.png" alt="" onerror="this.remove()"/>') : '';
+  // Stickers eliminados (F7.1) — preserved hSk/aSk vars por si se reactivan
+  const hStickerEl = '';
+  const aStickerEl = '';
 
   const hOpts = homeTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+p.name+'</option>').join('');
   const aOpts = awayTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+p.name+'</option>').join('');
@@ -686,13 +685,13 @@ function createMatchCard(match, idx) {
       '<div class="glow-line"></div>',
       '<div class="spark"></div><div class="spark"></div><div class="spark"></div>',
       '<div class="center">',
-        '<div class="mpill">Grupo '+match.group+' · '+match.stadium+'</div>',
         '<div class="vs-b"><div class="vs-ball"></div><span class="vs-text">VS</span></div>',
         '<div class="status-pill open" id="spill-'+idx+'">',
           '<div class="sdot"></div>',
           '<span id="stxt-'+idx+'">Abierta</span>',
         '</div>',
       '</div>',
+      '<div class="mpill mpill-bottom">'+match.stadium+'</div>',
     '</div>',
     '<div class="pred" id="pred-'+idx+'">',
       '<div id="score-input-'+idx+'">',
@@ -710,10 +709,10 @@ function createMatchCard(match, idx) {
           '</div>',
         '</div>',
         '<div class="pts-row">',
-          '<div class="ptc sign" id="ptc-sign-'+idx+'">🔵 +1pt signo</div>',
-          '<div class="ptc exact" id="ptc-exact-'+idx+'">🎯 +3pts exacto</div>',
-          '<div class="ptc scorer" id="ptc-scorer-'+idx+'">⚽ +2pts goleador</div>',
-          '<div class="ptc ia" id="ptc-ia-'+idx+'">🤖 +1pt vs IA</div>',
+          '<div class="ptc sign" id="ptc-sign-'+idx+'">🔵 +1 signo</div>',
+          '<div class="ptc exact" id="ptc-exact-'+idx+'">🎯 +3 exacto</div>',
+          '<div class="ptc scorer" id="ptc-scorer-'+idx+'">⚽ +2 goleador</div>',
+          '<div class="ptc ia" id="ptc-ia-'+idx+'">🤖 +1 vs IA</div>',
         '</div>',
         '<div class="gol-row">',
           '<span class="gol-lbl">Goleador</span>',
@@ -724,7 +723,6 @@ function createMatchCard(match, idx) {
               '<optgroup label="'+match.away+'">'+aOpts+'</optgroup>',
             '</select>',
           '</div>',
-          '<span class="gbadge" id="gbadge-'+idx+'">+2 pts</span>',
         '</div>',
       '</div>',
     '</div>',
@@ -1174,7 +1172,7 @@ function updateCardUI(idx, match) {
       if(gselSaved) gselSaved.disabled=true;
       document.querySelectorAll(`#pred-${idx} .sbn`).forEach(b=>b.disabled=true);
       const undoVisible = window._porraCerrada ? 'display:none' : '';
-      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">✓ Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">↩ Deshacer</button></div>`;
+      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">✓ Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">↩ Deshacer</button></div>`;
       btnRow.querySelector('.btn-undo').onclick=()=>{
         if (window._porraCerrada) return; // porra cerrada — no se puede deshacer
         // Deshacer SOLO esta tarjeta — no afecta a las demás
