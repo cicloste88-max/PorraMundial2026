@@ -1,0 +1,78 @@
+/* ── Bottom Tab Bar ──────────────────────────────────────────────────────────
+   F7.4-A: estilos definidos, barra no visible aún.
+   F7.4-B: body.fc-shell-active activará display:flex.
+   ────────────────────────────────────────────────────────────────────────── */
+.fc-tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--fc-tab-h) + var(--fc-safe-bottom));
+  background: var(--fc-surface);
+  border-top: 1px solid var(--fc-border);
+  display: none; /* activado por body.fc-shell-active en F7.4-B */
+  align-items: flex-start;
+  justify-content: space-around;
+  padding-bottom: var(--fc-safe-bottom);
+  z-index: var(--fc-z-tabbar);
+  /* Evitar selección accidental en tap rápido */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.fc-tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px 6px;
+  min-width: 0;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--fc-text-secondary);
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--fc-transition);
+}
+
+.fc-tabbar__item:hover,
+.fc-tabbar__item.fc-tabbar__item--active {
+  color: var(--fc-accent);
+}
+
+.fc-tabbar__icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fc-tabbar__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.fc-tabbar__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Indicador activo: punto bajo el icono */
+.fc-tabbar__item--active .fc-tabbar__icon::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fc-accent);
+  margin-top: 3px;
+}

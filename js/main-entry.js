@@ -65,6 +65,11 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/admin.js'))
   .then(() => loadScript('/js/ui-directo.js'))
   .then(() => loadScript('/js/live-sync.js'))
+  // App Shell (F7.4) — inerte en F7.4-A; shell.js último por consistencia con el orquestador
+  .then(() => loadScript('/js/components/icons.js'))
+  .then(() => loadScript('/js/components/bottom-tab.js'))
+  .then(() => loadScript('/js/components/app-header.js'))
+  .then(() => loadScript('/js/shell.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Porra Mundial 2026 - Pronósticos completos</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800;900&family=Space+Mono:wght@700&family=Bebas+Neue&display=swap" rel="stylesheet">
 
@@ -51,8 +51,15 @@ try {
 <link rel="stylesheet" href="/css/bracket-results.css">
 <link rel="stylesheet" href="/css/boost.css">
 <link rel="stylesheet" href="/css/directo.css">
+<!-- App Shell CSS (F7.4) -->
+<link rel="stylesheet" href="/css/components/tokens.css">
+<link rel="stylesheet" href="/css/components/bottom-tab.css">
+<link rel="stylesheet" href="/css/components/app-header.css">
 </head>
 <body>
+<!-- App Shell mount points (F7.4-A: hidden; F7.4-B: activados por body.fc-shell-active) -->
+<div id="fc-header-mount" hidden></div>
+<div id="fc-tabbar-mount" hidden></div>
 <!-- ═══ SPLASH SCREEN ═══ -->
 <div id="splash-screen">
   <div class="spl-glow"></div>
@@ -103,6 +110,7 @@ try {
       window._pendingPageRestore = lastPage;
       splash.style.display = 'none';
       if (splash.parentNode) splash.parentNode.removeChild(splash);
+      window._splashHidden = true;
       window.splashDone = function(){};
       return;
     }
@@ -123,7 +131,10 @@ try {
     hidden = true;
     clearInterval(iv);
     splash.classList.add('hidden');
-    setTimeout(function(){ if (splash.parentNode) splash.parentNode.removeChild(splash); }, 700);
+    setTimeout(function(){
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+      window._splashHidden = true;
+    }, 700);
   }
   document.getElementById('spl-skip').addEventListener('click', hideSplash);
   // Auto-ocultar: mínimo 4s de splash visible
