@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main**, último commit **5914945**. IA Predictor **Fases A–F cerradas y mergeadas en main** (PR #17 `6b06880` + post-F `fb22648 / 8dd691c / 6e46d2b` + doc sweep `a079fda / a24001a`), paridad Python↔TS verde 46/46, smoke tests verdes. EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido (9 raw-context fields) para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción (verificada en iPhone Safari + Chrome móvil).
+Rama activa **main**, último commit **0ddc6dc**. **F7.4-A merged: app shell esqueleto inerte LIVE** (PR #28, `dffd1ae`); siguiente **F7.4-B** (conexión `showPage` + `body.fc-shell-active` + migrar `_gruposInited` a Promise singleton). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
 
 ## Top-3 pendientes inmediatos
 
