@@ -585,7 +585,8 @@ const _boostFire = (function() {
 })();
 
 // Observador global: detecta qué tarjeta tiene boost-active
-const _boostObserver = new MutationObserver(function() {
+const _boostObserver = new MutationObserver(function(mutations) {
+  if (mutations.every(function(m) { return m.target.closest && m.target.closest('.fc-tabbar, .fc-appbar'); })) return;
   const active = document.querySelector('.card.boost-active');
   if (active) _boostFire.attachTo(active);
   else _boostFire.detach();

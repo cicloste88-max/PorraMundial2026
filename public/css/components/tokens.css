@@ -1,0 +1,35 @@
+:root {
+  /* Surface */
+  --fc-bg:        #0d0f1a;
+  --fc-surface:   #161929;
+  --fc-surface-2: #1e2235;
+  --fc-border:    rgba(255,255,255,0.08);
+
+  /* Text */
+  --fc-text-primary:   #f0f0f0;
+  --fc-text-secondary: rgba(255,255,255,0.55);
+
+  /* Accent */
+  --fc-accent:   #e8b84b;
+  --fc-accent-2: #4b7fe8;
+  --fc-live:     #ef4444;
+
+  /* Layout */
+  --fc-tab-h:     56px;
+  --fc-header-h:  52px;
+  --fc-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Z-index */
+  --fc-z-header: 200;
+  --fc-z-tabbar: 300;
+  --fc-z-modal:  400;
+  --fc-z-splash: 9999;
+
+  /* Radii */
+  --fc-radius-sm:   6px;
+  --fc-radius-md:   12px;
+  --fc-radius-pill: 999px;
+
+  /* Transitions */
+  --fc-transition: 200ms ease;
+}
