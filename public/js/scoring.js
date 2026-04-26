@@ -1172,7 +1172,7 @@ function updateCardUI(idx, match) {
       if(gselSaved) gselSaved.disabled=true;
       document.querySelectorAll(`#pred-${idx} .sbn`).forEach(b=>b.disabled=true);
       const undoVisible = window._porraCerrada ? 'display:none' : '';
-      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">✓ Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">↩ Deshacer</button></div>`;
+      btnRow.innerHTML=`<div class="saved-group"><div class="saved-badge" style="background:#16a34a;color:#fff;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">✓ Guardado</div><button class="btn-undo" data-idx="${idx}" style="${undoVisible}">↩ Deshacer</button></div>`;
       btnRow.querySelector('.btn-undo').onclick=()=>{
         if (window._porraCerrada) return; // porra cerrada — no se puede deshacer
         // Deshacer SOLO esta tarjeta — no afecta a las demás
