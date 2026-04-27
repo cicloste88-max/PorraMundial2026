@@ -687,6 +687,9 @@ function __mobileBoostRowClickHandler(e) {
   if (typeof window.renderBoostTicker === 'function') {
     window.renderBoostTicker();
   }
+  // ERR-32 follow-up: la default action del <input> nativo invierte el chk tras los syncs síncronos.
+  // Reconciliar en next tick (post-default-action) garantiza coherencia final.
+  setTimeout(refreshBoostRowsInFocus, 0);
 }
 
 window.refreshBoostRowsInFocus = refreshBoostRowsInFocus;
