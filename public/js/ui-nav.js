@@ -1,5 +1,5 @@
 // ui-nav.js - Porra Mundial 2026 / sub-bloque js-ui-nav
-// Navegacion SPA (showPage, goToEliminatoria, updateKOPts, initWelcome),
+// Navegacion SPA (showPage, updateKOPts, initWelcome),
 // modal de partido (openModal, closeModal, undoKO, setView, refreshAllViews),
 // koInit, updateAwardsFooter, renderPickerList.
 // Deps: data.js, scoring.js, ui-groups.js, ko.js, auth.js, leagues.js
@@ -492,8 +492,7 @@ function koInit() {
 
 
   // ─────────────────────────────────────────────────────────────
-  // NAVEGACIÓN SPA — showPage, goToEliminatoria,
-  //   updateKOPts, initWelcome
+  // NAVEGACIÓN SPA — showPage, updateKOPts, initWelcome
   // ─────────────────────────────────────────────────────────────
 /* ══ NAVEGACIÓN SPA ══ */
 let _gruposInitPromise = null;
@@ -566,7 +565,6 @@ function showPage(page) {
     }
   } catch (_) {}
 }
-function goToEliminatoria() { showPage('elim'); }
 function updateKOPts() {
   let pts = 0;
   Object.values(koPredictions).forEach(p => { if(p&&p.saved&&p.l!==null) pts += 3; });
