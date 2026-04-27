@@ -620,6 +620,23 @@ function refreshBoostRowsInFocus() {
     const date = m.date.slice(0, 10);
     const matchKey = getMatchKey(m);
     const boostedKey = bp[date];
+    // ERR-32: reconciliar chk + classes con boostPicks (single source of truth).
+    // Antes solo se gestionaba .boost-blocked; chk.checked y boost-active podían
+    // quedar desincronizados con boostPicks tras race con saveBoostPicks o
+    // limpieza sin tocar el DOM.
+    const chk = card.querySelector('.boost-chk');
+    const isThisMatch = boostedKey === matchKey;
+    if (chk) {
+      chk.checked = isThisMatch;
+      chk.disabled = !!(boostedKey && !isThisMatch);
+    }
+    if (isThisMatch) {
+      card.classList.add('boost-active');
+      row.classList.add('boost-on');
+    } else {
+      card.classList.remove('boost-active');
+      row.classList.remove('boost-on');
+    }
     if (boostedKey && boostedKey !== matchKey) {
       row.classList.add('boost-blocked');
     } else {

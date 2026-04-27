@@ -440,3 +440,34 @@ Tres fallos encadenados que requirieron solución combinada.
   - `unlockCardsInFocus(letra)` puede invocarse defensivamente desde cualquier handler que cambie estado de cards — el guard `if (!body) return` evita errores cuando no hay focus mobile abierto.
 - **Verificación de pre-existencia (smoke F7.4-D-1):** scoring.js MD5 idéntico main pre-F7.4-D-1 vs post-F7.4-D-1, `lockCardsInFocus` callsites iguales, reproducido en producción `porramundial2026-seven.vercel.app` antes del fix.
 - **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1). **Fecha fix:** 27 abr 2026 (PR #32 mini-PR aparte, commit `1a7a9b9`).
+
+---
+
+## ERR-32 — Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33)
+
+- **Síntoma:** en mobile-focus de page-grupos, una card podía mostrar `chk.checked=true` (input boost marcado) mientras la card NO tenía clase `boost-active` (apagada visualmente) ni `boostPicks[date]` lo respaldaba. Estado capturado en smoke ERR-30: `boostPicks={}` vacío, `localStorage.boostPicks_default` con 16 entradas pero ninguna del día del partido, card sin `boost-active`, `chk.checked=true` residual sin razón. Al pulsar la boost-row, la card se encendía pero el check seguía marcado igual que antes (sin reflejar el toggle correctamente).
+- **Causa:** `attachEvents` (`scoring.js`) lee `boostPicks` y marca `chk.checked` al renderizar inicialmente la card. Algún flow posterior (loadUserData sin sesión, deshacer guardado, race con `saveBoostPicks`) limpia `boostPicks` SIN tocar el DOM del chk → estado residual donde el check queda marcado pero sin coherencia visual ni con el modelo. `refreshBoostRowsInFocus` (`ui-groups-mobile.js:601`) solo gestionaba `.boost-blocked` y NO reconciliaba `chk.checked`, `boost-active`, `boost-on` con `boostPicks`.
+  - Click en boost-row: `__mobileBoostRowClickHandler` (capture phase) intercepta con `stopImmediatePropagation()` + `preventDefault()` → bloquea el cambio nativo del check. Llama a `tickerBoostToggle(matchKey, date)`. Como `boostPicks[date] === undefined`, entra en rama ELSE (ACTIVAR), marca `chk.checked=true` (ya estaba) y añade `boost-active`. Resultado: tarjeta enciende, check sigue marcado igual.
+- **Fix aplicado** (`refreshBoostRowsInFocus` en `ui-groups-mobile.js:622`, dentro del forEach de rows, ANTES de la lógica `boost-blocked` existente):
+  ```js
+  const chk = card.querySelector('.boost-chk');
+  const isThisMatch = boostedKey === matchKey;
+  if (chk) {
+    chk.checked = isThisMatch;
+    chk.disabled = !!(boostedKey && !isThisMatch);
+  }
+  if (isThisMatch) {
+    card.classList.add('boost-active');
+    row.classList.add('boost-on');
+  } else {
+    card.classList.remove('boost-active');
+    row.classList.remove('boost-on');
+  }
+  ```
+  La función ya se invoca tras `openMobileFocus(letra)` (línea 237) y tras `tickerBoostToggle` desde el handler delegado (línea 669), por lo que la reconciliación corre en cada momento donde el state visual y `boostPicks` deben coincidir.
+- **Patrón preventivo (single source of truth):**
+  - `boostPicks` es **la fuente de verdad por diseño** (se persiste a `localStorage.boostPicks_default` y a BD vía `saveBoostPicks`). Cualquier discrepancia entre el DOM (`chk.checked`, `.boost-active`, `.boost-on`) y `boostPicks` es un bug, no un estado intencional.
+  - Al añadir nuevos handlers que muten `boostPicks`, asegurar que se invoca `refreshBoostRowsInFocus` después (o equivalente para vista no-focus) para reconciliar el DOM. NO mutar el DOM en paralelo a `boostPicks` desde varios sitios.
+  - `chk.disabled = !!(boostedKey && !isThisMatch)` reproduce la lógica de `attachEvents` (`scoring.js`): el check está disabled si hay boost del día asignado a OTRA card. Mantener simétrico al render inicial.
+- **Verificación de pre-existencia (smoke F7.4-D-1):** reproducido en producción `porramundial2026-seven.vercel.app` antes del fix con el mismo síntoma.
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1). **Fecha fix:** 27 abr 2026 (PR #33 mini-PR aparte).
