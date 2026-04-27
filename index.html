@@ -200,21 +200,18 @@ try {
      Archivo destino : index.html
      ─────────────────────────────────────────────────────────────
      Usa             : (ninguna)
-     Expone          : #page-score, #score-user-bar
+     Expone          : #page-score
      Deps            : js-scoreboard
      Notas           : ninguna
 ════════════════════════════════════════════════════════════════ -->
 <!-- ══ PAGE: SCOREBOARD ══ -->
 <div id="page-score" style="display:none">
 
-  <!-- Header sticky -->
-  <div class="sb-header">
-    <div class="sb-header-left">
-      <button class="sb-back-btn" id="sb-back-btn" onclick="showPage(window._sbPrevPage||'grupos')">← <span id="sb-back-label">Grupos</span></button>
-      <span class="sb-header-title">Clasificación</span>
-    </div>
-    <div class="sb-user-bar" id="score-user-bar"></div>
-  </div>
+  <!-- Header (F7.4-C: migrado a .fc-appbar--page) -->
+  <header class="fc-appbar fc-appbar--page">
+    <button class="fc-appbar__back" id="sb-back-btn" type="button" aria-label="Volver" onclick="showPage(window._sbPrevPage||'grupos')"></button>
+    <span class="fc-appbar__title">Clasificación</span>
+  </header>
 
   <!-- Body -->
   <div class="sb-body">
@@ -656,34 +653,20 @@ try {
      Incluye header global, modal de partido y bracket principal.
 ════════════════════════════════════════════════════════════════ -->
 <div id="page-elim" style="display:none">
-<!-- ══ HEADER GLOBAL ══ -->
+<!-- ══ HEADER (F7.4-C: migrado a .fc-appbar--page) ══ -->
 <div id="elim-league-pill-slot" style="display:flex;justify-content:center;padding:4px 0 0"></div>
-<div class="global-header">
-  <div style="display:flex;align-items:center;gap:12px">
-    <a href="#" onclick="showPage('grupos');return false;" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#6b7280;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid #27272a;background:#1c1c1e;transition:all .15s" onmouseover="this.style.borderColor='#4ade80';this.style.color='#4ade80'" onmouseout="this.style.borderColor='#27272a';this.style.color='#6b7280'">← Fase de Grupos</a>
-    <div>
-      <h1 style="color:#fff;font-size:22px;font-family:'Inter Tight',sans-serif;font-weight:900;letter-spacing:-.02em">⚽ Porra <span style="color:#4ade80">Eliminatorias</span></h1>
-      <p style="color:#6b7280;font-size:12px;">Fase eliminatoria — 32 partidos</p>
-    </div>
+<header class="fc-appbar fc-appbar--page">
+  <button class="fc-appbar__back" type="button" aria-label="Volver a fase de grupos" onclick="showPage('grupos')"></button>
+  <span class="fc-appbar__title">Eliminatorias</span>
+</header>
+<!-- F7.4-C: franja transitoria "Mis puntos" + acceso Clasificación.
+     Será retirada en F7.4-E cuando el header global persistente muestre puntos + #posición. -->
+<div class="elim-pts-strip">
+  <div class="elim-pts-block">
+    <span class="elim-pts-label">Mis puntos</span>
+    <strong class="elim-pts-num" id="total-ko-pts">—</strong>
   </div>
-  <div class="gh-pts" style="margin-right:auto">
-    <span class="gh-pts-label">Mis puntos</span>
-    <strong class="gh-pts-num" id="total-ko-pts">—</strong>
-  </div>
-  <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-left:auto">
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-      <button onclick="showPage('score')"
-        style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
-               color:#fbbf24;padding:6px 14px;border-radius:10px;
-               border:1px solid #78350f;background:#1c1008;cursor:pointer;
-               transition:all .15s;font-family:'Inter',sans-serif"
-        onmouseover="this.style.borderColor='#f59e0b';this.style.background='#292010'"
-        onmouseout="this.style.borderColor='#78350f';this.style.background='#1c1008'">
-        🏆 Clasificación
-      </button>
-      <div id="elim-user-bar"></div>
-    </div>
-  </div>
+  <button type="button" class="elim-pts-clasif-btn" onclick="showPage('score')">🏆 Clasificación</button>
 </div>
 <div class="ko-sub-bar">
   <div class="view-tabs">
@@ -857,15 +840,11 @@ try {
 <!-- ══ ADMIN PAGE ══ -->
 <div id="page-admin" style="display:none">
   <div class="adm-wrap">
-    <div class="adm-header">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div>
-          <div class="adm-title">Panel de administración <span class="adm-badge">ADMIN</span></div>
-          <div class="adm-sub">Porra Mundial 2026</div>
-        </div>
-      </div>
-      <button class="adm-back" onclick="showPage('grupos')">← Volver a la porra</button>
-    </div>
+    <!-- Header (F7.4-C: migrado a .fc-appbar--page) -->
+    <header class="fc-appbar fc-appbar--page">
+      <button class="fc-appbar__back" type="button" aria-label="Volver" onclick="showPage('grupos')"></button>
+      <span class="fc-appbar__title">Panel de administración <span class="adm-badge">ADMIN</span></span>
+    </header>
 
     <div class="adm-status-bar" id="adm-status-bar">
       <span class="adm-spinner"></span> Cargando estado...

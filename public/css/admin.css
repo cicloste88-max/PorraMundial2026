@@ -19,12 +19,8 @@
 /* ══ ADMIN PAGE ══ */
 #page-admin{background:#06060a;color:#fff;font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px}
 .adm-wrap{max-width:860px;margin:0 auto;padding:20px 16px}
-.adm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #27272a}
-.adm-title{font-size:18px;font-weight:600;color:#fff}
-.adm-sub{font-size:12px;color:#6b7280;margin-top:2px}
+/* F7.4-C: .adm-header/.adm-title/.adm-sub/.adm-back migrados a .fc-appbar--page (ver components/app-header.css) */
 .adm-badge{background:#166534;color:#86efac;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.04em;margin-left:8px}
-.adm-back{background:none;border:1px solid #27272a;color:#9ca3af;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;transition:all .15s}
-.adm-back:hover{border-color:#4b5563;color:#fff}
 .adm-status-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;background:#111118;border:1px solid #1f1f27;border-radius:10px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#9ca3af}
 .adm-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block}
 .adm-dot.green{background:#22c55e}.adm-dot.amber{background:#f59e0b}.adm-dot.red{background:#ef4444}.adm-dot.gray{background:#6b7280}
@@ -86,12 +82,7 @@
 .adm-toast.err-toast{border-color:#7f1d1d;color:#fca5a5}
 .adm-spinner{display:inline-block;width:12px;height:12px;border:2px solid #374151;border-top-color:#9ca3af;border-radius:50%;animation:adm-spin .6s linear infinite;margin-right:5px;vertical-align:middle}
 @keyframes adm-spin{to{transform:rotate(360deg)}}
-.sb-header{background:#0d0d11;border-bottom:1px solid #1f2937;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
-.sb-header-left{display:flex;align-items:center;gap:12px}
-.sb-back-btn{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#6b7280;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid #27272a;background:#1c1c1e;transition:all .15s;cursor:pointer}
-.sb-back-btn:hover{border-color:#4ade80;color:#4ade80}
-.sb-header-title{font-family:'Inter Tight',sans-serif;font-size:15px;font-weight:700;color:#fff;letter-spacing:.02em}
-.sb-user-bar{display:flex;align-items:center;gap:8px}
+/* F7.4-C: .sb-header/.sb-header-left/.sb-back-btn/.sb-header-title/.sb-user-bar migrados a .fc-appbar--page (ver components/app-header.css) */
 .sb-body{max-width:720px;margin:0 auto;padding:24px 16px 60px}
 .sb-top{margin-bottom:28px}
 .sb-tournament-badge{display:inline-flex;align-items:center;gap:8px;background:#111827;border:1px solid #1f2937;border-radius:12px;padding:8px 14px;margin-bottom:16px}
@@ -226,21 +217,10 @@
   .group-section{margin-bottom:28px}
   .group-section h2{font-size:18px;margin-bottom:12px}
 
-  /* ── Header de Eliminatorias ── */
-  .global-header{flex-wrap:wrap;gap:6px;padding:8px 12px;justify-content:space-between}
-  .gh-left{gap:6px;flex:0 0 auto}
-  .gh-back{font-size:11px;padding:5px 8px}
-  .gh-title{font-size:13px}
-  .gh-pts{flex-shrink:0}
-  .gh-pts-num{font-size:16px}
-  .global-header>div:last-child{flex-wrap:nowrap;gap:6px;align-items:center}
-  #elim-user-bar{display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
+  /* ── Header de Eliminatorias (F7.4-C: migrado a .fc-appbar--page) ── */
   .ko-sub-bar{padding:4px 12px 8px;gap:8px}
   .view-tabs{flex:1}
   .view-tab{font-size:11px;padding:5px 8px;flex:1;justify-content:center}
-  #elim-user-bar .wc-user-name{display:none}
-  #elim-user-bar .wc-user-badge{padding:4px 8px 4px 6px}
-  #elim-user-bar .wc-logout-btn{font-size:10px;padding:4px 7px}
 
   /* ── KO cards — Safari fix ── */
   /* Estrategia: padding en el contenedor, no max-width en la tarjeta */
@@ -283,8 +263,7 @@
   .sb-podium-avatar{width:34px;height:34px;font-size:14px}
   .sb-table-header,.sb-row{grid-template-columns:28px 1fr repeat(3,44px)}
   .sb-th:nth-child(4),.sb-cell:nth-child(4){display:none} /* ocultar ELM en móvil */
-  .sb-back-btn span{display:none} /* solo flecha en móvil */
-  .sb-header-title{font-size:13px}
+  /* F7.4-C: .sb-back-btn/.sb-header-title eliminados (.fc-appbar--page se autoadapta) */
   .sb-breakdown{grid-template-columns:repeat(2,1fr)}
   .sb-body{padding:16px 12px 48px}
 
@@ -573,12 +552,8 @@
 /* ══ ADMIN PAGE ══ */
 #page-admin{background:#06060a;color:#fff;font-family:'Inter',sans-serif;min-height:100vh;padding:0 0 60px}
 .adm-wrap{max-width:860px;margin:0 auto;padding:20px 16px}
-.adm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #27272a}
-.adm-title{font-size:18px;font-weight:600;color:#fff}
-.adm-sub{font-size:12px;color:#6b7280;margin-top:2px}
+/* F7.4-C: .adm-header/.adm-title/.adm-sub/.adm-back migrados a .fc-appbar--page (ver components/app-header.css) */
 .adm-badge{background:#166534;color:#86efac;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.04em;margin-left:8px}
-.adm-back{background:none;border:1px solid #27272a;color:#9ca3af;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;transition:all .15s}
-.adm-back:hover{border-color:#4b5563;color:#fff}
 .adm-status-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;background:#111118;border:1px solid #1f1f27;border-radius:10px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#9ca3af}
 .adm-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block}
 .adm-dot.green{background:#22c55e}.adm-dot.amber{background:#f59e0b}.adm-dot.red{background:#ef4444}.adm-dot.gray{background:#6b7280}
@@ -640,12 +615,7 @@
 .adm-toast.err-toast{border-color:#7f1d1d;color:#fca5a5}
 .adm-spinner{display:inline-block;width:12px;height:12px;border:2px solid #374151;border-top-color:#9ca3af;border-radius:50%;animation:adm-spin .6s linear infinite;margin-right:5px;vertical-align:middle}
 @keyframes adm-spin{to{transform:rotate(360deg)}}
-.sb-header{background:#0d0d11;border-bottom:1px solid #1f2937;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
-.sb-header-left{display:flex;align-items:center;gap:12px}
-.sb-back-btn{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#6b7280;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid #27272a;background:#1c1c1e;transition:all .15s;cursor:pointer}
-.sb-back-btn:hover{border-color:#4ade80;color:#4ade80}
-.sb-header-title{font-family:'Inter Tight',sans-serif;font-size:15px;font-weight:700;color:#fff;letter-spacing:.02em}
-.sb-user-bar{display:flex;align-items:center;gap:8px}
+/* F7.4-C: .sb-header/.sb-header-left/.sb-back-btn/.sb-header-title/.sb-user-bar migrados a .fc-appbar--page (ver components/app-header.css) */
 .sb-body{max-width:720px;margin:0 auto;padding:24px 16px 60px}
 .sb-top{margin-bottom:28px}
 .sb-tournament-badge{display:inline-flex;align-items:center;gap:8px;background:#111827;border:1px solid #1f2937;border-radius:12px;padding:8px 14px;margin-bottom:16px}
@@ -780,20 +750,9 @@
   .group-section{margin-bottom:28px}
   .group-section h2{font-size:18px;margin-bottom:12px}
 
-  /* ── Header de Eliminatorias ── */
-  .global-header{flex-wrap:wrap;gap:6px;padding:8px 12px}
-  .gh-left{flex-wrap:wrap;gap:6px;flex:1;min-width:0}
-  .gh-back{font-size:11px;padding:5px 8px}
-  .gh-title{font-size:13px;width:100%}
-  .gh-pts{flex-shrink:0}
-  .gh-pts-label{font-size:10px}
-  .gh-pts-num{font-size:16px}
+  /* ── Header de Eliminatorias (F7.4-C: migrado a .fc-appbar--page) ── */
   .view-tabs{order:3;width:100%;justify-content:center}
   .view-tab{font-size:11px;padding:5px 10px;flex:1;justify-content:center}
-  #elim-user-bar{flex-shrink:0}
-  #elim-user-bar .wc-user-name{display:none}
-  #elim-user-bar .wc-user-badge{padding:4px 8px 4px 6px}
-  #elim-user-bar .wc-logout-btn{font-size:10px;padding:4px 7px}
 
   /* ── KO cards — Safari fix ── */
   /* Estrategia: padding en el contenedor, no max-width en la tarjeta */
@@ -836,8 +795,7 @@
   .sb-podium-avatar{width:34px;height:34px;font-size:14px}
   .sb-table-header,.sb-row{grid-template-columns:28px 1fr repeat(3,44px)}
   .sb-th:nth-child(4),.sb-cell:nth-child(4){display:none} /* ocultar ELM en móvil */
-  .sb-back-btn span{display:none} /* solo flecha en móvil */
-  .sb-header-title{font-size:13px}
+  /* F7.4-C: .sb-back-btn/.sb-header-title eliminados (.fc-appbar--page se autoadapta) */
   .sb-breakdown{grid-template-columns:repeat(2,1fr)}
   .sb-body{padding:16px 12px 48px}
 

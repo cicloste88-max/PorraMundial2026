@@ -512,9 +512,6 @@ function showPage(page) {
     const prev = prevPages.find(p => document.getElementById('page-'+p)?.style.display !== 'none');
     if (prev) window._sbPrevPage = prev;
     if (!window._sbPrevPage) window._sbPrevPage = 'grupos';
-    const labelMap = { grupos: 'Grupos', elim: 'Eliminatorias' };
-    const lbl = document.getElementById('sb-back-label');
-    if(lbl) lbl.textContent = labelMap[window._sbPrevPage] || 'Grupos';
   }
 
   document.getElementById('page-welcome').style.display = page==='welcome' ? 'block' : 'none';
@@ -525,12 +522,8 @@ function showPage(page) {
   // Auth bar fixed: solo en welcome
   const authBar = document.getElementById('wc-auth-bar');
   if (authBar) authBar.style.display = page==='welcome' ? 'flex' : 'none';
-  // Score user bar
-  const scoreBar = document.getElementById('score-user-bar');
-  if (scoreBar && currentUser) {
-    const ini = currentUser.nombre.charAt(0).toUpperCase();
-    scoreBar.innerHTML = `<div class="wc-user-badge" style="display:flex;align-items:center;gap:8px;background:rgba(17,19,24,.9);border:1px solid #27272a;border-radius:24px;padding:5px 12px 5px 7px"><div class="wc-user-avatar">${ini}</div><span class="wc-user-name">${escapeHtml(currentUser.nombre)}</span></div><button class="wc-logout-btn do-logout">Cerrar sesión</button>`;
-  }
+  // Score user bar — eliminado en F7.4-C; identidad de usuario llegará en F7.4-E
+  // vía header global persistente (D5: avatar + pts + #posición).
   if(page === 'elim')   { window.scrollTo(0,0); koInit(); }
   if(page === 'grupos') {
     window.scrollTo(0,0);

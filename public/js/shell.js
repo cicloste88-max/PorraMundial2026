@@ -4,6 +4,15 @@
   // F7.4-E ampliará: perfil
   var SHELL_PAGES = ['grupos', 'elim'];
 
+  // F7.4-C: rellena los botones back vacíos de los .fc-appbar con el SVG
+  // de getIcon('back'). Idempotente vía selector :empty — re-runs son no-op
+  // una vez cada botón tiene su SVG dentro.
+  function fcAppbarFillBackIcons() {
+    if (typeof window.getIcon !== 'function') return;
+    var btns = document.querySelectorAll('.fc-appbar__back:empty');
+    for (var i = 0; i < btns.length; i++) btns[i].innerHTML = window.getIcon('back');
+  }
+
   function fcShellApply(page) {
     if (!window._splashHidden) return;
 
@@ -24,7 +33,10 @@
       document.body.classList.remove('fc-shell-active');
       // Mount queda en DOM, oculto por CSS (display:none default)
     }
+
+    fcAppbarFillBackIcons();
   }
 
   window.fcShellApply = fcShellApply;
+  window.fcAppbarFillBackIcons = fcAppbarFillBackIcons;
 })();
