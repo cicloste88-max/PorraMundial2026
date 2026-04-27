@@ -6,7 +6,7 @@ window.supabase = { createClient }
 
 // 1b. Leer síncronamente la última página persistida (antes del chain).
 //    La consume auth.js en onAuthStateChange (event === 'INITIAL_SESSION').
-const VALID_PAGES = new Set(['grupos', 'elim', 'score', 'admin', 'perfil']);
+const VALID_PAGES = new Set(['grupos', 'elim', 'score', 'admin', 'perfil', 'jornada', 'directo', 'predictor']);
 try {
   const v = localStorage.getItem('porra_lastPage');
   window._pendingPageRestore = VALID_PAGES.has(v) ? v : null;
@@ -48,8 +48,9 @@ loadScript('/js/misc.js')
 //   (PARTIDOS, EQUIPOS, predictions, BRACKET, showPage, initWelcome, etc.)
 // - auth → scoreboard → close-porra → admin: orden original preservado
 // - ui-directo PENÚLTIMO: necesita PARTIDOS+EQUIPOS+predictions (data.js),
-//   calcMatchPoints (scoring.js), renderVistaJornada (ui-groups.js) y sobreescribe
-//   setVistaGrupos para incluir el tercer estado 'directo'.
+//   calcMatchPoints (scoring.js), renderVistaJornada (ui-groups.js).
+//   F7.4-D-1: ya no sobreescribe setVistaGrupos (eliminada); el toggle entre
+//   pages lo gobierna showPage('jornada'|'directo') desde el bottom-tab.
 // - live-sync AL FINAL: necesita matchKeyFor/updateDirectoCard expuestos por ui-directo.
 loadScript('/js/leagues.js')
   .then(() => loadScript('/js/data.js'))

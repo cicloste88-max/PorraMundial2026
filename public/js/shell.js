@@ -1,8 +1,8 @@
 (function() {
   // Pages que muestran el shell (bottom-tab visible)
-  // F7.4-D ampliará: jornada, directo, predictor (cuando se separen como pages)
+  // F7.4-D-1: jornada, directo, predictor añadidos al separarlas como pages dedicadas.
   // F7.4-E ampliará: perfil
-  var SHELL_PAGES = ['grupos', 'elim'];
+  var SHELL_PAGES = ['grupos', 'elim', 'jornada', 'directo', 'predictor'];
 
   // F7.4-C: rellena los botones back vacíos de los .fc-appbar con el SVG
   // de getIcon('back'). Idempotente vía selector :empty — re-runs son no-op

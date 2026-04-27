@@ -158,15 +158,10 @@ function ensureFocusLayer() {
     body.addEventListener('click', __mobileBoostRowClickHandler, true);
   }
 
-  // ── Tab listeners: cerrar focus al cambiar a Jornada/Directo ──
-  const btnJornada = document.getElementById('btn-vista-jornada');
-  const btnDirecto = document.getElementById('btn-vista-directo');
-  const tabHandler = function () {
-    const l = document.getElementById('mobile-focus-layer');
-    if (l && l.classList.contains('open')) closeMobileFocus();
-  };
-  if (btnJornada) btnJornada.addEventListener('click', tabHandler, { capture: true });
-  if (btnDirecto) btnDirecto.addEventListener('click', tabHandler, { capture: true });
+  // F7.4-D-1: listeners de cierre por tab eliminados. Los botones internos
+  // #btn-vista-jornada/#btn-vista-directo ya no existen — el toggle entre
+  // pages lo gobierna showPage desde el bottom-tab. Cierre del focus layer
+  // al salir de page-grupos: hook en showPage (ui-nav.js).
 
   return layer;
 }

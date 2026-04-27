@@ -498,27 +498,36 @@ function koInit() {
 /* ══ NAVEGACIÓN SPA ══ */
 let _gruposInitPromise = null;
 function showPage(page) {
+  // F7.4-D-1: exponer página actual ANTES de cualquier toggle/render.
+  // Consumido por tickerBoostToggle y _buildJornadaRanking (ui-groups.js)
+  // que antes leían _vistaActual local.
+  window._currentPage = page;
+
   // v2.10: si hay CSS lock activo y alguien intenta mostrar welcome, IGNORAR.
   // El lock solo se quita cuando se navega a una pagina real (grupos/elim/score/admin).
   var _lockCss = document.getElementById('restore-lock-css');
   if (_lockCss && page === 'welcome') return;
   if (_lockCss && page !== 'welcome') _lockCss.remove();
-  if ((page === 'grupos' || page === 'elim' || page === 'score' || page === 'perfil') && !currentUser) { openAuthModal('login'); return; }
+  if ((page === 'grupos' || page === 'elim' || page === 'score' || page === 'perfil' ||
+       page === 'jornada' || page === 'directo' || page === 'predictor') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
   // Capturar página actual ANTES de cambiar display (para el botón volver de score)
   if (page === 'score') {
-    const prevPages = ['grupos','elim'];
+    const prevPages = ['grupos','elim','jornada','directo','predictor'];
     const prev = prevPages.find(p => document.getElementById('page-'+p)?.style.display !== 'none');
     if (prev) window._sbPrevPage = prev;
     if (!window._sbPrevPage) window._sbPrevPage = 'grupos';
   }
 
-  document.getElementById('page-welcome').style.display = page==='welcome' ? 'block' : 'none';
-  document.getElementById('page-grupos').style.display  = page==='grupos'  ? 'block' : 'none';
-  document.getElementById('page-elim').style.display    = page==='elim'    ? 'block' : 'none';
-  document.getElementById('page-score').style.display   = page==='score'   ? 'block' : 'none';
-  document.getElementById('page-admin').style.display   = page==='admin'   ? 'block' : 'none';
+  document.getElementById('page-welcome').style.display   = page==='welcome'   ? 'block' : 'none';
+  document.getElementById('page-grupos').style.display    = page==='grupos'    ? 'block' : 'none';
+  document.getElementById('page-jornada').style.display   = page==='jornada'   ? 'block' : 'none';
+  document.getElementById('page-directo').style.display   = page==='directo'   ? 'block' : 'none';
+  document.getElementById('page-predictor').style.display = page==='predictor' ? 'block' : 'none';
+  document.getElementById('page-elim').style.display      = page==='elim'      ? 'block' : 'none';
+  document.getElementById('page-score').style.display     = page==='score'     ? 'block' : 'none';
+  document.getElementById('page-admin').style.display     = page==='admin'     ? 'block' : 'none';
   // Auth bar fixed: solo en welcome
   const authBar = document.getElementById('wc-auth-bar');
   if (authBar) authBar.style.display = page==='welcome' ? 'flex' : 'none';
@@ -531,6 +540,14 @@ function showPage(page) {
       _gruposInitPromise = Promise.resolve().then(function() { return initGrupos(); });
     }
   }
+  // F7.4-D-1: cerrar mobile-focus-layer (de page-grupos) si se sale de grupos.
+  if (page !== 'grupos' && typeof window.closeMobileFocus === 'function') {
+    var _focusLayer = document.getElementById('mobile-focus-layer');
+    if (_focusLayer && _focusLayer.classList.contains('open')) window.closeMobileFocus();
+  }
+  if(page === 'jornada')   { window.scrollTo(0,0); if (typeof renderVistaJornada === 'function') renderVistaJornada(); }
+  if(page === 'directo')   { window.scrollTo(0,0); if (typeof renderVistaDirecto === 'function') renderVistaDirecto(); }
+  if(page === 'predictor') { window.scrollTo(0,0); /* F7.4-D-2 init */ }
   if(page === 'welcome') { if(currentUser && typeof leagueRenderPanel === 'function') setTimeout(leagueRenderPanel, 50); }
   if(page === 'welcome') window.scrollTo(0,0);
   if(page === 'score')  { window.scrollTo(0,0); sbLoad(); }

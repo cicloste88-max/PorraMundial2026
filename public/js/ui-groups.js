@@ -66,6 +66,8 @@ function checkGroupsComplete() {
   // Verificar boosts: todas las jornadas deben tener boost asignado
   const diasConPartidos = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))];
   const boostsCompletos = diasConPartidos.every(d => boostPicks[d]);
+  // F7.4-D-1: flag global consumido por gate Fase final en bottom-tab.js
+  window._gruposComplete = (filled >= total && boostsCompletos);
 
   if(btn) {
     count.textContent = filled+'/'+total;
@@ -421,7 +423,7 @@ function tickerBoostToggle(matchKey, date) {
   renderBoostTicker();
   checkGroupsComplete();
   // Re-renderizar vista jornada si está activa
-  if (_vistaActual === 'jornada') setTimeout(() => renderVistaJornada(), 50);
+  if (window._currentPage === 'jornada') setTimeout(() => renderVistaJornada(), 50);
   // Re-renderizar panel expandido si sigue abierto
   const openPanel = document.getElementById('boost-ticker-panel');
   if (openPanel && openPanel.dataset.date && openPanel.style.display !== 'none') {
@@ -436,30 +438,10 @@ window.tickerBoostToggle = tickerBoostToggle;
 
 /* ════════════════════════════════════════════════════════
    VISTA JORNADA — tarjetas compactas ordenadas por día
+   F7.4-D-1: setVistaGrupos + _vistaActual eliminados.
+   El toggle entre vistas lo gobierna showPage('grupos'|'jornada'|'directo')
+   desde el bottom-tab. window._currentPage es la fuente de verdad.
    ════════════════════════════════════════════════════════ */
-let _vistaActual = 'grupos'; // 'grupos' | 'jornada'
-
-function setVistaGrupos(vista) {
-  _vistaActual = vista;
-  const gruposContainer  = document.getElementById('groups-container');
-  const jornadaContainer = document.getElementById('jornada-container');
-  const btnGrupos  = document.getElementById('btn-vista-grupos');
-  const btnJornada = document.getElementById('btn-vista-jornada');
-
-  if (vista === 'grupos') {
-    if (gruposContainer)  gruposContainer.style.display  = 'block';
-    if (jornadaContainer) jornadaContainer.style.display = 'none';
-    if (btnGrupos)  { btnGrupos.style.background  = '#27272a'; btnGrupos.style.color  = '#fff'; }
-    if (btnJornada) { btnJornada.style.background = 'transparent'; btnJornada.style.color = '#6b7280'; }
-  } else {
-    if (gruposContainer)  gruposContainer.style.display  = 'none';
-    if (jornadaContainer) jornadaContainer.style.display = 'block';
-    if (btnGrupos)  { btnGrupos.style.background  = 'transparent'; btnGrupos.style.color  = '#6b7280'; }
-    if (btnJornada) { btnJornada.style.background = '#27272a'; btnJornada.style.color = '#fff'; }
-    renderVistaJornada();
-  }
-}
-window.setVistaGrupos = setVistaGrupos;
 
 function renderVistaJornada() {
   const container = document.getElementById('jornada-container');
@@ -640,7 +622,7 @@ function _buildJornadaRanking() {
     if (typeof sbLoad === 'function') {
       sbLoad().then(() => {
         // Tras cargar, re-renderizar si seguimos en vista jornada
-        if (_vistaActual === 'jornada') renderVistaJornada();
+        if (window._currentPage === 'jornada') renderVistaJornada();
       });
     }
     return '<div class="jornada-ranking">' +
