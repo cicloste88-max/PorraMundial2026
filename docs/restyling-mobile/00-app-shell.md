@@ -168,10 +168,36 @@ Post-F7.4-A: 2 mount points entre body y splash:
 |---|---|---|---|
 | **F7.4-B** | ✅ **Cerrada** · PR #29 · commits `a5232cf` + `521991f` (27 abr 2026) | Conexión `showPage` → `fcShellApply` → toggle `body.fc-shell-active` + mount idempotente bottom-tab. `_gruposInited` → Promise singleton (R3). `'perfil'` añadido a VALID_PAGES en los 4 sitios divergentes (R2). Rename label `Quiniela` → `Fase final`. | `public/js/shell.js`, `public/js/components/bottom-tab.js`, `public/js/ui-nav.js`, `js/main-entry.js`, `index.html` (×2), `public/css/components/bottom-tab.css`. |
 | **F7.4-C** | ✅ **Cerrada** · PR #30 · commits `6925ada` + `876ec5d` · merge `a021e71` (27 abr 2026) | Migración `.adm-header`/`.sb-header`/`.global-header` → `.fc-appbar.fc-appbar--page`. Sweep central icono back en `shell.js` (estrategia α). Franja transitoria `.elim-pts-strip` con "Mis puntos" + botón "🏆 Clasificación" (autorretirada en F7.4-E). Eliminados `#score-user-bar`, `#elim-user-bar`, subtítulos redundantes. Badge ADMIN en slot `.fc-appbar__actions` (fix `876ec5d` post-smoke 375px overflow). `renderAppHeader()` no activado (queda no-op stub para F7.4-E). | `index.html` (3 headers), `public/js/shell.js` (sweep), `public/js/ui-nav.js` (purga score-user-bar + sb-back-label), `public/css/admin.css` (purga selectores), `public/css/ko.css` (purga + franja), `docs/restyling-mobile/01-headers.md` (nuevo). |
-| **F7.4-D** | Pendiente | Eliminar sub-tabs internos: 3 botones de page-grupos (`index.html:552-568`) + 3 view-tabs de page-elim (`index.html:678-681`). Reemplazar con tabs del shell o pages dedicadas. Limpiar alias `elim → quiniela` cuando exista tab dedicado para fase final. Resolver routes pendientes de Jornada/Directo/Predictor. | `index.html`, `public/js/ui-groups.js` (`setVistaGrupos`), `public/js/ko.js`, `public/js/components/bottom-tab.js`. |
+| **F7.4-D-1** | ✅ **Cerrada** · PR #31 · commit `7619eca` · merge `cbc52e4` (27 abr 2026; merge commit incompleto — docs end-of-session recuperados en PR #34) | Pages dedicadas Jornada/Directo/Predictor + cleanup. `setVistaGrupos`/`_vistaActual` eliminados (no wrapper); `window._currentPage` expuesta por `showPage`. Alias `quiniela`→`elim` limpiado en `_tabDefs`, `fcMarkActiveTab` (sin ternario) e `icons.js` case. Gate Fase final con `window._gruposComplete` + modal global `#fc-gate-modal` (pivot R-6: `#modal` interno a page-elim no funcionaba). `boost-ticker` movido a `#page-jornada` (R-3 documentado). 3 bugs preexistentes detectados durante smoke (ERR-30/31/32) — verificados pre-existentes, NO arreglados en este PR. ERR-30 ✅ FIXED en PR #32, ERR-32 ✅ FIXED en PR #33; ERR-31 documentado pendiente. | `index.html`, `js/main-entry.js`, `public/js/ui-nav.js`, `public/js/ui-groups.js`, `public/js/ui-directo.js`, `public/js/ui-groups-mobile.js`, `public/js/components/bottom-tab.js`, `public/js/components/icons.js`, `public/js/shell.js`, `public/css/base.css`, `public/css/directo.css`, `public/css/components/app-header.css`. |
+| **F7.4-D-2** | Pendiente | Predictor IA: widgets dentro de `#page-predictor`. Decisiones producto Pred-1..6 pendientes. | `public/js/components/predictor.js` (nuevo), `public/css/components/predictor.css` (nuevo), `index.html` (relleno de `#page-predictor`). |
+| **F7.4-D (legacy banner+btn)** | Pendiente — limpieza fina | Eliminar `#cta-eliminatorias` banner inferior de page-grupos y `#btn-go-eliminatorias` legacy (ambos redundantes con tab Fase final + gate modal). Limpiar `setView` de page-elim y los `view-tabs` (3 botones internos `📋 Rondas / 📊 Resultados / 🏟️ Cuadro`). | `index.html`, `public/js/ui-groups.js` (limpieza `checkGroupsComplete`), `public/js/ui-nav.js` (`setView`). Probable acoplado a F7.4-F. |
 | **F7.4-E** | Pendiente | Crear page-perfil (P10). Simplificar `renderAuthBar` para escribir solo en header global (R5). Implementar D5 (avatar + puntos + #posición), D6 (Clasificación como sub-vista con bottom-tab oculto), D7 (inline solo welcome hero). | `index.html` (page-perfil HTML), `public/js/auth.js` (`renderAuthBar`), `public/js/shell.js` (toggle off `body.fc-shell-active` durante page-score si origen=perfil), `public/css/components/app-header.css` (refinar D5). |
 
 **Orden no-negociable**: F7.4-B (conexión) ✅ desbloquea F7.4-C/D/E. F7.4-C y F7.4-D pueden paralelizarse si la separación de scope es nítida; F7.4-E va al final por dependencia de D5/D6.
+
+### F7.4-D-1 · DoD verificada
+
+**Programático:**
+- [x] `node --check` OK en los 7 JS tocados (ui-nav, ui-groups, ui-directo, ui-groups-mobile, bottom-tab, icons, shell).
+- [x] `npm run build` OK (200ms).
+- [x] `setVistaGrupos`/`_vistaActual`/`btn-vista-*` ausentes en código funcional (solo comentarios F7.4-D-1).
+- [x] VALID_PAGES en 3 sitios canónicos contiene los 8 elementos (grupos, elim, score, admin, perfil, jornada, directo, predictor).
+- [x] `dist/index.html`: 4 markers (`page-jornada`, `page-directo`, `page-predictor`, `fc-gate-modal`).
+- [x] `dist/js/components/bottom-tab.js`: `'elim'` presente, 0 `'quiniela'`.
+- [x] `dist/js/shell.js`: `SHELL_PAGES` con 5 elementos.
+- [x] `dist/css/base.css` y `directo.css`: 0 reglas `display:none` zombie.
+
+**Funcional (smoke San localhost:5173, mobile 375px):**
+- [x] Click 5 tabs → page correspondiente + bottom-tab marca activa.
+- [x] Gate Fase final con grupos incompletos → modal `#fc-gate-modal` centrado, no navega, botón "Entendido" cierra.
+- [x] Re-entrada Grupos no re-invoca `initGrupos` (Promise singleton F7.4-B intacto).
+- [x] Recarga con `localStorage.porra_lastPage = 'jornada'`/`'predictor'` → restaura.
+- [x] `tickerBoostToggle` en page-jornada re-renderiza al togglear boost.
+- [x] Hook `closeMobileFocus` funciona al navegar fuera de page-grupos.
+- [x] Sin regresiones en welcome, score (botón volver), admin, modal login.
+- [x] Console limpia salvo `console.debug` esperados.
+
+**Bugs preexistentes detectados (ERR-30/31/32, NO en scope F7.4-D-1):** verificados pre-existentes (scoring.js MD5 idéntico main vs F7.4-D-1, `lockCardsInFocus` callsites iguales, reproducidos en producción). Documentados en `errores_conocidos_porra.md`. **ERR-30 ✅ FIXED en mini-PR #32** (`1a7a9b9` · `unlockCardsInFocus` + `delete groupSaved` en handler `btn-undo`). **ERR-32 ✅ FIXED en mini-PR #33** (`13f4ecd` reconciliación chk + classes con `boostPicks` en `refreshBoostRowsInFocus` + `9c4bc04` follow-up `setTimeout(refreshBoostRowsInFocus, 0)` para click directo en input nativo). **ERR-31 documentado pendiente** (cosmético, btnRow residual tras Deshacer).
 
 ### F7.4-C · DoD verificada
 
