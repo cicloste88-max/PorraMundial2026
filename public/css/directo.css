@@ -3,7 +3,7 @@
    Clon visual de .jcard con adaptaciones para live data.
    ───────────────────────────────────────────────────────────── */
 
-#directo-container { display: none; }
+/* F7.4-D-1: #directo-container ahora vive en #page-directo, page padre gobierna display */
 
 /* Reusa layout base de jornada-wrap */
 .directo-wrap {

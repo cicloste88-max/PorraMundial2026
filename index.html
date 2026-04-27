@@ -35,7 +35,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 // y especificidad maxima, gana a cualquier showPage(welcome) rogue durante arranque.
 try {
   var lp = localStorage.getItem('porra_lastPage');
-  if (lp && ['grupos','elim','score','admin','perfil'].indexOf(lp) !== -1) {
+  if (lp && ['grupos','elim','score','admin','perfil','jornada','directo','predictor'].indexOf(lp) !== -1) {
     window._pendingPageRestore = lp;
     var st = document.createElement('style');
     st.id = 'restore-lock-css';
@@ -106,7 +106,7 @@ try {
   // El modulo bundle puede tardar en cargarse y auth.js guard necesita el flag YA.
   try {
     var lastPage = localStorage.getItem('porra_lastPage');
-    if (lastPage && ['grupos','elim','score','admin','perfil'].indexOf(lastPage) !== -1) {
+    if (lastPage && ['grupos','elim','score','admin','perfil','jornada','directo','predictor'].indexOf(lastPage) !== -1) {
       window._pendingPageRestore = lastPage;
       splash.style.display = 'none';
       if (splash.parentNode) splash.parentNode.removeChild(splash);
@@ -556,27 +556,8 @@ try {
       <div id="grupos-user-bar"></div>
     </div>
   </div>
-  <!-- Selector vista grupos/jornada -->
-  <div style="display:flex;gap:4px;background:#111318;border:1px solid #27272a;border-radius:10px;padding:3px;margin-bottom:12px">
-    <button id="btn-vista-grupos"
-      onclick="setVistaGrupos('grupos')"
-      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:#27272a;color:#fff">
-      ⚽ Fase de grupos
-    </button>
-    <button id="btn-vista-jornada"
-      onclick="setVistaGrupos('jornada')"
-      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#6b7280">
-      📅 Jornada
-    </button>
-    <button id="btn-vista-directo"
-      onclick="setVistaGrupos('directo')"
-      style="flex:1;padding:6px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#6b7280">
-      🔴 Directo
-    </button>
-  </div>
-  <!-- Ticker boost jornada -->
-  <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;flex-wrap:wrap;gap:8px;align-items:center">
-  </div>
+  <!-- F7.4-D-1: selector vista grupos/jornada/directo eliminado.
+       Tabs ahora en bottom-tab del shell. boost-ticker movido a #page-jornada. -->
   <!-- Barra global de simulación -->
   <div id="dice-global-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:rgba(30,27,75,.35);border:1px solid rgba(99,82,199,.2);border-radius:10px">
     <span style="font-size:11px;color:#9ca3af;margin-right:4px">🎲 Simular al azar:</span>
@@ -585,11 +566,7 @@ try {
     </button>
   </div>
   <div id="groups-container" style="min-height:400px"></div>
-  <!-- Vista jornada -->
-  <div id="jornada-user-strip"></div>
-  <div id="jornada-container" style="display:none;min-height:400px"></div>
-  <!-- Vista directo (live scores) -->
-  <div id="directo-container" style="display:none;min-height:400px"></div>
+<!-- F7.4-D-1: jornada-user-strip + jornada-container + directo-container movidos a #page-jornada / #page-directo -->
 <!-- Awards movidos a fase eliminatoria -->
 
   <!-- ── BANNER CTA: IR A ELIMINATORIAS ── -->
@@ -639,6 +616,58 @@ try {
 </div>
 
 <!-- Awards overlay movido a eliminatorias -->
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HTML · PAGE: JORNADA  (id=page-jornada) — F7.4-D-1
+     Archivo destino : index.html
+     ─────────────────────────────────────────────────────────────
+     Usa             : showPage('jornada'), renderVistaJornada
+     Expone          : #page-jornada, #boost-ticker, #jornada-user-strip, #jornada-container
+     Deps            : js-ui-groups (renderVistaJornada)
+     Notas           : boost-ticker se renderiza vía renderBoostTicker() (busca por id)
+════════════════════════════════════════════════════════════════ -->
+<div id="page-jornada" style="display:none">
+<div class="container">
+  <!-- Ticker boost jornada -->
+  <div id="boost-ticker" style="display:none;margin-bottom:12px;padding:8px 14px;background:rgba(28,14,6,.7);border:1px solid rgba(124,45,18,.5);border-radius:10px;flex-wrap:wrap;gap:8px;align-items:center">
+  </div>
+  <div id="jornada-user-strip"></div>
+  <div id="jornada-container" style="min-height:400px"></div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HTML · PAGE: DIRECTO  (id=page-directo) — F7.4-D-1
+     Archivo destino : index.html
+     ─────────────────────────────────────────────────────────────
+     Usa             : showPage('directo'), renderVistaDirecto
+     Expone          : #page-directo, #directo-container
+     Deps            : js-ui-directo (renderVistaDirecto)
+════════════════════════════════════════════════════════════════ -->
+<div id="page-directo" style="display:none">
+<div class="container">
+  <div id="directo-container" style="min-height:400px"></div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HTML · PAGE: PREDICTOR  (id=page-predictor) — F7.4-D-1 stub
+     Archivo destino : index.html
+     ─────────────────────────────────────────────────────────────
+     Usa             : showPage('predictor')
+     Expone          : #page-predictor
+     Deps            : (ninguno por ahora)
+     Notas           : widgets en F7.4-D-2 (próxima sesión)
+════════════════════════════════════════════════════════════════ -->
+<div id="page-predictor" style="display:none">
+<div class="container" style="padding:24px">
+  <h1 style="font-family:'Inter Tight',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:0 0 8px">🎯 Predictor IA</h1>
+  <p style="color:#9ca3af;font-size:13px;margin:0">Widgets disponibles próximamente (F7.4-D-2).</p>
+</div>
 </div>
 
 
@@ -1023,6 +1052,17 @@ if (navigator.locks) {
 
 
 <!-- JS · MÓDULO ADMIN PANEL → migrado a js/admin.js (cargado desde main-entry.js) -->
+
+
+<!-- F7.4-D-1: Gate modal global (Fase final bloqueada). Auto-contained, fuera de cualquier page.
+     Será absorbido o eliminado en F7.4-F (rediseño page-elim). -->
+<div id="fc-gate-modal" class="fc-gate-modal" role="dialog" aria-modal="true" aria-labelledby="fc-gate-modal-title">
+  <div class="fc-gate-modal__card">
+    <h3 id="fc-gate-modal-title" class="fc-gate-modal__title">Fase final bloqueada</h3>
+    <p class="fc-gate-modal__msg">Es necesario rellenar la fase de grupos al completo (resultados, goleadores y boost de jornada) antes de acceder a las eliminatorias.</p>
+    <button type="button" class="fc-gate-modal__btn" onclick="window.fcGateModalClose && window.fcGateModalClose()">Entendido</button>
+  </div>
+</div>
 
 
 </body>

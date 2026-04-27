@@ -1,11 +1,23 @@
 (function() {
   var _tabDefs = [
     { id: 'grupos',    label: 'Grupos',    icon: 'grupos',    route: 'grupos' },
-    { id: 'jornada',   label: 'Jornada',   icon: 'jornada',   route: null },
-    { id: 'directo',   label: 'Directo',   icon: 'directo',   route: null },
-    { id: 'quiniela',  label: 'Fase final', icon: 'quiniela',  route: 'elim' },
-    { id: 'predictor', label: 'Predictor', icon: 'predictor', route: null }
+    { id: 'jornada',   label: 'Jornada',   icon: 'jornada',   route: 'jornada' },
+    { id: 'directo',   label: 'Directo',   icon: 'directo',   route: 'directo' },
+    { id: 'elim',      label: 'Fase final', icon: 'elim',     route: 'elim' },
+    { id: 'predictor', label: 'Predictor', icon: 'predictor', route: 'predictor' }
   ];
+
+  // F7.4-D-1: gate modal "Fase final bloqueada" (mostrar si _gruposComplete falsy).
+  // El modal vive como #fc-gate-modal en index.html (fuera de cualquier page).
+  function _showGruposGateModal() {
+    var modal = document.getElementById('fc-gate-modal');
+    if (modal) modal.classList.add('open');
+  }
+  function _closeGruposGateModal() {
+    var modal = document.getElementById('fc-gate-modal');
+    if (modal) modal.classList.remove('open');
+  }
+  window.fcGateModalClose = _closeGruposGateModal;
 
   function renderBottomTab(activePage) {
     var mount = document.getElementById('fc-tabbar-mount');
@@ -30,7 +42,12 @@
         var tab = btn.dataset.tab;
         var def = _tabDefs.find(function(d) { return d.id === tab; });
         if (!def || !def.route) {
-          console.debug('[shell] tab "' + tab + '" sin route — pendiente F7.4-D');
+          console.debug('[shell] tab "' + tab + '" sin route');
+          return;
+        }
+        // F7.4-D-1: gate Fase final si grupos no completos.
+        if (def.route === 'elim' && !window._gruposComplete) {
+          _showGruposGateModal();
           return;
         }
         if (typeof window.showPage === 'function') window.showPage(def.route);
@@ -43,10 +60,8 @@
   function fcMarkActiveTab(activePage) {
     var mount = document.getElementById('fc-tabbar-mount');
     if (!mount) return;
-    // 'elim' se pinta como tab 'quiniela' (alias en F7.4-B; F7.4-D limpiará)
-    var activeTabId = (activePage === 'elim') ? 'quiniela' : activePage;
     mount.querySelectorAll('.fc-tabbar__item').forEach(function(btn) {
-      btn.classList.toggle('fc-tabbar__item--active', btn.dataset.tab === activeTabId);
+      btn.classList.toggle('fc-tabbar__item--active', btn.dataset.tab === activePage);
     });
   }
 

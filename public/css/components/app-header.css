@@ -146,3 +146,63 @@
 .fc-appbar__rank:hover {
   color: var(--fc-accent);
 }
+
+/* ── F7.4-D-1: Gate modal global (Fase final bloqueada) ──────────────────────
+   Auto-contained, vive fuera de cualquier page (#fc-gate-modal en index.html
+   antes del </body>). Será absorbido o eliminado en F7.4-F.
+   ────────────────────────────────────────────────────────────────────────── */
+.fc-gate-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.fc-gate-modal.open {
+  display: flex;
+}
+.fc-gate-modal__card {
+  background: var(--fc-surface);
+  border: 1px solid var(--fc-border);
+  border-radius: 14px;
+  padding: 24px 20px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.fc-gate-modal__title {
+  margin: 0 0 10px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+}
+.fc-gate-modal__msg {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fc-text-secondary);
+}
+.fc-gate-modal__btn {
+  display: inline-block;
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-border);
+  background: var(--fc-surface-2);
+  color: var(--fc-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--fc-transition), color var(--fc-transition);
+}
+.fc-gate-modal__btn:hover {
+  background: var(--fc-accent);
+  color: var(--fc-bg);
+}

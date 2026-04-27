@@ -5,7 +5,7 @@
 // Usa: PARTIDOS, EQUIPOS, predictions, getMatchKey, SB, calcMatchPoints,
 //      iaPredictions, boostPicks (todos globals de data.js/scoring.js)
 // Lee: window._liveScoresByMatchKey (poblado por live-sync.js — Map de match_key → row)
-// Expone: window.renderVistaDirecto, window.updateDirectoCard, window.setVistaGrupos (override)
+// Expone: window.renderVistaDirecto, window.updateDirectoCard
 //
 // El flujo de realtime vive en live-sync.js. Este módulo solo renderiza
 // y expone updateDirectoCard(matchKey, liveRow) para que live-sync lo llame
@@ -129,51 +129,9 @@
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Override de setVistaGrupos para soportar 'directo' como 3er estado
+  // F7.4-D-1: setVistaGruposExtended eliminado. El toggle entre pages
+  // grupos/jornada/directo lo gobierna showPage desde el bottom-tab.
   // ─────────────────────────────────────────────────────────────
-  const _originalSetVistaGrupos = window.setVistaGrupos;
-
-  function setVistaGruposExtended(vista) {
-    const gruposContainer  = document.getElementById('groups-container');
-    const jornadaContainer = document.getElementById('jornada-container');
-    const directoContainer = document.getElementById('directo-container');
-    const btnGrupos  = document.getElementById('btn-vista-grupos');
-    const btnJornada = document.getElementById('btn-vista-jornada');
-    const btnDirecto = document.getElementById('btn-vista-directo');
-
-    // Ocultar todos, luego mostrar el elegido
-    if (gruposContainer)  gruposContainer.style.display  = 'none';
-    if (jornadaContainer) jornadaContainer.style.display = 'none';
-    if (directoContainer) directoContainer.style.display = 'none';
-
-    const resetBtn = (btn) => {
-      if (!btn) return;
-      btn.style.background = 'transparent';
-      btn.style.color = '#6b7280';
-    };
-    const activateBtn = (btn) => {
-      if (!btn) return;
-      btn.style.background = '#27272a';
-      btn.style.color = '#fff';
-    };
-    resetBtn(btnGrupos);
-    resetBtn(btnJornada);
-    resetBtn(btnDirecto);
-
-    if (vista === 'grupos') {
-      if (gruposContainer) gruposContainer.style.display = 'block';
-      activateBtn(btnGrupos);
-    } else if (vista === 'jornada') {
-      if (jornadaContainer) jornadaContainer.style.display = 'block';
-      activateBtn(btnJornada);
-      if (typeof window.renderVistaJornada === 'function') window.renderVistaJornada();
-    } else if (vista === 'directo') {
-      if (directoContainer) directoContainer.style.display = 'block';
-      activateBtn(btnDirecto);
-      renderVistaDirecto();
-    }
-  }
-  window.setVistaGrupos = setVistaGruposExtended;
 
   // ─────────────────────────────────────────────────────────────
   // Traducción status → etiqueta y clase
