@@ -496,14 +496,14 @@ function koInit() {
   //   updateKOPts, initWelcome
   // ─────────────────────────────────────────────────────────────
 /* ══ NAVEGACIÓN SPA ══ */
-let _gruposInited = false;
+let _gruposInitPromise = null;
 function showPage(page) {
   // v2.10: si hay CSS lock activo y alguien intenta mostrar welcome, IGNORAR.
   // El lock solo se quita cuando se navega a una pagina real (grupos/elim/score/admin).
   var _lockCss = document.getElementById('restore-lock-css');
   if (_lockCss && page === 'welcome') return;
   if (_lockCss && page !== 'welcome') _lockCss.remove();
-  if ((page === 'grupos' || page === 'elim' || page === 'score') && !currentUser) { openAuthModal('login'); return; }
+  if ((page === 'grupos' || page === 'elim' || page === 'score' || page === 'perfil') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
   // Capturar página actual ANTES de cambiar display (para el botón volver de score)
@@ -532,11 +532,19 @@ function showPage(page) {
     scoreBar.innerHTML = `<div class="wc-user-badge" style="display:flex;align-items:center;gap:8px;background:rgba(17,19,24,.9);border:1px solid #27272a;border-radius:24px;padding:5px 12px 5px 7px"><div class="wc-user-avatar">${ini}</div><span class="wc-user-name">${escapeHtml(currentUser.nombre)}</span></div><button class="wc-logout-btn do-logout">Cerrar sesión</button>`;
   }
   if(page === 'elim')   { window.scrollTo(0,0); koInit(); }
-  if(page === 'grupos') { window.scrollTo(0,0); if(!_gruposInited) { _gruposInited=true; initGrupos(); } }
+  if(page === 'grupos') {
+    window.scrollTo(0,0);
+    if (!_gruposInitPromise) {
+      _gruposInitPromise = Promise.resolve().then(function() { return initGrupos(); });
+    }
+  }
   if(page === 'welcome') { if(currentUser && typeof leagueRenderPanel === 'function') setTimeout(leagueRenderPanel, 50); }
   if(page === 'welcome') window.scrollTo(0,0);
   if(page === 'score')  { window.scrollTo(0,0); sbLoad(); }
   if(page === 'admin')  { window.scrollTo(0,0); admInit(); }
+
+  // F7.4-B: aplicar shell según page
+  if (typeof window.fcShellApply === 'function') window.fcShellApply(page);
 
   // Persistir última página (excepto welcome) para restaurar al recargar.
   // Key con underscore para entrar en el barrido de doLogout (auth.js:286).

@@ -35,7 +35,7 @@ function openAuthModal(tab) { window._pendingAuth = tab; }
 // y especificidad maxima, gana a cualquier showPage(welcome) rogue durante arranque.
 try {
   var lp = localStorage.getItem('porra_lastPage');
-  if (lp && ['grupos','elim','score','admin'].indexOf(lp) !== -1) {
+  if (lp && ['grupos','elim','score','admin','perfil'].indexOf(lp) !== -1) {
     window._pendingPageRestore = lp;
     var st = document.createElement('style');
     st.id = 'restore-lock-css';
@@ -106,7 +106,7 @@ try {
   // El modulo bundle puede tardar en cargarse y auth.js guard necesita el flag YA.
   try {
     var lastPage = localStorage.getItem('porra_lastPage');
-    if (lastPage && ['grupos','elim','score','admin'].indexOf(lastPage) !== -1) {
+    if (lastPage && ['grupos','elim','score','admin','perfil'].indexOf(lastPage) !== -1) {
       window._pendingPageRestore = lastPage;
       splash.style.display = 'none';
       if (splash.parentNode) splash.parentNode.removeChild(splash);

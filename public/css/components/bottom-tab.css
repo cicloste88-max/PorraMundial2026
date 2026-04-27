@@ -76,3 +76,13 @@
   background: var(--fc-accent);
   margin-top: 3px;
 }
+
+/* F7.4-B: activar shell cuando el body lo marca */
+body.fc-shell-active .fc-tabbar {
+  display: flex;
+}
+
+/* Padding para que el contenido no quede tapado por la tabbar */
+body.fc-shell-active {
+  padding-bottom: calc(var(--fc-tab-h) + var(--fc-safe-bottom));
+}
