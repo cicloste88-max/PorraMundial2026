@@ -1208,3 +1208,43 @@ QA: `node --check` OK en los 3 JS, `npm run build` OK, selector `body.fc-shell-a
 **[27abr2026] F7.4-C merged a main** (squash-merge `a021e71`, PR #30 cerrado tras review San). Doc `docs/restyling-mobile/00-app-shell.md §7` actualizada: F7.4-C 🟡 → ✅ Cerrada con merge sha. DoD F7.4-C añadida con 11 puntos verificados (mobile 375px los 3 headers, back-btns funcionales, franja contador funcional, botón Clasificación en franja, bottom-tab sin regresión, console limpia, no regresiones laterales, build/check OK, selectores purgados en dist, smoke San + fix post-smoke). Branch `claude/migrate-headers-fc-appbar-SPMrq` auto-deleted post-squash. Siguiente fase activa: **F7.4-D** (eliminar sub-tabs internos `#btn-vista-grupos/jornada/directo` de page-grupos `index.html:552-568` + `.view-tabs` de page-elim; resolver routes pendientes de Jornada/Directo/Predictor con pages dedicadas; limpiar alias `elim → quiniela` en `bottom-tab.js:fcMarkActiveTab`).
 
 **[27abr2026] Issue #27 formalizado en `.claude/rules/multi-agent-sync.md`** (nuevo). Path-scope amplio (`index.html`, `public/**`, `js/**`, `docs/**`, `supabase/**`, `apify-actors/**`, `.claude/rules/**`, `CLAUDE.md`, `migration-log.md`) para garantizar auto-carga en cualquier sesión que toque el repo. 6 secciones: (1) quién edita y dónde — Code en container Anthropic, nunca FS local de San; (2) push inmediato tras cada commit; (3) sync local — `git pull` + reinicio Vite (Ctrl+C + `npm run dev`) + hard-reload (Ctrl+Shift+R) — Vite cachea módulos en memoria entre HMRs y solo pull+reload no basta; (4) detección de desincronía — verificar HEAD remoto vs local antes de patchear; (5) cambio de fase con branch nueva — `git fetch origin && git checkout` (NUNCA `git pull origin <nueva-branch>` desde la antigua que produce conflicts en ficheros tocados por ambas, vivido F7.4-B → F7.4-C en `bottom-tab.js`+`shell.js`); (6) post squash-merge — limpiar branch local obsoleta con `git branch -D` (la remote la auto-borra GitHub, pero la local recreada por sandbox genera PR fantasma si pushea desde ella). CLAUDE.md actualizado: entrada nueva en tabla `.claude/rules/` + puntero en sección Reglas CRÍTICAS apuntando al doc. Push directo a main (regla docs-only, sin código ejecutable, riesgo cero — patrón consistente con `5d6c7c7 docs: end-of-session F7.4-A` y `bab10ba docs: cierre F7.4-C`).
+
+---
+
+## 2026-04-27 — F7.4-D-1 (pages dedicadas Jornada/Directo/Predictor) — PR #31 abierto
+
+**F7.4-D-1 PR abierto** (PR #31, commit `7619eca`): pages dedicadas Jornada/Directo/Predictor + cleanup setVistaGrupos/_vistaActual + alias `quiniela→elim` limpiado + gate Fase final con `#fc-gate-modal`. Pendiente merge tras smoke San OK.
+
+**Cambios en 12 ficheros:**
+- `index.html`: 3 botones `#btn-vista-*` y containers (jornada-user-strip, jornada-container, directo-container) movidos fuera de page-grupos a 3 nuevas pages dedicadas (`#page-jornada` con boost-ticker, `#page-directo`, `#page-predictor` stub). Nuevo `#fc-gate-modal` global pre `</body>`. VALID_PAGES splash arrays (línea 38 y 109) ampliados a 8 elementos.
+- `js/main-entry.js`: VALID_PAGES Set con 8 elementos. Comentario sobre orden ui-directo actualizado (ya no override).
+- `public/js/ui-nav.js`: `window._currentPage = page` al INICIO de showPage. Guard auth ampliado a jornada/directo/predictor. prevPages para back de Score: 5 elementos. 3 toggles display nuevos. Init handlers (page-jornada → renderVistaJornada, directo → renderVistaDirecto, predictor → stub). Hook cierre `mobile-focus-layer` si page≠grupos (sustituye listeners obsoletos en ui-groups-mobile).
+- `public/js/ui-groups.js`: `setVistaGrupos`+`window.setVistaGrupos`+`let _vistaActual` eliminados (líneas 437-462). 2 refs `_vistaActual === 'jornada'` (424, 643) → `window._currentPage`. `checkGroupsComplete`: línea nueva tras `boostsCompletos` setea `window._gruposComplete = (filled >= total && boostsCompletos)`.
+- `public/js/ui-directo.js`: bloque `Override de setVistaGrupos` + `_originalSetVistaGrupos` + `setVistaGruposExtended` + `window.setVistaGrupos = setVistaGruposExtended` eliminado (líneas 131-176). Cabecera "Expone" actualizada.
+- `public/js/components/bottom-tab.js`: `_tabDefs` con id/icon `'elim'` (no `'quiniela'`); routes null de jornada/directo/predictor → rutas reales. `fcMarkActiveTab` sin ternario alias. Click handler con gate `if (def.route === 'elim' && !window._gruposComplete) { _showGruposGateModal(); return; }`. Helpers `_showGruposGateModal`/`_closeGruposGateModal` (add/remove `.open` al `#fc-gate-modal`). `window.fcGateModalClose` expuesto.
+- `public/js/components/icons.js`: case `'quiniela'` → `'elim'` (SVG trofeo intacto).
+- `public/js/shell.js`: `SHELL_PAGES = ['grupos', 'elim']` → `['grupos', 'elim', 'jornada', 'directo', 'predictor']`. Comentario actualizado.
+- `public/js/ui-groups-mobile.js`: bloque "Tab listeners cerrar focus" con `getElementById('btn-vista-jornada')` eliminado (botones ya no existen). Comentario apunta al hook equivalente en `ui-nav.js showPage`.
+- `public/css/base.css`: regla zombie `#jornada-container{display:none}` eliminada (page-jornada padre gobierna visibilidad).
+- `public/css/directo.css`: regla zombie `#directo-container { display: none }` eliminada (page-directo gobierna).
+- `public/css/components/app-header.css`: bloque nuevo `.fc-gate-modal` + `.fc-gate-modal.open` + `.fc-gate-modal__card`/`__title`/`__msg`/`__btn` (~50 líneas). Backdrop semitransparente con blur, card centrada 360px max-width, botón "Entendido" con hover invertido.
+
+**Decisiones aprobadas (D1-D5 spec + 2 pivots):**
+- (D1) Page-elim NO se toca; rediseña entera F7.4-F.
+- (D2) Page-predictor stub mínimo (heading + párrafo).
+- (D3) `setVistaGrupos` ELIMINADA (no wrapper). `_vistaActual` reemplazado por `window._currentPage`.
+- (D4) Tab Fase final con gate `_gruposComplete` → modal "Es necesario rellenar fase de grupos al completo".
+- (D5) Bottom-tab: `quiniela`→`elim` en id, icon, case `getIcon`. Routes null → rutas reales.
+- **Pivot R-6**: NO reusar `#modal` (vive dentro de `#page-elim` con `display:none` cuando user no entró aún → no funciona como gate global). Crear `#fc-gate-modal` mini auto-contained (~30 líneas HTML+CSS+JS combined). Será absorbido o eliminado en F7.4-F.
+- **R-3**: `boost-ticker` movido a `#page-jornada` (justificación: comentario HTML "Ticker boost jornada", info por días, page-grupos ya tiene CTA banner inferior con resumen de boosts pendientes que duplica info).
+
+**QA programático:** `node --check` OK en los 7 JS, `npm run build` OK (200ms). `setVistaGrupos`/`_vistaActual`/`btn-vista-*`/`'quiniela'` ausentes en código funcional (solo comentarios F7.4-D-1 + 1 string literal en `data.js:294` no relacionado). VALID_PAGES con 8 elementos en los 3 sitios canónicos. dist/index.html: 4 markers (page-jornada, page-directo, page-predictor, fc-gate-modal). dist/js/components/bottom-tab.js: `'elim'` presente, 0 `'quiniela'`. dist/js/shell.js: SHELL_PAGES con 5 elementos. dist/css/base.css y directo.css: 0 reglas `display:none` zombie.
+
+**QA visual San (smoke localhost:5173 mobile 375px):** los 12 puntos DoD funcional ✅ verificados por San (5 tabs navegan + gate modal centrado y cerrable + Promise singleton F7.4-B intacto + restore localStorage para jornada/predictor + tickerBoostToggle re-renderiza + hook closeMobileFocus funciona + sin regresiones welcome/score/admin/login + console limpia + alias quiniela→elim limpio).
+
+**3 bugs preexistentes detectados durante smoke (NO en scope F7.4-D-1)** — documentados en `errores_conocidos_porra.md` como **ERR-30/31/32**. Verificados pre-existentes: scoring.js MD5 idéntico main vs F7.4-D-1, lockCardsInFocus callsites iguales (6/3), reproducidos en producción `porramundial2026-seven.vercel.app`:
+- **ERR-30** (BLOQUEANTE UX): `mobile-locked` persiste tras Deshacer (regla CSS bloquea botones). Causa: handler `btn-undo` no llama `unlockCardsInFocus` ni resetea `groupSaved`. Fix simple ≤5 líneas → candidato a mini-PR aparte tras merge.
+- **ERR-31**: `btnRow` residual tras Deshacer (mantiene "✓ Guardado + ↩ Deshacer" en vez de regresar al botón Guardar). Causa: handler no restaura `btnRow.innerHTML`.
+- **ERR-32**: boost check desincroniza al desmarcar (UI pierde `boost-active` pero input sigue `.checked=true`). Race entre `saveBoostPicks` async y re-render. Prioridad menor que ERR-30.
+
+**Próximo paso**: merge PR #31 tras revisión San → cierre doc 00-app-shell §7 → mini-PR ERR-30 → arrancar F7.4-D-2 (widgets Predictor) o F7.4-E (page-perfil + simplificación renderAuthBar) según prioridad.

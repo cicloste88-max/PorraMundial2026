@@ -2,6 +2,21 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-04-27 — F7.4-D-1 pages dedicadas Jornada/Directo/Predictor (PR #31)
+
+**Pages dedicadas + cleanup app shell** (commit `7619eca`, branch `claude/f7-4-d-1-pages-dedicadas`, PR #31 abierto pendiente merge tras smoke San).
+
+- **5 tabs en bottom-tab navegan a pages reales**: `Grupos / Jornada / Directo / Fase final / Predictor`. Las routes null de F7.4-B ya tienen destino — clicar Jornada/Directo/Predictor abre su page propia (no más `console.debug "sin route"`).
+- **Gate Fase final**: si `window._gruposComplete` es falsy, click en tab "Fase final" muestra modal `#fc-gate-modal` "Es necesario rellenar fase de grupos al completo (resultados, goleadores y boost de jornada) antes de acceder a las eliminatorias". Botón "Entendido" cierra. Modal global, fuera de cualquier page (auto-contained, ~50 líneas CSS+HTML+JS combined).
+- **Limpieza interna page-grupos**: eliminados los 3 botones internos `#btn-vista-grupos/jornada/directo` con su contenedor selector. La función `setVistaGrupos` (ui-groups.js) y su override `setVistaGruposExtended` (ui-directo.js) eliminadas. `_vistaActual` reemplazado por `window._currentPage` expuesta por `showPage`.
+- **Alias `quiniela→elim` retirado**: `_tabDefs` con id/icon `'elim'`; `fcMarkActiveTab` sin ternario alias; `icons.js` case `'elim'` (SVG trofeo intacto).
+- **`boost-ticker` movido a page-jornada**: información de boosts por día, encaja conceptualmente con la vista por jornadas. Page-grupos mantiene su CTA banner inferior con pastillas de boosts pendientes (no se duplica info).
+- **Hook `closeMobileFocus` global**: si page≠grupos y mobile-focus-layer abierto, se cierra automáticamente. Sustituye listeners obsoletos de los `#btn-vista-*` en `ui-groups-mobile.js`.
+- **Persistencia ampliada**: VALID_PAGES y arrays de splash skip/hideSplash incluyen los 3 nuevos pages → recarga con `localStorage.porra_lastPage = 'jornada'`/`'directo'`/`'predictor'` restaura correctamente.
+- **3 bugs preexistentes** detectados durante smoke (ERR-30/31/32) — verificados pre-existentes (scoring.js MD5 idéntico, reproducidos en producción), documentados en `errores_conocidos_porra.md`. **ERR-30 candidato a mini-PR aparte tras merge** (BLOQUEANTE UX, fix ≤5 líneas).
+
+12 ficheros (198+ / 131-): `index.html`, `js/main-entry.js`, `public/js/{ui-nav,ui-groups,ui-directo,ui-groups-mobile,components/bottom-tab,components/icons,shell}.js`, `public/css/{base,directo,components/app-header}.css`.
+
 ## Histórico migrado del CLAUDE.md (24 abr 2026)
 
 ### Saga F5 v2.1 → v2.11 (3 capas defensivas, 20 abr 2026)

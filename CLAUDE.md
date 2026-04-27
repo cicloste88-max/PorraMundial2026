@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** post-merge F7.4-C (squash `a021e71`, PR #30). Los 3 headers inline (`.adm-header`, `.sb-header`, `.global-header`) ya migrados a `.fc-appbar.fc-appbar--page` LIVE en producción con sweep central icono back en `shell.js` (estrategia α), franja transitoria `.elim-pts-strip` (Mis puntos + botón Clasificación, autorretirada en F7.4-E) y badge ADMIN en slot `__actions`. Siguiente fase activa: **F7.4-D** (eliminar sub-tabs internos `#btn-vista-grupos/jornada/directo` de page-grupos `index.html:552-568` + `.view-tabs` de page-elim; resolver routes pendientes de Jornada/Directo/Predictor con pages dedicadas; limpiar alias `elim → quiniela` en `bottom-tab.js:fcMarkActiveTab`). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
+Rama activa **main** post-merge F7.4-C (squash `a021e71`, PR #30). **F7.4-D-1 PR #31 abierto** (commit `7619eca`, branch `claude/f7-4-d-1-pages-dedicadas`): pages dedicadas Jornada/Directo/Predictor + cleanup `setVistaGrupos`/`_vistaActual` (reemplazado por `window._currentPage`) + alias `quiniela→elim` limpio en bottom-tab/icons + gate Fase final con modal global `#fc-gate-modal` (pivot R-6 vs `#modal` interno page-elim). `boost-ticker` movido a page-jornada. Smoke San OK (12/12 puntos DoD funcional). 3 bugs preexistentes detectados (ERR-30/31/32) documentados, NO en scope. Pendiente merge a main. Siguiente: **mini-PR ERR-30** (bloqueante UX, fix simple) → **F7.4-D-2** (widgets Predictor) o **F7.4-E** (page-perfil + simplificar `renderAuthBar`). Headers `.fc-appbar.fc-appbar--page` LIVE de F7.4-C. IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
 
 ## Top-3 pendientes inmediatos
 
@@ -121,6 +121,9 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
 | ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
+| ERR-30 | `mobile-locked` persiste tras Deshacer (BLOQUEANTE UX, candidato mini-PR) |
+| ERR-31 | `btnRow` residual tras Deshacer (mantiene "✓ Guardado + ↩ Deshacer") |
+| ERR-32 | Boost check desincroniza al desmarcar (race save async vs re-render) |
 
 ### Otros ficheros de contexto
 

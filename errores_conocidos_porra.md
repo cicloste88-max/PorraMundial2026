@@ -419,3 +419,30 @@ Tres fallos encadenados que requirieron solución combinada.
   - Workflow recomendado para San tras hacer cambios grandes a una EF: (1) Claude Code comitea el código al branch; (2) San hace `git pull` + `npx supabase functions deploy <name> --no-verify-jwt --project-ref <ref>`; (3) verificación vía `list_edge_functions` desde Code o Claude.ai.
   - El MCP `deploy_edge_function` sigue siendo el camino cómodo para monofichero; no lo deprecamos, sólo lo capamos por tamaño. Si falla con Stream idle timeout, NO reintentar en loop — saltar a CLI.
 - **Fecha detección:** 23 abr 2026 noche (intento de deploy v10 tras Commit 1 de post-F; dos surfaces MCP fallaron idéntico). Resuelto vía `supabase CLI` en la misma sesión.
+
+## ERR-30 — `mobile-locked` persiste tras Deshacer (BLOQUEANTE UX)
+
+- **Síntoma:** en mobile-focus de page-grupos, si el grupo está marcado como guardado (`groupSaved[letra] = true`) y el usuario abre el focus + pulsa Deshacer en una card, la card queda con la clase `mobile-locked`. La regla CSS `.card.mobile-locked .sbn/.gsel/.boost-row { pointer-events:none }` bloquea TODOS los botones interactivos de la card → la card queda inutilizable hasta navegar fuera y volver.
+- **Causa:** `openMobileFocus` (`public/js/ui-groups-mobile.js` ~234) llama a `lockCardsInFocus(letra)` cuando `groupSaved[letra]`. El handler de `btn-undo` en `public/js/scoring.js` (~51623) ejecuta `pred.saved = false` + `savePredictions()` pero NO llama a `unlockCardsInFocus(match.group)` ni resetea `groupSaved[match.group]`. Resultado: la regla CSS sigue aplicándose con datos stale.
+- **Fix candidato:** en el handler `btn-undo`, tras `savePredictions()`, añadir `window.unlockCardsInFocus?.(match.group)`. Validar también que `groupSaved` se actualice correctamente (probablemente `groupSaved[match.group] = false` si era la última card saved del grupo — verificar lógica de detección).
+- **Verificación de pre-existencia:** scoring.js MD5 idéntico en main pre-F7.4-D-1 y post-F7.4-D-1 (commit `7619eca`). `lockCardsInFocus` callsites: 6 (no cambiados); `unlockCardsInFocus` callsites: 3 (no cambiados). Reproducido en producción `porramundial2026-seven.vercel.app`.
+- **Estado:** documentado, NO arreglado en F7.4-D-1. Candidato a mini-PR aparte tras merge — bloqueante UX y fix simple (≤5 líneas).
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1).
+
+## ERR-31 — `btnRow` residual tras Deshacer
+
+- **Síntoma:** en cualquier card guardada (no solo dentro de mobile-focus), pulsar Deshacer hace que el `btnRow` mantenga el HTML "✓ Guardado + ↩ Deshacer" en vez de regresar al botón "Guardar" original.
+- **Causa:** el handler `btn-undo` en `public/js/scoring.js` (~51623) hace `pred.saved = false` + `savePredictions()` pero NO restaura `btnRow.innerHTML` al estado pre-saved. La interfaz sigue mostrando el row de "guardado" aunque el dato ya está en estado borrador.
+- **Fix candidato:** tras `pred.saved = false`, restaurar `btnRow.innerHTML` con el HTML del botón Guardar original, o invocar la función que renderiza el row inicial (probablemente `_buildSaveBtnRow` o equivalente — auditar). Acoplar al fix de ERR-30 si se aborda en el mismo mini-PR.
+- **Verificación de pre-existencia:** misma lógica de auditoría que ERR-30 (scoring.js MD5 idéntico). Reproducido en producción.
+- **Estado:** documentado, NO arreglado en F7.4-D-1.
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1).
+
+## ERR-32 — Boost check desincroniza al desmarcar
+
+- **Síntoma:** en una card con boost activo, desmarcar el check del boost hace que la card pierda visualmente la clase `boost-active` (correcto), pero el input checkbox sigue marcado (`.checked = true`) → estado UI inconsistente.
+- **Causa probable (sospecha, no confirmado):** race condition entre `saveBoostPicks()` async y un re-render que vuelve a marcar el check leyendo estado pre-save. La escritura optimista del DOM ocurre antes que la persistencia, y el re-render dispara desde un trigger que aún ve el `boostPicks` antiguo.
+- **Fix candidato:** auditar el flujo `tickerBoostToggle` → `saveBoostPicks` → re-renders. Posibles caminos: (a) hacer el re-render condicionado al callback `then` de `saveBoostPicks`; (b) leer el estado del DOM (no de `boostPicks`) en el re-render; (c) eliminar el re-render redundante si ya hay otro que lo hace. Requiere debugging en sesión.
+- **Verificación de pre-existencia:** reproducido en producción.
+- **Estado:** documentado, NO arreglado en F7.4-D-1. Prioridad menor que ERR-30 (no bloquea, solo confunde).
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1).
