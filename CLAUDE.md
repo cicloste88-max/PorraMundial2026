@@ -121,6 +121,7 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
 | ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
+| ERR-30 | `mobile-locked` persiste tras Deshacer (✅ FIXED en PR #32) |
 
 ### Otros ficheros de contexto
 

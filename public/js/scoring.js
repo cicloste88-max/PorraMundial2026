@@ -1184,6 +1184,11 @@ function updateCardUI(idx, match) {
         if(gselEl){ gselEl.value=''; gselEl.disabled=false; }
         // Re-habilitar steppers
         document.querySelectorAll(`#pred-${idx} .sbn`).forEach(b=>b.disabled=false);
+        // ERR-30: re-habilitar interacción tras deshacer en focus mobile.
+        // Sincronización con league_members.groups_saved queda pendiente (deuda
+        // documentada en errores_conocidos_porra.md). Se aborda en F7.4-F.
+        if (window.groupSaved) delete window.groupSaved[match.group];
+        if (typeof window.unlockCardsInFocus === 'function') window.unlockCardsInFocus(match.group);
         savePredictions();
         updateCardUI(idx,match);
         renderGroupTableCard(match.group);
