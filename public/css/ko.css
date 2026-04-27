@@ -30,41 +30,38 @@ body{font-family:'Inter',sans-serif;background:#0f172a;color:#fff;min-height:100
 }
 
 /* ════════════════════════════════════════════════
-   HEADER GLOBAL (sticky, igual que fase grupos)
+   HEADER GLOBAL eliminado en F7.4-C
+   Migrado a .fc-appbar--page (public/css/components/app-header.css).
+   Selectores antiguos (.global-header, .gh-left, .gh-back, .gh-title,
+   .gh-pts, .gh-pts-label, .gh-pts-num) retirados.
 ════════════════════════════════════════════════ */
-.global-header{
-  background:rgba(10,15,30,.95);
-  border-bottom:1px solid #1e293b;
-  padding:14px 24px;
+
+/* ════════════════════════════════════════════════
+   FRANJA "Mis puntos" (F7.4-C transitoria)
+   Aparece debajo del .fc-appbar--page de eliminatorias mostrando el contador
+   de puntos KO + acceso rápido a Clasificación. Será retirada en F7.4-E
+   cuando el header global persistente exponga puntos + #posición (D5).
+════════════════════════════════════════════════ */
+.elim-pts-strip{
   display:flex;align-items:center;justify-content:space-between;
-  flex-wrap:wrap;gap:10px;
-  position:sticky;top:0;z-index:100;
-  backdrop-filter:blur(12px);
+  gap:10px;padding:8px 16px;
+  background:var(--card);border-bottom:1px solid var(--border);
 }
-.gh-left{display:flex;align-items:center;gap:16px}
-.gh-back{
-  display:flex;align-items:center;gap:6px;
-  font-size:12px;font-weight:600;color:var(--text-3);
-  text-decoration:none;padding:6px 12px;border-radius:10px;
-  border:1px solid var(--border);background:var(--card);
-  cursor:pointer;transition:all .15s;
-}
-.gh-back:hover{border-color:var(--green);color:var(--green)}
-.gh-title{
-  font-family:'Inter Tight',sans-serif;
-  font-size:18px;font-weight:900;letter-spacing:-.01em;
-}
-.gh-title span{color:var(--green)}
-.gh-pts{
-  display:flex;align-items:center;gap:8px;
-  background:var(--deep);border:1px solid var(--border);
-  border-radius:24px;padding:6px 16px;
-}
-.gh-pts-label{font-size:11px;color:var(--text-3)}
-.gh-pts-num{
+.elim-pts-block{display:flex;align-items:baseline;gap:8px}
+.elim-pts-label{font-size:11px;color:var(--text-3)}
+.elim-pts-num{
   font-family:'Inter Tight',sans-serif;
   font-size:22px;font-weight:900;color:var(--green);
 }
+.elim-pts-clasif-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:#fbbf24;
+  padding:5px 12px;border-radius:10px;
+  border:1px solid #78350f;background:#1c1008;
+  cursor:pointer;transition:all .15s;
+  font-family:'Inter',sans-serif;
+}
+.elim-pts-clasif-btn:hover{border-color:#f59e0b;background:#292010}
 
 /* VIEW MODE TABS */
 .view-tabs{
@@ -732,41 +729,9 @@ body{font-family:'Inter',sans-serif;background:#0f172a;color:#fff;min-height:100
 }
 
 /* ════════════════════════════════════════════════
-   HEADER GLOBAL (sticky, igual que fase grupos)
+   F7.4-C: bloque duplicado del HEADER GLOBAL eliminado
+   (reemplazado por .fc-appbar--page + .elim-pts-strip más arriba en este fichero).
 ════════════════════════════════════════════════ */
-.global-header{
-  position:sticky;top:0;z-index:100;
-  background:rgba(15,23,42,.95);backdrop-filter:blur(12px);
-  border-bottom:1px solid #1e293b;
-  display:flex;justify-content:space-between;align-items:center;
-  flex-wrap:wrap;gap:10px;
-  padding:12px 16px;
-}
-.gh-clasif{color:#fbbf24!important;border-color:#78350f!important;background:#1c1008!important}
-.gh-left{display:flex;align-items:center;gap:16px;flex-shrink:1;min-width:0}
-.gh-back{
-  display:flex;align-items:center;gap:6px;
-  font-size:12px;font-weight:600;color:var(--text-3);
-  text-decoration:none;padding:6px 12px;border-radius:10px;
-  border:1px solid var(--border);background:var(--card);
-  cursor:pointer;transition:all .15s;
-}
-.gh-back:hover{border-color:var(--green);color:var(--green)}
-.gh-title{
-  font-family:'Inter Tight',sans-serif;
-  font-size:18px;font-weight:900;letter-spacing:-.01em;
-}
-.gh-title span{color:var(--green)}
-.gh-pts{
-  display:flex;align-items:center;gap:8px;
-  background:var(--deep);border:1px solid var(--border);
-  border-radius:24px;padding:6px 16px;
-}
-.gh-pts-label{font-size:11px;color:var(--text-3)}
-.gh-pts-num{
-  font-family:'Inter Tight',sans-serif;
-  font-size:22px;font-weight:900;color:var(--green);
-}
 
 /* VIEW MODE TABS */
 .view-tabs{
