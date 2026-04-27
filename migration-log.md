@@ -1165,3 +1165,42 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
 - `public/css/components/bottom-tab.css`: `body.fc-shell-active .fc-tabbar { display: flex }` + `padding-bottom = tab height + safe-area`.
 
 QA: `node --check` OK en los 3 JS, `npm run build` OK, selector `body.fc-shell-active` y `fcShellApply` verificados en dist. Smoke San OK (PTI sobre tab "Fase final" + `console.debug "[shell] tab \"jornada\"/\"directo\" sin route — pendiente F7.4-D"` visible en consola). Console limpia. Doc cerrada en `docs/restyling-mobile/00-app-shell.md` §7. Riesgos R2 (VALID_PAGES divergentes) + R3 (`_gruposInited` boolean) resueltos. GAP simulacro registrado fuera de scope F7.4-B (se aborda al reactivar el flujo de simulacro live). Siguiente: **F7.4-C** (migrar `.adm-header`, `.sb-header`, `.global-header` → `.fc-appbar` con variantes).
+
+---
+
+## 2026-04-27 — F7.4-C (migrar headers a .fc-appbar) — PR #30 abierto
+
+**F7.4-C PR abierto** (PR #30, commits `6925ada` + `876ec5d`): los 3 headers inline (`.adm-header`, `.sb-header`, `.global-header`) reemplazados por el componente `.fc-appbar.fc-appbar--page` con sweep central del icono back en `shell.js` (estrategia α). Pendiente merge tras smoke San OK.
+
+**Cambios en 6 ficheros:**
+- `index.html`: 3 secciones reemplazadas (page-score, page-elim, page-admin). Eliminados subtítulos redundantes ("Fase eliminatoria — 32 partidos", "Porra Mundial 2026"), color destacado del span "Eliminatorias", `#score-user-bar`, `#elim-user-bar`. Badge ADMIN movido al slot `.fc-appbar__actions` post-smoke (fix `876ec5d` porque el title con `text-overflow:ellipsis` lo desbordaba en mobile 375px: `badgeRight=335.28` vs `headerRight=328`). Comentario header section actualizado (`#score-user-bar` removido del Expone).
+- `public/js/shell.js`: nuevo helper `fcAppbarFillBackIcons()` con `querySelectorAll('.fc-appbar__back:empty')` + `getIcon('back')`. Idempotente (`:empty` excluye botones ya rellenos). Guard `typeof window.getIcon === 'function'`. Invocado al final de `fcShellApply` (cada showPage → re-sweep barato). Expuesto como `window.fcAppbarFillBackIcons`.
+- `public/js/ui-nav.js`: bloque `labelMap`/`sb-back-label` eliminado de `showPage` (3 líneas). Bloque `score-user-bar` (4 líneas) reemplazado por comentario explicativo (F7.4-C / pendiente F7.4-E vía D5). `_sbPrevPage` capture conservado. `updateKOPts()` (~líneas 558-563) intacto — divergencia 1 aprobada: `id="total-ko-pts"` se conserva (no renombrar).
+- `public/css/admin.css`: purgados `.adm-header`/`.adm-title`/`.adm-sub`/`.adm-back`/`.adm-back:hover` + `.sb-header`/`.sb-header-left`/`.sb-back-btn`/`.sb-back-btn:hover`/`.sb-header-title`/`.sb-user-bar` en sus 2 copias duplicadas. Purgadas media queries `.global-header`/`.gh-*`/`#elim-user-bar` en sus 2 copias + `.sb-back-btn span`/`.sb-header-title` responsive en sus 2 copias. Conservados: `.adm-badge` (utility, sigue inline en `.fc-appbar__actions`), `.adm-wrap`, `.adm-status-bar`, `.adm-metrics`, `.adm-tabs`, `.sb-body`, `.sb-top` y resto del body. **Conservadas las media queries de `#global-header` (id, page-grupos no migrado en F7.4-C — pendiente F7.4-E)**.
+- `public/css/ko.css`: purgado bloque `.global-header`+`.gh-*` + duplicado (con `.gh-clasif`). Añadido bloque transitorio `.elim-pts-strip`/`.elim-pts-block`/`.elim-pts-label`/`.elim-pts-num`/`.elim-pts-clasif-btn` (será retirado en F7.4-E con la franja entera). Conservados: `.view-tabs`, `.view-tab`, `.ko-sub-bar`, `.container`, hero, rounds y todo lo demás del fichero.
+- `docs/restyling-mobile/01-headers.md` (nuevo): patrón doc 00, secciones inventario producción pre-F7.4-C, estructura objetivo (`.fc-appbar--page` + `.elim-pts-strip` transitoria), decisiones (B+(2)+A+α + divergencia 1), DoD, snapshots CSS pre-cambio, riesgos H-R1..R5, pendientes F7.4-D/E.
+
+**Decisiones aprobadas por San (B+(2)+A+α):**
+- (B) "Mis puntos" baja a franja transitoria `.elim-pts-strip` debajo del header.
+- (2) Botón "🏆 Clasificación" se conserva como `.elim-pts-clasif-btn` dentro de la franja (vs eliminarlo o meterlo en `__actions` que alargaba el header). Se autorretira en F7.4-E con la franja.
+- (A) `#score-user-bar` eliminado por completo. Identidad de usuario unificada en F7.4-E vía header global persistente (D5).
+- (α) Sweep central del icono back en `shell.js` (vs duplicar SVG hardcoded en 3 sitios o activar `renderAppHeader` con mounts dinámicos).
+- Divergencia 1: NO renombrar `id="total-ko-pts"` → `elim-pts-num` (churn sin valor; el id ya existía y solo lo escribe `updateKOPts`).
+
+**QA programático:**
+- `node --check` OK en `shell.js` + `ui-nav.js`.
+- `npm run build` OK (153ms inicial, 521ms tras fix badge).
+- `dist/css/components/app-header.css` contiene `.fc-appbar--page` ✓.
+- `dist/css/ko.css` contiene `.elim-pts-strip` ✓.
+- `dist/js/shell.js` contiene `fcAppbarFillBackIcons` ✓.
+- 0 reglas CSS reales `.global-header`/`.gh-*`/`.adm-header`/`.sb-header`/`.sb-back-btn` en dist (solo comentarios de migración con prefijo `F7.4-C:` → no son selectores).
+- `dist/index.html`: 3 headers `.fc-appbar--page`. Única ocurrencia residual: `id="global-header"` (page-grupos, intacto a propósito).
+
+**QA visual San (smoke localhost:5173 mobile 375px iPhone):**
+- 3 headers visibles con back-btn 36×36 + título centrado. Click back funcional en los 3.
+- Franja "Mis puntos" debajo del header de Eliminatorias: contador `#total-ko-pts` se actualiza con `updateKOPts()`. Botón "🏆 Clasificación" navega.
+- Bottom-tab visible en Grupos+Elim, oculto en Score/Admin (sin regresión vs F7.4-B).
+- Console limpia salvo `console.debug` esperados.
+- **Issue detectado**: badge ADMIN dentro del title se desbordaba en mobile 375px (medición San: `badgeRight=335.28` vs `headerRight=328`, overflow 7.3px) por el `text-overflow:ellipsis` del `.fc-appbar__title`. **Fix `876ec5d`**: badge movido al slot `.fc-appbar__actions` (ya soportado por `app-header.css:74-80`, sin cambios CSS). Verificación visual+programática post-fix OK.
+
+**Próximo paso**: merge PR #30 tras revisión San → cierre doc 00-app-shell §7 → arrancar F7.4-D (eliminar sub-tabs internos page-grupos y view-tabs page-elim, pages dedicadas para Jornada/Directo/Predictor).

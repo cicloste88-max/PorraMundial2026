@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** post-merge F7.4-B. **F7.4-B merged: bottom-tab activa en grupos+elim LIVE** (PR #29, commits `a5232cf` + `521991f`); siguiente **F7.4-C** (migrar `.adm-header`, `.sb-header`, `.global-header` inline → componente `.fc-appbar` con variantes — D4/D7). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
+Rama activa **main** post-merge F7.4-B. **F7.4-C PR #30 abierto** (commits `6925ada` + `876ec5d`, branch `claude/migrate-headers-fc-appbar-SPMrq`): los 3 headers inline (`.adm-header`, `.sb-header`, `.global-header`) migrados a `.fc-appbar.fc-appbar--page` con sweep central icono back (estrategia α en `shell.js`). Franja transitoria `.elim-pts-strip` con "Mis puntos" + botón "🏆 Clasificación" debajo del header de Eliminatorias (autorretirada en F7.4-E). Smoke San OK + fix badge ADMIN al slot `__actions` (mobile 375px overflow). Pendiente merge a main. Siguiente **F7.4-D** (eliminar sub-tabs internos `#btn-vista-grupos/jornada/directo` de page-grupos + `.view-tabs` de page-elim; pages dedicadas para Jornada/Directo/Predictor; limpiar alias `elim → quiniela`). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
 
 ## Top-3 pendientes inmediatos
 
