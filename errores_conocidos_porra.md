@@ -443,6 +443,17 @@ Tres fallos encadenados que requirieron solución combinada.
 
 ---
 
+## ERR-31 — `btnRow` residual tras Deshacer
+
+- **Síntoma:** en cualquier card guardada (no solo dentro de mobile-focus), pulsar Deshacer hace que el `btnRow` mantenga el HTML "✓ Guardado + ↩ Deshacer" en vez de regresar al botón "Guardar" original. La interfaz sigue mostrando el row de "guardado" aunque el dato ya está en estado borrador (`pred.saved=false`).
+- **Causa:** el handler `btn-undo` en `public/js/scoring.js:1177-1192` ejecuta `pred.l/v/gol=null` + `pred.saved=false` + `savePredictions()` + `updateCardUI` + `renderGroupTableCard` + `updateGlobalPoints` + `checkGroupsComplete` (el fix de ERR-30 añadió `delete groupSaved` + `unlockCardsInFocus`), pero **NO** restaura `btnRow.innerHTML` al estado pre-saved. La interfaz no se entera del cambio de estado del row de botones.
+- **Fix candidato:** tras `pred.saved = false`, restaurar `btnRow.innerHTML` con el HTML del botón Guardar original, o invocar la función que renderiza el row inicial (probablemente `_buildSaveBtnRow` o equivalente — auditar). Acoplar al fix de ERR-30 sería natural si se reabriera; alternativa: nuevo mini-PR aparte.
+- **Verificación de pre-existencia:** misma lógica de auditoría que ERR-30/32 (scoring.js MD5 idéntico main pre-F7.4-D-1 vs post-F7.4-D-1). Reproducido en producción `porramundial2026-seven.vercel.app`.
+- **Estado:** documentado, NO arreglado. Cosmético — no bloquea uso, solo confunde visualmente al usuario porque el row sigue mostrando "Guardado". Prioridad menor que ERR-30 (que sí bloqueaba interacción) y ERR-32 (que rompía el toggle del boost).
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1).
+
+---
+
 ## ERR-32 — Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33)
 
 - **Síntoma:** en mobile-focus de page-grupos, una card podía mostrar `chk.checked=true` (input boost marcado) mientras la card NO tenía clase `boost-active` (apagada visualmente) ni `boostPicks[date]` lo respaldaba. Estado capturado en smoke ERR-30: `boostPicks={}` vacío, `localStorage.boostPicks_default` con 16 entradas pero ninguna del día del partido, card sin `boost-active`, `chk.checked=true` residual sin razón. Al pulsar la boost-row, la card se encendía pero el check seguía marcado igual que antes (sin reflejar el toggle correctamente).

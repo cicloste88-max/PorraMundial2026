@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** post-merge F7.4-C (squash `a021e71`, PR #30). Los 3 headers inline (`.adm-header`, `.sb-header`, `.global-header`) ya migrados a `.fc-appbar.fc-appbar--page` LIVE en producción con sweep central icono back en `shell.js` (estrategia α), franja transitoria `.elim-pts-strip` (Mis puntos + botón Clasificación, autorretirada en F7.4-E) y badge ADMIN en slot `__actions`. Siguiente fase activa: **F7.4-D** (eliminar sub-tabs internos `#btn-vista-grupos/jornada/directo` de page-grupos `index.html:552-568` + `.view-tabs` de page-elim; resolver routes pendientes de Jornada/Directo/Predictor con pages dedicadas; limpiar alias `elim → quiniela` en `bottom-tab.js:fcMarkActiveTab`). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
+Rama activa **main** post-merge F7.4-D-1 (merge commit `cbc52e4`, PR #31). Pages dedicadas Jornada/Directo/Predictor + cleanup `setVistaGrupos`/`_vistaActual` (reemplazado por `window._currentPage`) + alias `quiniela→elim` limpio + gate Fase final con modal global `#fc-gate-modal` (pivot R-6) + `boost-ticker` movido a page-jornada. Mini-PRs siguientes: **ERR-30 ✅ FIXED** (PR #32, `1a7a9b9` — `unlockCardsInFocus` + `delete groupSaved` en handler `btn-undo`); **ERR-32 ✅ FIXED** (PR #33, `13f4ecd` + `9c4bc04` follow-up — reconciliación chk + classes con `boostPicks` en `refreshBoostRowsInFocus` + `setTimeout` post-default-action). **ERR-31 documentado, pendiente fix** (cosmético: btnRow residual tras Deshacer). Headers `.fc-appbar.fc-appbar--page` LIVE de F7.4-C. Siguiente fase: **F7.4-D-2** (widgets Predictor) o **F7.4-E** (page-perfil + simplificar `renderAuthBar`). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE con `breakdown` enriquecido para los 72 partidos de grupos. Feature `feat/mobile-grupos-focus` LIVE en producción.
 
 ## Top-3 pendientes inmediatos
 
@@ -122,6 +122,7 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
 | ERR-30 | `mobile-locked` persiste tras Deshacer (✅ FIXED en PR #32) |
+| ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente fix) |
 | ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33) |
 
 ### Otros ficheros de contexto
