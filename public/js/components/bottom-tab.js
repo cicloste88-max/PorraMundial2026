@@ -3,7 +3,7 @@
     { id: 'grupos',    label: 'Grupos',    icon: 'grupos',    route: 'grupos' },
     { id: 'jornada',   label: 'Jornada',   icon: 'jornada',   route: null },
     { id: 'directo',   label: 'Directo',   icon: 'directo',   route: null },
-    { id: 'quiniela',  label: 'Quiniela',  icon: 'quiniela',  route: 'elim' },
+    { id: 'quiniela',  label: 'Fase final', icon: 'quiniela',  route: 'elim' },
     { id: 'predictor', label: 'Predictor', icon: 'predictor', route: null }
   ];
 
