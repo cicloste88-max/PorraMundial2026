@@ -122,6 +122,7 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
 | ERR-30 | `mobile-locked` persiste tras Deshacer (✅ FIXED en PR #32) |
+| ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33) |
 
 ### Otros ficheros de contexto
 
