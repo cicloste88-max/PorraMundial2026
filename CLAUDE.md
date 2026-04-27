@@ -35,7 +35,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 ## Reglas CRÍTICAS
 
 - **NUNCA push a main sin validar en localhost:5173 primero**.
-- **Push inmediato tras cada commit** — nunca acumular.
+- **Push inmediato tras cada commit** — nunca acumular. Tras pull, San reinicia Vite + hard-reload (ver `.claude/rules/multi-agent-sync.md`).
 - **NO crear ni modificar `vercel.json`** (el wildcard corrompía MIME types de ES modules — ver ERR-06).
 - **Actualizar `migration-log.md`** tras cada acción importante.
 - **Consultar `errores_conocidos_porra.md`** antes de debuggear.
@@ -84,6 +84,7 @@ Activación one-time del hook pre-commit en clones nuevos: `git config core.hook
 | `frontend-css.md` | `**/*.css`, `public/css/**` | Vite public, verificación post-build, migración inline |
 | `frontend-js.md` | `public/js/**`, `js/main-entry.js` | DOMContentLoaded, var/const, shims, badge-fallback |
 | `apify-actor.md` | `apify-actors/**` | Contrato I/O, push, eventId discovery, Cloudflare 403 |
+| `multi-agent-sync.md` | `index.html`, `public/**`, `js/**`, `docs/**`, `supabase/**`, `apify-actors/**`, `.claude/rules/**`, `CLAUDE.md`, `migration-log.md` | Sync Code↔San: push inmediato, reinicio Vite tras pull, detección desincronía, switch branch limpio, post-squash cleanup |
 
 ### Errores conocidos — tabla-índice
 
