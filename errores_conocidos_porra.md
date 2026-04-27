@@ -419,3 +419,24 @@ Tres fallos encadenados que requirieron solución combinada.
   - Workflow recomendado para San tras hacer cambios grandes a una EF: (1) Claude Code comitea el código al branch; (2) San hace `git pull` + `npx supabase functions deploy <name> --no-verify-jwt --project-ref <ref>`; (3) verificación vía `list_edge_functions` desde Code o Claude.ai.
   - El MCP `deploy_edge_function` sigue siendo el camino cómodo para monofichero; no lo deprecamos, sólo lo capamos por tamaño. Si falla con Stream idle timeout, NO reintentar en loop — saltar a CLI.
 - **Fecha detección:** 23 abr 2026 noche (intento de deploy v10 tras Commit 1 de post-F; dos surfaces MCP fallaron idéntico). Resuelto vía `supabase CLI` en la misma sesión.
+
+---
+
+## ERR-30 — `mobile-locked` persiste tras Deshacer en focus mobile (✅ FIXED en PR #32, commit `1a7a9b9`)
+
+- **Síntoma:** en mobile-focus de page-grupos, si el grupo está marcado como guardado (`window.groupSaved[letra] === true`) y el usuario abre el focus + pulsa Deshacer en una card, la card queda con la clase `mobile-locked`. La regla CSS `.card.mobile-locked .sbn, .card.mobile-locked .gsel, .card.mobile-locked .boost-row { pointer-events: none; opacity: 0.6 }` (`base.css:1155`) bloquea **todos** los botones interactivos (steppers ▲▼, goleador, boost-row) → la card queda inutilizable hasta navegar fuera y volver.
+- **Causa:** `openMobileFocus` (`public/js/ui-groups-mobile.js:233`) llama a `lockCardsInFocus(letra)` cuando `groupSaved[letra]`. El handler de `btn-undo` en `public/js/scoring.js:1177-1192` ejecutaba `pred.saved = false` + `savePredictions()` y re-habilitaba `.sbn` con `disabled=false` pero **NO** llamaba a `unlockCardsInFocus(match.group)` ni reseteaba `window.groupSaved[match.group]`. Resultado: la regla CSS seguía aplicándose con datos stale en próximas aperturas del focus.
+- **Fix aplicado** (`scoring.js`, handler `btn-undo`, tras re-habilitar steppers y antes de `savePredictions()`):
+  ```js
+  // ERR-30: re-habilitar interacción tras deshacer en focus mobile.
+  if (window.groupSaved) delete window.groupSaved[match.group];
+  if (typeof window.unlockCardsInFocus === 'function') window.unlockCardsInFocus(match.group);
+  ```
+  - **`delete` (no `= false`):** coherente con patrón canónico en `unsaveGroup` (`ui-groups-mobile.js:524`) y error-rollback (línea 509). Funcionalmente equivalente para checks `if (window.groupSaved[letra])` (ambos falsy).
+  - **`unlockCardsInFocus` null-safe:** `ui-groups-mobile.js:552` hace `if (!body) return` — no-op si no hay focus mobile abierto.
+- **Deuda aceptada — gap BD sync:** el handler NO sincroniza con `league_members.groups_saved` en BD. Tras reload, `loadUserData` rehidrata `window.groupSaved` desde BD y el bug puede reaparecer si `groups_saved.A=true` persiste en BD aunque la card individual ya tenga `predictions[X].saved=false`. El fix arregla el caso principal "deshacer + abrir focus de nuevo en la misma sesión"; el caso post-reload es edge raro (user cierra app entre Deshacer y nuevo focus). F7.4-F rediseñará el flujo entero. Si aparece regresión real se eleva a ERR-30b con BD sync.
+- **Patrón preventivo:**
+  - Handlers que mutan estado individual de un item dentro de un grupo "saved" deben invalidar el flag de grupo (`groupSaved[letra]`) para mantener consistencia con la lógica de locking visual.
+  - `unlockCardsInFocus(letra)` puede invocarse defensivamente desde cualquier handler que cambie estado de cards — el guard `if (!body) return` evita errores cuando no hay focus mobile abierto.
+- **Verificación de pre-existencia (smoke F7.4-D-1):** scoring.js MD5 idéntico main pre-F7.4-D-1 vs post-F7.4-D-1, `lockCardsInFocus` callsites iguales, reproducido en producción `porramundial2026-seven.vercel.app` antes del fix.
+- **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1). **Fecha fix:** 27 abr 2026 (PR #32 mini-PR aparte, commit `1a7a9b9`).
