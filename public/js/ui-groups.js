@@ -47,128 +47,19 @@ function savePredictions() {
 }
 
 function checkGroupsComplete() {
-  if (!boostPicks) return; // NOTA: no usar .length === 0 — debe actualizar UI cuando se eliminan todos los boosts
-  // NO llamar savePredictions() aquí — esta función se invoca cada 1s desde el timer
-  // y causaba un POST a Supabase cada segundo. savePredictions() se llama desde attachEvents() al guardar.
+  // F7.4-D-A: helper puro — solo computa el flag global consumido por
+  // el gate Fase final en bottom-tab.js (#fc-gate-modal). El btn header y
+  // el banner CTA fueron eliminados con la migración a pages dedicadas.
+  if (!boostPicks) return;
   let filled = 0;
   PARTIDOS.forEach(m => {
     const p = predictions[getMatchKey(m)];
-    if(p && p.saved) filled++;
+    if (p && p.saved) filled++;
   });
-  const total = PARTIDOS.length; // 72
-  const pct = Math.round(filled / total * 100);
-
-  // Header button
-  const btn = document.getElementById('btn-go-eliminatorias');
-  const icon = document.getElementById('btn-elim-icon');
-  const text = document.getElementById('btn-elim-text');
-  const count = document.getElementById('btn-elim-count');
-  // Verificar boosts: todas las jornadas deben tener boost asignado
+  const total = PARTIDOS.length;
   const diasConPartidos = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))];
   const boostsCompletos = diasConPartidos.every(d => boostPicks[d]);
-  // F7.4-D-1: flag global consumido por gate Fase final en bottom-tab.js
   window._gruposComplete = (filled >= total && boostsCompletos);
-
-  if(btn) {
-    count.textContent = filled+'/'+total;
-    if(filled >= total && boostsCompletos) {
-      btn.disabled = false;
-      btn.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#4ade80;padding:6px 14px;border-radius:10px;border:1px solid #166534;background:#052e16;cursor:pointer;transition:all .3s;opacity:1;font-family:Inter,sans-serif;box-shadow:0 0 16px rgba(74,222,128,.2)';
-      icon.textContent = '⚽';
-      text.textContent = 'Ver Eliminatorias';
-      count.style.display = 'none';
-    } else {
-      btn.disabled = true;
-      btn.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#4b5563;padding:6px 14px;border-radius:10px;border:1px solid #27272a;background:#1c1c1e;cursor:not-allowed;transition:all .3s;opacity:.6;font-family:Inter,sans-serif';
-      icon.textContent = '🔒';
-      if(filled >= total && !boostsCompletos) {
-        const pendientes = diasConPartidos.filter(d => !boostPicks[d]).length;
-        text.textContent = 'Boost: faltan ' + pendientes + ' jornada' + (pendientes > 1 ? 's' : '');
-        count.style.display = 'none';
-      } else {
-        text.textContent = 'Eliminatorias';
-        count.style.display = 'inline';
-      }
-    }
-  }
-
-  // CTA banner
-  const ctaLocked = document.getElementById('cta-locked-msg');
-  const ctaReady  = document.getElementById('cta-ready-msg');
-  const ctaFilled = document.getElementById('cta-filled');
-  if(ctaFilled) ctaFilled.textContent = filled;
-
-  // Group dots
-  const dotsEl = document.getElementById('cta-groups-dots');
-  if(dotsEl) {
-    dotsEl.innerHTML = '';
-    GRUPOS.forEach(g => {
-      const gFilled = PARTIDOS.filter(m => m.group===g.letra && predictions[getMatchKey(m)]?.saved).length;
-      const dot = document.createElement('div');
-      dot.title = 'Grupo '+g.letra+' ('+gFilled+'/6)';
-      dot.style.cssText = 'width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;transition:all .3s;';
-      if(gFilled >= 6) {
-        dot.style.background = '#052e16';
-        dot.style.border = '1.5px solid #166534';
-        dot.style.color = '#4ade80';
-        dot.textContent = g.letra;
-      } else if(gFilled > 0) {
-        dot.style.background = '#1c1003';
-        dot.style.border = '1.5px solid #d97706';
-        dot.style.color = '#fb923c';
-        dot.textContent = g.letra;
-      } else {
-        dot.style.background = '#1c1c1e';
-        dot.style.border = '1.5px solid #3a3a3e';
-        dot.style.color = '#6b7280';
-        dot.textContent = g.letra;
-      }
-      dotsEl.appendChild(dot);
-    });
-  }
-
-  if(ctaLocked && ctaReady) {
-    if(filled >= total && boostsCompletos) {
-      ctaLocked.style.display = 'none';
-      ctaReady.style.display = 'block';
-    } else {
-      ctaLocked.style.display = 'block';
-      ctaReady.style.display = 'none';
-
-      // Pastillas boost pendientes bajo el CTA locked — misma lógica que ticker superior
-      const boostPendingEl = document.getElementById('cta-boost-pending');
-      if(boostPendingEl) {
-        const pendientes = diasConPartidos.filter(d => !boostPicks[d]);
-        if (pendientes.length === 0) {
-          // Todos asignados — ocultar (igual que ticker superior)
-          boostPendingEl.style.display = 'none';
-          boostPendingEl.innerHTML = '';
-        } else {
-          const openDate = document.getElementById('cta-boost-panel')?.dataset.date || null;
-          const existingPanel = document.getElementById('cta-boost-panel');
-          boostPendingEl.style.display = 'flex';
-          const label = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;flex-shrink:0">🔥 Boosts pendientes:</span>';
-          const pills = pendientes.map(d => {
-            const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short'});
-            const nM = PARTIDOS.filter(m => m.date?.substring(0,10) === d).length;
-            const jNum = diasConPartidos.indexOf(d) + 1;
-            return '<button onclick="ctaExpandJornada(\'' + d + '\')" style="' +
-              'display:inline-flex;align-items:center;gap:4px;' +
-              'padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;' +
-              'border:1.5px solid rgba(234,88,12,.5);' +
-              'background:rgba(124,45,18,.35);color:rgb(251,146,60);' +
-              'cursor:pointer;white-space:nowrap;' +
-              'animation:boostPulse 1.5s ease-in-out infinite;' +
-              '">🔥 J' + jNum + ' · ' + dayLabel + ' (' + nM + ')</button>';
-          }).join('');
-          const panelHtml = (openDate && existingPanel)
-            ? '<div id="cta-boost-panel" data-date="' + openDate + '" style="width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(124,45,18,.3);flex-wrap:wrap;gap:6px;align-items:center;display:flex">' + existingPanel.innerHTML + '</div>'
-            : '';
-          boostPendingEl.innerHTML = label + pills + panelHtml;
-        }
-      }
-    }
-  }
 }
 
 
@@ -342,34 +233,6 @@ function tickerExpandJornada(date) {
 window.tickerExpandJornada = tickerExpandJornada;
 
 /* Expande panel de jornada dentro del CTA inferior */
-function ctaExpandJornada(date) {
-  const container = document.getElementById('cta-boost-pending');
-  if (!container) return;
-
-  let panel = document.getElementById('cta-boost-panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'cta-boost-panel';
-    panel.style.cssText = 'width:100%;margin-top:8px;padding:8px;border-top:1px solid rgba(124,45,18,.3);flex-wrap:wrap;gap:6px;align-items:center;display:flex';
-    container.appendChild(panel);
-  }
-
-  // Toggle
-  if (panel.dataset.date === date && panel.style.display !== 'none') {
-    panel.style.display = 'none';
-    panel.dataset.date = '';
-    return;
-  }
-
-  panel.dataset.date = date;
-  panel.style.display = 'flex';
-  panel.innerHTML = _buildMatchButtons(date, 'tickerBoostToggle');
-
-  // Scroll suave al panel
-  setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
-}
-window.ctaExpandJornada = ctaExpandJornada;
-
 /* Llamado desde el ticker al hacer click en un partido */
 function tickerBoostToggle(matchKey, date) {
   // Desmarcar boost anterior del mismo día en las tarjetas
@@ -428,10 +291,6 @@ function tickerBoostToggle(matchKey, date) {
   const openPanel = document.getElementById('boost-ticker-panel');
   if (openPanel && openPanel.dataset.date && openPanel.style.display !== 'none') {
     openPanel.innerHTML = _buildMatchButtons(openPanel.dataset.date, 'tickerBoostToggle');
-  }
-  const ctaPanel = document.getElementById('cta-boost-panel');
-  if (ctaPanel && ctaPanel.dataset.date && ctaPanel.style.display !== 'none') {
-    ctaPanel.innerHTML = _buildMatchButtons(ctaPanel.dataset.date, 'tickerBoostToggle');
   }
 }
 window.tickerBoostToggle = tickerBoostToggle;

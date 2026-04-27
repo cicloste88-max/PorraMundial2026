@@ -2,6 +2,39 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-04-27 — F7.4-D-A eliminar banner+btn legacy de page-grupos (PR pendiente)
+
+**Cleanup app shell parte A** (commit `678ba5a`).
+
+Tras la migración a pages dedicadas + bottom-tab + gate Fase final (F7.4-D-1, PR #31), el botón header `#btn-go-eliminatorias` y el banner inferior `#cta-eliminatorias` quedaban como UI duplicada de la navegación canónica. Se eliminan junto con todo el JS huérfano que mutaba sus nodos.
+
+- **`index.html`**: borra btn header (9 líneas) + banner CTA completo (43 líneas, incluye `cta-locked-msg`, `cta-ready-msg`, `cta-filled`, `cta-groups-dots`, `cta-boost-pending`, `cta-boost-panel`).
+- **`public/js/ui-groups.js`**:
+  - `checkGroupsComplete` refactorizada de 124 LOC a 14 LOC: pasa a helper puro que solo computa `window._gruposComplete` (consumido por gate modal `#fc-gate-modal` en bottom-tab.js). Toda la mutación DOM del btn+banner eliminada.
+  - `ctaExpandJornada` + export borrados (0 callers fuera del banner).
+  - 4 líneas muertas en handler boost (re-render de `cta-boost-panel`) eliminadas.
+- **`public/js/ui-nav.js`**: `goToEliminatoria` borrada (0 callers tras eliminar ambos onclick HTML); comentarios doc actualizados.
+- Scope **estrictamente A**: NO toca `setView`, `view-tabs`, `ko-sub-bar` ni page-elim. La parte B se cierra acoplada a F7.4-F.
+
+3 ficheros (9+ / 204−). Validado con `node --check` + `npm run build` (44 modules, 0 warnings, bundle 188.50 KB).
+
+## 2026-04-27 — ERR-32 boost sync con boostPicks en focus mobile (PR #33)
+
+**Boost check desincronizado en focus mobile** ✅ FIXED (commits `13f4ecd` + follow-up `9c4bc04`).
+
+En el layer `mobile-focus`, los checks de boost de cada tarjeta y sus clases CSS (`boost-on`/`boost-active`) podían quedar desincronizados respecto a `boostPicks` cuando el usuario alternaba el boost desde el input directo de la card o tras una acción default. Síntoma: ✅ verde residual o `boost-active` en una card sin boost real (o viceversa).
+
+- `refreshBoostRowsInFocus`: reconcilia el estado de `chk.checked` y las clases del row contra `boostPicks[date]` del día actual.
+- Follow-up `9c4bc04`: `setTimeout(refresh, 0)` después del default-action del input directo, garantiza que la lectura post-handler ve el estado ya commit-eado.
+
+## 2026-04-27 — ERR-30 mobile-locked persiste tras Deshacer (PR #32)
+
+**Cards no se rehabilitan tras Deshacer en mobile focus** ✅ FIXED (commit `1a7a9b9`).
+
+El handler `btn-undo` en `scoring.js` no liberaba los `mobile-locked` aplicados al guardar el grupo, dejando las cards inactivas tras Deshacer en el layer focus. Se añade `unlockCardsInFocus(group)` y `delete window.groupSaved[group]` al final del handler.
+
+ERR-31 (btnRow residual tras Deshacer) sigue documentado pendiente — cosmético, scope F7.4-F.
+
 ## 2026-04-27 — F7.4-D-1 pages dedicadas Jornada/Directo/Predictor (PR #31)
 
 **Pages dedicadas + cleanup app shell** (commit `7619eca`, PR #31 mergeado vía merge commit `cbc52e4` — docs end-of-session perdidos en ese merge parcial, recuperados en PR #34 docs-recovery).

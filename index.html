@@ -531,15 +531,6 @@ try {
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <button id="btn-go-eliminatorias" onclick="goToEliminatoria()" disabled
-        style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
-               color:#4b5563;padding:6px 14px;border-radius:10px;
-               border:1px solid #27272a;background:#1c1c1e;cursor:not-allowed;
-               transition:all .3s;opacity:.5;font-family:'Inter',sans-serif">
-        <span id="btn-elim-icon">🔒</span>
-        <span id="btn-elim-text">Eliminatorias</span>
-        <span id="btn-elim-count" style="font-size:10px;color:#6b7280">0/72</span>
-      </button>
       <button onclick="showPage('score')"
         style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
                color:#fbbf24;padding:6px 14px;border-radius:10px;
@@ -568,50 +559,7 @@ try {
   <div id="groups-container" style="min-height:400px"></div>
 <!-- F7.4-D-1: jornada-user-strip + jornada-container + directo-container movidos a #page-jornada / #page-directo -->
 <!-- Awards movidos a fase eliminatoria -->
-
-  <!-- ── BANNER CTA: IR A ELIMINATORIAS ── -->
-  <div id="cta-eliminatorias" style="
-    margin-top:48px;
-    background:linear-gradient(135deg,#0a0f1e,#111827);
-    border:1px solid #1e293b;border-radius:20px;
-    padding:32px;text-align:center;
-    position:relative;overflow:hidden;
-  ">
-    <div style="position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:120px;opacity:.04;pointer-events:none;line-height:1">⚽</div>
-    <!-- Estado: incompleto -->
-    <div id="cta-locked-msg">
-      <div style="font-size:32px;margin-bottom:12px">🔒</div>
-      <div style="font-family:'Inter Tight',sans-serif;font-size:20px;font-weight:900;color:#9ca3af;margin-bottom:6px">Completa los pronósticos de grupos</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:20px">Pronostica los 72 partidos para acceder a la fase eliminatoria</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
-        <div style="background:#1c1c1e;border:1px solid #27272a;border-radius:12px;padding:12px 20px">
-          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Guardados</div>
-          <div style="font-family:'Inter Tight',sans-serif;font-size:28px;font-weight:900;color:#fff"><span id="cta-filled">0</span><span style="color:#4b5563">/72</span></div>
-        </div>
-        <div style="background:#1c1c1e;border:1px solid #27272a;border-radius:12px;padding:12px 16px;min-width:200px">
-          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Grupos</div>
-          <div id="cta-groups-dots" style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center"></div>
-        </div>
-      </div>
-    </div>
-    <div id="cta-boost-pending" style="display:none;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin-top:16px;padding:10px 16px;background:rgba(28,14,6,.5);border:1px solid rgba(124,45,18,.4);border-radius:12px"></div>
-    <!-- Estado: completo -->
-    <div id="cta-ready-msg" style="display:none">
-      <div style="font-size:40px;margin-bottom:12px">🏆</div>
-      <div style="font-family:'Inter Tight',sans-serif;font-size:24px;font-weight:900;color:#4ade80;margin-bottom:6px">¡Fase de grupos completada!</div>
-      <div style="font-size:13px;color:#9ca3af;margin-bottom:24px">El motor ha calculado los 32 clasificados. Accede al cuadro eliminatorio.</div>
-      <button onclick="goToEliminatoria()" style="
-        background:#16a34a;color:#fff;border:none;border-radius:12px;
-        padding:14px 32px;font-family:'Inter',sans-serif;
-        font-size:15px;font-weight:700;cursor:pointer;
-        box-shadow:0 4px 20px rgba(22,163,74,.4);
-        transition:all .2s;display:inline-flex;align-items:center;gap:8px;
-      " onmouseover="this.style.transform='translateY(-2px)'"
-         onmouseout="this.style.transform='none'">
-        Ver Cuadro Eliminatorio →
-      </button>
-    </div>
-  </div>
+  <!-- F7.4-D-A: banner #cta-eliminatorias eliminado (gate Fase final vive en bottom-tab + #fc-gate-modal). -->
 
 </div>
 
