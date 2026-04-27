@@ -164,14 +164,25 @@ Post-F7.4-A: 2 mount points entre body y splash:
 
 ## 7 · Pendientes para F7.4-B / C / D / E (out of scope F7.4-A)
 
-| Fase | Alcance | Ficheros previsibles |
-|---|---|---|
-| **F7.4-B** | Conectar `showPage` → `fcShellApply` → toggle `body.fc-shell-active` + mount/unmount tabs/header. Migrar `_gruposInited` a Promise singleton (R3). Añadir `'perfil'` a VALID_PAGES en los 4 sitios divergentes (R2). | `public/js/ui-nav.js`, `public/js/shell.js` (activar lógica), `js/main-entry.js`, `index.html` (3 sitios), `public/css/components/bottom-tab.css` (añadir selector `body.fc-shell-active .fc-tabbar { display: flex; }`). |
-| **F7.4-C** | Migrar `.adm-header`, `.sb-header`, `.global-header` → componente `.fc-appbar` con variantes. Activar `renderAppHeader()`. | `index.html` (3 secciones), `public/js/components/app-header.js`. |
-| **F7.4-D** | Eliminar sub-tabs internos: 3 botones de page-grupos (`index.html:552-568`) + 3 view-tabs de page-elim (`index.html:678-681`). Reemplazar con tabs del shell o pages dedicadas. | `index.html`, `public/js/ui-groups.js` (`setVistaGrupos`), `public/js/ko.js`. |
-| **F7.4-E** | Crear page-perfil (P10). Simplificar `renderAuthBar` para escribir solo en header global (R5). Implementar D5 (avatar + puntos + #posición), D6 (Clasificación como sub-vista con bottom-tab oculto), D7 (inline solo welcome hero). | `index.html` (page-perfil HTML), `public/js/auth.js` (`renderAuthBar`), `public/js/shell.js` (toggle off `body.fc-shell-active` durante page-score si origen=perfil), `public/css/components/app-header.css` (refinar D5). |
+| Fase | Estado | Alcance | Ficheros |
+|---|---|---|---|
+| **F7.4-B** | ✅ **Cerrada** · PR #29 · commits `a5232cf` + `521991f` (27 abr 2026) | Conexión `showPage` → `fcShellApply` → toggle `body.fc-shell-active` + mount idempotente bottom-tab. `_gruposInited` → Promise singleton (R3). `'perfil'` añadido a VALID_PAGES en los 4 sitios divergentes (R2). Rename label `Quiniela` → `Fase final`. | `public/js/shell.js`, `public/js/components/bottom-tab.js`, `public/js/ui-nav.js`, `js/main-entry.js`, `index.html` (×2), `public/css/components/bottom-tab.css`. |
+| **F7.4-C** | Pendiente | Migrar `.adm-header`, `.sb-header`, `.global-header` → componente `.fc-appbar` con variantes. Activar `renderAppHeader()`. | `index.html` (3 secciones), `public/js/components/app-header.js`. |
+| **F7.4-D** | Pendiente | Eliminar sub-tabs internos: 3 botones de page-grupos (`index.html:552-568`) + 3 view-tabs de page-elim (`index.html:678-681`). Reemplazar con tabs del shell o pages dedicadas. Limpiar alias `elim → quiniela` cuando exista tab dedicado para fase final. Resolver routes pendientes de Jornada/Directo/Predictor. | `index.html`, `public/js/ui-groups.js` (`setVistaGrupos`), `public/js/ko.js`, `public/js/components/bottom-tab.js`. |
+| **F7.4-E** | Pendiente | Crear page-perfil (P10). Simplificar `renderAuthBar` para escribir solo en header global (R5). Implementar D5 (avatar + puntos + #posición), D6 (Clasificación como sub-vista con bottom-tab oculto), D7 (inline solo welcome hero). | `index.html` (page-perfil HTML), `public/js/auth.js` (`renderAuthBar`), `public/js/shell.js` (toggle off `body.fc-shell-active` durante page-score si origen=perfil), `public/css/components/app-header.css` (refinar D5). |
 
-**Orden no-negociable**: F7.4-B (conexión) bloquea F7.4-C/D/E. F7.4-C y F7.4-D pueden paralelizarse si la separación de scope es nítida; F7.4-E va al final por dependencia de D5/D6.
+**Orden no-negociable**: F7.4-B (conexión) ✅ desbloquea F7.4-C/D/E. F7.4-C y F7.4-D pueden paralelizarse si la separación de scope es nítida; F7.4-E va al final por dependencia de D5/D6.
+
+### F7.4-B · DoD verificada
+
+- [x] Mobile 375px — bottom-tab visible en grupos + elim, oculta en welcome/admin/score (smoke San).
+- [x] Tab Grupos → navega a grupos, marcado activo. Tab Fase final → navega a elim, marcado activo (alias `elim → quiniela`).
+- [x] Tabs Jornada / Directo / Predictor → no-op + `console.debug "[shell] tab \"X\" sin route — pendiente F7.4-D"`.
+- [x] Re-entrada Grupos no re-invoca `initGrupos` (Promise singleton `_gruposInitPromise`).
+- [x] Console limpia: solo `console.debug` esperados.
+- [x] Sin regresiones en welcome auth bar, login modal, score (botón volver), admin, directo.
+- [x] `node --check` OK en `shell.js`, `bottom-tab.js`, `ui-nav.js`. `npm run build` OK. `body.fc-shell-active` presente en `dist/css/components/bottom-tab.css:81,86`. `fcShellApply` en `dist/js/shell.js` y `dist/js/ui-nav.js`.
+- [x] **GAP simulacro**: registrado fuera de scope F7.4-B, se aborda al reactivar el flujo de simulacro live.
 
 ---
 

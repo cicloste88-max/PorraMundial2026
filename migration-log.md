@@ -1151,3 +1151,17 @@ Rama: `feat/mobile-grupos-focus`. Spec validada con el usuario. Implementación 
 ## 2026-04-26 — Cierre sesión F7.4-A (app shell esqueleto inerte)
 
 **[21:52 26abr2026] F7.4-A merged** (PR #28, commit `0ddc6dc`): app shell esqueleto inerte. 7 ficheros nuevos en `public/{css,js}/components/` (tokens.css, bottom-tab.css, app-header.css, icons.js con 17 SVG, bottom-tab.js, app-header.js, shell.js no-op), 4 mods inline (`index.html`: viewport-fit=cover + `_splashHidden` flag en ambos paths splash + 3 `<link>` CSS + 2 mounts hidden `#fc-header-mount`/`#fc-tabbar-mount`; `main-entry.js`: cadena loadScript +4; `scoring.js:588` guard MutationObserver para ignorar mutations dentro de `.fc-tabbar`/`.fc-appbar`). 0 cambios visuales/comportamiento. QA programático 12/12 OK + smoke visual OK. Doc cerrada en `docs/restyling-mobile/00-app-shell.md`. Siguiente: F7.4-B (conexión `showPage` → `fcShellApply` → toggle `body.fc-shell-active` + mount/unmount + migrar `_gruposInited` a Promise singleton + añadir 'perfil' a VALID_PAGES en los 4 sitios).
+
+---
+
+## 2026-04-27 — Cierre sesión F7.4-B (conectar app shell · bottom-tab activa)
+
+**[01:25 27abr2026] F7.4-B merged** (PR #29, commits `a5232cf` + `521991f`): app shell conectado, bottom-tab visible en page-grupos y page-elim. 6 ficheros modificados:
+- `public/js/shell.js`: `fcShellApply` real con guard `_splashHidden`, toggle `body.fc-shell-active` y mount idempotente. `SHELL_PAGES = ['grupos', 'elim']`.
+- `public/js/components/bottom-tab.js`: render real 5 tabs + handlers. Tabs con route (Grupos→grupos, Fase final→elim) navegan via `showPage`; tabs sin route (Jornada/Directo/Predictor) loguean `console.debug "pendiente F7.4-D"`. Alias `elim → quiniela` en `fcMarkActiveTab`. Rename label `Quiniela` → `Fase final` (commit `521991f`).
+- `public/js/ui-nav.js`: (R3) `_gruposInited` boolean → `_gruposInitPromise` singleton. (R2) `'perfil'` añadido al guard auth. Llamada `fcShellApply(page)` al final de `showPage`.
+- `js/main-entry.js:9`: `'perfil'` añadido a `VALID_PAGES`.
+- `index.html` (líneas 38, 109): `'perfil'` añadido a las 2 listas hardcoded de `porra_lastPage`.
+- `public/css/components/bottom-tab.css`: `body.fc-shell-active .fc-tabbar { display: flex }` + `padding-bottom = tab height + safe-area`.
+
+QA: `node --check` OK en los 3 JS, `npm run build` OK, selector `body.fc-shell-active` y `fcShellApply` verificados en dist. Smoke San OK (PTI sobre tab "Fase final" + `console.debug "[shell] tab \"jornada\"/\"directo\" sin route — pendiente F7.4-D"` visible en consola). Console limpia. Doc cerrada en `docs/restyling-mobile/00-app-shell.md` §7. Riesgos R2 (VALID_PAGES divergentes) + R3 (`_gruposInited` boolean) resueltos. GAP simulacro registrado fuera de scope F7.4-B (se aborda al reactivar el flujo de simulacro live). Siguiente: **F7.4-C** (migrar `.adm-header`, `.sb-header`, `.global-header` → `.fc-appbar` con variantes).
