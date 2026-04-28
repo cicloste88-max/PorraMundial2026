@@ -8,6 +8,7 @@ Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
 - Aplicado vía Claude.ai (Supabase MCP) en sesión inicial: RLS en `orchestrator_jobs`; `search_path` + grants tightening en 4 funcs de control (`handle_new_user`, `enforce_max_leagues_per_user`, `schedule_match_crons`, `unschedule_match_crons`); fix `get_vault_secrets`; DROP `idx_award_picks_league` e `idx_ko_predictions_league`.
 - Aplicado vía Claude Code (migrations preparadas + apply Supabase MCP desde Claude.ai, registradas en `schema_migrations` con timestamps `20260428020438`/`20260428020439`): DROP `_fix_encoding_temp`, DROP view `refactor_status`, `search_path` en `is_porra_abierta` (sin tocar grants — ver **ERR-33**), +7 índices en FKs (`award_picks.user_id`, `boost_picks.league_id`, `ia_predictions.snapshot_id`, `ko_predictions.user_id`, `leagues.created_by`, `predictions.user_id`, `whatsapp_subscribers.user_id`).
+- Fix post-PR#36 (28abr 02:33 UTC): RLS+policy `service_only` en `tmp_upload_files` (advisor ERROR `0013_rls_disabled_in_public`). 1 ERROR → 0 en advisor security.
 - Backlog: `tmp_upload_files` (verificar fase_e en repo), 19 RLS rewrites con `(SELECT auth.uid())`, 5 policies SELECT duplicadas, 4 buckets storage con listing amplio, leaked password protection (dashboard). Detalle en `migration-log.md` y `docs/db/audit_28abr_section26_rls_planning.md`.
 
 ## 2026-04-27 — F7.4-D-A eliminar banner+btn legacy de page-grupos (PR pendiente)

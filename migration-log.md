@@ -1324,4 +1324,19 @@ Sección 2.6 (19 RLS rewrites con `(SELECT auth.uid())`) → planning en `docs/d
 - `545fced` feat(db): add missing FK indexes (7)
 - `2c66229` docs(db): planning sección 2.6 RLS rewrites
 
+## 2026-04-28 02:33 UTC — Fix tmp_upload_files (post-PR#36)
+
+ERROR del advisor 0013 (rls_disabled_in_public) sobre `public.tmp_upload_files` que NO se trató con la severidad debida en el levantamiento original (estaba listado solo como 'DROP residual #4'). Anon y authenticated tenían SELECT/INSERT/UPDATE/DELETE/TRUNCATE → cualquier persona con la anon key (pública por diseño en el frontend) podía leer los 7 base64 de Fase E y, peor, INSERT/UPDATE/DELETE/TRUNCATE arbitrariamente.
+
+Aplicado vía Claude.ai MCP, transacción atómica:
+- `ALTER TABLE … ENABLE ROW LEVEL SECURITY`
+- `CREATE POLICY tmp_upload_files_service_only FOR ALL TO service_role USING (true) WITH CHECK (true)`
+- `REVOKE ALL ON public.tmp_upload_files FROM anon, authenticated`
+
+Patrón idéntico a `orchestrator_jobs_service_only`. Verificación 5/5 PASS (`rls_enabled`, `policy_correct_pattern`, `grants_revoked_from_public_roles`, `service_role_kept`, `data_intact`). Diff advisor security: 1 ERROR → 0.
+
+DROP final de la tabla queda en backlog (verificar antes que los 7 paths `docs/fase_e/*` están commiteados al repo).
+
+Migration registrada: `20260428023300_secure_tmp_upload_files` (`created_by=claude-ai-mcp`).
+
 **[27abr2026 18:41] F7.4-D-A** (commit `678ba5a`, branch `claude/update-legacy-banner-button-DoQLh`). Eliminado banner `#cta-eliminatorias` y btn header `#btn-go-eliminatorias` legacy de page-grupos — ya redundantes con bottom-tab + gate modal `#fc-gate-modal` (F7.4-D-1). `checkGroupsComplete` (`public/js/ui-groups.js`) refactorizada de 124 LOC a 14 LOC: helper puro que solo computa `window._gruposComplete` (consumido por gate modal en `bottom-tab.js`). `ctaExpandJornada` + export borrados (0 callers fuera del banner). `goToEliminatoria` borrada de `public/js/ui-nav.js` (0 callers tras eliminar onclick HTML). 4 líneas muertas en handler boost (re-render `cta-boost-panel`) eliminadas. 3 ficheros (9+ / 204−). Validado: `node --check` OK + `npm run build` OK (44 modules, bundle 188.50 KB, 0 warnings). Scope estrictamente A: NO toca `setView`, `view-tabs`, `ko-sub-bar` ni page-elim (acoplado a F7.4-F). Pendiente smoke localhost por San.

@@ -36,7 +36,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 Detalle aplicación + planning en `migration-log.md` (entradas 28abr) y `docs/db/audit_28abr_section26_rls_planning.md`.
 
-1. **`tmp_upload_files`** — verificar 7 paths `docs/fase_e/*` en repo antes de DROP en migration siguiente.
+1. **`tmp_upload_files`** — SECURIZADO 28abr (RLS+policy `service_only`). Pendiente DROP final cuando se verifique que `docs/fase_e/*` está commiteado al repo.
 2. **19 RLS rewrites** con `(SELECT auth.uid())` — pre-11jun. Tablas `predictions`/`ko_predictions`/`award_picks`/`boost_picks`/`league_members`/`leagues`/`profiles`/`live_scores`/`whatsapp_subscribers`.
 3. **5 policies SELECT duplicadas** (`award_picks`, `boost_picks`, `ko_predictions`, `predictions`, `live_scores`): DROP la antigua de cada par.
 4. **4 buckets storage** (`flags`, `kits`, `miniatures`, `sites`): restringir listing público a paths explícitos.
