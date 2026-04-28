@@ -483,3 +483,19 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Follow-up (mismo PR #33):** smoke parcial OK tras el fix inicial, pero quedaba un caso edge cuando el dedo impactaba directamente el `<input class="boost-chk">` (no la `<span class="boost-txt">`). Trace con interceptor del setter `chk.checked` confirmó que la default action del checkbox nativo invertía `chk` DESPUÉS de los syncs síncronos (no pasa por el setter JS, no aparece en interceptores). El `e.preventDefault()` en capture phase del body NO cancela el toggle nativo cuando el target es el input directo (quirk de `<label for=...>` + checkbox). Fix: 1 línea adicional en `__mobileBoostRowClickHandler` (post `renderBoostTicker()`): `setTimeout(refreshBoostRowsInFocus, 0);`. La reconciliación diferida corre en next tick, después de la default action del navegador, garantizando coherencia final.
 - **Verificación de pre-existencia (smoke F7.4-D-1):** reproducido en producción `porramundial2026-seven.vercel.app` antes del fix con el mismo síntoma.
 - **Fecha detección:** 27 abr 2026 (smoke F7.4-D-1). **Fecha fix:** 27 abr 2026 (PR #33 mini-PR aparte, fix inicial + follow-up para click en input directo).
+
+---
+
+## ERR-33 — `REVOKE FROM PUBLIC` en función usada por RLS rompe `authenticated`
+
+- **Síntoma:** tras aplicar `REVOKE EXECUTE ... FROM PUBLIC` + `GRANT TO service_role` siguiendo el advisor de Supabase, los `INSERT`/`UPDATE` de usuarios `authenticated` en una tabla con RLS empiezan a fallar con error `42501 permission denied for function <fn>`.
+- **Causa:** la función está invocada desde el bloque `USING` o `WITH CHECK` de una policy. Cuando `authenticated` intenta operar sobre la tabla, Postgres evalúa la policy con los permisos del rol activo. Sin `EXECUTE` para `authenticated`/`PUBLIC`, la evaluación falla. `SECURITY DEFINER` no salva la situación porque el filtro de grants se aplica antes de la elevación.
+- **Fix aplicado:** mantener `GRANT EXECUTE TO PUBLIC` (o al menos a `authenticated`). La protección real ya viene de `SECURITY DEFINER` + lógica interna de filtrado por `user_id` dentro del cuerpo de la función. Sobre `is_porra_abierta(uuid, uuid)` solo se aplicó `SET search_path = public, pg_temp`, dejando los grants intactos.
+- **Patrón preventivo:** verificación previa antes de aplicar el patrón "función de control" del advisor:
+  ```sql
+  SELECT schemaname, tablename, policyname FROM pg_policies
+  WHERE qual LIKE '%<funcname>%' OR with_check LIKE '%<funcname>%';
+  ```
+  Si devuelve filas → **NO** revocar de `PUBLIC`. Aplicar solo `SET search_path = public, pg_temp`.
+- **Caso conocido:** `is_porra_abierta(uuid, uuid)` en sesión audit Postgres 28abr2026 — usada en 8 policies (`predictions`/`ko_predictions`/`award_picks`/`boost_picks` × INSERT/UPDATE).
+- **Fecha detección:** 28 abr 2026 (sesión audit Postgres, atajado pre-apply gracias a verificación de Claude.ai vía MCP).

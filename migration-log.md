@@ -1257,4 +1257,71 @@ QA: `node --check` OK en los 3 JS, `npm run build` OK, selector `body.fc-shell-a
 
 **[27abr2026] Mini-PR ERR-32 fix** (PR #33, branch `claude/err-32-fix-boost-sync`). Fix BLOQUEANTE UX detectado tras smoke ERR-30 (boost check desincronizado con `boostPicks`). `refreshBoostRowsInFocus` (`ui-groups-mobile.js:601`) ahora reconcilia `chk.checked`, `boost-active`, `boost-on` con `boostPicks` además de `boost-blocked`. ~10 líneas insertadas dentro del forEach de rows (variables `bp`, `boostedKey`, `card`, `row`, `matchKey` reusadas del scope existente). `boostPicks` queda como single source of truth — `chk.disabled = !!(boostedKey && !isThisMatch)` mantiene simétrico el render con `attachEvents` de `scoring.js`. ERR-32 entry creada en errores_conocidos_porra.md con ✅ FIXED. CLAUDE.md tabla ERR ampliada con ERR-32. Pendiente smoke San (5 puntos).
 
+---
+
+## 2026-04-28 — Sesión audit Postgres (parte aplicada desde Claude.ai)
+
+Auditoría completa con `get_advisors` (security + performance) tras meses sin revisión. Bloques aplicados directamente vía Supabase MCP `execute_sql`:
+
+### Bloque A — Vault decryption fix (raíz crítica)
+
+La función `public.get_vault_secrets(text[])` tenía grants amplios y descifraba sin `SECURITY DEFINER` correcto. Reescrita: `search_path` fijado, grants limitados, `SECURITY DEFINER` explícito.
+
+### Bloque B — RLS en `orchestrator_jobs`
+
+```sql
+ALTER TABLE public.orchestrator_jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY orchestrator_jobs_service_only ON public.orchestrator_jobs
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+```
+
+### Bloque C — REVOKE/GRANT en 4 funcs de control
+
+Patrón aplicado a `enforce_max_leagues_per_user()`, `handle_new_user()`, `schedule_match_crons(text, timestamptz)`, `unschedule_match_crons(text)`:
+
+```sql
+REVOKE EXECUTE ON FUNCTION public.<fn>(...) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.<fn>(...) TO service_role;
+ALTER  FUNCTION public.<fn>(...) SET search_path = public, pg_temp;
+```
+
+Justificación: las 4 son triggers o helpers consumidos solo desde `service_role`. **NO** se aplica este patrón a `is_porra_abierta` por ser invocada desde RLS USING/WITH CHECK — ver **ERR-33**.
+
+### Bloque D — DROP de índices unused
+
+```sql
+DROP INDEX IF EXISTS public.idx_award_picks_league;
+DROP INDEX IF EXISTS public.idx_ko_predictions_league;
+```
+
+Validado vía `pg_stat_user_indexes`: 0 lecturas desde creación.
+
+### Bloque E — Verificación tablas IA
+
+`ia_snapshots` y `ia_predictions` tienen RLS y policies de lectura pública. No requiere acción.
+
+---
+
+## 2026-04-28 — Sesión audit Postgres (parte aplicada por Claude Code)
+
+Migrations preparadas en `supabase/migrations/` por Claude Code y aplicadas vía Supabase MCP desde Claude.ai (CLI no linkeado en container Code; saltamos D3 db-push del plan original). Registradas en `supabase_migrations.schema_migrations` con timestamps `20260428020438` y `20260428020439` para coherencia repo↔BD (`supabase db pull/push --linked` no las re-aplicará).
+
+- `DROP TABLE _fix_encoding_temp` (residual, 0 filas).
+- `DROP VIEW refactor_status` (residual del refactor F4, sin dependientes).
+- `ALTER FUNCTION is_porra_abierta SET search_path = public, pg_temp`. **NO** se modifican grants — la función vive en USING/WITH CHECK de 8 RLS policies (`predictions`, `ko_predictions`, `award_picks`, `boost_picks` × INSERT/UPDATE) y necesita `EXECUTE` para `authenticated`. Ver ERR-33.
+- 7 `CREATE INDEX IF NOT EXISTS` en FKs sin cobertura (advisor performance): `award_picks.user_id`, `boost_picks.league_id`, `ia_predictions.snapshot_id`, `ko_predictions.user_id`, `leagues.created_by`, `predictions.user_id`, `whatsapp_subscribers.user_id`. Sin `CONCURRENTLY` (tablas <500 filas, bloqueo despreciable).
+
+Sección 2.6 (19 RLS rewrites con `(SELECT auth.uid())`) → planning en `docs/db/audit_28abr_section26_rls_planning.md`, no ejecutado en esta sesión (bajo impacto pre-Mundial, tablas <500 filas; re-evaluar pre-11jun).
+
+**Verificación post-apply 5/5 PASS** desde Claude.ai (search_path en `is_porra_abierta`, drops verificados, 7 índices presentes, grants intactos anti-regresión ERR-33, 2 entries registradas en `schema_migrations`).
+
+**Diff advisors performance:** `unindexed_foreign_keys` 7 INFO → 0 ✅; `auth_rls_initplan` 19 WARN → 19 WARN (esperado, planning); `multiple_permissive_policies` ~30 → ~30 (backlog); `unused_index` 0 → 7 INFO (los recién creados, los retira advisors al detectar uso).
+
+**Backlog formal:** `tmp_upload_files` (7 filas `docs/fase_e/*` a verificar antes de DROP), 19 RLS rewrites pre-11jun, 5 policies SELECT duplicadas (`award_picks`/`boost_picks`/`ko_predictions`/`predictions`/`live_scores`), 4 buckets storage con listing amplio (`flags`/`kits`/`miniatures`/`sites`), leaked password protection (Auth dashboard).
+
+**Commits rama `claude/postgres-security-audit-bFlg0`:**
+- `f3030b6` feat(db): drop residuals + fix is_porra_abierta search_path
+- `545fced` feat(db): add missing FK indexes (7)
+- `2c66229` docs(db): planning sección 2.6 RLS rewrites
+
 **[27abr2026 18:41] F7.4-D-A** (commit `678ba5a`, branch `claude/update-legacy-banner-button-DoQLh`). Eliminado banner `#cta-eliminatorias` y btn header `#btn-go-eliminatorias` legacy de page-grupos — ya redundantes con bottom-tab + gate modal `#fc-gate-modal` (F7.4-D-1). `checkGroupsComplete` (`public/js/ui-groups.js`) refactorizada de 124 LOC a 14 LOC: helper puro que solo computa `window._gruposComplete` (consumido por gate modal en `bottom-tab.js`). `ctaExpandJornada` + export borrados (0 callers fuera del banner). `goToEliminatoria` borrada de `public/js/ui-nav.js` (0 callers tras eliminar onclick HTML). 4 líneas muertas en handler boost (re-render `cta-boost-panel`) eliminadas. 3 ficheros (9+ / 204−). Validado: `node --check` OK + `npm run build` OK (44 modules, bundle 188.50 KB, 0 warnings). Scope estrictamente A: NO toca `setView`, `view-tabs`, `ko-sub-bar` ni page-elim (acoplado a F7.4-F). Pendiente smoke localhost por San.
