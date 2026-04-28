@@ -32,6 +32,16 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 5. Verificar estructura JSON `_results.ko_results` con `update-results` real (11 jun).
 6. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos).
 
+## Pendientes — Audit Postgres 28abr (backlog)
+
+Detalle aplicación + planning en `migration-log.md` (entradas 28abr) y `docs/db/audit_28abr_section26_rls_planning.md`.
+
+1. **`tmp_upload_files`** — verificar 7 paths `docs/fase_e/*` en repo antes de DROP en migration siguiente.
+2. **19 RLS rewrites** con `(SELECT auth.uid())` — pre-11jun. Tablas `predictions`/`ko_predictions`/`award_picks`/`boost_picks`/`league_members`/`leagues`/`profiles`/`live_scores`/`whatsapp_subscribers`.
+3. **5 policies SELECT duplicadas** (`award_picks`, `boost_picks`, `ko_predictions`, `predictions`, `live_scores`): DROP la antigua de cada par.
+4. **4 buckets storage** (`flags`, `kits`, `miniatures`, `sites`): restringir listing público a paths explícitos.
+5. **Auth dashboard**: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies.
+
 ## Reglas CRÍTICAS
 
 - **NUNCA push a main sin validar en localhost:5173 primero**.
@@ -124,12 +134,13 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-30 | `mobile-locked` persiste tras Deshacer (✅ FIXED en PR #32) |
 | ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente fix) |
 | ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33) |
+| ERR-33 | `REVOKE FROM PUBLIC` en función usada por RLS rompe `authenticated` |
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..29 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..33 (síntoma/causa/fix/patrón).
 
 ## End-of-session protocol
 
