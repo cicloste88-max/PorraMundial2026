@@ -17,6 +17,7 @@ App de pronósticos para el Mundial 2026 (Canadá · México · Estados Unidos).
 | Live scoring | Apify actor propio (Playwright + proxy residencial Webshare) |
 | Notificaciones | Twilio WhatsApp |
 | Agentes | Claude Haiku via Anthropic API + `porra-orchestrator` EF |
+| Seguridad | Cloudflare Turnstile (CAPTCHA login, Managed mode) |
 
 ---
 
@@ -41,9 +42,12 @@ porra-mundial-2026/
 │   └── main-entry.js                   · ESM entry, expone Supabase y carga la chain
 │
 ├── public/js/                          ← Classic scripts cargados vía loadScript
+│   ├── shell.js                        · Bootstrap de la app (carga chain de scripts)
 │   ├── data.js                         · PARTIDOS, EQUIPOS, GRUPOS, BRACKET, predictions
 │   ├── scoring.js                      · Motor de puntos + tarjetas + premios
 │   ├── ui-groups.js                    · Vista Grupos + Vista Jornada
+│   ├── ui-groups-mobile.js             · Vista móvil grupos (acordeón + focus layer + carrusel)
+│   ├── ui-directo.js                   · Vista Directo (live scores + simulacros admin)
 │   ├── ko.js                           · Bracket KO + predicciones IA
 │   ├── ui-nav.js                       · SPA nav + modal + welcome
 │   ├── auth.js                         · Autenticación Supabase
@@ -52,10 +56,14 @@ porra-mundial-2026/
 │   ├── close-porra.js                  · Cierre de pronósticos
 │   ├── admin.js                        · Panel admin + dado + simulador
 │   ├── bracket-results.js              · Vista resultados reales del bracket KO
+│   ├── live-sync.js                    · Sincronización en tiempo real (Supabase Realtime)
 │   └── misc.js                         · Utilidades UI
 │
 ├── apify-actors/                       ← Actores Apify custom
 │   └── sofascore-webshare-proxy/       · Actor principal (producción)
+│
+├── supabase/
+│   └── migrations/                     ← Migraciones SQL aplicadas a BD (timestamps)
 │
 ├── supabase-ef-patches/                ← Snapshots de Edge Functions
 │
@@ -86,8 +94,10 @@ porra-mundial-2026/
 | `orchestrator_jobs` | Historial ejecuciones agentes Haiku |
 | `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id). Columna `is_historic BOOLEAN DEFAULT false`: `true` = trial runs / pruebas, conservado como referencia consultiva de formatos/estados. **No usar en scoring** (filtrar `WHERE is_historic = false`). |
 | `whatsapp_subscribers` | Teléfonos activos para notificaciones |
+| `ia_snapshots` | Snapshots del predictor IA (ELO, H2H, form) por fecha |
+| `ia_predictions` | Predicciones IA por partido (signo, probabilidades) |
 
-RLS habilitado en todas las tablas.
+RLS habilitado en todas las tablas. Audit de seguridad completo aplicado 28-29abr2026 (PR#36-38).
 
 ---
 
@@ -99,11 +109,13 @@ RLS habilitado en todas las tablas.
 | `update-results` | v4 | Sync football-data.org → `results`. Activar pg_cron el 11 jun |
 | `porra-orchestrator` | v3 | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API |
-| `porra-match-live` | v13 | Live scores async + webhook |
+| `porra-fix-encoding` | v6 | Inspect/write ficheros GitHub via API |
+| `porra-match-live` | v16 | Live scores async + webhook |
 | `porra-apify-webhook` | v7 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
 | `porra-whatsapp-send` | v1 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
+| `create-league` | v2 | Crear liga (cualquier usuario, max 3 no-admin). verify_jwt=false |
+| `porra-ia-compute` | v10 | Motor IA Predictor (ELO+H2H+form+host). Genera ia_snapshots + ia_predictions |
 
 ---
 
@@ -212,6 +224,27 @@ pg_cron (durante partido)
 | `TWILIO_ACCOUNT_SID` | Twilio |
 | `TWILIO_API_KEY` | Twilio |
 | `TWILIO_API_SECRET` | Twilio |
+| `TURNSTILE_SITE_KEY` | Cloudflare Turnstile sitekey público (login CAPTCHA) |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret key (validación servidor) |
+
+---
+
+## Seguridad
+
+### CAPTCHA
+
+Login protegido con Cloudflare Turnstile (Managed mode). En localhost se usa el test sitekey `1x00000000000000000000AA` (always-passes, banner rojo "Solo para pruebas" esperado). En producción se usa el sitekey real `0x4AAAAAADFzAxFI4isPOuJx`. Detección vía `window.location.hostname` en script inline. Secret en Supabase Auth → Attack Protection.
+
+### Audit Postgres (28-29 abr 2026)
+
+Auditoría completa de seguridad y rendimiento aplicada (PR#36-40):
+
+- RLS habilitado en todas las tablas públicas expuestas.
+- REVOKE/GRANT en funciones de control (`enforce_max_leagues`, `handle_new_user`, `schedule`/`unschedule_match_crons`).
+- `search_path` fijado en todas las funciones públicas.
+- 7 índices de FK creados (rendimiento).
+- Policies duplicadas eliminadas; 17 RLS rewrites con `(SELECT auth.uid())`.
+- Advisor Supabase: 0 ERRORs.
 
 ---
 
@@ -220,9 +253,10 @@ pg_cron (durante partido)
 | Fichero | Propósito |
 |---------|-----------|
 | `CLAUDE.md` | Contexto de trabajo para Claude Code (sesiones). |
-| `errores_conocidos_porra.md` | Histórico de bugs resueltos y patrones críticos (ERR-01 a ERR-20, 13 documentados). |
+| `errores_conocidos_porra.md` | Histórico de bugs resueltos y patrones críticos (ERR-01 a ERR-33). |
 | `migration-log.md` | Bitácora cronológica de etapas del proyecto. |
 | `CONTEXTO_PORRA_2026.md` | Contexto maestro del proyecto. |
+| `docs/db/audit_28abr_section26_rls_planning.md` | Planning 19 RLS rewrites pendientes |
 
 ---
 
@@ -285,6 +319,8 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Vista Directo con pipeline live realtime (72 tarjetas Mundial + sección **🧪 Simulacros activos** sólo admin para testing con partidos fuera del torneo)
 - Usuarios no-admin pueden crear sus propias porras (hasta 3, admin ilimitado) vía EF `create-league`
 - Rediseño móvil de fase de grupos (acordeón por grupo + focus layer pantalla completa + carrusel 6 partidos + slide clasificación + botón Guardar/Deshacer con persistencia en BD)
+- IA Predictor integrado (Fases A-F cerradas): motor ELO+H2H+form+host, snapshots en BD, 72 predicciones de grupos, tooltip explicativo +1pt bonus vs IA
+- Audit Postgres seguridad completo (PR#36-40, 28-29abr2026): RLS, grants, índices FK, CAPTCHA Turnstile
 
 ### Antes del 11 de junio de 2026
 
@@ -296,7 +332,6 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - [ ] Verificar estructura JSON `_results.ko_results` con `update-results` real
 - [ ] Auto-completar Pichichi del torneo sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
 - [ ] Enganche final de frases IA para pronóstico signo de partido (lógica ya incorporada, falta wiring)
-- [ ] Bugs UI: parpadeo botón envío porra, hora CEST en píldora partido, cinta tabs móvil eliminatorias, simular eliminatorias visible a todos
 
 ### Post-torneo
 
