@@ -2,6 +2,13 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-04-29 — Cloudflare Turnstile CAPTCHA (PR#39 + PR#40)
+
+**Auth / Seguridad.**
+
+- **PR#39** (`8b1dc30`): Cloudflare Turnstile CAPTCHA (Managed mode) en formulario de login. Script `api.js` en `<head>`, widget `cf-turnstile` antes del submit, token leído de `[name=cf-turnstile-response]` y pasado vía `options.captchaToken` en `signInWithPassword`. Widget reseteado con `window.turnstile.reset()` tras cada intento. Sitekey + secret en Vault (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`). Secret además configurada en Supabase Auth → Attack Protection.
+- **PR#40** (`7467a4b`): test sitekey `1x00000000000000000000AA` (always-passes) en `localhost` para evitar error 110200; sitekey real `0x4AAAAAADFzAxFI4isPOuJx` en producción. Detección vía `window.location.hostname === 'localhost'`. Banner rojo "Solo para pruebas" en local es esperado.
+
 ## 2026-04-28 — Audit Postgres (Claude.ai + Code, ERR-33)
 
 **Database (audit 28abr).**

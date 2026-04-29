@@ -38,6 +38,12 @@ Items 1-5 del backlog post-audit ✅ cerrados (PR#37 + migrations `2026042803000
 
 1. **Auth dashboard**: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies. Acción de San (1 click).
 
+## Auth & Secrets
+
+Login protegido con Cloudflare Turnstile (Managed mode) — PR#39 + PR#40 (29abr). En `localhost` se usa el test sitekey `1x00000000000000000000AA` (always-passes, banner rojo "Solo para pruebas" esperado); en producción `0x4AAAAAADFzAxFI4isPOuJx`. Detección vía `window.location.hostname` en script inline pre-render. Secret configurado en Supabase Auth → Attack Protection.
+
+Vault añade dos secrets: `TURNSTILE_SITE_KEY` (público, `0x4AAAAAADFzAxFI4isPOuJx`) y `TURNSTILE_SECRET_KEY` (privado). Resto del catálogo Vault/EF en `.claude/rules/edge-functions.md` y `docs/architecture.md` §Secrets.
+
 ## Reglas CRÍTICAS
 
 - **NUNCA push a main sin validar en localhost:5173 primero**.
