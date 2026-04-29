@@ -247,11 +247,6 @@ h2{
 .ia-prediction{font-weight:700;color:#c4b5fd}
 .ia-detail{font-size:10px;color:#6b7280}
 .ia-quip{font-size:10px;color:#8b949e;font-style:italic;letter-spacing:.01em}
-.ia-loading{display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280}
-.ia-dot{width:4px;height:4px;border-radius:50%;background:#7c3aed;animation:iaDot 1.2s ease-in-out infinite}
-.ia-dot:nth-child(2){animation-delay:.2s}.ia-dot:nth-child(3){animation-delay:.4s}
-@keyframes iaDot{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-/* .ia-btn removed — IA now auto-fetches on load */
 .score-live{display:none;flex-direction:column;align-items:center;gap:5px;margin-bottom:10px}
 .score-big{display:flex;align-items:center;gap:12px}
 .score-num{font-family:'Noto Sans',sans-serif;font-size:44px;font-weight:900;color:#f0fdf4;line-height:1}
@@ -698,19 +693,6 @@ h2{
 .gbadge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#27272a;color:#6b7280;white-space:nowrap;transition:all .3s;flex-shrink:0}
 .gbadge.on{background:#1c1003;border:1px solid #d97706;color:#fcd34d}
 .gbadge.earned{background:#052e16;border:1px solid #166534;color:#4ade80}
-.ia-bar{background:#111318;border-top:1px solid #27272a;padding:8px 16px;display:flex;align-items:center;gap:10px;min-height:38px}
-.ia-lbl{font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:4px}
-.ia-lbl::before{content:'';width:6px;height:6px;border-radius:50%;background:#7c3aed;box-shadow:0 0 6px rgba(124,58,237,.6);animation:iaPulse 2s infinite}
-@keyframes iaPulse{0%,100%{opacity:1}50%{opacity:.5}}
-.ia-content{flex:1;font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:6px}
-.ia-prediction{font-weight:700;color:#c4b5fd}
-.ia-detail{font-size:10px;color:#6b7280}
-.ia-quip{font-size:10px;color:#8b949e;font-style:italic;letter-spacing:.01em}
-.ia-loading{display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280}
-.ia-dot{width:4px;height:4px;border-radius:50%;background:#7c3aed;animation:iaDot 1.2s ease-in-out infinite}
-.ia-dot:nth-child(2){animation-delay:.2s}.ia-dot:nth-child(3){animation-delay:.4s}
-@keyframes iaDot{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-/* .ia-btn removed — IA now auto-fetches on load */
 .score-live{display:none;flex-direction:column;align-items:center;gap:5px;margin-bottom:10px}
 .score-big{display:flex;align-items:center;gap:12px}
 .score-num{font-family:'Noto Sans',sans-serif;font-size:44px;font-weight:900;color:#f0fdf4;line-height:1}
