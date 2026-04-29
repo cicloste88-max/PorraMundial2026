@@ -79,6 +79,36 @@ Cuando un PR se mergea con squash, GitHub auto-elimina la branch `claude/*` en r
 
 Ya documentado como precedente en `migration-log.md` (cierre F7.4-A): "tras squash-merge + auto-delete de la rama de trabajo, el sandbox local puede recrearla sin saberlo si pushea desde la rama vieja (genera PRs fantasma)".
 
+## 7 · Subagentes Haiku 4.5 paralelos (patrón validado F7.X)
+
+Cuando una fase requiere generar múltiples ficheros independientes (ej. CSS shell + design tokens + JS controller + wiring), el padre puede delegar a 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas:
+
+- **Oleada 1**: subagentes que solo escriben artefactos sin dependencias externas (ej. CSS + tokens).
+- **Oleada 2**: subagentes que dependen de los outputs de la oleada 1 (ej. JS que usa selectores CSS, wiring que importa el JS).
+
+**Responsabilidad del padre tras las oleadas**:
+
+1. **Integrar** los outputs (concatenar/colocar ficheros donde tocan).
+2. **Resolver mismatches** de selectores CSS↔JS (subagente CSS puede usar `.elim-card` mientras el JS usa `.card-elim` — el padre uniforma).
+3. **Resolver escapes** en template strings (subagentes a veces escapan backticks/dólares de más al copiar a Write).
+4. **Validar** con `node --check` + `npm run build` + smoke localhost antes de commit.
+
+Caveat E13 sigue aplicando: subagentes con tool Write **no heredan** `.claude/rules/` — pasar contexto inline en el prompt del subagente o restringir a artefactos puros sin reglas de proyecto.
+
+Validado en F7.X (PR#44, 30abr2026): 4 subagentes generaron `ui-elim-shell.js` (545 LOC) + `elim-shell.css` (295) + `elim-tokens.css` (30) + wiring en `main-entry`/`ui-nav`/`bottom-tab` con éxito tras integración del padre.
+
+## 8 · Design source bundles en branch dedicada
+
+Cuando se trabaja con un bundle de design source extenso (mockups HTML/CSS/JS de referencia, screenshots, specs), **NO embeber inline en el brief de la fase** (consume ventana de contexto y no sobrevive entre sesiones). En su lugar:
+
+1. Crear branch dedicada `docs/<nombre>-design-source-v<N>` desde `main`.
+2. Push del bundle en un único commit descriptivo.
+3. Referenciar la branch + commit SHA en el brief de la fase y en `CHANGELOG.md`.
+
+**Ventajas**: (a) sobrevive entre sesiones, (b) versionable (v2, v3 si rediseño), (c) consultable vía `git show <sha>:<ruta>` o checkout de la branch en local sin contaminar `main`.
+
+Validado en F7.X: bundle design source v2 vive en `docs/quiniela-design-source-v2` commit `fd95d08`. Patrón a seguir para futuros design source bundles.
+
 ## Referencias
 
 - `CLAUDE.md` § Reglas CRÍTICAS (Push inmediato + NUNCA push a main sin validar)
