@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** post-merge F7.4-D (PR #31 pages dedicadas + #32 ERR-30 + #33 ERR-32 + **F7.4-D-A**: banner `#cta-eliminatorias` y btn `#btn-go-eliminatorias` legacy borrados de page-grupos; `checkGroupsComplete` reducida a helper puro que conserva `window._gruposComplete` para gate modal). Pages dedicadas Jornada/Directo/Predictor; gate Fase final modal `#fc-gate-modal`; `setVistaGrupos`/`_vistaActual` reemplazados por `window._currentPage`; alias `quiniela→elim` limpio; `boost-ticker` en page-jornada. ERR-31 cosmético (btnRow residual tras Deshacer) pendiente. Siguiente fase: **F7.4-D-2** (widgets Predictor), **F7.4-E** (page-perfil + simplificar `renderAuthBar`) o **F7.4-F** (rediseño page-elim, donde se cerrará la parte B del cleanup: `setView` + `view-tabs`). IA Predictor Fases A–F cerradas (paridad Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE. `feat/mobile-grupos-focus` LIVE en producción. Detalle F7.4-D-A + ERR-30 + ERR-32 en `CHANGELOG.md`.
+Rama activa **main** HEAD `5ddb974` post-merge **F7.4-D-2** (PR#43, cleanup IA Predictor widgets, −18 LOC) + **F7.X** (PR#44, +872 −66 LOC, nuevo shell visual `#page-elim` Fase final, cards CORE preservadas, gate modal retirado, bug UI #3 corregido). Pages dedicadas Jornada/Directo/Predictor + page-elim rediseñado; `_currentPage` global; alias `quiniela→elim` limpio. ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** vía Supabase Auth dashboard (over-engineering app privada). Siguiente fase candidata: **F7.4-E** (page-perfil), **F7.7** (rediseño Predictor) o tests Vitest motor. IA Predictor Fases A–F cerradas (Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE. Detalle en `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
@@ -13,13 +13,13 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. **Code splitting `admin.js`** (dynamic import bajo `is_admin`) — bundle −25%.
+3. **F7.7 rediseño Predictor** (widgets) — completaría el sweep de pages dedicadas tras F7.X.
 
 ## Pendientes — Bugs UI
 
 1. Cinta superior tabs ronda no se visualiza completa en móvil (eliminatorias).
 2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
-3. Botón simular eliminatorias visible para todos los usuarios (actualmente solo admin).
+3. ✅ Corregido en F7.X.7 (PR#44) — botón simular eliminatorias ya no visible para non-admin.
 4. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
 5. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
 
@@ -40,9 +40,7 @@ Items 1-5 del backlog post-audit ✅ cerrados (PR#37 + migrations `2026042803000
 
 ## Auth & Secrets
 
-Login protegido con Cloudflare Turnstile (Managed mode) — PR#39 + PR#40 (29abr). En `localhost` se usa el test sitekey `1x00000000000000000000AA` (always-passes, banner rojo "Solo para pruebas" esperado); en producción `0x4AAAAAADFzAxFI4isPOuJx`. Detección vía `window.location.hostname` en script inline pre-render. Secret configurado en Supabase Auth → Attack Protection.
-
-Vault añade dos secrets: `TURNSTILE_SITE_KEY` (público, `0x4AAAAAADFzAxFI4isPOuJx`) y `TURNSTILE_SECRET_KEY` (privado). Resto del catálogo Vault/EF en `.claude/rules/edge-functions.md` y `docs/architecture.md` §Secrets.
+Cloudflare Turnstile **DESACTIVADO 30abr2026** vía Supabase Auth dashboard. Decisión: app privada, fricción innecesaria + Supabase Cloud single-secret slot + Cloudflare no acepta ports localhost. Widget HTML/JS en `index.html` y `auth.js` permanecen (no estorban; no ejecutan sin secret en Auth). Catálogo Vault/EF en `.claude/rules/edge-functions.md` y `docs/architecture.md` §Secrets.
 
 ## Reglas CRÍTICAS
 
@@ -63,15 +61,12 @@ Vault añade dos secrets: `TURNSTILE_SITE_KEY` (público, `0x4AAAAAADFzAxFI4isPO
 ## Comandos útiles
 
 ```bash
-npm run dev                                              # localhost:5173
-npm run build                                            # genera dist/
-git add -A && git commit -m "..." && git push origin main
-
-# Lanzar actor Apify manualmente:
+npm run dev    # localhost:5173
+npm run build  # dist/
 apify call N8vUChlhok5JU3cnL -i '{"eventId":"15832749"}' -t 90
 ```
 
-Activación one-time del hook pre-commit en clones nuevos: `git config core.hooksPath .githooks`.
+Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`.
 
 ## Mapa de la documentación
 
@@ -133,9 +128,9 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
 | ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
 | ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
-| ERR-30 | `mobile-locked` persiste tras Deshacer (✅ FIXED en PR #32) |
-| ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente fix) |
-| ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ FIXED en PR #33) |
+| ERR-30 | `mobile-locked` persiste tras Deshacer (✅ PR#32) |
+| ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente) |
+| ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ PR#33) |
 | ERR-33 | `REVOKE FROM PUBLIC` en función usada por RLS rompe `authenticated` |
 
 ### Otros ficheros de contexto
@@ -146,14 +141,12 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 
 ## End-of-session protocol
 
-1. Actualizar `Estado actual` y top-3 pendientes en este `CLAUDE.md` + commit.
-2. Bugs resueltos durante la sesión → entrada en `CHANGELOG.md` (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB). NO en `CLAUDE.md`.
-3. Append `[HH:MM] ACCION: descripción — ficheros afectados` a `migration-log.md`.
-4. Verificar tamaños pre-commit con `.githooks/pre-commit` (enforcement: 10KB CLAUDE.md / 30KB CHANGELOG.md; **no activo aún en main** — activar one-time con `git config core.hooksPath .githooks`). Si CHANGELOG > 30KB, mover entradas antiguas a archive.
+1. Actualizar `Estado actual` + top-3 en este `CLAUDE.md` + commit.
+2. Bugs resueltos → `CHANGELOG.md` (90d, auto-archive a `CHANGELOG-archive-YYYYMM.md` si >30KB). NO en `CLAUDE.md`.
+3. Append `[HH:MM] ACCION: …` a `migration-log.md`.
+4. Verificar tamaños con `.githooks/pre-commit` (10KB CLAUDE.md / 30KB CHANGELOG.md; activar one-time con `git config core.hooksPath .githooks`).
 5. Revisar política retención CHANGELOG el 20 jul 2026 (post-Mundial: revertir a 30d).
 
 ## Frase inicio sesión
 
-`Porra Mundial 2026. HEAD actual en main. Fase activa y últimos 3 prioritarios.`
-
-Provoca la respuesta del slash command `/start-session` (ver `.claude/commands/start-session.md`): leer §"Estado actual" + reportar HEAD + fase + top-3 sin pedir confirmación.
+`Porra Mundial 2026. HEAD actual en main. Fase activa y últimos 3 prioritarios.` → invoca `/start-session`.
