@@ -7,17 +7,15 @@
     { id: 'predictor', label: 'Predictor', icon: 'predictor', route: 'predictor' }
   ];
 
-  // F7.4-D-1: gate modal "Fase final bloqueada" (mostrar si _gruposComplete falsy).
-  // El modal vive como #fc-gate-modal en index.html (fuera de cualquier page).
-  function _showGruposGateModal() {
-    var modal = document.getElementById('fc-gate-modal');
-    if (modal) modal.classList.add('open');
-  }
-  function _closeGruposGateModal() {
+  // F7.X.8: gate modal "Fase final bloqueada" RETIRADO. El PhaseStepper del
+  // shell #page-elim ya comunica visualmente el bloqueo cascada (estado
+  // is-locked + 🔒 + counter '—/N'). UX más fluida sin modal interruptivo.
+  // window.fcGateModalClose se conserva como no-op para no romper handlers
+  // antiguos (ej. botón inline en #fc-gate-modal del index.html).
+  window.fcGateModalClose = function () {
     var modal = document.getElementById('fc-gate-modal');
     if (modal) modal.classList.remove('open');
-  }
-  window.fcGateModalClose = _closeGruposGateModal;
+  };
 
   function renderBottomTab(activePage) {
     var mount = document.getElementById('fc-tabbar-mount');
@@ -45,11 +43,9 @@
           console.debug('[shell] tab "' + tab + '" sin route');
           return;
         }
-        // F7.4-D-1: gate Fase final si grupos no completos.
-        if (def.route === 'elim' && !window._gruposComplete) {
-          _showGruposGateModal();
-          return;
-        }
+        // F7.X.8: gate modal retirado. Navegación a 'elim' ahora SIEMPRE
+        // permitida; el PhaseStepper del shell page-elim comunica el bloqueo
+        // cascada visualmente (filas con 🔒 + counter '—/N').
         if (typeof window.showPage === 'function') window.showPage(def.route);
       });
     });

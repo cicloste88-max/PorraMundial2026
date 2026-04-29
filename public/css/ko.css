@@ -36,32 +36,6 @@ body{font-family:'Inter',sans-serif;background:#0f172a;color:#fff;min-height:100
    .gh-pts, .gh-pts-label, .gh-pts-num) retirados.
 ════════════════════════════════════════════════ */
 
-/* ════════════════════════════════════════════════
-   FRANJA "Mis puntos" (F7.4-C transitoria)
-   Aparece debajo del .fc-appbar--page de eliminatorias mostrando el contador
-   de puntos KO + acceso rápido a Clasificación. Será retirada en F7.4-E
-   cuando el header global persistente exponga puntos + #posición (D5).
-════════════════════════════════════════════════ */
-.elim-pts-strip{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:10px;padding:8px 16px;
-  background:var(--card);border-bottom:1px solid var(--border);
-}
-.elim-pts-block{display:flex;align-items:baseline;gap:8px}
-.elim-pts-label{font-size:11px;color:var(--text-3)}
-.elim-pts-num{
-  font-family:'Inter Tight',sans-serif;
-  font-size:22px;font-weight:900;color:var(--green);
-}
-.elim-pts-clasif-btn{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:12px;font-weight:600;color:#fbbf24;
-  padding:5px 12px;border-radius:10px;
-  border:1px solid #78350f;background:#1c1008;
-  cursor:pointer;transition:all .15s;
-  font-family:'Inter',sans-serif;
-}
-.elim-pts-clasif-btn:hover{border-color:#f59e0b;background:#292010}
 
 /* VIEW MODE TABS */
 .view-tabs{

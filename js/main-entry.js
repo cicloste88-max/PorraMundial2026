@@ -71,6 +71,9 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/components/bottom-tab.js'))
   .then(() => loadScript('/js/components/app-header.js'))
   .then(() => loadScript('/js/shell.js'))
+  // F7.X: shell visual de #page-elim (Fase final). Necesita BRACKET (ko.js),
+  // koPredictions (data.js), buildKOCard (ko.js), diceSimulateAllKO (admin.js).
+  .then(() => loadScript('/js/ui-elim-shell.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
