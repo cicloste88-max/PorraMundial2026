@@ -34,13 +34,9 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
-Detalle aplicación + planning en `migration-log.md` (entradas 28abr) y `docs/db/audit_28abr_section26_rls_planning.md`.
+Items 1-5 del backlog post-audit ✅ cerrados (PR#37 + migrations `20260428030000` y `20260428040000`). Detalle en `migration-log.md` (entradas 28abr) y `docs/db/audit_28abr_section26_rls_planning.md`.
 
-1. **`tmp_upload_files`** — SECURIZADO 28abr (RLS+policy `service_only`). Pendiente DROP final cuando se verifique que `docs/fase_e/*` está commiteado al repo.
-2. **19 RLS rewrites** con `(SELECT auth.uid())` — pre-11jun. Tablas `predictions`/`ko_predictions`/`award_picks`/`boost_picks`/`league_members`/`leagues`/`profiles`/`live_scores`/`whatsapp_subscribers`.
-3. **5 policies SELECT duplicadas** (`award_picks`, `boost_picks`, `ko_predictions`, `predictions`, `live_scores`): DROP la antigua de cada par.
-4. **4 buckets storage** (`flags`, `kits`, `miniatures`, `sites`): restringir listing público a paths explícitos.
-5. **Auth dashboard**: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies.
+1. **Auth dashboard**: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies. Acción de San (1 click).
 
 ## Reglas CRÍTICAS
 

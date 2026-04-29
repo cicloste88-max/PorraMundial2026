@@ -1339,4 +1339,51 @@ DROP final de la tabla queda en backlog (verificar antes que los 7 paths `docs/f
 
 Migration registrada: `20260428023300_secure_tmp_upload_files` (`created_by=claude-ai-mcp`).
 
+## 2026-04-28 03:00 UTC — Backlog items 3+4: dup policies + RLS initplan rewrites
+
+Cierra los items 3 y 4 del backlog post-audit Postgres 28abr. Aplicado vía Claude.ai MCP, transacción atómica.
+
+**Item 3 — DROP 4 policies SELECT duplicadas con `USING(true)`:**
+
+- `award_picks_select`, `boost_picks_select`, `ko_predictions_select`, `predictions_select`.
+
+Decisión de producto: los usuarios **NO** ven predicciones de otros. Cada par tenía además la policy `"Ver mis X"` con `USING ((SELECT auth.uid()) = user_id)` que es la que sobrevive. Esto reduce además el WARN `multiple_permissive_policies` (~30 → ~5).
+
+**Item 4 — 17 RLS rewrites `auth.uid()` → `(SELECT auth.uid())`:**
+
+Tablas tocadas: `award_picks`, `boost_picks`, `ko_predictions`, `predictions` (3 policies cada una × INSERT/UPDATE/SELECT — la SELECT vía `"Ver mis X"`), `league_members` (3), `leagues` (1), `profiles` (1). Patrón: envolver `auth.uid()` en `(SELECT auth.uid())` para que el planner lo trate como InitPlan (evaluado una vez por query) en vez de re-evaluarlo por fila. Política compleja en `"Usuario actualiza solo nombre e inscrito"` también reescrita. Diff advisor: `auth_rls_initplan` 19 WARN → 2.
+
+Nota: `live_scores` y `whatsapp_subscribers` quedaron fuera del rewrite por no tener `auth.uid()` en quals/with_check (re-revisado tras el levantamiento — el conteo original incluía las que ya estaban con `(SELECT)` o que en realidad usaban `auth.role()`). Total efectivo: 17 (no 19).
+
+Verificación 4/4 PASS. Migration registrada: `20260428030000_rls_drop_dup_policies_and_initplan_rewrites` (`created_by=claude-ai-mcp`).
+
+## 2026-04-28 04:00 UTC — Backlog items 2+5: storage listing + tmp_upload_files DROP
+
+Cierra los items 2 y 5 del backlog post-audit Postgres 28abr. Aplicado vía Claude.ai MCP.
+
+**Item 2 — DROP 4 policies SELECT en `storage.objects`:**
+
+- `flags_public_read`, `kits_public_read`, `miniatures_public_read`, `sites_public_read`.
+
+Razonamiento: los buckets correspondientes (`flags`, `kits`, `miniatures`, `sites`) tienen `public:true`. Eso ya permite servir objetos vía URL directa sin necesidad de policy RLS. Las policies eran **redundantes** Y permitían además listing arbitrario del inventario completo del bucket (advisor `public_bucket_allows_listing`, WARN). Diff advisor: 4 WARN → 0. URL directa sigue funcionando intacta — el cliente sigue accediendo a las imágenes pero no puede enumerarlas.
+
+**Item 5 — DROP `public.tmp_upload_files`:**
+
+Tabla securizada el 28abr 02:33 UTC (PR#37, RLS+policy `service_only`). Confirmado tras inspección: contenía scripts Python de backtest WC2022 de Fase E del IA Predictor (21abr2026). Esa fase ya está cumplida — el motor está implementado en TypeScript en la EF `porra-ia-compute v10` con paridad 46/46 verificada vs el original Python. La tabla ya no aporta. DROP final aplicado.
+
+Verificación 4/4 PASS. Migration registrada: `20260428040000_drop_storage_listing_policies_and_tmp_upload_files` (`created_by=claude-ai-mcp`).
+
+**Estado backlog post-audit Postgres 28abr tras esta sesión:**
+
+- ✅ Item 1: `tmp_upload_files` securizado (PR#37) + DROP final aplicado aquí.
+- ✅ Item 2: storage listing policies DROPped.
+- ✅ Item 3: 4 dup SELECT policies DROPped.
+- ✅ Item 4: 17 RLS rewrites con `(SELECT auth.uid())`.
+- ✅ Item 5: `tmp_upload_files` DROP final.
+- ⏳ Auth dashboard leaked password protection (HaveIBeenPwned) — acción de San (1 click en Supabase → Authentication → Policies).
+
+Diff advisors finales:
+- security: `public_bucket_allows_listing` 4 → 0; ERRORs siguen en 0.
+- performance: `auth_rls_initplan` 19 → 2; `multiple_permissive_policies` ~30 → ~5; `unindexed_foreign_keys` 0 (de PR#36).
+
 **[27abr2026 18:41] F7.4-D-A** (commit `678ba5a`, branch `claude/update-legacy-banner-button-DoQLh`). Eliminado banner `#cta-eliminatorias` y btn header `#btn-go-eliminatorias` legacy de page-grupos — ya redundantes con bottom-tab + gate modal `#fc-gate-modal` (F7.4-D-1). `checkGroupsComplete` (`public/js/ui-groups.js`) refactorizada de 124 LOC a 14 LOC: helper puro que solo computa `window._gruposComplete` (consumido por gate modal en `bottom-tab.js`). `ctaExpandJornada` + export borrados (0 callers fuera del banner). `goToEliminatoria` borrada de `public/js/ui-nav.js` (0 callers tras eliminar onclick HTML). 4 líneas muertas en handler boost (re-render `cta-boost-panel`) eliminadas. 3 ficheros (9+ / 204−). Validado: `node --check` OK + `npm run build` OK (44 modules, bundle 188.50 KB, 0 warnings). Scope estrictamente A: NO toca `setView`, `view-tabs`, `ko-sub-bar` ni page-elim (acoplado a F7.4-F). Pendiente smoke localhost por San.
