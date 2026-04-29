@@ -311,8 +311,10 @@ async function doLogin() {
   const pass  = document.getElementById('login-pass').value;
   if (!email || !pass) return setAuthMsg('Rellena email y contraseña.');
   setAuthLoading('login-btn', true);
-  const { error } = await db.auth.signInWithPassword({ email, password: pass });
+  const captchaToken = document.querySelector('[name=cf-turnstile-response]')?.value || undefined;
+  const { error } = await db.auth.signInWithPassword({ email, password: pass, options: { captchaToken } });
   setAuthLoading('login-btn', false);
+  if (window.turnstile) window.turnstile.reset();
   if (error) {
     setAuthMsg(error.message.includes('Invalid') ? 'Email o contraseña incorrectos.' : error.message);
   } else {
