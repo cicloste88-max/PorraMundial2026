@@ -298,6 +298,10 @@
   function _renderElimExpanded(props) {
     var container = document.createElement('div');
     container.className = 'fc-elim-expanded';
+    if (props && Array.isArray(props.matches)) {
+      // F7.X.6: data-phase-len permite refinar dots según nº de slides (CSS).
+      container.setAttribute('data-phase-len', String(props.matches.length));
+    }
 
     if (!props || !Array.isArray(props.matches) || props.matches.length === 0) {
       var empty = document.createElement('div');
