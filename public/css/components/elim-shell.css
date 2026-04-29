@@ -1,0 +1,258 @@
+/* F7.X · Shell visual de #page-elim (Fase final).
+   Skeleton mínimo F7.X.1 — los detalles visuales (estados stepper, carrusel
+   transitions, dots responsive) llegan en F7.X.6. */
+
+/* Sub-vistas KO antiguas y #finalizar-section: ocultas hasta sprint Bracket /
+   sprint Perfil-Cierre. Mantenidas en DOM para rollback. */
+#page-elim #view-cinematic,
+#page-elim #view-bracket,
+#page-elim #view-stadium,
+#page-elim #view-bracket-results,
+#page-elim #finalizar-section,
+#page-elim .modal-overlay { display: none; }
+#page-elim .modal-overlay.open { display: flex; }
+
+/* ── Header propio (PorraHeader) ── */
+.fc-elim-header {
+  padding: 50px 16px 0;
+  background: var(--ink-900);
+  color: var(--ink-100);
+}
+.fc-elim-header__top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+.fc-elim-header__back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 10px;
+  background: var(--ink-700); border: 1px solid var(--ink-600);
+  color: var(--ink-200); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.fc-elim-header__back:hover { background: var(--ink-600); }
+.fc-elim-header__brand {
+  text-align: right;
+}
+.fc-elim-header__brand-title {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 14px; font-weight: 900; color: var(--ink-100);
+  letter-spacing: -.01em;
+}
+.fc-elim-header__brand-sub {
+  font-size: 11px; color: var(--ink-400);
+}
+.fc-elim-header__actions {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.fc-elim-header__action {
+  flex: 1; padding: 10px 14px; border-radius: 12px;
+  font-size: 13px; font-weight: 700;
+  border: 1px solid var(--ink-600); background: var(--ink-800);
+  cursor: pointer; transition: all .15s;
+}
+.fc-elim-header__action--cuadro { color: #60A5FA; }
+.fc-elim-header__action--premios { color: #FFD700; }
+.fc-elim-header__action.is-active { background: var(--ink-700); }
+.fc-elim-header__points {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink-300);
+  padding-bottom: 12px;
+}
+.fc-elim-header__points strong { color: var(--ink-100); font-weight: 800; }
+.fc-elim-header__admin-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: .08em;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--fifa-gold-deep); color: var(--ink-100);
+}
+
+/* ── PhaseStepper ── */
+.fc-elim-stepper {
+  display: flex; align-items: stretch; gap: 4px;
+  padding: 12px 16px; background: var(--ink-900);
+  overflow-x: auto; scrollbar-width: none;
+}
+.fc-elim-stepper::-webkit-scrollbar { display: none; }
+.fc-elim-stepper__item {
+  flex: 1; min-width: 56px;
+  padding: 8px 6px; border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; transition: all .2s;
+  position: relative;
+}
+.fc-elim-stepper__label {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  color: var(--ink-400); text-transform: uppercase;
+}
+.fc-elim-stepper__counter {
+  font-size: 11px; font-weight: 800; color: var(--ink-300);
+  font-variant-numeric: tabular-nums;
+}
+.fc-elim-stepper__sep {
+  display: flex; align-items: center;
+  color: var(--ink-500); font-size: 12px; padding: 0 2px;
+}
+.fc-elim-stepper__item.is-active {
+  flex: 1.4;
+  background: var(--ink-700);
+  border-color: #FFD700;
+}
+.fc-elim-stepper__item.is-active::after {
+  content: ''; position: absolute; left: 8px; right: 8px; bottom: 4px;
+  height: 2px; background: #FFD700; border-radius: 2px;
+}
+.fc-elim-stepper__item.is-complete {
+  border-color: rgba(34,197,94,.3);
+}
+.fc-elim-stepper__item.is-complete .fc-elim-stepper__label,
+.fc-elim-stepper__item.is-complete .fc-elim-stepper__counter {
+  color: #22C55E;
+}
+.fc-elim-stepper__item.is-locked {
+  opacity: .5; cursor: not-allowed;
+}
+.fc-elim-stepper__item.is-locked .fc-elim-stepper__label {
+  color: rgba(255,255,255,.2);
+}
+.fc-elim-stepper__lock {
+  font-size: 10px; line-height: 1;
+}
+
+/* ── Banner Simular global ── */
+.fc-elim-dice-banner {
+  display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 12px 16px; padding: 10px 14px;
+  background: rgba(30,27,75,.35);
+  border: 1px solid rgba(99,82,199,.2);
+  border-radius: 10px;
+}
+.fc-elim-dice-banner.is-visible { display: flex; }
+.fc-elim-dice-banner__label {
+  font-size: 11px; color: var(--ink-300);
+}
+
+/* ── Lista de filas (ElimRow + expanded) ── */
+.fc-elim-list {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 0 12px 80px;
+}
+.fc-elim-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--ink-800); border: 1px solid transparent;
+  border-radius: 12px; cursor: pointer;
+  transition: border-color .2s;
+}
+.fc-elim-row.is-expanded { border-color: var(--win); }
+.fc-elim-row.is-locked { opacity: .55; cursor: not-allowed; }
+.fc-elim-row__bar {
+  width: 4px; align-self: stretch; min-height: 36px;
+  border-radius: 2px;
+  background: var(--ink-600);
+}
+.fc-elim-row.is-complete .fc-elim-row__bar { background: var(--win); }
+.fc-elim-row__text { flex: 1; }
+.fc-elim-row__eyebrow {
+  font-size: 10px; font-weight: 700; color: var(--ink-400);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.fc-elim-row__label {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 22px; font-weight: 900; color: var(--ink-100);
+  letter-spacing: -.02em;
+}
+.fc-elim-row__sub {
+  font-size: 11px; color: var(--ink-400);
+}
+.fc-elim-row__side {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
+.fc-elim-row__counter {
+  font-size: 12px; font-weight: 800; color: var(--ink-300);
+  font-variant-numeric: tabular-nums;
+}
+.fc-elim-row.is-locked .fc-elim-row__counter { color: rgba(255,255,255,.45); }
+.fc-elim-row.is-progress .fc-elim-row__counter { color: #FFD700; }
+.fc-elim-row.is-complete .fc-elim-row__counter { color: var(--win); }
+.fc-elim-row__progress {
+  width: 60px; height: 3px; border-radius: 2px;
+  background: var(--ink-600); overflow: hidden;
+}
+.fc-elim-row__progress > i {
+  display: block; height: 100%; background: var(--ink-300);
+}
+.fc-elim-row.is-progress .fc-elim-row__progress > i { background: #FFD700; }
+.fc-elim-row.is-complete .fc-elim-row__progress > i { background: var(--win); }
+
+/* ── ElimExpanded (carrusel + flechas + dots) ── */
+.fc-elim-expanded {
+  background: var(--ink-900);
+  border: 1px solid var(--win);
+  border-radius: 12px;
+  padding: 14px 0 18px;
+  margin-bottom: 10px;
+}
+.fc-elim-expanded__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px 10px;
+}
+.fc-elim-expanded__title {
+  font-size: 13px; font-weight: 800; color: var(--ink-100);
+}
+.fc-elim-expanded__badge-complete {
+  font-size: 10px; font-weight: 800; letter-spacing: .06em;
+  color: var(--win); background: rgba(34,197,94,.12);
+  padding: 3px 8px; border-radius: 6px;
+}
+.fc-elim-carousel {
+  position: relative;
+  display: flex; gap: 10px;
+  padding: 0 16px;
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.fc-elim-carousel::-webkit-scrollbar { display: none; }
+.fc-elim-carousel__slide {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  transition: transform .2s, opacity .2s;
+}
+.fc-elim-carousel__slide:not(.is-current) {
+  transform: scale(.92); opacity: .55;
+}
+.fc-elim-arrow {
+  position: absolute; top: 50%; width: 30px; height: 30px;
+  border-radius: 50%; background: rgba(0,0,0,.7);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #fff; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 2;
+}
+.fc-elim-arrow--left  { left: 6px;  transform: translateY(-50%) rotate(180deg); }
+.fc-elim-arrow--right { right: 6px; transform: translateY(-50%); }
+.fc-elim-dots {
+  display: flex; align-items: center; justify-content: center;
+  gap: 5px; padding: 12px 0 0;
+}
+.fc-elim-dots__dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--ink-500); transition: all .2s;
+}
+.fc-elim-dots__dot.is-current {
+  width: 16px; border-radius: 3px;
+  background: var(--win);
+}
+
+/* ── Botón 🎲 Simular (compartido row + expanded) ── */
+.fc-elim-dice-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 8px;
+  font-size: 11px; font-weight: 700;
+  background: rgba(124,58,237,.15);
+  border: 1px solid rgba(124,58,237,.4);
+  color: #A78BFA; cursor: pointer;
+  transition: background .15s;
+}
+.fc-elim-dice-btn:hover { background: rgba(124,58,237,.25); }

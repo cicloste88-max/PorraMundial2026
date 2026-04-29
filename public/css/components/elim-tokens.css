@@ -1,0 +1,31 @@
+/* F7.X · Tokens del shell visual de #page-elim (Fase final).
+   Procedencia: docs/restyling-mobile/02-quiniela-design-source.md (branch
+   docs/quiniela-design-source-v2). "Quiniela" en el design source es
+   placeholder de Claude Design — el target real es page-elim. */
+
+:root {
+  /* Brand — FIFA oficial premium */
+  --fifa-red: #E30613;
+  --fifa-green: #006341;
+  --fifa-blue: #0A4595;
+  --fifa-gold: #C9A961;
+  --fifa-gold-deep: #9A7B3A;
+
+  /* Neutrals — premium sport */
+  --ink-900: #0A0E1A;
+  --ink-800: #141826;
+  --ink-700: #1F2433;
+  --ink-600: #2A3142;
+  --ink-500: #4A5163;
+  --ink-400: #7A8194;
+  --ink-300: #B8BEC9;
+  --ink-200: #E2E5EB;
+  --ink-100: #F2F4F8;
+  --ink-50:  #F8F9FB;
+
+  /* Semantic */
+  --live: #E30613;
+  --win:  #00834A;
+  --draw: #B7860B;
+  --loss: #6F1E22;
+}

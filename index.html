@@ -55,6 +55,8 @@ try {
 <link rel="stylesheet" href="/css/components/tokens.css">
 <link rel="stylesheet" href="/css/components/bottom-tab.css">
 <link rel="stylesheet" href="/css/components/app-header.css">
+<link rel="stylesheet" href="/css/components/elim-tokens.css">
+<link rel="stylesheet" href="/css/components/elim-shell.css">
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
@@ -645,31 +647,12 @@ try {
      Incluye header global, modal de partido y bracket principal.
 ════════════════════════════════════════════════════════════════ -->
 <div id="page-elim" style="display:none">
-<!-- ══ HEADER (F7.4-C: migrado a .fc-appbar--page) ══ -->
-<div id="elim-league-pill-slot" style="display:flex;justify-content:center;padding:4px 0 0"></div>
-<header class="fc-appbar fc-appbar--page">
-  <button class="fc-appbar__back" type="button" aria-label="Volver a fase de grupos" onclick="showPage('grupos')"></button>
-  <span class="fc-appbar__title">Eliminatorias</span>
-</header>
-<!-- F7.4-C: franja transitoria "Mis puntos" + acceso Clasificación.
-     Será retirada en F7.4-E cuando el header global persistente muestre puntos + #posición. -->
-<div class="elim-pts-strip">
-  <div class="elim-pts-block">
-    <span class="elim-pts-label">Mis puntos</span>
-    <strong class="elim-pts-num" id="total-ko-pts">—</strong>
-  </div>
-  <button type="button" class="elim-pts-clasif-btn" onclick="showPage('score')">🏆 Clasificación</button>
-</div>
-<div class="ko-sub-bar">
-  <div class="view-tabs">
-    <button class="view-tab active" onclick="setView('cinematic')">📋 Rondas</button>
-    <button class="view-tab" onclick="setView('bracket-results')">📊 Resultados</button>
-    <button class="view-tab" onclick="setView('stadium')">🏟️ Cuadro</button>
-  </div>
-  <button class="dice-btn" onclick="diceSimulateAllKO()" style="display:none" id="ko-dice-btn">
-    <span class="dice-icon">🎲</span> Simular eliminatorias
-  </button>
-</div>
+<!-- F7.X.1: header viejo + .elim-pts-strip + .ko-sub-bar sustituidos por mounts del nuevo shell.
+     #total-ko-pts se conserva (lo lee updateKOPts en ui-nav.js); se re-monta dentro del header propio. -->
+<div class="fc-elim-header" id="fc-elim-header"></div>
+<div class="fc-elim-stepper" id="fc-elim-stepper"></div>
+<div class="fc-elim-dice-banner" id="fc-elim-dice-banner"></div>
+<div class="fc-elim-list" id="fc-elim-list"></div>
 
 <!-- ══ MODAL ══ -->
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
