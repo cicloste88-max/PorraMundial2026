@@ -1407,3 +1407,41 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
 - PR#40 `7467a4b` — `fix(auth): use Turnstile test sitekey on localhost`.
 
 **Scope:** solo formulario login (`#auth-login-form`). `doRegister()` y modal de registro intactos. `auth.js` tocada únicamente en `doLogin()` (PR#39); PR#40 es 100% `index.html`.
+
+## 2026-04-30 — F7.4-D-2 cleanup IA Predictor CSS (PR#43)
+
+[~10:00 UTC] CLEANUP: cleanup IA Predictor widgets — `public/css/base.css` −18 LOC. Eliminado bloque IA duplicado (líneas 701-713) + reglas huérfanas `.ia-loading`, `.ia-dot`, `@keyframes iaDot` sin uso tras eliminar chip `.ia-hint` en post-F.2 (24abr2026). `scoring.js` NO tocado. Smoke verde: cards grupo siguen hidratando `.ia-bar` con signo + % + quip. Commit `0baaa4a`. Merge PR#43.
+
+## 2026-04-30 — F7.X nuevo shell visual page-elim Fase final (PR#44)
+
+[~14:00 UTC] FASE: rediseño visual `#page-elim` con nuevo shell controller. 8 commits, +872 −66 LOC, merge SHA `5ddb974`.
+
+**Files nuevos:**
+- `public/js/ui-elim-shell.js` (+545 LOC) — controlador shell, mounting/unmounting, render de cabecera + sección rondas wrapping cards CORE.
+- `public/css/components/elim-shell.css` (+295) — estilos shell, header, layout grid de rondas.
+- `public/css/components/elim-tokens.css` (+30) — design tokens (`--elim-bg`, `--elim-card-radius`, etc.).
+
+**Wiring:**
+- `js/main-entry.js` carga `ui-elim-shell.js` en chain (3 LOC).
+- `public/js/ui-nav.js` invoca `mountElimShell()` al entrar a page-elim (11 LOC).
+- `public/js/components/bottom-tab.js` retira gate modal `_showGruposGateModal` (24 LOC). Fase final accesible siempre; shell muestra estado coherente con `window._gruposComplete`.
+
+**Cards CORE preservadas** (R32→R16→QF→SF→Final): el shell envuelve, no reemplaza. Comportamiento y datos intactos.
+
+**Bug UI #3 backlog corregido**: botón simular eliminatorias antes visible para non-admin. Gate ahora chequea `window._isAdmin` correctamente.
+
+**Sub-vistas diferidas**: KO panel detail, Awards section, finalizar-section quedan para iteración cosmética posterior. Scope estricto al shell + tokens + wiring + bug fix.
+
+**Patrón multi-agente validado**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: CSS shell + tokens; oleada 2: JS controller + wiring). Padre integró outputs y resolvió mismatches de selectores CSS↔JS y escapes en template strings. Patrón añadido a `.claude/rules/multi-agent-sync.md`.
+
+**Design source persistente en branch dedicada**: bundle v2 de referencia push-eado a branch `docs/quiniela-design-source-v2` (commit `fd95d08`). Mejor que embed en brief porque: (a) sobrevive entre sesiones, (b) versionable, (c) consultable vía `git show`. Patrón a seguir.
+
+## 2026-04-30 — Cloudflare Turnstile DESACTIVADO
+
+[~16:00 UTC] AUTH: CAPTCHA Turnstile desactivado en Supabase Auth dashboard → Authentication → Attack Protection (secret eliminada). Tras 2 días en producción (PR#39+PR#40, 29abr), decisión de revertir por:
+
+1. App privada (porra entre amigos) — fricción del CAPTCHA innecesaria.
+2. **Limitación arquitectónica Supabase Cloud**: single-secret slot por proyecto — imposible separar `localhost:5173` de `porramundial2026-seven.vercel.app` sin segundo proyecto Supabase.
+3. **Cloudflare no acepta hostnames con port** en site config — bloqueando dev local incluso con sitekey real.
+
+**No es bug del código.** Widget HTML/JS en `index.html` y `auth.js` permanece (no estorba — sin secret en Auth, `signInWithPassword` ignora `captchaToken`). Decisión documentada en `CHANGELOG.md`. NO se añade a `errores_conocidos_porra.md` (limitación de stack, no error).
