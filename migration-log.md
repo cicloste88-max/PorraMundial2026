@@ -1387,3 +1387,23 @@ Diff advisors finales:
 - performance: `auth_rls_initplan` 19 → 2; `multiple_permissive_policies` ~30 → ~5; `unindexed_foreign_keys` 0 (de PR#36).
 
 **[27abr2026 18:41] F7.4-D-A** (commit `678ba5a`, branch `claude/update-legacy-banner-button-DoQLh`). Eliminado banner `#cta-eliminatorias` y btn header `#btn-go-eliminatorias` legacy de page-grupos — ya redundantes con bottom-tab + gate modal `#fc-gate-modal` (F7.4-D-1). `checkGroupsComplete` (`public/js/ui-groups.js`) refactorizada de 124 LOC a 14 LOC: helper puro que solo computa `window._gruposComplete` (consumido por gate modal en `bottom-tab.js`). `ctaExpandJornada` + export borrados (0 callers fuera del banner). `goToEliminatoria` borrada de `public/js/ui-nav.js` (0 callers tras eliminar onclick HTML). 4 líneas muertas en handler boost (re-render `cta-boost-panel`) eliminadas. 3 ficheros (9+ / 204−). Validado: `node --check` OK + `npm run build` OK (44 modules, bundle 188.50 KB, 0 warnings). Scope estrictamente A: NO toca `setView`, `view-tabs`, `ko-sub-bar` ni page-elim (acoplado a F7.4-F). Pendiente smoke localhost por San.
+
+## 2026-04-29 — Cloudflare Turnstile CAPTCHA (PR#39 + PR#40)
+
+Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `auth_captcha_enabled` del advisor de Supabase.
+
+- Widget Managed mode: Cloudflare decide si mostrar reto o no (invisible para la mayoría).
+- Hostname configurado: `porramundial2026-seven.vercel.app`.
+- Sitekey y secret guardados en Vault (`TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`).
+- Secret además configurada en Supabase Auth dashboard → Authentication → Attack Protection.
+- `captchaToken` leído de `[name=cf-turnstile-response]` y pasado en `signInWithPassword` `options`.
+- Widget reseteado vía `window.turnstile.reset()` tras cada intento (success o error — los tokens son single-use).
+- Localhost: test sitekey `1x00000000000000000000AA` (always-passes, banner rojo "Solo para pruebas" esperado).
+- Producción: sitekey real `0x4AAAAAADFzAxFI4isPOuJx`, sin banner.
+- Detección entorno: `window.location.hostname === 'localhost'` en script inline síncrono que asigna `class="cf-turnstile"` + `data-sitekey` antes de que `api.js` (async defer) auto-renderice.
+
+**Commits:**
+- PR#39 `8b1dc30` — `feat(auth): add Cloudflare Turnstile CAPTCHA to login form`.
+- PR#40 `7467a4b` — `fix(auth): use Turnstile test sitekey on localhost`.
+
+**Scope:** solo formulario login (`#auth-login-form`). `doRegister()` y modal de registro intactos. `auth.js` tocada únicamente en `doLogin()` (PR#39); PR#40 es 100% `index.html`.
