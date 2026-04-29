@@ -532,7 +532,12 @@ function showPage(page) {
   if (authBar) authBar.style.display = page==='welcome' ? 'flex' : 'none';
   // Score user bar — eliminado en F7.4-C; identidad de usuario llegará en F7.4-E
   // vía header global persistente (D5: avatar + pts + #posición).
-  if(page === 'elim')   { window.scrollTo(0,0); koInit(); }
+  if(page === 'elim')   {
+    window.scrollTo(0,0);
+    koInit(); // resuelve slots para que buildKOCard tenga equipos.
+    // F7.X.4: shell visual nuevo. Si ui-elim-shell.js cargado, render.
+    if (typeof window.renderElimShell === 'function') window.renderElimShell();
+  }
   if(page === 'grupos') {
     window.scrollTo(0,0);
     if (!_gruposInitPromise) {
