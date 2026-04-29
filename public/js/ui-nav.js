@@ -543,6 +543,10 @@ function showPage(page) {
     if (!_gruposInitPromise) {
       _gruposInitPromise = Promise.resolve().then(function() { return initGrupos(); });
     }
+    // F7.X.7: bug #3 — #dice-global-bar visible para TODOS los usuarios con
+    // porra abierta. Antes solo se mostraba al admin via admReopenDirect.
+    var diceBar = document.getElementById('dice-global-bar');
+    if (diceBar) diceBar.style.display = window._porraCerrada ? 'none' : 'flex';
   }
   // F7.4-D-1: cerrar mobile-focus-layer (de page-grupos) si se sale de grupos.
   if (page !== 'grupos' && typeof window.closeMobileFocus === 'function') {
