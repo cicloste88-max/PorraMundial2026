@@ -15,7 +15,7 @@ Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 - **Cards CORE preservadas**: las tarjetas de eliminatorias existentes (R32→R16→QF→SF→Final) NO tocadas — el nuevo shell envuelve manteniendo grilla + comportamiento.
 - **Bug UI #3 corregido** (botón simular eliminatorias visible para todos): gate ahora chequea `is_admin` correctamente vía `window._isAdmin`.
 - **Sub-vistas KO/Awards/finalizar-section diferidas**: scope estricto al shell + tokens + wiring. Iteración cosmética posterior.
-- **Patrón multi-agente**: 4 subagentes Haiku 4.5 paralelos vía Task tool (2 oleadas) generaron CSS/HTML/JS por separado; padre integró + resolvió mismatches de selectores y escapes en strings template.
+- **Patrón multi-agente**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: PorraHeader + PhaseStepper; oleada 2: ElimRow + ElimExpanded). Split POR COMPONENTE — cada subagente portó un componente completo de JSX a vanilla JS + sus reglas CSS. Padre integró todo en `ui-elim-shell.js` + `elim-shell.css` y resolvió mismatches de selectores y escapes.
 - **Design source v2 persistente**: bundle de referencia push-eado a branch dedicada `docs/quiniela-design-source-v2` (commit `fd95d08`). Patrón a seguir para futuros design source bundles (vs embed inline en briefs).
 
 ## 2026-04-30 — F7.4-D-2 cleanup IA Predictor widgets (PR#43)

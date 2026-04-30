@@ -1432,7 +1432,7 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
 
 **Sub-vistas diferidas**: KO panel detail, Awards section, finalizar-section quedan para iteración cosmética posterior. Scope estricto al shell + tokens + wiring + bug fix.
 
-**Patrón multi-agente validado**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: CSS shell + tokens; oleada 2: JS controller + wiring). Padre integró outputs y resolvió mismatches de selectores CSS↔JS y escapes en template strings. Patrón añadido a `.claude/rules/multi-agent-sync.md`.
+**Patrón multi-agente validado**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: PorraHeader + PhaseStepper; oleada 2: ElimRow + ElimExpanded — split POR COMPONENTE, no por tipo de fichero). Padre integró outputs y resolvió mismatches de selectores CSS↔JS y escapes en template strings. Patrón añadido a `.claude/rules/multi-agent-sync.md`.
 
 **Design source persistente en branch dedicada**: bundle v2 de referencia push-eado a branch `docs/quiniela-design-source-v2` (commit `fd95d08`). Mejor que embed en brief porque: (a) sobrevive entre sesiones, (b) versionable, (c) consultable vía `git show`. Patrón a seguir.
 
