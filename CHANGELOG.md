@@ -2,6 +2,30 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-04-30 — Turnstile DESACTIVADO (Supabase Auth dashboard)
+
+**Auth / Decisión arquitectónica.** Tras 2 días con Cloudflare Turnstile en login (PR#39+PR#40, 29abr), CAPTCHA desactivado en Supabase Auth dashboard. Razones: app privada (porra entre amigos), fricción innecesaria, **Supabase Cloud expone un único secret slot por proyecto** (no se puede separar dev/prod) y **Cloudflare no acepta hostnames con port** (bloqueando `localhost:5173`). El widget HTML/JS en `index.html` y `auth.js` se mantiene intacto (no estorba; no ejecuta sin secret en Auth). No es bug del código — es limitación arquitectónica del stack. NO añadido a `errores_conocidos_porra.md` (no es ERR).
+
+## 2026-04-30 — F7.X nuevo shell visual #page-elim (PR#44)
+
+**Rediseño Fase final** (8 commits, +872 −66 LOC, merge SHA `5ddb974`).
+
+- **Files nuevos**: `public/js/ui-elim-shell.js` (+545 LOC, controlador shell), `public/css/components/elim-shell.css` (+295), `public/css/components/elim-tokens.css` (+30 design tokens).
+- **Wiring**: `js/main-entry.js` carga `ui-elim-shell.js` en chain; `public/js/ui-nav.js` invoca `mountElimShell()` al entrar a page-elim; `public/js/components/bottom-tab.js` retira el gate modal `_showGruposGateModal` (Fase final ahora accesible siempre, shell muestra estado coherente con `window._gruposComplete`).
+- **Cards CORE preservadas**: las tarjetas de eliminatorias existentes (R32→R16→QF→SF→Final) NO tocadas — el nuevo shell envuelve manteniendo grilla + comportamiento.
+- **Bug UI #3 corregido** (botón simular eliminatorias visible para todos): gate ahora chequea `is_admin` correctamente vía `window._isAdmin`.
+- **Sub-vistas KO/Awards/finalizar-section diferidas**: scope estricto al shell + tokens + wiring. Iteración cosmética posterior.
+- **Patrón multi-agente**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: PorraHeader + PhaseStepper; oleada 2: ElimRow + ElimExpanded). Split POR COMPONENTE — cada subagente portó un componente completo de JSX a vanilla JS + sus reglas CSS. Padre integró todo en `ui-elim-shell.js` + `elim-shell.css` y resolvió mismatches de selectores y escapes.
+- **Design source v2 persistente**: bundle de referencia push-eado a branch dedicada `docs/quiniela-design-source-v2` (commit `fd95d08`). Patrón a seguir para futuros design source bundles (vs embed inline en briefs).
+
+## 2026-04-30 — F7.4-D-2 cleanup IA Predictor widgets (PR#43)
+
+**Cleanup CSS** (commit `0baaa4a`).
+
+- **`public/css/base.css` −18 LOC**: bloque IA duplicado en líneas 701-713 eliminado; reglas huérfanas `.ia-loading`, `.ia-dot`, `@keyframes iaDot` (sin uso tras eliminar chip `.ia-hint` en post-F.2 y `hydrateIABar` actual no usa spinner) borradas.
+- **`scoring.js` NO tocado**: la lógica de hidratación IA permanece intacta. Solo CSS muerto retirado.
+- Reduce superficie de mantenimiento del Predictor sin tocar comportamiento. Smoke verde post-merge (cards de grupo siguen pintando `.ia-bar` con %, signo, quip).
+
 ## 2026-04-29 — Cloudflare Turnstile CAPTCHA (PR#39 + PR#40)
 
 **Auth / Seguridad.**

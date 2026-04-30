@@ -79,6 +79,42 @@ Cuando un PR se mergea con squash, GitHub auto-elimina la branch `claude/*` en r
 
 Ya documentado como precedente en `migration-log.md` (cierre F7.4-A): "tras squash-merge + auto-delete de la rama de trabajo, el sandbox local puede recrearla sin saberlo si pushea desde la rama vieja (genera PRs fantasma)".
 
+## 7 · Subagentes Haiku 4.5 paralelos (patrón validado F7.X)
+
+Cuando una fase requiere portar múltiples componentes UI (de JSX a vanilla JS, o de mockup a código), el padre puede delegar a subagentes Haiku 4.5 paralelos vía Task tool. **El split es POR COMPONENTE**, no por tipo de fichero — cada subagente recibe el código original de SU componente + naming convention del proyecto y devuelve vanilla JS + sus reglas CSS específicas.
+
+**Oleadas**: cuando hay >3 componentes a portar en paralelo, partir en oleadas de 2-3 subagentes cada una. La razón **NO es dependencia entre oleadas** (los componentes suelen ser independientes); la razón es **gestión de contexto del padre al integrar**: integrar 4 outputs de golpe satura, integrar 2+2 con commit intermedio mantiene al padre con cabeza despejada para detectar mismatches y bugs.
+
+Ejemplo F7.X (4 componentes UI portados de JSX a vanilla):
+
+- **Oleada 1 (F7.X.2)**: `PorraHeader` + `PhaseStepper` en paralelo. Padre integró ambos en `ui-elim-shell.js` + `elim-shell.css`, commit, push.
+- **Oleada 2 (F7.X.3)**: `ElimRow` + `ElimExpanded` en paralelo. Padre integró sobre el output de la oleada 1, commit, push.
+
+En cada oleada el subagente recibe el JSX original de su componente + naming convention del proyecto y devuelve vanilla JS + reglas CSS específicas. Padre concatena en los ficheros target.
+
+**Responsabilidad del padre tras las oleadas**:
+
+1. **Integrar** los outputs (concatenar/colocar ficheros donde tocan).
+2. **Resolver mismatches** de selectores CSS↔JS (subagente puede usar `.elim-card` mientras otro usa `.card-elim` — el padre uniforma).
+3. **Resolver escapes** en template strings (subagentes a veces escapan backticks/dólares de más al copiar a Write).
+4. **Validar** con `node --check` + `npm run build` + smoke localhost antes de commit.
+
+Caveat E13 sigue aplicando: subagentes con tool Write **no heredan** `.claude/rules/` — pasar contexto inline en el prompt del subagente o restringir a artefactos puros sin reglas de proyecto.
+
+Validado en F7.X (PR#44, 30abr2026): 4 componentes (PorraHeader + PhaseStepper + ElimRow + ElimExpanded) integrados en `ui-elim-shell.js` (545 LOC) + `elim-shell.css` (295) + `elim-tokens.css` (30) + wiring en `main-entry`/`ui-nav`/`bottom-tab` con éxito tras integración del padre.
+
+## 8 · Design source bundles en branch dedicada
+
+Cuando se trabaja con un bundle de design source extenso (mockups HTML/CSS/JS de referencia, screenshots, specs), **NO embeber inline en el brief de la fase** (consume ventana de contexto y no sobrevive entre sesiones). En su lugar:
+
+1. Crear branch dedicada `docs/<nombre>-design-source-v<N>` desde `main`.
+2. Push del bundle en un único commit descriptivo.
+3. Referenciar la branch + commit SHA en el brief de la fase y en `CHANGELOG.md`.
+
+**Ventajas**: (a) sobrevive entre sesiones, (b) versionable (v2, v3 si rediseño), (c) consultable vía `git show <sha>:<ruta>` o checkout de la branch en local sin contaminar `main`.
+
+Validado en F7.X: bundle design source v2 vive en `docs/quiniela-design-source-v2` commit `fd95d08`. Patrón a seguir para futuros design source bundles.
+
 ## Referencias
 
 - `CLAUDE.md` § Reglas CRÍTICAS (Push inmediato + NUNCA push a main sin validar)
