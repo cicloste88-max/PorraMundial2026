@@ -235,35 +235,131 @@
   z-index: 1;
 }
 
+/* B9-redesign: footer dorado (reemplaza el rojo CTA). En pre-mundial es
+   "Te quedan X partidos por pronosticar →" sutil; en mid-Mundial será
+   "Última: ESP 2-1 BRA · Ver todo ›" (B10-active). */
 .fc-pred-tile__footer {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 11px 16px;
+  padding: 12px 16px 0;
+  margin-top: 14px;
   background: transparent;
   border: 0;
-  border-top: 1px solid rgba(201, 169, 97, 0.25);
-  color: var(--fifa-red);
+  border-top: 1px solid rgba(201, 169, 97, 0.15);
+  color: rgba(255, 255, 255, 0.55);
   font-family: var(--font-text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
   transition: background-color 140ms ease;
   -webkit-tap-highlight-color: transparent;
 }
-.fc-pred-tile__footer:hover { background-color: rgba(199, 24, 28, 0.10); }
-.fc-pred-tile__footer:active { background-color: rgba(199, 24, 28, 0.18); }
-.fc-pred-tile__footer-flame { font-size: 14px; line-height: 1; }
+.fc-pred-tile__footer:hover  { background-color: rgba(201, 169, 97, 0.04); }
+.fc-pred-tile__footer:active { background-color: rgba(201, 169, 97, 0.08); }
+.fc-pred-tile__footer-flame {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+}
 .fc-pred-tile__footer-text { flex: 1; }
+.fc-pred-tile__footer-link {
+  margin-left: auto;
+  color: var(--fifa-gold);
+  font-size: 11px;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
 .fc-pred-tile__chevron {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
-  color: var(--fifa-red);
+  color: var(--fifa-gold);
 }
 
+/* B9-redesign: chip "Nº de N" superior derecha (gold-ghost ligero). */
+.fc-pred-tile__chip--liga {
+  background: rgba(201, 169, 97, 0.12);
+  border: 1px solid rgba(201, 169, 97, 0.30);
+  color: var(--fifa-gold);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+/* B9-redesign: hero line ("🏆 Faltan N días" en pre-mundial). */
+.fc-pred-tile__hero {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__hero-emoji { font-size: 13px; line-height: 1; }
+.fc-pred-tile__hero-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+/* B9-redesign: 2 barras de progreso (GRUPOS / ELIMINATORIAS) en flex
+   ratio 72:32. Width interna por <i> con width inline desde JS. */
+.fc-pred-tile__bars {
+  display: flex;
+  gap: 6px;
+  margin-top: 22px; /* hueco para los labels absolute encima */
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__bar {
+  height: 6px;
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.fc-pred-tile__bar > i {
+  display: block;
+  height: 100%;
+  background: #22C55E;
+  transition: width 0.3s ease;
+}
+.fc-pred-tile__bar--grupos { flex: 72; }
+.fc-pred-tile__bar--ko     { flex: 32; }
+.fc-pred-tile__bar-label {
+  position: absolute;
+  top: -14px;
+  left: 0;
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+}
+.fc-pred-tile__bar--ko .fc-pred-tile__bar-label {
+  color: rgba(255, 255, 255, 0.25);
+}
+.fc-pred-tile__bars-caption {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+/* DEPRECATED B9: superseded by .fc-pred-tile__hero + .__bars + .__bars-
+   caption. Reglas conservadas por seguridad ante rollback; serán
+   eliminadas en B10 si ningún consumer las reclama. NO tocar contenido. */
 #fc-pred-tile[data-state="pre-mundial"] .fc-pred-tile__pre-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -310,6 +406,7 @@
   background: var(--fifa-gold-deep);
   border-color: var(--fifa-gold-deep);
 }
+/* /DEPRECATED B9 */
 
 #fc-pred-tile[data-state="finalizado"] .fc-pred-tile__footer { display: none; }
 
@@ -334,7 +431,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 12px 8px;
+  /* B9-redesign: padding más generoso (mockup compacto pero respirable). */
+  padding: 14px 10px;
   background: var(--ink-800);
   text-align: center;
 }
@@ -361,20 +459,27 @@
   align-items: center;
   gap: 4px;
   font-family: var(--font-display);
-  font-size: 22px;
+  /* B9-redesign: tamaño compacto (mockup era 18px, no 22). */
+  font-size: 18px;
   font-weight: 800;
   /* B8-skin: fade pre-mundial. B9-stats-live cambiará a --ink-100
      cuando los valores sean reales (clase override o JS). */
   color: rgba(255, 255, 255, 0.3);
   line-height: 1;
+  margin-top: 6px;
 }
 
 .fc-pred-stats__val--win { color: var(--win); }
 
 .fc-pred-stats__sub {
-  font-family: var(--font-text);
-  font-size: 10px;
-  font-weight: 500;
+  /* B9-redesign: el __sub actúa como LABEL superior tipo eyebrow
+     ("% ACIERTOS" arriba del valor) y como hint inferior pre-mundial
+     ("Disponible 11 jun"). Estilo unificado fade. */
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.4);
   margin-top: 2px;
 }

@@ -81,39 +81,69 @@
     }
   }
 
+  // B9-redesign: tile pre-mundial reestructurado. Eyebrow + chip "Nº de N",
+  // hero "🏆 Faltan N días", 2 barras de progreso (grupos:KO ratio 72:32),
+  // caption "X de 104 pronósticos hechos", footer dorado. Old __pre-grid
+  // marcado DEPRECATED en CSS; reglas conservadas por seguridad ante rollback.
   function _renderTilePreMundial(state) {
     var days = Math.max(0, Number(state.daysToKickoff || 0));
     var daysLabel = days <= 0 ? 'Mañana arranca' : ('Faltan ' + days + (days === 1 ? ' día' : ' días'));
 
-    var predicted = Number(state.predicted || 0);
-    var total = Number(state.total || _TILE_TOTAL_GROUP);
-    var pendingTotal = Number(state.pendingTotal || Math.max(0, total - predicted));
+    var totalGroup = 72;
+    var totalKO = 32;
+    var totalAll = totalGroup + totalKO; // 104
 
-    var bar = _progressBar(predicted, total);
+    var gruposUser = Number(state.predicted || 0);
+    var koUser = Number(state.koPredicted || 0);
+    var doneAll = gruposUser + koUser;
+    var pendingAll = Math.max(0, totalAll - doneAll);
+
+    var pctGrupos = totalGroup > 0 ? Math.min(100, Math.round((gruposUser / totalGroup) * 100)) : 0;
+    var pctKo     = totalKO    > 0 ? Math.min(100, Math.round((koUser    / totalKO   ) * 100)) : 0;
+
+    var league = state.league || { rank: 0, total: 0 };
+    var leagueChipHtml;
+    if (league && league.total > 0) {
+      // En pre-Mundial todos empatados a 0 → todos primeros.
+      leagueChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">' +
+        league.rank + 'º de ' + league.total + '</span>';
+    } else {
+      leagueChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">Líder</span>';
+    }
+
     var watermark = _buildWatermark();
 
     var footer =
       '<button type="button" class="fc-pred-tile__footer" aria-label="Ir a partidos pendientes">' +
         '<span class="fc-pred-tile__footer-flame" aria-hidden="true">🔥</span>' +
-        '<span class="fc-pred-tile__footer-text">Te quedan ' + pendingTotal +
-          (pendingTotal === 1 ? ' partido' : ' partidos') + ' por pronosticar</span>' +
+        '<span class="fc-pred-tile__footer-text">Te quedan ' + pendingAll +
+          (pendingAll === 1 ? ' partido' : ' partidos') + ' por pronosticar</span>' +
         _buildChevron() +
       '</button>';
 
     return '' +
       '<div class="fc-pred-tile__body">' +
         watermark +
-        '<div class="fc-pred-tile__eyebrow">PREDICTOR · LISTO PARA EL MUNDIAL</div>' +
-        '<div class="fc-pred-tile__pre-grid">' +
-          '<div class="fc-pred-tile__pre-col fc-pred-tile__pre-col--left">' +
-            '<div class="fc-pred-tile__pre-trophy" aria-hidden="true">🏆</div>' +
-            '<div class="fc-pred-tile__pre-days">' + _esc(daysLabel) + '</div>' +
+        '<div class="fc-pred-tile__row fc-pred-tile__row--top">' +
+          '<div class="fc-pred-tile__eyebrow">PREDICTOR · MUNDIAL 2026</div>' +
+          leagueChipHtml +
+        '</div>' +
+        '<div class="fc-pred-tile__hero">' +
+          '<span class="fc-pred-tile__hero-emoji" aria-hidden="true">🏆</span>' +
+          '<div class="fc-pred-tile__hero-text">' + _esc(daysLabel) + '</div>' +
+        '</div>' +
+        '<div class="fc-pred-tile__bars" aria-hidden="true">' +
+          '<div class="fc-pred-tile__bar fc-pred-tile__bar--grupos">' +
+            '<span class="fc-pred-tile__bar-label">GRUPOS</span>' +
+            '<i style="width:' + pctGrupos + '%"></i>' +
           '</div>' +
-          '<div class="fc-pred-tile__pre-col fc-pred-tile__pre-col--right">' +
-            '<div class="fc-pred-tile__pre-label">Pronósticos</div>' +
-            '<div class="fc-pred-tile__pre-count">' + predicted + '/' + total + '</div>' +
-            '<div class="fc-pred-tile__pre-bar" aria-hidden="true">' + bar + '</div>' +
+          '<div class="fc-pred-tile__bar fc-pred-tile__bar--ko">' +
+            '<span class="fc-pred-tile__bar-label">ELIMINATORIAS</span>' +
+            '<i style="width:' + pctKo + '%"></i>' +
           '</div>' +
+        '</div>' +
+        '<div class="fc-pred-tile__bars-caption">' +
+          doneAll + ' de ' + totalAll + ' pronósticos hechos' +
         '</div>' +
       '</div>' +
       footer;
@@ -766,21 +796,53 @@
     return n;
   }
 
+  // B9-redesign: cuenta KO predictions del user en la liga visualizada.
+  // koPredictions es global poblado por auth.js; saved=true marca persistencia
+  // confirmada. Las claves duplicadas number/string colapsan al mismo property
+  // (JS coerciona a string), no hay riesgo de doble conteo.
+  function _countKOPredictionsHechas() {
+    if (typeof koPredictions !== 'object' || !koPredictions) return 0;
+    var n = 0;
+    for (var k in koPredictions) {
+      if (Object.prototype.hasOwnProperty.call(koPredictions, k)
+          && koPredictions[k] && koPredictions[k].saved) n++;
+    }
+    return n;
+  }
+
+  // B9-redesign: cuenta miembros de la liga activa.
+  // _myLeagues (leagues.js) NO trae memberCount. _activeLeague tampoco. Como
+  // el query asíncrono complicaría el render, devolvemos 0 por defecto y
+  // el chip cae al fallback "Líder" hasta que B10/sesión futura wire el
+  // member count tras un fetch en leagueSelect. Sub-decisión documentada.
+  function _getLeagueMemberCount() {
+    var lg = window._activeLeague || (typeof currentLeague === 'object' ? currentLeague : null);
+    if (!lg) return 0;
+    if (typeof lg.memberCount === 'number') return lg.memberCount;
+    if (Array.isArray(lg.members)) return lg.members.length;
+    return 0;
+  }
+
   function _computeStateForCurrentPage() {
     var mode = _detectModeFromCalendar();
     var predicted = _countPredictionsHechas();
+    var koPredicted = _countKOPredictionsHechas();
     var pendingTotal = Math.max(0, _TILE_TOTAL_GROUP - predicted);
+    var memberCount = _getLeagueMemberCount();
 
     var st = {
       mode: mode,
       jornada: null,
       // Tile
       pts: (typeof totalPoints === 'number') ? totalPoints : 0,
-      league: { rank: 0, total: 0 },     // pendientes B6+: query liga local
+      // B9-redesign: en pre-mundial todos empatados a 0 → user es 1º. Si no
+      // tenemos memberCount aún, se usa 0 y el chip cae a "Líder".
+      league: { rank: memberCount > 0 ? 1 : 0, total: memberCount },
       global: { rank: 0, delta: null },  // pendientes B6+: query global cross-league
       pendingToday: 0,                   // pendientes B6+: hoy real
       pendingTotal: pendingTotal,
       predicted: predicted,
+      koPredicted: koPredicted,
       total: _TILE_TOTAL_GROUP,
       daysToKickoff: _daysToKickoff(),
       // Stats
@@ -794,7 +856,10 @@
       matches: [],
       // Callbacks
       onFooterTap: function () {
-        if (typeof showPage === 'function') showPage('grupos');
+        // B9-redesign: si los 72 grupos están completos pero faltan KO,
+        // mandar a Fase final; si no, a Grupos.
+        var goElim = (predicted >= _TILE_TOTAL_GROUP) && (koPredicted < 32);
+        if (typeof showPage === 'function') showPage(goElim ? 'elim' : 'grupos');
       },
       onTrophyTap: function () {
         var awards = (typeof awardPicks === 'object' && awardPicks) ? awardPicks : {};
