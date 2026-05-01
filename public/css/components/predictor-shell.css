@@ -72,16 +72,16 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
   border: 0;
   border-radius: 999px;
-  color: var(--ink-300);
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   transition: background 0.15s ease;
 }
 .fc-pred-trophy-btn:hover,
 .fc-pred-trophy-btn:focus-visible {
-  background: var(--ink-700);
+  background: rgba(255, 255, 255, 0.10);
   outline: none;
 }
 
@@ -113,11 +113,27 @@
   margin: 12px 0 16px;
   border-radius: 16px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(154, 123, 58, 0.18) 0%, rgba(201, 169, 97, 0.10) 100%);
-  border: 1px solid rgba(201, 169, 97, 0.35);
+  background: linear-gradient(135deg, rgba(201, 169, 97, 0.08) 0%, rgba(201, 169, 97, 0.02) 100%);
+  border: 1px solid rgba(201, 169, 97, 0.25);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
   font-family: var(--font-text);
   color: var(--ink-100);
+}
+
+/* B8-skin: glow radial decorativo top-right (decoración pura, no
+   interfiere con el watermark trofeo que vive en .__watermark con
+   z-index 0 más arriba). */
+#fc-pred-tile::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 97, 0.12), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .fc-pred-tile__body {
@@ -144,7 +160,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--fifa-gold-deep);
+  color: var(--fifa-gold);
   line-height: 1.2;
 }
 
@@ -311,6 +327,8 @@
 }
 
 .fc-pred-stats__col {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -321,6 +339,23 @@
   text-align: center;
 }
 
+/* B8-skin: accent bar superior por columna (azul / naranja / violeta).
+   El borde inferior del bar redondeado da el toque "tab indicator". */
+.fc-pred-stats__col::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  opacity: 0.4;
+  border-radius: 0 0 2px 2px;
+  background: transparent;
+}
+.fc-pred-stats__col:nth-child(1)::before { background: #60A5FA; }  /* % Aciertos */
+.fc-pred-stats__col:nth-child(2)::before { background: #FB923C; }  /* Racha */
+.fc-pred-stats__col:nth-child(3)::before { background: #A78BFA; }  /* Bonus IA */
+
 .fc-pred-stats__val {
   display: inline-flex;
   align-items: center;
@@ -328,7 +363,9 @@
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 800;
-  color: var(--ink-100);
+  /* B8-skin: fade pre-mundial. B9-stats-live cambiará a --ink-100
+     cuando los valores sean reales (clase override o JS). */
+  color: rgba(255, 255, 255, 0.3);
   line-height: 1;
 }
 
@@ -338,12 +375,13 @@
   font-family: var(--font-text);
   font-size: 10px;
   font-weight: 500;
-  color: var(--ink-400);
+  color: rgba(255, 255, 255, 0.4);
   margin-top: 2px;
 }
 
-.fc-pred-stats__col .fc-icon-flame { color: var(--fifa-red); }
-.fc-pred-stats__col .fc-icon-bolt  { color: var(--fifa-blue); }
+/* B8-skin: iconos alineados con accent bars (col 2 naranja, col 3 violeta). */
+.fc-pred-stats__col .fc-icon-flame { color: #FB923C; }
+.fc-pred-stats__col .fc-icon-bolt  { color: #A78BFA; }
 
 /* ──────────────────────────────────────────────────────────────────────
    5. FilterChips (B3)
@@ -383,16 +421,17 @@
   display: inline-flex;
   align-items: center;
   padding: 10px 16px;
-  background: var(--ink-700);
-  color: var(--ink-100);
+  background: rgba(201, 169, 97, 0.08);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  color: var(--fifa-gold);
   border-radius: 999px;
   font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   transition: background 0.15s ease;
 }
-.fc-pred-quick-link:hover { background: var(--ink-600); }
+.fc-pred-quick-link:hover { background: rgba(201, 169, 97, 0.14); }
 
 /* ──────────────────────────────────────────────────────────────────────
    6. PredictionCard (B4)
