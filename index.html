@@ -57,6 +57,7 @@ try {
 <link rel="stylesheet" href="/css/components/app-header.css">
 <link rel="stylesheet" href="/css/components/elim-tokens.css">
 <link rel="stylesheet" href="/css/components/elim-shell.css">
+<link rel="stylesheet" href="/css/components/predictor-shell.css">
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
@@ -628,11 +629,18 @@ try {
      Deps            : (ninguno por ahora)
      Notas           : widgets en F7.4-D-2 (próxima sesión)
 ════════════════════════════════════════════════════════════════ -->
+<!-- F7.7-VIS · Shell visual del Predictor (B1 mounts vacíos; B2..B5 los rellenan).
+     Cada mount es un sección/contenedor que el JS ui-pred-shell.js (B2..B5)
+     puebla en mountPredShell(). El render real se dispara desde
+     ui-nav.js::showPage('predictor') tras B6. -->
 <div id="page-predictor" style="display:none">
-<div class="container" style="padding:24px">
-  <h1 style="font-family:'Inter Tight',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:0 0 8px">🎯 Predictor IA</h1>
-  <p style="color:#9ca3af;font-size:13px;margin:0">Widgets disponibles próximamente (F7.4-D-2).</p>
-</div>
+  <div class="fc-pred-shell">
+    <header id="fc-pred-header"></header>
+    <section id="fc-pred-tile"   data-state="pre-mundial"></section>
+    <section id="fc-pred-stats"></section>
+    <nav    id="fc-pred-filters"></nav>
+    <section id="fc-pred-list"></section>
+  </div>
 </div>
 
 

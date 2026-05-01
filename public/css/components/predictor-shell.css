@@ -1,0 +1,44 @@
+/* F7.7 · Estilos del shell visual de #page-predictor.
+   Procedencia: docs/restyling-mobile/03-predictor-design-source.md (branch
+   docs/predictor-design-source-v1). Tokens compartidos en elim-tokens.css.
+
+   Estructura prevista (rellena por B2..B5):
+     1. Layout #page-predictor wrapper
+     2. Header (#fc-pred-header)            — B3
+     3. PredictionTile (#fc-pred-tile)      — B2
+     4. StatsStrip (#fc-pred-stats)         — B3
+     5. FilterChips (#fc-pred-filters)      — B3
+     6. PredictionCard (.fc-pred-card)      — B4
+     7. ScoreStepper (.fc-pred-stepper)     — B4
+     8. Trophy modal (#modal variant)       — B5
+*/
+
+/* ──────────────────────────────────────────────────────────────────────
+   1. Layout — #page-predictor wrapper
+   ────────────────────────────────────────────────────────────────────── */
+
+#page-predictor {
+  background: var(--bg, #FFFFFF);
+  color: var(--ink-900);
+  font-family: var(--font-text);
+  min-height: 100vh;
+  padding: 56px 18px 96px;  /* top safe-area iOS · lateral 18 (consistente F7.X) · bottom hueco bottom-tab */
+}
+
+#page-predictor .fc-pred-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   2. Header                                              [pendiente B3]
+   3. PredictionTile                                      [pendiente B2]
+   4. StatsStrip                                          [pendiente B3]
+   5. FilterChips                                         [pendiente B3]
+   6. PredictionCard                                      [pendiente B4]
+   7. ScoreStepper                                        [pendiente B4]
+   8. Trophy modal                                        [pendiente B5]
+   ────────────────────────────────────────────────────────────────────── */

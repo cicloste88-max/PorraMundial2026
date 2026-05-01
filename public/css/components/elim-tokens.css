@@ -1,7 +1,11 @@
 /* F7.X · Tokens del shell visual de #page-elim (Fase final).
    Procedencia: docs/restyling-mobile/02-quiniela-design-source.md (branch
    docs/quiniela-design-source-v2). "Quiniela" en el design source es
-   placeholder de Claude Design — el target real es page-elim. */
+   placeholder de Claude Design — el target real es page-elim.
+
+   F7.7 · Extiende con tokens compartidos para #page-predictor (familias
+   tipográficas + gradiente tile dorado). Procedencia: docs/restyling-mobile/
+   03-predictor-design-source.md. */
 
 :root {
   /* Brand — FIFA oficial premium */
@@ -10,6 +14,10 @@
   --fifa-blue: #0A4595;
   --fifa-gold: #C9A961;
   --fifa-gold-deep: #9A7B3A;
+
+  /* F7.7 — gradiente tile dorado del Predictor */
+  --fifa-gold-bg-from: #FFF8E1;
+  --fifa-gold-bg-to:   #FFEDB3;
 
   /* Neutrals — premium sport */
   --ink-900: #0A0E1A;
@@ -28,4 +36,9 @@
   --win:  #00834A;
   --draw: #B7860B;
   --loss: #6F1E22;
+
+  /* F7.7 — type families (compartidas Predictor + futuras vistas) */
+  --font-display: "Saira", "SF Pro Display", -apple-system, system-ui, sans-serif;
+  --font-text:    "Inter", -apple-system, system-ui, sans-serif;
+  --font-numeric: "Saira", "SF Mono", ui-monospace, monospace;
 }
