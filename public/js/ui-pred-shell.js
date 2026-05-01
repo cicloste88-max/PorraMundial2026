@@ -391,6 +391,226 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // [B4] Helpers privados list/card
+  // ─────────────────────────────────────────────────────────────
+  function _signOf(h, a) {
+    if (h == null || a == null) return null;
+    if (h > a) return '1';
+    if (h < a) return '2';
+    return 'X';
+  }
+
+  function _shortName(team) {
+    if (!team) return '';
+    if (team.name_en) return team.name_en;
+    if (team.name) return team.name.substring(0, 3).toUpperCase();
+    return '';
+  }
+
+  function _teamImgSafe(name, size) {
+    if (typeof teamImg === 'function') {
+      try { return teamImg(name, size); } catch (e) {}
+    }
+    return '<div class="fc-pred-card__badge-fallback" style="width:' + size + 'px;height:' + size + 'px;"></div>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B4] PredictionCard list (#fc-pred-list) — agrupado por eyebrow
+  // ─────────────────────────────────────────────────────────────
+  function _renderList(state) {
+    var mount = document.getElementById('fc-pred-list');
+    if (!mount) return;
+
+    if (!state || state.mode === 'pre-mundial' || !state.matches || state.matches.length === 0) {
+      mount.innerHTML = '<div class="fc-pred-list__empty"><span>No hay partidos en esta vista.</span></div>';
+      return;
+    }
+
+    var groups = _groupByEyebrow(state.matches);
+    var html = '';
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      html += '<div class="fc-pred-list__group">';
+      html += '<h3 class="fc-eyebrow fc-pred-list__eyebrow">' + _esc(g.eyebrow) + '</h3>';
+      html += '<div class="fc-pred-list__cards">';
+      for (var j = 0; j < g.matches.length; j++) {
+        html += _renderCard(g.matches[j]);
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+    mount.innerHTML = html;
+  }
+
+  function _groupByEyebrow(matches) {
+    var map = {};
+    var order = [];
+    for (var i = 0; i < matches.length; i++) {
+      var key = matches[i].eyebrow || '';
+      if (!map[key]) {
+        map[key] = { eyebrow: key, matches: [] };
+        order.push(key);
+      }
+      map[key].matches.push(matches[i]);
+    }
+    var out = [];
+    for (var k = 0; k < order.length; k++) out.push(map[order[k]]);
+    return out;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B4] PredictionCard (3 estados: open / locked / resolved)
+  // ─────────────────────────────────────────────────────────────
+  function _renderCard(match) {
+    if (!match) return '';
+    var status = match.status || 'open';
+    var pred = match.pred || null;
+    var real = match.real || null;
+    var correct = !!match.correct;
+
+    var when = _esc(match.when || '');
+    var chipHtml = '';
+    if (status === 'open') {
+      chipHtml = '<span class="fc-pred-card__chip fc-pred-card__chip--open">Cierra · ' + _esc(match.closesIn || '') + '</span>';
+    } else if (status === 'locked') {
+      var lockSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+      chipHtml = '<span class="fc-pred-card__chip fc-pred-card__chip--locked">' + lockSvg + 'Bloqueada</span>';
+    } else if (status === 'resolved') {
+      if (correct) {
+        chipHtml = '<span class="fc-pred-card__chip fc-pred-card__chip--win">+' + (match.points || 0) + ' pts</span>';
+      } else {
+        chipHtml = '<span class="fc-pred-card__chip fc-pred-card__chip--miss">' + (match.points || 0) + ' pts</span>';
+      }
+    }
+
+    var homeBadge = _teamImgSafe(match.home && match.home.name, 36);
+    var awayBadge = _teamImgSafe(match.away && match.away.name, 36);
+    var homeShort = _esc(_shortName(match.home));
+    var awayShort = _esc(_shortName(match.away));
+
+    var scoreHtml = '';
+    var scoreClass = 'fc-pred-card__score';
+    if (status === 'resolved') {
+      var scoreColor = correct ? 'fc-pred-card__score--win' : 'fc-pred-card__score--miss';
+      var ph = (pred && pred.home != null) ? pred.home : '—';
+      var pa = (pred && pred.away != null) ? pred.away : '—';
+      scoreHtml =
+        '<div class="' + scoreClass + ' ' + scoreColor + '">' +
+          '<span class="fc-num">' + _esc(ph) + '</span>' +
+          '<span class="fc-pred-card__score-sep">-</span>' +
+          '<span class="fc-num">' + _esc(pa) + '</span>' +
+        '</div>';
+      if (real) {
+        scoreHtml +=
+          '<div class="fc-pred-card__real">Real: ' +
+            '<span class="fc-num">' + _esc(real.home) + '</span>' +
+            '<span>–</span>' +
+            '<span class="fc-num">' + _esc(real.away) + '</span>' +
+          '</div>';
+      }
+    } else {
+      var sh = (pred && pred.home != null) ? pred.home : '—';
+      var sa = (pred && pred.away != null) ? pred.away : '—';
+      scoreHtml =
+        '<div class="' + scoreClass + '">' +
+          '<span class="fc-num">' + _esc(sh) + '</span>' +
+          '<span class="fc-pred-card__score-sep">-</span>' +
+          '<span class="fc-num">' + _esc(sa) + '</span>' +
+        '</div>';
+    }
+
+    var cardClasses = ['fc-pred-card', 'fc-pred-card--' + status];
+    if (status === 'resolved' && correct) cardClasses.push('fc-pred-card--win');
+
+    var extras = '';
+    if (status === 'open') {
+      var hVal = (pred && pred.home != null) ? pred.home : 0;
+      var aVal = (pred && pred.away != null) ? pred.away : 0;
+
+      var userSign = (pred && pred.home != null && pred.away != null) ? _signOf(pred.home, pred.away) : null;
+      var iaChip = _buildIaChip(userSign, match.iaSign || null);
+
+      var players = [];
+      if (match.home && match.home.players) players = players.concat(match.home.players);
+      if (match.away && match.away.players) players = players.concat(match.away.players);
+      var selectedScorer = (pred && pred.scorer) ? pred.scorer : '';
+      var scorerOpts = '<option value="">— elige goleador —</option>';
+      for (var p = 0; p < players.length; p++) {
+        var pl = players[p];
+        if (!pl || !pl.key) continue;
+        var sel = (pl.key === selectedScorer) ? ' selected' : '';
+        scorerOpts += '<option value="' + _esc(pl.key) + '"' + sel + '>' + _esc(pl.name || pl.key) + '</option>';
+      }
+
+      extras =
+        '<div class="fc-pred-card__steppers">' +
+          _renderStepper('home', match.home, hVal) +
+          _renderStepper('away', match.away, aVal) +
+        '</div>' +
+        (iaChip ? iaChip : '') +
+        '<select class="fc-pred-card__scorer" data-match-key="' + _esc(match.matchKey || '') + '" aria-label="Goleador">' +
+          scorerOpts +
+        '</select>' +
+        _buildScoringBreakdown();
+    }
+
+    return '' +
+      '<article class="' + cardClasses.join(' ') + '" data-match-key="' + _esc(match.matchKey || '') + '">' +
+        '<header class="fc-pred-card__header">' +
+          '<span class="fc-pred-card__when">' + when + '</span>' +
+          chipHtml +
+        '</header>' +
+        '<div class="fc-pred-card__body">' +
+          '<div class="fc-pred-card__team fc-pred-card__team--home">' +
+            '<span class="fc-pred-card__badge">' + homeBadge + '</span>' +
+            '<span class="fc-pred-card__teamname">' + homeShort + '</span>' +
+          '</div>' +
+          '<div class="fc-pred-card__score-wrap">' + scoreHtml + '</div>' +
+          '<div class="fc-pred-card__team fc-pred-card__team--away">' +
+            '<span class="fc-pred-card__badge">' + awayBadge + '</span>' +
+            '<span class="fc-pred-card__teamname">' + awayShort + '</span>' +
+          '</div>' +
+        '</div>' +
+        extras +
+      '</article>';
+  }
+
+  function _renderStepper(side, team, value) {
+    var name = _esc(_shortName(team));
+    var flagHtml = _teamImgSafe(team && team.name, 24);
+    var v = (value == null) ? 0 : value;
+    return '' +
+      '<div class="fc-pred-stepper" data-team="' + _esc(side) + '">' +
+        '<span class="fc-pred-stepper__flag">' + flagHtml + '</span>' +
+        '<span class="fc-pred-stepper__name">' + name + '</span>' +
+        '<button class="fc-pred-stepper__btn" data-action="dec" type="button" aria-label="Restar">−</button>' +
+        '<span class="fc-pred-stepper__val fc-num">' + _esc(v) + '</span>' +
+        '<button class="fc-pred-stepper__btn" data-action="inc" type="button" aria-label="Sumar">+</button>' +
+      '</div>';
+  }
+
+  function _buildIaChip(userSign, iaSign) {
+    if (!userSign || !iaSign) return '';
+    if (userSign === iaSign) {
+      return '<div class="fc-pred-card__iachip fc-pred-card__iachip--match">Coincides con la IA</div>';
+    }
+    return '<div class="fc-pred-card__iachip fc-pred-card__iachip--against">Vas contra la IA · +1 si aciertas</div>';
+  }
+
+  function _buildScoringBreakdown() {
+    return '' +
+      '<div class="fc-pred-card__breakdown">' +
+        '<span class="fc-pred-card__breakdown-item" data-tip="Acierto del resultado (1, X o 2). Suma 1 punto si no aciertas el exacto.">Signo: +1</span>' +
+        '<span class="fc-pred-card__breakdown-sep">·</span>' +
+        '<span class="fc-pred-card__breakdown-item" data-tip="Resultado exacto. Suma 3 puntos (incluye signo, no acumula con +1 signo).">Exacto: +3</span>' +
+        '<span class="fc-pred-card__breakdown-sep">·</span>' +
+        '<span class="fc-pred-card__breakdown-item" data-tip="Acierta el goleador del partido. Suma 2 puntos.">Goleador: +2</span>' +
+        '<span class="fc-pred-card__breakdown-sep">·</span>' +
+        '<span class="fc-pred-card__breakdown-item" data-tip="Si vas contra el pronóstico de la IA y aciertas el signo, suma 1 punto extra.">vs IA: +1</span>' +
+      '</div>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // EXPOSICIÓN PARCIAL (B6 wirea el entry point completo)
   // ─────────────────────────────────────────────────────────────
   window.PorraPred = window.PorraPred || {};
@@ -398,6 +618,7 @@
   window.PorraPred._renderHeader = _renderHeader;
   window.PorraPred._renderStats = _renderStats;
   window.PorraPred._renderFilters = _renderFilters;
+  window.PorraPred._renderList = _renderList;
   window.PorraPred._computeAciertos = _computeAciertos;
   window.PorraPred._computeStreak = _computeStreak;
   window.PorraPred._subtitleFromMode = _subtitleFromMode;

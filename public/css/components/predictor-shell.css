@@ -387,7 +387,262 @@
 .fc-pred-quick-link:hover { background: var(--ink-200); }
 
 /* ──────────────────────────────────────────────────────────────────────
-   6. PredictionCard                                      [pendiente B4]
-   7. ScoreStepper                                        [pendiente B4]
+   6. PredictionCard (B4)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-num {
+  font-family: var(--font-numeric);
+  font-feature-settings: "tnum" 1;
+}
+
+.fc-pred-list__group + .fc-pred-list__group { margin-top: 18px; }
+.fc-pred-list__eyebrow { margin: 0 0 8px; }
+.fc-pred-list__cards   { display: flex; flex-direction: column; gap: 10px; }
+.fc-pred-list__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--ink-500);
+  font-family: var(--font-text);
+  font-size: 14px;
+  background: var(--ink-50);
+  border-radius: 12px;
+}
+
+.fc-pred-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-family: var(--font-text);
+  color: var(--ink-900);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+.fc-pred-card--locked { opacity: 0.85; }
+.fc-pred-card--win    { border: 1px solid rgba(0, 131, 74, 0.3); }
+.fc-pred-card--win::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--win);
+}
+
+.fc-pred-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fc-pred-card__when {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.fc-pred-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fc-pred-card__chip--open   { background: #E8F1FF; color: var(--fifa-blue); }
+.fc-pred-card__chip--locked { background: var(--ink-100); color: var(--ink-500); }
+.fc-pred-card__chip--win    { background: rgba(0, 131, 74, 0.1); color: var(--win); }
+.fc-pred-card__chip--miss   { background: var(--ink-100); color: var(--ink-500); }
+
+.fc-pred-card__body {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-card__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.fc-pred-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+.fc-pred-card__badge img,
+.fc-pred-card__badge > div {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.fc-pred-card__badge-fallback { background: var(--ink-100); border-radius: 6px; }
+.fc-pred-card__teamname {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-700);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fc-pred-card__score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+}
+.fc-pred-card__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1;
+}
+.fc-pred-card__score--win  { color: var(--win); }
+.fc-pred-card__score--miss { color: var(--ink-400); }
+.fc-pred-card__score-sep   { font-weight: 700; color: var(--ink-400); }
+.fc-pred-card__real {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-numeric);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+.fc-pred-card__steppers {
+  background: var(--ink-50);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fc-pred-card__iachip {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.fc-pred-card__iachip--match   { color: var(--ink-500); background: var(--ink-100); }
+.fc-pred-card__iachip--against { color: var(--fifa-blue); background: rgba(10, 69, 149, 0.08); }
+
+.fc-pred-card__scorer {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ink-200);
+  border-radius: 10px;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--ink-900);
+  background: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.fc-pred-card__scorer:focus {
+  outline: 2px solid var(--fifa-blue);
+  outline-offset: 1px;
+}
+
+.fc-pred-card__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-500);
+}
+.fc-pred-card__breakdown-item { cursor: help; }
+.fc-pred-card__breakdown-sep  { color: var(--ink-300); }
+
+/* ──────────────────────────────────────────────────────────────────────
+   7. ScoreStepper (B4)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-pred-stepper {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-stepper__flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.fc-pred-stepper__flag img,
+.fc-pred-stepper__flag > div {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.fc-pred-stepper__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-900);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fc-pred-stepper__btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  color: var(--ink-900);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: var(--font-text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.fc-pred-stepper__btn:hover  { background: var(--ink-50); border-color: var(--ink-300); }
+.fc-pred-stepper__btn:active { background: var(--ink-100); }
+.fc-pred-stepper__btn:focus-visible {
+  outline: 2px solid var(--fifa-blue);
+  outline-offset: 1px;
+}
+.fc-pred-stepper__val {
+  min-width: 22px;
+  text-align: center;
+  font-family: var(--font-numeric);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
    8. Trophy modal                                        [pendiente B5]
    ────────────────────────────────────────────────────────────────────── */
