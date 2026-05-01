@@ -34,8 +34,66 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   2. Header                                              [pendiente B3]
+   2. Header (B3)
    ────────────────────────────────────────────────────────────────────── */
+
+.fc-eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.fc-pred-header {
+  padding: 16px 0 12px;
+}
+
+.fc-pred-eyebrow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fc-pred-trophy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.fc-pred-trophy-btn:hover,
+.fc-pred-trophy-btn:focus-visible {
+  background: var(--ink-100);
+  outline: none;
+}
+
+.fc-pred-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+  margin: 0 0 4px;
+  line-height: 1.1;
+}
+
+.fc-pred-subtitle {
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-500);
+  margin: 0;
+}
 
 /* ──────────────────────────────────────────────────────────────────────
    3. PredictionTile (B2)
@@ -232,8 +290,103 @@
 #fc-pred-tile[data-state="finalizado"] .fc-pred-tile__footer { display: none; }
 
 /* ──────────────────────────────────────────────────────────────────────
-   4. StatsStrip                                          [pendiente B3]
-   5. FilterChips                                         [pendiente B3]
+   4. StatsStrip (B3)
+   ────────────────────────────────────────────────────────────────────── */
+
+#fc-pred-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--ink-200);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.fc-pred-stats__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: #fff;
+  text-align: center;
+}
+
+.fc-pred-stats__val {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-900);
+  line-height: 1;
+}
+
+.fc-pred-stats__val--win { color: var(--win); }
+
+.fc-pred-stats__sub {
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+
+.fc-pred-stats__col .fc-icon-flame { color: var(--fifa-red); }
+.fc-pred-stats__col .fc-icon-bolt  { color: var(--fifa-blue); }
+
+/* ──────────────────────────────────────────────────────────────────────
+   5. FilterChips (B3)
+   ────────────────────────────────────────────────────────────────────── */
+
+#fc-pred-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#fc-pred-filters::-webkit-scrollbar { display: none; }
+
+.fc-pred-filter-chip {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.fc-pred-filter-chip:hover { background: var(--ink-200); }
+.fc-pred-filter-chip.is-active {
+  background: var(--ink-900);
+  color: #fff;
+}
+
+.fc-pred-quick-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--ink-100);
+  color: var(--ink-900);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.fc-pred-quick-link:hover { background: var(--ink-200); }
+
+/* ──────────────────────────────────────────────────────────────────────
    6. PredictionCard                                      [pendiente B4]
    7. ScoreStepper                                        [pendiente B4]
    8. Trophy modal                                        [pendiente B5]

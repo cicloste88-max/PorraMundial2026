@@ -201,10 +201,206 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // [B3] Helper subtitle dinámico
+  // ─────────────────────────────────────────────────────────────
+  function _subtitleFromMode(mode, jornada) {
+    switch (mode) {
+      case 'pre-mundial': return 'Cierre porra: 10 jun · 23:59';
+      case 'groups':      return 'Jornada ' + (jornada || 1) + ' · Fase de grupos';
+      case 'ko16':        return 'Octavos';
+      case 'ko8':         return 'Cuartos';
+      case 'sf':          return 'Semifinales';
+      case 'final':       return 'Final';
+      case 'finalizado':  return 'Mundial finalizado';
+      default:            return '';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B3] Header (#fc-pred-header)
+  // ─────────────────────────────────────────────────────────────
+  function _renderHeader(state) {
+    var mount = document.getElementById('fc-pred-header');
+    if (!mount) return;
+
+    var subtitle = _subtitleFromMode(state.mode, state.jornada);
+
+    var trophySvg =
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M6 4h12v3a6 6 0 0 1-12 0V4z"/>' +
+      '<path d="M6 6H3a3 3 0 0 0 3 3"/>' +
+      '<path d="M18 6h3a3 3 0 0 1-3 3"/>' +
+      '<path d="M9 17h6"/><path d="M12 13v4"/><path d="M8 21h8"/>' +
+      '</svg>';
+
+    mount.className = 'fc-pred-header';
+    mount.innerHTML =
+      '<div class="fc-pred-eyebrow-row">' +
+        '<span class="fc-eyebrow">PREDICTOR</span>' +
+        '<button class="fc-pred-trophy-btn" type="button" aria-label="Mis premios individuales">' +
+          trophySvg +
+        '</button>' +
+      '</div>' +
+      '<h1 class="fc-pred-title">Tus predicciones</h1>' +
+      '<p class="fc-pred-subtitle">' + _esc(subtitle) + '</p>';
+
+    var trophyBtn = mount.querySelector('.fc-pred-trophy-btn');
+    if (trophyBtn && typeof state.onTrophyTap === 'function') {
+      trophyBtn.addEventListener('click', function () { state.onTrophyTap(); });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B3] Helpers puros — % aciertos + racha (§1.3 del bundle)
+  // ─────────────────────────────────────────────────────────────
+  function _computeAciertos(predictionsResolved, iaByMatch) {
+    if (!predictionsResolved || !predictionsResolved.length) {
+      return { pts: 0, max: 0, pct: null };
+    }
+    var pts = 0, max = 0;
+    for (var i = 0; i < predictionsResolved.length; i++) {
+      var p = predictionsResolved[i];
+      var iaSign = (iaByMatch && iaByMatch[p.matchKey]) ? iaByMatch[p.matchKey] : null;
+      var userSign = (p.pred.home > p.pred.away) ? '1'
+                   : (p.pred.home < p.pred.away) ? '2' : 'X';
+      var vsIA = !!(iaSign && userSign !== iaSign);
+      max += vsIA ? 6 : 5;
+      if (p.exactCorrect) pts += 3;
+      if (p.scorerCorrect) pts += 2;
+      if (vsIA && p.signCorrect) pts += 1;
+    }
+    var pct = max > 0 ? Math.round((pts / max) * 100) : null;
+    return { pts: pts, max: max, pct: pct };
+  }
+
+  function _computeStreak(predictionsResolved) {
+    if (!predictionsResolved || !predictionsResolved.length) return 0;
+    // Asume array ordenado cronológicamente ASC; cuenta desde el final.
+    var streak = 0;
+    for (var i = predictionsResolved.length - 1; i >= 0; i--) {
+      if (predictionsResolved[i].signCorrect) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B3] StatsStrip (#fc-pred-stats)
+  // ─────────────────────────────────────────────────────────────
+  function _renderStats(state) {
+    var mount = document.getElementById('fc-pred-stats');
+    if (!mount) return;
+
+    var isPre = state.mode === 'pre-mundial';
+
+    var flameSvg =
+      '<svg class="fc-icon-flame" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M12 2c1 4-2 5-2 8a4 4 0 0 0 8 0c0-2-1-3-2-4 0 2-1 3-2 3 0-3 2-5-2-7zM7 13c-2 2-3 4-3 6a8 8 0 0 0 16 0c0-1-.3-2-.8-3-.7 2-2.4 3-4.2 3 1-1 1.5-2.5 1-4-1 1.5-2.5 2-4 2-3 0-5-2-5-4z"/>' +
+      '</svg>';
+
+    var boltSvg =
+      '<svg class="fc-icon-bolt" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M13 2L4 14h6l-2 8 10-13h-6l1-7z"/>' +
+      '</svg>';
+
+    var pctVal, rachaVal, bonusVal;
+    if (isPre) {
+      pctVal = '—'; rachaVal = '—'; bonusVal = '—';
+    } else {
+      pctVal = (state.aciertosPct == null) ? '—' : (state.aciertosPct + '%');
+      rachaVal = (state.racha == null) ? '0' : String(state.racha);
+      bonusVal = String(state.bonusIa || 0);
+    }
+
+    var pctColorClass = (!isPre && state.aciertosPct != null && state.aciertosPct >= 60)
+      ? ' fc-pred-stats__val--win' : '';
+
+    var subPre = isPre ? '<span class="fc-pred-stats__sub">Disponible 11 jun</span>' : '';
+
+    mount.innerHTML =
+      '<div class="fc-pred-stats__col">' +
+        '<span class="fc-eyebrow">% Aciertos</span>' +
+        '<strong class="fc-pred-stats__val' + pctColorClass + '">' + pctVal + '</strong>' +
+        subPre +
+      '</div>' +
+      '<div class="fc-pred-stats__col">' +
+        '<span class="fc-eyebrow">Racha</span>' +
+        '<strong class="fc-pred-stats__val">' + flameSvg + ' ' + rachaVal + '</strong>' +
+        subPre +
+      '</div>' +
+      '<div class="fc-pred-stats__col">' +
+        '<span class="fc-eyebrow">Bonus IA</span>' +
+        '<strong class="fc-pred-stats__val">' + boltSvg + ' ' + bonusVal + '</strong>' +
+        subPre +
+      '</div>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // [B3] FilterChips (#fc-pred-filters) — pre-mundial: quick-link
+  // ─────────────────────────────────────────────────────────────
+  function _renderFilters(state) {
+    var mount = document.getElementById('fc-pred-filters');
+    if (!mount) return;
+
+    if (state.mode === 'pre-mundial') {
+      var predicted = state.predicted || 0;
+      var total = state.total || 72;
+      mount.innerHTML =
+        '<a class="fc-pred-quick-link" href="javascript:void(0)" data-target="grupos">' +
+          'Tu porra · ' + predicted + '/' + total + ' &rarr;' +
+        '</a>';
+      var link = mount.querySelector('.fc-pred-quick-link');
+      if (link && typeof state.onQuickLink === 'function') {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          state.onQuickLink('grupos');
+        });
+      }
+      return;
+    }
+
+    var active = state.activeFilter || 'pending';
+    var todayN = (typeof state.todayCount === 'number') ? state.todayCount : 0;
+
+    var chips = [
+      { key: 'pending',  label: 'Por jugar' },
+      { key: 'today',    label: 'Hoy · ' + todayN },
+      { key: 'week',     label: 'Esta sem.' },
+      { key: 'resolved', label: 'Resueltas' }
+    ];
+
+    var html = '';
+    for (var i = 0; i < chips.length; i++) {
+      var c = chips[i];
+      var cls = 'fc-pred-filter-chip' + (c.key === active ? ' is-active' : '');
+      html += '<button class="' + cls + '" data-filter="' + c.key + '" type="button">' +
+              _esc(c.label) + '</button>';
+    }
+    mount.innerHTML = html;
+
+    var btns = mount.querySelectorAll('.fc-pred-filter-chip');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].addEventListener('click', function (ev) {
+        var k = ev.currentTarget.getAttribute('data-filter');
+        for (var m = 0; m < btns.length; m++) btns[m].classList.remove('is-active');
+        ev.currentTarget.classList.add('is-active');
+        if (typeof state.onFilterChange === 'function') state.onFilterChange(k);
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // EXPOSICIÓN PARCIAL (B6 wirea el entry point completo)
   // ─────────────────────────────────────────────────────────────
   window.PorraPred = window.PorraPred || {};
   window.PorraPred._renderTile = _renderTile;
+  window.PorraPred._renderHeader = _renderHeader;
+  window.PorraPred._renderStats = _renderStats;
+  window.PorraPred._renderFilters = _renderFilters;
+  window.PorraPred._computeAciertos = _computeAciertos;
+  window.PorraPred._computeStreak = _computeStreak;
+  window.PorraPred._subtitleFromMode = _subtitleFromMode;
   window.PorraPred._state = _state;
 
 })();
