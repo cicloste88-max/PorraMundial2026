@@ -81,10 +81,10 @@
     }
   }
 
-  // B9-redesign: tile pre-mundial reestructurado. Eyebrow + chip "Nº de N",
-  // hero "🏆 Faltan N días", 2 barras de progreso (grupos:KO ratio 72:32),
-  // caption "X de 104 pronósticos hechos", footer dorado. Old __pre-grid
-  // marcado DEPRECATED en CSS; reglas conservadas por seguridad ante rollback.
+  // B10-traceability: tile pre-Mundial con stack de 2 chips (Liga + Global)
+  // top-right absolute + rank-row con nombre del rango + frase del rango entre
+  // Hero y Bars. Datos vienen de window._predictorRanking (poblado por
+  // loadPredictorRankingData() en data.js, vistas SQL B10).
   function _renderTilePreMundial(state) {
     var days = Math.max(0, Number(state.daysToKickoff || 0));
     var daysLabel = days <= 0 ? 'Mañana arranca' : ('Faltan ' + days + (days === 1 ? ' día' : ' días'));
@@ -101,15 +101,46 @@
     var pctGrupos = totalGroup > 0 ? Math.min(100, Math.round((gruposUser / totalGroup) * 100)) : 0;
     var pctKo     = totalKO    > 0 ? Math.min(100, Math.round((koUser    / totalKO   ) * 100)) : 0;
 
-    var league = state.league || { rank: 0, total: 0 };
-    var leagueChipHtml;
-    if (league && league.total > 0) {
-      // En pre-Mundial todos empatados a 0 → todos primeros.
-      leagueChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">' +
-        league.rank + 'º de ' + league.total + '</span>';
+    // Chip Liga (gold-ghost). Lee state.league.position con fallback a .rank.
+    var league = state.league || {};
+    var leaguePos = Number(league.position || league.rank || 0);
+    var leagueTotal = Number(league.total || 0);
+    var ligaChipHtml;
+    if (leagueTotal > 0) {
+      ligaChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">' +
+        leaguePos + 'º de ' + leagueTotal + ' · Liga</span>';
     } else {
-      leagueChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">Líder</span>';
+      ligaChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">Líder · Liga</span>';
     }
+
+    // Chip Global (neutro). Lee state.global.position con fallback a .rank.
+    var glob = state.global || {};
+    var globalPos = Number(glob.position || glob.rank || 0);
+    var globalChipHtml;
+    if (globalPos > 0) {
+      globalChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--global">' +
+        globalPos + 'º · Global</span>';
+    } else {
+      globalChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--global">— · Global</span>';
+    }
+
+    // Rank row (nombre + frase). Pre-Mundial todos a 0 pts → "Chupetín".
+    var pts = Number(state.totalPts || state.pts || 0);
+    var rank = { name: '—', phrase: '' };
+    if (typeof window.getRank === 'function') {
+      try {
+        var r = window.getRank(pts);
+        if (r && typeof r === 'object') {
+          rank.name = r.name || '—';
+          rank.phrase = r.phrase || '';
+        }
+      } catch (e) { /* defensivo */ }
+    }
+    var rankRowHtml =
+      '<div class="fc-pred-tile__rank-row">' +
+        '<span class="fc-pred-tile__rank-name">' + _esc(rank.name) + '</span>' +
+        (rank.phrase ? '<span class="fc-pred-tile__rank-phrase">"' + _esc(rank.phrase) + '"</span>' : '') +
+      '</div>';
 
     var watermark = _buildWatermark();
 
@@ -124,14 +155,18 @@
     return '' +
       '<div class="fc-pred-tile__body">' +
         watermark +
+        '<div class="fc-pred-tile__rank-stack">' +
+          ligaChipHtml +
+          globalChipHtml +
+        '</div>' +
         '<div class="fc-pred-tile__row fc-pred-tile__row--top">' +
           '<div class="fc-pred-tile__eyebrow">PREDICTOR · MUNDIAL 2026</div>' +
-          leagueChipHtml +
         '</div>' +
         '<div class="fc-pred-tile__hero">' +
           '<span class="fc-pred-tile__hero-emoji" aria-hidden="true">🏆</span>' +
           '<div class="fc-pred-tile__hero-text">' + _esc(daysLabel) + '</div>' +
         '</div>' +
+        rankRowHtml +
         '<div class="fc-pred-tile__bars" aria-hidden="true">' +
           '<div class="fc-pred-tile__bar fc-pred-tile__bar--grupos">' +
             '<span class="fc-pred-tile__bar-label">GRUPOS</span>' +
@@ -374,11 +409,14 @@
     if (!mount) return;
 
     if (state.mode === 'pre-mundial') {
-      var predicted = state.predicted || 0;
-      var total = state.total || 72;
+      // B10-traceability fix: divisor 72 → 104 (grupos + KO). Numerador
+      // suma predicted + koPredicted (ambos en state desde B9).
+      var predicted = Number(state.predicted || 0);
+      var koPredicted = Number(state.koPredicted || 0);
+      var doneAll = predicted + koPredicted;
       mount.innerHTML =
         '<a class="fc-pred-quick-link" href="javascript:void(0)" data-target="grupos">' +
-          'Tu porra · ' + predicted + '/' + total + ' &rarr;' +
+          'Tu porra · ' + doneAll + '/104 &rarr;' +
         '</a>';
       var link = mount.querySelector('.fc-pred-quick-link');
       if (link && typeof state.onQuickLink === 'function') {
@@ -830,15 +868,37 @@
     var pendingTotal = Math.max(0, _TILE_TOTAL_GROUP - predicted);
     var memberCount = _getLeagueMemberCount();
 
+    // B10-traceability: lee window._predictorRanking poblado por
+    // loadPredictorRankingData() en data.js (vistas SQL). Si no está cargado
+    // todavía (primera render antes de async resolve), cae al fallback
+    // (memberCount inferido de _activeLeague + globalRank=0).
+    var ranking = window._predictorRanking || null;
+    var leagueMembersFinal = ranking ? Number(ranking.leagueMembers || 0) : memberCount;
+    var leagueRankFinal = ranking ? Number(ranking.leagueRank || 0)
+                                  : (memberCount > 0 ? 1 : 0);
+    var globalRankFinal = ranking ? Number(ranking.globalRank || 0) : 0;
+    var globalTotalFinal = ranking ? Number(ranking.globalTotal || 0) : 0;
+    var totalPts = (typeof totalPoints === 'number') ? totalPoints : 0;
+
     var st = {
       mode: mode,
       jornada: null,
       // Tile
-      pts: (typeof totalPoints === 'number') ? totalPoints : 0,
-      // B9-redesign: en pre-mundial todos empatados a 0 → user es 1º. Si no
-      // tenemos memberCount aún, se usa 0 y el chip cae a "Líder".
-      league: { rank: memberCount > 0 ? 1 : 0, total: memberCount },
-      global: { rank: 0, delta: null },  // pendientes B6+: query global cross-league
+      pts: totalPts,
+      totalPts: totalPts,
+      // En pre-Mundial todos empatados a 0 → user es 1º. Mid-Mundial leerá
+      // del cache real (sprint B11 user_points_cache).
+      league: {
+        rank: leagueRankFinal,        // alias compat
+        position: leagueRankFinal,    // nuevo nombre canónico
+        total: leagueMembersFinal
+      },
+      global: {
+        rank: globalRankFinal,        // alias compat
+        position: globalRankFinal,
+        total: globalTotalFinal,
+        delta: null
+      },
       pendingToday: 0,                   // pendientes B6+: hoy real
       pendingTotal: pendingTotal,
       predicted: predicted,
@@ -893,12 +953,27 @@
 
   function mountPredShell() {
     if (!document.getElementById('page-predictor')) return;
+    // Render inicial inmediato con datos cacheados (o fallback).
     var st = _computeStateForCurrentPage();
     _renderHeader(st);
     _renderTile(st);
     _renderStats(st);
     _renderFilters(st);
     _renderList(st);
+
+    // B10-traceability: kickoff async para llenar window._predictorRanking
+    // (chips Liga + Global con datos reales). Tras resolver, re-render
+    // de Tile + Filters (los únicos que dependen del ranking).
+    if (typeof window.loadPredictorRankingData === 'function') {
+      window.loadPredictorRankingData().then(function (ranking) {
+        if (!ranking) return;
+        var st2 = _computeStateForCurrentPage();
+        _renderTile(st2);
+        _renderFilters(st2);
+      }).catch(function (err) {
+        console.warn('[predictor] loadPredictorRankingData failed', err);
+      });
+    }
   }
 
   // ─────────────────────────────────────────────────────────────

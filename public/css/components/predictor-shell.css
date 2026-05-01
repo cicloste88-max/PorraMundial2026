@@ -243,7 +243,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 12px 16px 0;
+  padding: 12px 16px 14px;
   margin-top: 14px;
   background: transparent;
   border: 0;
@@ -355,6 +355,58 @@
   margin-top: 6px;
   position: relative;
   z-index: 1;
+}
+
+/* === [B10-traceability] Stack chips Liga + Global apilados (top-right
+   absolute) + bloque rango con frase entre Hero y Bars. === */
+
+.fc-pred-tile__rank-stack {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+/* .fc-pred-tile__chip--liga ya existe en B9 — sin cambios. */
+
+.fc-pred-tile__chip--global {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fc-pred-tile__rank-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 14px;
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__rank-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--fifa-gold);
+}
+.fc-pred-tile__rank-phrase {
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* DEPRECATED B9: superseded by .fc-pred-tile__hero + .__bars + .__bars-

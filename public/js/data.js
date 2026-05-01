@@ -317,3 +317,84 @@ window.PHRASES_GRUPO = {
   ]
 };
 
+// === [B10-traceability] Predictor ranking helpers ===
+//
+// Vistas backend (migración 20260430200000_predictor_ranking_views.sql):
+//   v_league_member_count(league_id, human_count, total_count)
+//   v_user_global_rank(user_id, total_pts, rank_global, total_users)
+//
+// loadPredictorRankingData() lo invoca mountPredShell() en ui-pred-shell.js
+// y popla window._predictorRanking. Pre-Mundial: total_pts=0 para todos →
+// todos empatados, leagueRank=1 si liga tiene miembros. Mid-Mundial
+// requerirá sprint B11 (user_points_cache real) para diferenciar.
+//
+// Defensiva: si window._porraDb no está disponible o falta league/user,
+// devuelve null y mantiene compat con render fallback de #fc-pred-tile
+// ("Líder · Liga" / "— · Global").
+
+var _leagueMemberCountCache = {};
+var _globalRankCache = {};
+
+async function loadLeagueMemberCount(leagueId) {
+  if (!leagueId) return null;
+  if (_leagueMemberCountCache[leagueId]) return _leagueMemberCountCache[leagueId];
+  if (!window._porraDb) return null;
+  var res = await window._porraDb
+    .from('v_league_member_count')
+    .select('human_count,total_count')
+    .eq('league_id', leagueId)
+    .maybeSingle();
+  if (res.error) {
+    console.warn('[predictor] loadLeagueMemberCount error', res.error);
+    return null;
+  }
+  _leagueMemberCountCache[leagueId] = res.data;
+  return res.data;
+}
+
+async function loadGlobalRank(userId) {
+  if (!userId) return null;
+  if (_globalRankCache[userId]) return _globalRankCache[userId];
+  if (!window._porraDb) return null;
+  var res = await window._porraDb
+    .from('v_user_global_rank')
+    .select('rank_global,total_users')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (res.error) {
+    console.warn('[predictor] loadGlobalRank error', res.error);
+    return null;
+  }
+  _globalRankCache[userId] = res.data;
+  return res.data;
+}
+
+async function loadPredictorRankingData() {
+  var leagueId = window._activeLeague && window._activeLeague.id;
+  var userId = window.currentUser && window.currentUser.id;
+  if (!leagueId || !userId) return null;
+
+  var results = await Promise.all([
+    loadLeagueMemberCount(leagueId),
+    loadGlobalRank(userId)
+  ]);
+  var leagueData = results[0];
+  var globalData = results[1];
+
+  var memberCount = leagueData
+    ? Number(leagueData.human_count || leagueData.total_count || 0)
+    : 0;
+  // Pre-Mundial: todos empatados a 0 pts → user es 1º si liga tiene miembros.
+  var leagueRank = memberCount > 0 ? 1 : 0;
+
+  window._predictorRanking = {
+    leagueMembers: memberCount,
+    leagueRank: leagueRank,
+    globalRank: globalData ? Number(globalData.rank_global || 0) : 0,
+    globalTotal: globalData ? Number(globalData.total_users || 0) : 0
+  };
+  return window._predictorRanking;
+}
+
+window.loadPredictorRankingData = loadPredictorRankingData;
+
