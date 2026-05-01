@@ -730,9 +730,117 @@
   }
 
   // ─────────────────────────────────────────────────────────────
-  // EXPOSICIÓN PARCIAL (B6 wirea el entry point completo)
+  // [B6] Entry point — mountPredShell()
+  //
+  // Llamado desde ui-nav.js::showPage('predictor') tras hacer visible
+  // #page-predictor. Lee stores existentes (predictions, ko_predictions,
+  // award_picks, EQUIPOS, iaPredictions, currentUser, _porraCerrada,
+  // currentLeague) y compone state para los 5 renders.
+  //
+  // Mientras estamos pre-Mundial (today < KICKOFF), forzamos mode
+  // 'pre-mundial' independiente del estado de la porra. La transición
+  // a 'groups'/'ko*'/'finalizado' es trabajo de F7.7 sesiones futuras
+  // (datos reales 11 jun) — el shell ya lo soporta.
+  // ─────────────────────────────────────────────────────────────
+  function _detectModeFromCalendar() {
+    var now = Date.now();
+    if (now < _KICKOFF_TS) return 'pre-mundial';
+    // Post-kickoff: por ahora groups (transición fina KO/finalizado en
+    // sesión futura cuando arranque el Mundial; A5 lo deja explícito).
+    return 'groups';
+  }
+
+  function _daysToKickoff() {
+    var diffMs = _KICKOFF_TS - Date.now();
+    if (diffMs <= 0) return 0;
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  function _countPredictionsHechas() {
+    if (typeof predictions !== 'object' || !predictions) return 0;
+    var n = 0;
+    for (var k in predictions) {
+      if (Object.prototype.hasOwnProperty.call(predictions, k)
+          && predictions[k] && predictions[k].saved) n++;
+    }
+    return n;
+  }
+
+  function _computeStateForCurrentPage() {
+    var mode = _detectModeFromCalendar();
+    var predicted = _countPredictionsHechas();
+    var pendingTotal = Math.max(0, _TILE_TOTAL_GROUP - predicted);
+
+    var st = {
+      mode: mode,
+      jornada: null,
+      // Tile
+      pts: (typeof totalPoints === 'number') ? totalPoints : 0,
+      league: { rank: 0, total: 0 },     // pendientes B6+: query liga local
+      global: { rank: 0, delta: null },  // pendientes B6+: query global cross-league
+      pendingToday: 0,                   // pendientes B6+: hoy real
+      pendingTotal: pendingTotal,
+      predicted: predicted,
+      total: _TILE_TOTAL_GROUP,
+      daysToKickoff: _daysToKickoff(),
+      // Stats
+      aciertosPct: null,
+      racha: null,
+      bonusIa: 0,
+      // Filters
+      todayCount: 0,
+      activeFilter: _state.activeFilter,
+      // List (vacío en pre-mundial)
+      matches: [],
+      // Callbacks
+      onFooterTap: function () {
+        if (typeof showPage === 'function') showPage('grupos');
+      },
+      onTrophyTap: function () {
+        var awards = (typeof awardPicks === 'object' && awardPicks) ? awardPicks : {};
+        var leagueObj = (typeof currentLeague === 'object' && currentLeague)
+          ? { name: currentLeague.nombre || '' } : { name: '' };
+        var ctx = {
+          porraAbierta: !window._porraCerrada,
+          league: leagueObj,
+          onChangeAward: null,  // C5/futuro flow award_picks
+          onClose: null
+        };
+        _openTrophyModal({
+          golden_ball:  awards.golden_ball  || null,
+          golden_boot:  awards.golden_boot  || null,
+          golden_glove: awards.golden_glove || null,
+          young_player: awards.young_player || null
+        }, ctx);
+      },
+      onFilterChange: function (key) {
+        _state.activeFilter = key;
+        // Re-render solo de la lista — Tile/Stats/Header no cambian
+        // por filter.
+        _renderList(_computeStateForCurrentPage());
+      },
+      onQuickLink: function (target) {
+        if (typeof showPage === 'function') showPage(target);
+      }
+    };
+    return st;
+  }
+
+  function mountPredShell() {
+    if (!document.getElementById('page-predictor')) return;
+    var st = _computeStateForCurrentPage();
+    _renderHeader(st);
+    _renderTile(st);
+    _renderStats(st);
+    _renderFilters(st);
+    _renderList(st);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // EXPOSICIÓN
   // ─────────────────────────────────────────────────────────────
   window.PorraPred = window.PorraPred || {};
+  window.PorraPred.mount = mountPredShell;
   window.PorraPred._renderTile = _renderTile;
   window.PorraPred._renderHeader = _renderHeader;
   window.PorraPred._renderStats = _renderStats;
@@ -743,5 +851,7 @@
   window.PorraPred._computeStreak = _computeStreak;
   window.PorraPred._subtitleFromMode = _subtitleFromMode;
   window.PorraPred._state = _state;
+  // Compatibilidad con la convención del repo (window.mountPredShell).
+  window.mountPredShell = mountPredShell;
 
 })();
