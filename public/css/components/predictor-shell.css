@@ -644,5 +644,117 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   8. Trophy modal                                        [pendiente B5]
+   8. Trophy modal (B5) — reusa #modal genérico (estructura+animación
+      ya existentes en ko.css). Solo añadimos estilos de contenido.
    ────────────────────────────────────────────────────────────────────── */
+
+.fc-pred-trophy-modal {
+  font-family: var(--font-text);
+  color: var(--ink-900);
+  padding: 4px 2px 8px;
+}
+
+.fc-pred-trophy-modal__head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.fc-pred-trophy-modal__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+
+.fc-pred-trophy-modal__subtitle {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin: 0;
+}
+
+.fc-pred-trophy-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fc-pred-trophy-modal__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-100);
+}
+
+.fc-pred-trophy-modal__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-trophy-modal__row--bottom {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fc-pred-trophy-modal__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--fifa-gold-deep);
+}
+
+.fc-pred-trophy-modal__label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.fc-pred-trophy-modal__pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-700);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fc-pred-trophy-modal__pick--empty {
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+.fc-pred-trophy-modal__player { font-weight: 600; color: var(--ink-900); }
+.fc-pred-trophy-modal__sep    { color: var(--ink-400); }
+.fc-pred-trophy-modal__flag   { font-size: 14px; line-height: 1; }
+.fc-pred-trophy-modal__team   { color: var(--ink-700); }
+
+.fc-pred-trophy-modal__change {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+.fc-pred-trophy-modal__change:hover,
+.fc-pred-trophy-modal__change:focus-visible {
+  background: var(--ink-200);
+  outline: none;
+}

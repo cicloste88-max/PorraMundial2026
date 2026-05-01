@@ -611,6 +611,125 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // [B5] Trophy modal — reusa #modal genérico (ui-nav.js gestiona close)
+  // ─────────────────────────────────────────────────────────────
+  function _findPlayerByKey(key) {
+    if (!key || typeof EQUIPOS === 'undefined' || !Array.isArray(EQUIPOS)) return null;
+    for (var i = 0; i < EQUIPOS.length; i++) {
+      var team = EQUIPOS[i];
+      if (!team || !team.players) continue;
+      for (var j = 0; j < team.players.length; j++) {
+        if (team.players[j] && team.players[j].key === key) {
+          return {
+            teamName: team.name,
+            teamFlag: team.flag,
+            playerName: team.players[j].name
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  function _openTrophyModal(awards, ctx) {
+    var modalEl = document.getElementById('modal');
+    if (!modalEl) return;
+
+    awards = awards || {};
+    ctx = ctx || {};
+
+    // Cascada defensiva para localizar el content-wrap del #modal
+    var contentWrap = modalEl.querySelector('.modal-content-wrap')
+                   || modalEl.querySelector('.content-wrap')
+                   || modalEl.querySelector('[data-modal-content]');
+
+    if (!contentWrap) {
+      var inner = modalEl.querySelector('.modal-inner');
+      if (!inner) return;
+      contentWrap = inner.querySelector('.fc-pred-trophy-modal__inject');
+      if (!contentWrap) {
+        contentWrap = document.createElement('div');
+        contentWrap.className = 'fc-pred-trophy-modal__inject';
+        inner.appendChild(contentWrap);
+      }
+    }
+
+    contentWrap.innerHTML = _renderTrophyContent(awards, ctx);
+    modalEl.classList.add('open');
+
+    var root = contentWrap.querySelector('.fc-pred-trophy-modal');
+    if (root && ctx.porraAbierta && typeof ctx.onChangeAward === 'function') {
+      root.addEventListener('click', function (ev) {
+        var btn = ev.target && ev.target.closest && ev.target.closest('[data-award-change]');
+        if (!btn) return;
+        ev.preventDefault();
+        var awardKey = btn.getAttribute('data-award-change');
+        if (awardKey) ctx.onChangeAward(awardKey);
+      });
+    }
+  }
+
+  function _renderTrophyContent(awards, ctx) {
+    var leagueName = (ctx && ctx.league && ctx.league.name) ? ctx.league.name : '';
+
+    var svgTrophy = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v3a3 3 0 0 1-3 3M7 5H4v3a3 3 0 0 0 3 3"/></svg>';
+    var svgBoot   = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17V6h6v6h6a4 4 0 0 1 4 4v1H4z"/><path d="M8 9h2M8 12h2"/></svg>';
+    var svgGlove  = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 21V10a2 2 0 1 1 4 0V4a2 2 0 1 1 4 0v8h2a2 2 0 0 1 2 2v3a4 4 0 0 1-4 4z"/></svg>';
+    var svgYoung  = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V11"/><path d="M12 11c0-3 2-5 5-5-1 3-2 5-5 5z"/><path d="M12 13c0-3-2-5-5-5 1 3 2 5 5 5z"/></svg>';
+
+    var items = [
+      _renderAwardItem('golden_ball',  'Balón de Oro',           svgTrophy, awards.golden_ball,  ctx),
+      _renderAwardItem('golden_boot',  'Bota de Oro',            svgBoot,   awards.golden_boot,  ctx),
+      _renderAwardItem('golden_glove', 'Guante de Oro',          svgGlove,  awards.golden_glove, ctx),
+      _renderAwardItem('young_player', 'Mejor Joven (≤21)', svgYoung,  awards.young_player, ctx)
+    ].join('');
+
+    return '' +
+      '<div class="fc-pred-trophy-modal" role="dialog" aria-label="Mis premios individuales">' +
+        '<header class="fc-pred-trophy-modal__head">' +
+          '<h2 class="fc-pred-trophy-modal__title">Mis premios individuales</h2>' +
+          (leagueName ? '<p class="fc-pred-trophy-modal__subtitle">Liga: ' + _esc(leagueName) + '</p>' : '') +
+        '</header>' +
+        '<ul class="fc-pred-trophy-modal__list">' + items + '</ul>' +
+      '</div>';
+  }
+
+  function _renderAwardItem(awardKey, awardLabel, awardIconSvg, playerKey, ctx) {
+    var info = _findPlayerByKey(playerKey);
+    var canEdit = !!(ctx && ctx.porraAbierta);
+
+    var pickHtml;
+    if (info) {
+      var flag = info.teamFlag ? '<span class="fc-pred-trophy-modal__flag">' + _esc(info.teamFlag) + '</span>' : '';
+      pickHtml = '' +
+        '<div class="fc-pred-trophy-modal__pick">' +
+          '<span class="fc-pred-trophy-modal__player">' + _esc(info.playerName) + '</span>' +
+          '<span class="fc-pred-trophy-modal__sep">·</span>' +
+          flag +
+          '<span class="fc-pred-trophy-modal__team">' + _esc(info.teamName) + '</span>' +
+        '</div>';
+    } else {
+      pickHtml = '<div class="fc-pred-trophy-modal__pick fc-pred-trophy-modal__pick--empty">— sin elegir —</div>';
+    }
+
+    var changeBtn = canEdit
+      ? '<button type="button" class="fc-pred-trophy-modal__change" data-award-change="' + awardKey + '">Cambiar</button>'
+      : '';
+
+    return '' +
+      '<li class="fc-pred-trophy-modal__item" data-award="' + awardKey + '">' +
+        '<div class="fc-pred-trophy-modal__row">' +
+          '<span class="fc-pred-trophy-modal__icon" aria-hidden="true">' + awardIconSvg + '</span>' +
+          '<span class="fc-pred-trophy-modal__label">' + _esc(awardLabel) + '</span>' +
+        '</div>' +
+        '<div class="fc-pred-trophy-modal__row fc-pred-trophy-modal__row--bottom">' +
+          pickHtml +
+          changeBtn +
+        '</div>' +
+      '</li>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // EXPOSICIÓN PARCIAL (B6 wirea el entry point completo)
   // ─────────────────────────────────────────────────────────────
   window.PorraPred = window.PorraPred || {};
@@ -619,6 +738,7 @@
   window.PorraPred._renderStats = _renderStats;
   window.PorraPred._renderFilters = _renderFilters;
   window.PorraPred._renderList = _renderList;
+  window.PorraPred._openTrophyModal = _openTrophyModal;
   window.PorraPred._computeAciertos = _computeAciertos;
   window.PorraPred._computeStreak = _computeStreak;
   window.PorraPred._subtitleFromMode = _subtitleFromMode;
