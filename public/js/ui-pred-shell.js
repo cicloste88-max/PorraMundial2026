@@ -80,7 +80,7 @@
       pctGlobal: 0,
       currentPhaseIdx: 0,
       ballPos: 0,
-      badgeText: '0% · ' + days + ' días',
+      badgeText: 'Faltan ' + days + ' días',
       ballState: 'prematch',
       marks: [
         { idx: 0, label: 'Grupos', isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 0   },
@@ -101,15 +101,14 @@
     var pct = Math.max(0, Math.min(100, Number(p.pctGlobal || 0)));
     var ballPos = Math.max(0, Math.min(100, Number(p.ballPos || 0)));
 
-    // B12-info-fixes: badge mid-Mundial muestra "{pct}% · {matchesPlayed}/104"
-    // (el nombre de la fase ya aparece en la marca activa de la timeline).
+    // B13-fix-coherence: badge mid-Mundial muestra "{fase} · {matchesPlayed}/104" (sin %).
     // Pre-Mundial (prematch / matchesPlayed=0) y Finalizado (matchesPlayed=104)
     // mantienen el badgeText canónico computado en data.js::getMundialProgress.
     var matchesPlayed = Number(p.matchesPlayed || 0);
     var badgeText = p.badgeText || '';
     if (p.ballState !== 'prematch' && p.ballState !== 'finished'
         && matchesPlayed > 0 && matchesPlayed < TOTAL_MATCHES) {
-      badgeText = pct + '% · ' + matchesPlayed + '/' + TOTAL_MATCHES;
+      badgeText = (p.phaseLabel || 'Grupos') + ' · ' + matchesPlayed + '/' + TOTAL_MATCHES;
     }
 
     var ballClasses = 'timeline-ball';
@@ -140,7 +139,7 @@
     return '' +
       '<div class="timeline">' +
         '<div class="timeline-track">' +
-          '<div class="timeline-progress" style="width:' + pct + '%"></div>' +
+          '<div class="timeline-progress" style="width:' + ballPos + '%"></div>' +
           '<div class="timeline-marks">' +
             marksHtml +
           '</div>' +

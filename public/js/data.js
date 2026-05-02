@@ -465,7 +465,7 @@ window.loadPredictorRankingData = loadPredictorRankingData;
       pctGlobal: 0,
       currentPhaseIdx: 0,
       ballPos: 0,
-      badgeText: '0% · ' + days + ' días',
+      badgeText: 'Faltan ' + days + ' días',
       ballState: 'prematch',
       marks: _buildMarks(0)
     };
@@ -533,15 +533,16 @@ window.loadPredictorRankingData = loadPredictorRankingData;
     var badgeText;
     if (matchesPlayed === 0) {
       var d = Math.max(0, Math.ceil((KICKOFF_TS_MUNDIAL - Date.now()) / 86400000));
-      badgeText = '0% · ' + (d > 0 ? (d + ' días') : 'Grupos');
+      badgeText = d > 0 ? ('Faltan ' + d + ' días') : 'Grupos';
     } else {
-      badgeText = pctGlobal + '% · ' + _phaseLabelLong(phase.key);
+      badgeText = _phaseLabelLong(phase.key);
     }
 
     return {
       matchesPlayed: matchesPlayed,
       pctGlobal: pctGlobal,
       currentPhaseIdx: currentPhaseIdx,
+      phaseLabel: _phaseLabelLong(phase.key),
       ballPos: ballPos,
       badgeText: badgeText,
       ballState: ballState,
