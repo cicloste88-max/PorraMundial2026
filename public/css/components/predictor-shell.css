@@ -475,7 +475,7 @@
 /* B15-badge-clamp: badge con left dinámico y flecha móvil independiente */
 .timeline-badge {
   position: absolute;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 24px);
   /* left + transform los inyecta el JS como inline style según ballPos */
   background: linear-gradient(135deg, rgba(201, 169, 97, 0.22), rgba(201, 169, 97, 0.10));
   border: 1px solid rgba(201, 169, 97, 0.50);
