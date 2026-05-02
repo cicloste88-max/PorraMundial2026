@@ -101,6 +101,17 @@
     var pct = Math.max(0, Math.min(100, Number(p.pctGlobal || 0)));
     var ballPos = Math.max(0, Math.min(100, Number(p.ballPos || 0)));
 
+    // B12-info-fixes: badge mid-Mundial muestra "{pct}% · {matchesPlayed}/104"
+    // (el nombre de la fase ya aparece en la marca activa de la timeline).
+    // Pre-Mundial (prematch / matchesPlayed=0) y Finalizado (matchesPlayed=104)
+    // mantienen el badgeText canónico computado en data.js::getMundialProgress.
+    var matchesPlayed = Number(p.matchesPlayed || 0);
+    var badgeText = p.badgeText || '';
+    if (p.ballState !== 'prematch' && p.ballState !== 'finished'
+        && matchesPlayed > 0 && matchesPlayed < TOTAL_MATCHES) {
+      badgeText = pct + '% · ' + matchesPlayed + '/' + TOTAL_MATCHES;
+    }
+
     var ballClasses = 'timeline-ball';
     if (p.ballState === 'prematch') ballClasses += ' is-prematch';
     else if (p.ballState === 'finished') ballClasses += ' is-finished';
@@ -136,7 +147,7 @@
           '<div class="' + ballClasses + '" style="left:' + ballPos + '%">' +
             '<div class="timeline-ball-glow"></div>' +
             '<img src="' + TRIONDA_URL + '" alt="Trionda" loading="lazy"/>' +
-            '<div class="timeline-badge">' + _esc(p.badgeText || '') + '</div>' +
+            '<div class="timeline-badge">' + _esc(badgeText) + '</div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -247,7 +258,7 @@
           globalChipHtml +
         '</div>' +
         '<div class="fc-pred-tile__row fc-pred-tile__row--top">' +
-          '<div class="fc-pred-tile__eyebrow">MUNDIAL 2026 · 11 JUN – 19 JUL</div>' +
+          '<div class="fc-pred-tile__eyebrow">11 JUN – 19 JUL</div>' +
         '</div>' +
         '<div class="fc-pred-tile__hero">' +
           '<span class="fc-pred-tile__hero-emoji" aria-hidden="true">🏆</span>' +
