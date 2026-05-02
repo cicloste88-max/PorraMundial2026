@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** HEAD `5ddb974` post-merge **F7.4-D-2** (PR#43, cleanup IA Predictor widgets, −18 LOC) + **F7.X** (PR#44, +872 −66 LOC, nuevo shell visual `#page-elim` Fase final, cards CORE preservadas, gate modal retirado, bug UI #3 corregido). Pages dedicadas Jornada/Directo/Predictor + page-elim rediseñado; `_currentPage` global; alias `quiniela→elim` limpio. ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** vía Supabase Auth dashboard (over-engineering app privada). Siguiente fase candidata: **F7.4-E** (page-perfil), **F7.7** (rediseño Predictor) o tests Vitest motor. IA Predictor Fases A–F cerradas (Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE. Detalle en `CHANGELOG.md`.
+Rama activa **main** HEAD `5ddb974` post-merge **F7.4-D-2** (PR#43, IA Predictor cleanup) + **F7.X** (PR#44, shell `#page-elim` rediseñado, +872 −66 LOC). ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** (app privada, fricción innecesaria). Branch activa `docs/predictor-design-source-v1` con sprint **F7.7-VIS** (B1..B14). IA Predictor Fases A–F cerradas (Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE. Detalle en `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
@@ -19,9 +19,8 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 1. Cinta superior tabs ronda no se visualiza completa en móvil (eliminatorias).
 2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
-3. ✅ Corregido en F7.X.7 (PR#44) — botón simular eliminatorias ya no visible para non-admin.
-4. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
-5. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
+3. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
+4. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
 
 ## Pendientes — Antes del 11 junio 2026
 
@@ -34,9 +33,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
-Items 1-5 del backlog post-audit ✅ cerrados (PR#37 + migrations `20260428030000` y `20260428040000`). Detalle en `migration-log.md` (entradas 28abr) y `docs/db/audit_28abr_section26_rls_planning.md`.
-
-1. **Auth dashboard**: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies. Acción de San (1 click).
+Items 1-5 cerrados (PR#37). Pendiente: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies (1 click San). Detalle en `docs/db/audit_28abr_section26_rls_planning.md`.
 
 ## Auth & Secrets
 

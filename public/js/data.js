@@ -489,27 +489,30 @@ window.loadPredictorRankingData = loadPredictorRankingData;
       };
     }
 
+    // B14-fix-phase-boundary: usar < estricto en lugar de <= para que la fase
+    // avance EXACTAMENTE cuando la anterior se llena. Frontera inclusiva en la
+    // fase entrante (matchesInCurrentPhase=0), no en la saliente.
     var currentPhaseIdx = 0;
     var matchesInCurrentPhase = 0;
 
-    if (groupsFinishedKnown < 72) {
+    if (groupsFinishedKnown < 72 && matchesPlayed < 72) {
       currentPhaseIdx = 0;
-      matchesInCurrentPhase = matchesPlayed > 72 ? 72 : matchesPlayed;
+      matchesInCurrentPhase = matchesPlayed;
     } else {
       var koPlayed = matchesPlayed - 72;
-      if (koPlayed <= 16) {
+      if (koPlayed < 16) {
         currentPhaseIdx = 1;
         matchesInCurrentPhase = koPlayed;
-      } else if (koPlayed <= 24) {
+      } else if (koPlayed < 24) {
         currentPhaseIdx = 2;
         matchesInCurrentPhase = koPlayed - 16;
-      } else if (koPlayed <= 28) {
+      } else if (koPlayed < 28) {
         currentPhaseIdx = 3;
         matchesInCurrentPhase = koPlayed - 24;
-      } else if (koPlayed <= 30) {
+      } else if (koPlayed < 30) {
         currentPhaseIdx = 4;
         matchesInCurrentPhase = koPlayed - 28;
-      } else if (koPlayed <= 32) {
+      } else if (koPlayed < 32) {
         currentPhaseIdx = 5;
         matchesInCurrentPhase = koPlayed - 30;
       } else {
