@@ -1,0 +1,1057 @@
+/* F7.7 · Estilos del shell visual de #page-predictor.
+   Procedencia: docs/restyling-mobile/03-predictor-design-source.md (branch
+   docs/predictor-design-source-v1). Tokens compartidos en elim-tokens.css.
+
+   F7.7-VIS-7 (B7-fixes): paleta adaptada al dark theme de la app real.
+   El bundle inicial (mockup iOS-frame) asumía fondo claro; las cards y
+   tile dorado masivo sobresalían sobre el fondo dark. Ajuste: cards
+   sobre --ink-800 con bordes --ink-700 y texto --ink-100/300/400; oro
+   queda como ACENTO (eyebrow + watermark + chip dorado superior + barra
+   de pre-mundial), no como fondo crema. Patrón coherente con F7.X
+   page-elim.
+
+   Estructura:
+     1. Layout #page-predictor wrapper
+     2. Header (#fc-pred-header)
+     3. PredictionTile (#fc-pred-tile)
+     4. StatsStrip (#fc-pred-stats)
+     5. FilterChips (#fc-pred-filters)
+     6. PredictionCard (.fc-pred-card)
+     7. ScoreStepper (.fc-pred-stepper)
+     8. Trophy modal (#modal variant)
+*/
+
+/* ──────────────────────────────────────────────────────────────────────
+   1. Layout — #page-predictor wrapper
+   ────────────────────────────────────────────────────────────────────── */
+
+#page-predictor {
+  background: var(--bg, #FFFFFF);
+  color: var(--ink-900);
+  font-family: var(--font-text);
+  min-height: 100vh;
+  padding: 56px 18px 96px;  /* top safe-area iOS · lateral 18 (consistente F7.X) · bottom hueco bottom-tab */
+}
+
+#page-predictor .fc-pred-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   2. Header (B3)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.fc-pred-header {
+  padding: 16px 0 12px;
+}
+
+.fc-pred-eyebrow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fc-pred-trophy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.fc-pred-trophy-btn:hover,
+.fc-pred-trophy-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.10);
+  outline: none;
+}
+
+.fc-pred-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink-100);
+  margin: 0 0 4px;
+  line-height: 1.1;
+}
+
+.fc-pred-subtitle {
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-400);
+  margin: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   3. PredictionTile (B2)
+   ────────────────────────────────────────────────────────────────────── */
+
+#fc-pred-tile {
+  position: relative;
+  display: block;
+  margin: 12px 0 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(201, 169, 97, 0.08) 0%, rgba(201, 169, 97, 0.02) 100%);
+  border: 1px solid rgba(201, 169, 97, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-text);
+  color: var(--ink-100);
+}
+
+/* B8-skin: glow radial decorativo top-right (decoración pura, no
+   interfiere con el watermark trofeo que vive en .__watermark con
+   z-index 0 más arriba). */
+#fc-pred-tile::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 97, 0.12), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fc-pred-tile__body {
+  position: relative;
+  padding: 14px 16px 14px;
+  z-index: 1;
+}
+
+.fc-pred-tile__watermark {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 88px;
+  height: 88px;
+  color: var(--fifa-gold-deep);
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fc-pred-tile__eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fifa-gold);
+  line-height: 1.2;
+}
+
+.fc-pred-tile__chip {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fc-pred-tile__chip--gold {
+  background: var(--fifa-gold-deep);
+  color: #fff;
+}
+.fc-pred-tile__chip--secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-200);
+  border: 1px solid rgba(201, 169, 97, 0.30);
+}
+.fc-pred-tile__chip--rank {
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+}
+
+.fc-pred-tile__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__row--top { margin-bottom: 6px; }
+.fc-pred-tile__row--mid { margin-bottom: 8px; }
+
+.fc-pred-tile__pts {
+  font-family: var(--font-numeric);
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-100);
+  letter-spacing: -0.02em;
+}
+.fc-pred-tile__pts-unit {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-300);
+  letter-spacing: 0.04em;
+}
+
+.fc-pred-tile__delta {
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+.fc-pred-tile__delta--up   { color: var(--win); }
+.fc-pred-tile__delta--down { color: var(--fifa-red); }
+
+.fc-pred-tile__phrase {
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-300);
+  margin-top: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+/* B9-redesign: footer dorado (reemplaza el rojo CTA). En pre-mundial es
+   "Te quedan X partidos por pronosticar →" sutil; en mid-Mundial será
+   "Última: ESP 2-1 BRA · Ver todo ›" (B10-active). */
+.fc-pred-tile__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px 14px;
+  margin-top: 14px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid rgba(201, 169, 97, 0.15);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-pred-tile__footer:hover  { background-color: rgba(201, 169, 97, 0.04); }
+.fc-pred-tile__footer:active { background-color: rgba(201, 169, 97, 0.08); }
+.fc-pred-tile__footer-flame {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.35);
+}
+.fc-pred-tile__footer-text { flex: 1; }
+.fc-pred-tile__footer-link {
+  margin-left: auto;
+  color: var(--fifa-gold);
+  font-size: 11px;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.fc-pred-tile__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--fifa-gold);
+}
+
+/* B9-redesign: chip "Nº de N" superior derecha (gold-ghost ligero). */
+.fc-pred-tile__chip--liga {
+  background: rgba(201, 169, 97, 0.12);
+  border: 1px solid rgba(201, 169, 97, 0.30);
+  color: var(--fifa-gold);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+/* B9-redesign: hero line ("🏆 Faltan N días" en pre-mundial). */
+.fc-pred-tile__hero {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__hero-emoji { font-size: 13px; line-height: 1; }
+.fc-pred-tile__hero-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+/* B11-trionda: B9-redesign 2 barras + caption ELIMINADAS. Ahora la
+   timeline única con balón Trionda (definida más abajo) las reemplaza. */
+
+/* === [B10-traceability] Stack chips Liga + Global apilados (top-right
+   absolute) + bloque rango con frase entre Hero y Bars. === */
+
+.fc-pred-tile__rank-stack {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+/* .fc-pred-tile__chip--liga ya existe en B9 — sin cambios. */
+
+.fc-pred-tile__chip--global {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fc-pred-tile__rank-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 14px;
+  position: relative;
+  z-index: 1;
+}
+.fc-pred-tile__rank-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--fifa-gold);
+}
+.fc-pred-tile__rank-phrase {
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* === [B11-trionda] Timeline única con balón Trionda girando.
+   Reemplaza .fc-pred-tile__bars (B9) + .fc-pred-tile__bars-caption.
+   Asset Trionda: cmyfyswystjgzdwbqyyb.supabase.co/.../Trionda-official-ball.png.
+   Estados: is-prematch (pausado), is-finished (lento 6s). === */
+
+.timeline { position: relative; padding: 50px 0 38px; margin-top: 10px; }
+.timeline-track {
+  position: relative;
+  height: 4px;
+  margin: 0 22px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 2px;
+}
+.timeline-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--win) 0%, var(--win) 70%, var(--fifa-gold) 100%);
+  border-radius: 2px;
+  transition: width 0.8s cubic-bezier(.4, 0, .2, 1);
+}
+.timeline-marks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+.timeline-mark {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ink-800);
+  border: 2px solid rgba(255, 255, 255, 0.30);
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+.timeline-mark.is-passed {
+  background: var(--win);
+  border-color: var(--win);
+}
+.timeline-mark.is-final-current {
+  background: var(--fifa-gold);
+  border-color: var(--fifa-gold);
+  width: 16px;
+  height: 16px;
+}
+.timeline-mark-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.timeline-mark-label.is-passed { color: rgba(34, 197, 94, 0.85); }
+.timeline-mark-label.is-current { color: var(--fifa-gold); }
+.timeline-ball {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  transition: left 0.8s cubic-bezier(.4, 0, .2, 1);
+  filter: drop-shadow(0 2px 8px rgba(201, 169, 97, 0.45));
+}
+.timeline-ball-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 97, 0.45) 0%, transparent 65%);
+  transform: translate(-50%, -50%);
+  animation: glow-breathe 1.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.35; width: 40px; height: 40px; }
+  50%      { opacity: 0.75; width: 56px; height: 56px; }
+}
+.timeline-ball img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+  animation: ball-spin 2.4s linear infinite;
+}
+@keyframes ball-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.timeline-ball.is-prematch img { animation-play-state: paused; }
+.timeline-ball.is-finished img { animation: ball-spin 6s linear infinite; }
+/* B15-badge-clamp: badge con left dinámico y flecha móvil independiente */
+.timeline-badge {
+  position: absolute;
+  bottom: calc(100% + 24px);
+  /* left + transform los inyecta el JS como inline style según ballPos */
+  background: linear-gradient(135deg, rgba(201, 169, 97, 0.22), rgba(201, 169, 97, 0.10));
+  border: 1px solid rgba(201, 169, 97, 0.50);
+  border-radius: 9px;
+  padding: 5px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--fifa-gold);
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(201, 169, 97, 0.20);
+  pointer-events: none;
+}
+
+/* Flecha apuntadora con left dinámico independiente del badge */
+.timeline-badge-arrow {
+  position: absolute;
+  bottom: -4px;
+  /* left lo inyecta el JS como inline style; centrada con transform */
+  transform: translateX(-50%) rotate(45deg);
+  width: 7px;
+  height: 7px;
+  background: rgba(201, 169, 97, 0.16);
+  border-right: 1px solid rgba(201, 169, 97, 0.50);
+  border-bottom: 1px solid rgba(201, 169, 97, 0.50);
+  pointer-events: none;
+}
+
+/* UX-2 (B11): eyebrow del rank-row "Tu rango". */
+.fc-pred-tile__rank-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.40);
+}
+
+/* DEPRECATED B9: superseded by .fc-pred-tile__hero + .__bars + .__bars-
+   caption. Reglas conservadas por seguridad ante rollback; serán
+   eliminadas en B10 si ningún consumer las reclama. NO tocar contenido. */
+#fc-pred-tile[data-state="pre-mundial"] .fc-pred-tile__pre-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+  align-items: center;
+}
+.fc-pred-tile__pre-col { display: flex; flex-direction: column; gap: 4px; }
+.fc-pred-tile__pre-col--left { align-items: flex-start; }
+.fc-pred-tile__pre-col--right { align-items: flex-start; }
+
+.fc-pred-tile__pre-trophy { font-size: 22px; line-height: 1; }
+.fc-pred-tile__pre-days {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: -0.01em;
+}
+.fc-pred-tile__pre-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+.fc-pred-tile__pre-count {
+  font-family: var(--font-numeric);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-100);
+  line-height: 1;
+}
+.fc-pred-tile__pre-bar { display: flex; gap: 4px; margin-top: 2px; }
+.fc-pred-tile__pre-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(201, 169, 97, 0.20);
+  border: 1px solid rgba(201, 169, 97, 0.35);
+}
+.fc-pred-tile__pre-dot.is-on {
+  background: var(--fifa-gold-deep);
+  border-color: var(--fifa-gold-deep);
+}
+/* /DEPRECATED B9 */
+
+#fc-pred-tile[data-state="finalizado"] .fc-pred-tile__footer { display: none; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   4. StatsStrip (B3)
+   ────────────────────────────────────────────────────────────────────── */
+
+#fc-pred-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--ink-700);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.fc-pred-stats__col {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* B9-redesign: padding más generoso (mockup compacto pero respirable). */
+  padding: 14px 10px;
+  background: var(--ink-800);
+  text-align: center;
+}
+
+/* B8-skin: accent bar superior por columna (azul / naranja / violeta).
+   El borde inferior del bar redondeado da el toque "tab indicator". */
+.fc-pred-stats__col::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  opacity: 0.4;
+  border-radius: 0 0 2px 2px;
+  background: transparent;
+}
+.fc-pred-stats__col:nth-child(1)::before { background: #60A5FA; }  /* % Aciertos */
+.fc-pred-stats__col:nth-child(2)::before { background: #FB923C; }  /* Racha */
+.fc-pred-stats__col:nth-child(3)::before { background: #A78BFA; }  /* Bonus IA */
+
+.fc-pred-stats__val {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  /* B9-redesign: tamaño compacto (mockup era 18px, no 22). */
+  font-size: 18px;
+  font-weight: 800;
+  /* B8-skin: fade pre-mundial. B9-stats-live cambiará a --ink-100
+     cuando los valores sean reales (clase override o JS). */
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1;
+  margin-top: 6px;
+}
+
+.fc-pred-stats__val--win { color: var(--win); }
+
+.fc-pred-stats__sub {
+  /* B9-redesign: el __sub actúa como LABEL superior tipo eyebrow
+     ("% ACIERTOS" arriba del valor) y como hint inferior pre-mundial
+     ("Disponible 11 jun"). Estilo unificado fade. */
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+/* B8-skin: iconos alineados con accent bars (col 2 naranja, col 3 violeta). */
+.fc-pred-stats__col .fc-icon-flame { color: #FB923C; }
+.fc-pred-stats__col .fc-icon-bolt  { color: #A78BFA; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   5. FilterChips (B3)
+   ────────────────────────────────────────────────────────────────────── */
+
+#fc-pred-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#fc-pred-filters::-webkit-scrollbar { display: none; }
+
+.fc-pred-filter-chip {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-700);
+  color: var(--ink-300);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.fc-pred-filter-chip:hover { background: var(--ink-600); }
+.fc-pred-filter-chip.is-active {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+/* B11-trionda UX-4: .fc-pred-quick-link ELIMINADO. Navegación cubierta
+   por bottom-tabs; el chip "Tu porra · X/104 →" ya no se renderiza. */
+
+/* ──────────────────────────────────────────────────────────────────────
+   6. PredictionCard (B4)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-num {
+  font-family: var(--font-numeric);
+  font-feature-settings: "tnum" 1;
+}
+
+.fc-pred-list__group + .fc-pred-list__group { margin-top: 18px; }
+.fc-pred-list__eyebrow { margin: 0 0 8px; }
+.fc-pred-list__cards   { display: flex; flex-direction: column; gap: 10px; }
+.fc-pred-list__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--ink-400);
+  font-family: var(--font-text);
+  font-size: 14px;
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+}
+
+.fc-pred-card {
+  position: relative;
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-family: var(--font-text);
+  color: var(--ink-100);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+.fc-pred-card--locked { opacity: 0.85; }
+.fc-pred-card--win    { border: 1px solid rgba(0, 131, 74, 0.3); }
+.fc-pred-card--win::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--win);
+}
+
+.fc-pred-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fc-pred-card__when {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+.fc-pred-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fc-pred-card__chip--open   { background: rgba(10, 69, 149, 0.25); color: #60A5FA; }
+.fc-pred-card__chip--locked { background: var(--ink-700); color: var(--ink-400); }
+.fc-pred-card__chip--win    { background: rgba(0, 131, 74, 0.20); color: #22C55E; }
+.fc-pred-card__chip--miss   { background: var(--ink-700); color: var(--ink-400); }
+
+.fc-pred-card__body {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-card__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.fc-pred-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+.fc-pred-card__badge img,
+.fc-pred-card__badge > div {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.fc-pred-card__badge-fallback { background: var(--ink-700); border-radius: 6px; }
+.fc-pred-card__teamname {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-300);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fc-pred-card__score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+}
+.fc-pred-card__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1;
+}
+.fc-pred-card__score--win  { color: var(--win); }
+.fc-pred-card__score--miss { color: var(--ink-400); }
+.fc-pred-card__score-sep   { font-weight: 700; color: var(--ink-400); }
+.fc-pred-card__real {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-numeric);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+.fc-pred-card__steppers {
+  background: var(--ink-50);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fc-pred-card__iachip {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.fc-pred-card__iachip--match   { color: var(--ink-500); background: var(--ink-100); }
+.fc-pred-card__iachip--against { color: var(--fifa-blue); background: rgba(10, 69, 149, 0.08); }
+
+.fc-pred-card__scorer {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ink-200);
+  border-radius: 10px;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--ink-900);
+  background: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.fc-pred-card__scorer:focus {
+  outline: 2px solid var(--fifa-blue);
+  outline-offset: 1px;
+}
+
+.fc-pred-card__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-500);
+}
+.fc-pred-card__breakdown-item { cursor: help; }
+.fc-pred-card__breakdown-sep  { color: var(--ink-300); }
+
+/* ──────────────────────────────────────────────────────────────────────
+   7. ScoreStepper (B4)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-pred-stepper {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-stepper__flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.fc-pred-stepper__flag img,
+.fc-pred-stepper__flag > div {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.fc-pred-stepper__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-900);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fc-pred-stepper__btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  color: var(--ink-900);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: var(--font-text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.fc-pred-stepper__btn:hover  { background: var(--ink-50); border-color: var(--ink-300); }
+.fc-pred-stepper__btn:active { background: var(--ink-100); }
+.fc-pred-stepper__btn:focus-visible {
+  outline: 2px solid var(--fifa-blue);
+  outline-offset: 1px;
+}
+.fc-pred-stepper__val {
+  min-width: 22px;
+  text-align: center;
+  font-family: var(--font-numeric);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   8. Trophy modal (B5) — reusa #modal genérico (estructura+animación
+      ya existentes en ko.css). Solo añadimos estilos de contenido.
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-pred-trophy-modal {
+  font-family: var(--font-text);
+  color: var(--ink-900);
+  padding: 4px 2px 8px;
+}
+
+.fc-pred-trophy-modal__head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.fc-pred-trophy-modal__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+
+.fc-pred-trophy-modal__subtitle {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin: 0;
+}
+
+.fc-pred-trophy-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fc-pred-trophy-modal__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-100);
+}
+
+.fc-pred-trophy-modal__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fc-pred-trophy-modal__row--bottom {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fc-pred-trophy-modal__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--fifa-gold-deep);
+}
+
+.fc-pred-trophy-modal__label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.fc-pred-trophy-modal__pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-700);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fc-pred-trophy-modal__pick--empty {
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+.fc-pred-trophy-modal__player { font-weight: 600; color: var(--ink-900); }
+.fc-pred-trophy-modal__sep    { color: var(--ink-400); }
+.fc-pred-trophy-modal__flag   { font-size: 14px; line-height: 1; }
+.fc-pred-trophy-modal__team   { color: var(--ink-700); }
+
+.fc-pred-trophy-modal__change {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+.fc-pred-trophy-modal__change:hover,
+.fc-pred-trophy-modal__change:focus-visible {
+  background: var(--ink-200);
+  outline: none;
+}

@@ -555,7 +555,10 @@ function showPage(page) {
   }
   if(page === 'jornada')   { window.scrollTo(0,0); if (typeof renderVistaJornada === 'function') renderVistaJornada(); }
   if(page === 'directo')   { window.scrollTo(0,0); if (typeof renderVistaDirecto === 'function') renderVistaDirecto(); }
-  if(page === 'predictor') { window.scrollTo(0,0); /* F7.4-D-2 init */ }
+  if(page === 'predictor') {
+    window.scrollTo(0,0);
+    if (typeof window.mountPredShell === 'function') window.mountPredShell();
+  }
   if(page === 'welcome') { if(currentUser && typeof leagueRenderPanel === 'function') setTimeout(leagueRenderPanel, 50); }
   if(page === 'welcome') window.scrollTo(0,0);
   if(page === 'score')  { window.scrollTo(0,0); sbLoad(); }

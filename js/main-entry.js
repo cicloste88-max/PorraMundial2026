@@ -74,6 +74,11 @@ loadScript('/js/leagues.js')
   // F7.X: shell visual de #page-elim (Fase final). Necesita BRACKET (ko.js),
   // koPredictions (data.js), buildKOCard (ko.js), diceSimulateAllKO (admin.js).
   .then(() => loadScript('/js/ui-elim-shell.js'))
+  // F7.7: shell visual de #page-predictor. Necesita predictions/EQUIPOS
+  // (data.js), iaPredictions (auth.js), teamImg (ko.js), getRank
+  // (predictor-ranks.js), totalPoints/awardPicks/currentLeague.
+  .then(() => loadScript('/js/predictor-ranks.js'))
+  .then(() => loadScript('/js/ui-pred-shell.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
