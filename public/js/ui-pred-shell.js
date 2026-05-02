@@ -25,6 +25,18 @@
   var _KICKOFF_TS = Date.UTC(2026, 5, 11, 20, 0, 0);
   var _TILE_TOTAL_GROUP = 72;  // partidos fase de grupos (barra pre-mundial)
 
+  // B11-trionda: constantes de la timeline única (balón Trionda + 6 marcas).
+  var TRIONDA_URL = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Ball/Trionda-official-ball.png';
+  var TOTAL_MATCHES = 104;
+  var PHASES = [
+    { idx: 0, key: 'groups', label: 'Grupos', total: 72 },
+    { idx: 1, key: 'r32',    label: '1/16',   total: 16 },
+    { idx: 2, key: 'r16',    label: '1/8',    total: 8  },
+    { idx: 3, key: 'qf',     label: '1/4',    total: 4  },
+    { idx: 4, key: 'sf',     label: '1/2',    total: 2  },
+    { idx: 5, key: 'final',  label: 'Final',  total: 2  }
+  ];
+
   // ─────────────────────────────────────────────────────────────
   // HELPERS GENÉRICOS
   // ─────────────────────────────────────────────────────────────
@@ -56,6 +68,81 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // [B11-trionda] Timeline única con balón Trionda + fallback pre-mundial.
+  // Recibe progress = { matchesPlayed, pctGlobal, currentPhaseIdx, ballPos,
+  //                     badgeText, ballState, marks }. data.js::getMundialProgress
+  //                     lo computa async; mountPredShell lo wirea en state.
+  // ─────────────────────────────────────────────────────────────
+  function _defaultProgressForPreMundial(state) {
+    var days = Math.max(0, Number((state && state.daysToKickoff) || 0));
+    return {
+      matchesPlayed: 0,
+      pctGlobal: 0,
+      currentPhaseIdx: 0,
+      ballPos: 0,
+      badgeText: '0% · ' + days + ' días',
+      ballState: 'prematch',
+      marks: [
+        { idx: 0, label: 'Grupos', isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 0   },
+        { idx: 1, label: '1/16',   isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 20  },
+        { idx: 2, label: '1/8',    isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 40  },
+        { idx: 3, label: '1/4',    isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 60  },
+        { idx: 4, label: '1/2',    isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 80  },
+        { idx: 5, label: 'Final',  isPassed: false, isCurrent: false, isFinalCurrent: false, leftPct: 100 }
+      ]
+    };
+  }
+
+  function _renderTriondaTimeline(p) {
+    if (!p || !Array.isArray(p.marks)) {
+      p = _defaultProgressForPreMundial({});
+    }
+
+    var pct = Math.max(0, Math.min(100, Number(p.pctGlobal || 0)));
+    var ballPos = Math.max(0, Math.min(100, Number(p.ballPos || 0)));
+
+    var ballClasses = 'timeline-ball';
+    if (p.ballState === 'prematch') ballClasses += ' is-prematch';
+    else if (p.ballState === 'finished') ballClasses += ' is-finished';
+
+    var marksHtml = '';
+    for (var i = 0; i < p.marks.length; i++) {
+      var m = p.marks[i] || {};
+      var leftPct = Math.max(0, Math.min(100, Number(m.leftPct || 0)));
+
+      var markCls = 'timeline-mark';
+      if (m.isPassed) markCls += ' is-passed';
+      if (m.isFinalCurrent) markCls += ' is-final-current';
+
+      var labelCls = 'timeline-mark-label';
+      if (m.isPassed) labelCls += ' is-passed';
+      if (m.isCurrent && !m.isFinalCurrent) labelCls += ' is-current';
+
+      var labelContent = m.isFinalCurrent ? '🏆' : _esc(m.label || '');
+
+      marksHtml +=
+        '<span class="' + markCls + '" style="left:' + leftPct + '%">' +
+          '<span class="' + labelCls + '">' + labelContent + '</span>' +
+        '</span>';
+    }
+
+    return '' +
+      '<div class="timeline">' +
+        '<div class="timeline-track">' +
+          '<div class="timeline-progress" style="width:' + pct + '%"></div>' +
+          '<div class="timeline-marks">' +
+            marksHtml +
+          '</div>' +
+          '<div class="' + ballClasses + '" style="left:' + ballPos + '%">' +
+            '<div class="timeline-ball-glow"></div>' +
+            '<img src="' + TRIONDA_URL + '" alt="Trionda" loading="lazy"/>' +
+            '<div class="timeline-badge">' + _esc(p.badgeText || '') + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // [B2] PredictionTile (#fc-pred-tile) — 3 estados
   // ─────────────────────────────────────────────────────────────
   function _renderTile(state) {
@@ -81,25 +168,20 @@
     }
   }
 
-  // B10-traceability: tile pre-Mundial con stack de 2 chips (Liga + Global)
-  // top-right absolute + rank-row con nombre del rango + frase del rango entre
-  // Hero y Bars. Datos vienen de window._predictorRanking (poblado por
-  // loadPredictorRankingData() en data.js, vistas SQL B10).
+  // B11-trionda: tile pre-Mundial con eyebrow "MUNDIAL 2026 · 11 JUN – 19 JUL"
+  // (UX-1), rank-row con eyebrow "Tu rango" (UX-2) y timeline única con balón
+  // Trionda en lugar de las 2 barras GRUPOS/ELIMINATORIAS (UX-3). Los datos
+  // de progreso del Mundial vienen de state.mundialProgress (poblado por
+  // mountPredShell tras getMundialProgress()); fallback síncrono usa
+  // _defaultProgressForPreMundial(state).
   function _renderTilePreMundial(state) {
     var days = Math.max(0, Number(state.daysToKickoff || 0));
     var daysLabel = days <= 0 ? 'Mañana arranca' : ('Faltan ' + days + (days === 1 ? ' día' : ' días'));
 
-    var totalGroup = 72;
-    var totalKO = 32;
-    var totalAll = totalGroup + totalKO; // 104
-
     var gruposUser = Number(state.predicted || 0);
     var koUser = Number(state.koPredicted || 0);
     var doneAll = gruposUser + koUser;
-    var pendingAll = Math.max(0, totalAll - doneAll);
-
-    var pctGrupos = totalGroup > 0 ? Math.min(100, Math.round((gruposUser / totalGroup) * 100)) : 0;
-    var pctKo     = totalKO    > 0 ? Math.min(100, Math.round((koUser    / totalKO   ) * 100)) : 0;
+    var pendingAll = Math.max(0, TOTAL_MATCHES - doneAll);
 
     // Chip Liga (gold-ghost). Lee state.league.position con fallback a .rank.
     var league = state.league || {};
@@ -124,7 +206,7 @@
       globalChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--global">— · Global</span>';
     }
 
-    // Rank row (nombre + frase). Pre-Mundial todos a 0 pts → "Chupetín".
+    // Rank row (eyebrow + nombre + frase). Pre-Mundial todos a 0 pts → "Chupetín".
     var pts = Number(state.totalPts || state.pts || 0);
     var rank = { name: '—', phrase: '' };
     if (typeof window.getRank === 'function') {
@@ -138,9 +220,14 @@
     }
     var rankRowHtml =
       '<div class="fc-pred-tile__rank-row">' +
+        '<span class="fc-pred-tile__rank-eyebrow">Tu rango</span>' +
         '<span class="fc-pred-tile__rank-name">' + _esc(rank.name) + '</span>' +
         (rank.phrase ? '<span class="fc-pred-tile__rank-phrase">"' + _esc(rank.phrase) + '"</span>' : '') +
       '</div>';
+
+    // Timeline Trionda. Si state.mundialProgress aún no está poblado, fallback síncrono.
+    var progress = state.mundialProgress || _defaultProgressForPreMundial(state);
+    var timelineHtml = _renderTriondaTimeline(progress);
 
     var watermark = _buildWatermark();
 
@@ -160,26 +247,14 @@
           globalChipHtml +
         '</div>' +
         '<div class="fc-pred-tile__row fc-pred-tile__row--top">' +
-          '<div class="fc-pred-tile__eyebrow">PREDICTOR · MUNDIAL 2026</div>' +
+          '<div class="fc-pred-tile__eyebrow">MUNDIAL 2026 · 11 JUN – 19 JUL</div>' +
         '</div>' +
         '<div class="fc-pred-tile__hero">' +
           '<span class="fc-pred-tile__hero-emoji" aria-hidden="true">🏆</span>' +
           '<div class="fc-pred-tile__hero-text">' + _esc(daysLabel) + '</div>' +
         '</div>' +
         rankRowHtml +
-        '<div class="fc-pred-tile__bars" aria-hidden="true">' +
-          '<div class="fc-pred-tile__bar fc-pred-tile__bar--grupos">' +
-            '<span class="fc-pred-tile__bar-label">GRUPOS</span>' +
-            '<i style="width:' + pctGrupos + '%"></i>' +
-          '</div>' +
-          '<div class="fc-pred-tile__bar fc-pred-tile__bar--ko">' +
-            '<span class="fc-pred-tile__bar-label">ELIMINATORIAS</span>' +
-            '<i style="width:' + pctKo + '%"></i>' +
-          '</div>' +
-        '</div>' +
-        '<div class="fc-pred-tile__bars-caption">' +
-          doneAll + ' de ' + totalAll + ' pronósticos hechos' +
-        '</div>' +
+        timelineHtml +
       '</div>' +
       footer;
   }
@@ -409,22 +484,9 @@
     if (!mount) return;
 
     if (state.mode === 'pre-mundial') {
-      // B10-traceability fix: divisor 72 → 104 (grupos + KO). Numerador
-      // suma predicted + koPredicted (ambos en state desde B9).
-      var predicted = Number(state.predicted || 0);
-      var koPredicted = Number(state.koPredicted || 0);
-      var doneAll = predicted + koPredicted;
-      mount.innerHTML =
-        '<a class="fc-pred-quick-link" href="javascript:void(0)" data-target="grupos">' +
-          'Tu porra · ' + doneAll + '/104 &rarr;' +
-        '</a>';
-      var link = mount.querySelector('.fc-pred-quick-link');
-      if (link && typeof state.onQuickLink === 'function') {
-        link.addEventListener('click', function (e) {
-          e.preventDefault();
-          state.onQuickLink('grupos');
-        });
-      }
+      // B11-trionda UX-4: quick-link eliminado. Navegación ya cubierta por
+      // bottom-tabs. Filtros ocultos en pre-mundial.
+      mount.innerHTML = '';
       return;
     }
 
@@ -905,6 +967,9 @@
       koPredicted: koPredicted,
       total: _TILE_TOTAL_GROUP,
       daysToKickoff: _daysToKickoff(),
+      // B11-trionda: progress del Mundial (poblado por mountPredShell tras
+      // getMundialProgress() async). Si null → render usa fallback.
+      mundialProgress: window._mundialProgress || null,
       // Stats
       aciertosPct: null,
       racha: null,
@@ -972,6 +1037,20 @@
         _renderFilters(st2);
       }).catch(function (err) {
         console.warn('[predictor] loadPredictorRankingData failed', err);
+      });
+    }
+
+    // B11-trionda: kickoff async para llenar window._mundialProgress
+    // (timeline con balón Trionda). Tras resolver, re-render solo del
+    // Tile (es el único que consume mundialProgress).
+    if (typeof window.getMundialProgress === 'function') {
+      window.getMundialProgress().then(function (progress) {
+        if (!progress) return;
+        window._mundialProgress = progress;
+        var st3 = _computeStateForCurrentPage();
+        _renderTile(st3);
+      }).catch(function (err) {
+        console.warn('[predictor] getMundialProgress failed', err);
       });
     }
   }

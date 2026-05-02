@@ -311,51 +311,8 @@
   letter-spacing: -0.01em;
 }
 
-/* B9-redesign: 2 barras de progreso (GRUPOS / ELIMINATORIAS) en flex
-   ratio 72:32. Width interna por <i> con width inline desde JS. */
-.fc-pred-tile__bars {
-  display: flex;
-  gap: 6px;
-  margin-top: 22px; /* hueco para los labels absolute encima */
-  position: relative;
-  z-index: 1;
-}
-.fc-pred-tile__bar {
-  height: 6px;
-  border-radius: 3px;
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
-.fc-pred-tile__bar > i {
-  display: block;
-  height: 100%;
-  background: #22C55E;
-  transition: width 0.3s ease;
-}
-.fc-pred-tile__bar--grupos { flex: 72; }
-.fc-pred-tile__bar--ko     { flex: 32; }
-.fc-pred-tile__bar-label {
-  position: absolute;
-  top: -14px;
-  left: 0;
-  font-family: var(--font-display);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.45);
-  text-transform: uppercase;
-}
-.fc-pred-tile__bar--ko .fc-pred-tile__bar-label {
-  color: rgba(255, 255, 255, 0.25);
-}
-.fc-pred-tile__bars-caption {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 6px;
-  position: relative;
-  z-index: 1;
-}
+/* B11-trionda: B9-redesign 2 barras + caption ELIMINADAS. Ahora la
+   timeline única con balón Trionda (definida más abajo) las reemplaza. */
 
 /* === [B10-traceability] Stack chips Liga + Global apilados (top-right
    absolute) + bloque rango con frase entre Hero y Bars. === */
@@ -407,6 +364,152 @@
   font-size: 12px;
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.55);
+}
+
+/* === [B11-trionda] Timeline única con balón Trionda girando.
+   Reemplaza .fc-pred-tile__bars (B9) + .fc-pred-tile__bars-caption.
+   Asset Trionda: cmyfyswystjgzdwbqyyb.supabase.co/.../Trionda-official-ball.png.
+   Estados: is-prematch (pausado), is-finished (lento 6s). === */
+
+.timeline { position: relative; padding: 50px 0 38px; margin-top: 10px; }
+.timeline-track {
+  position: relative;
+  height: 4px;
+  margin: 0 22px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 2px;
+}
+.timeline-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--win) 0%, var(--win) 70%, var(--fifa-gold) 100%);
+  border-radius: 2px;
+  transition: width 0.8s cubic-bezier(.4, 0, .2, 1);
+}
+.timeline-marks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+.timeline-mark {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ink-800);
+  border: 2px solid rgba(255, 255, 255, 0.30);
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+.timeline-mark.is-passed {
+  background: var(--win);
+  border-color: var(--win);
+}
+.timeline-mark.is-final-current {
+  background: var(--fifa-gold);
+  border-color: var(--fifa-gold);
+  width: 16px;
+  height: 16px;
+}
+.timeline-mark-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.timeline-mark-label.is-passed { color: rgba(34, 197, 94, 0.85); }
+.timeline-mark-label.is-current { color: var(--fifa-gold); }
+.timeline-ball {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  transition: left 0.8s cubic-bezier(.4, 0, .2, 1);
+  filter: drop-shadow(0 2px 8px rgba(201, 169, 97, 0.45));
+}
+.timeline-ball-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 97, 0.45) 0%, transparent 65%);
+  transform: translate(-50%, -50%);
+  animation: glow-breathe 1.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.35; width: 40px; height: 40px; }
+  50%      { opacity: 0.75; width: 56px; height: 56px; }
+}
+.timeline-ball img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+  animation: ball-spin 2.4s linear infinite;
+}
+@keyframes ball-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.timeline-ball.is-prematch img { animation-play-state: paused; }
+.timeline-ball.is-finished img { animation: ball-spin 6s linear infinite; }
+.timeline-badge {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(201, 169, 97, 0.22), rgba(201, 169, 97, 0.10));
+  border: 1px solid rgba(201, 169, 97, 0.50);
+  border-radius: 9px;
+  padding: 5px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--fifa-gold);
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(201, 169, 97, 0.20);
+  pointer-events: none;
+}
+.timeline-badge::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 7px;
+  height: 7px;
+  background: rgba(201, 169, 97, 0.16);
+  border-right: 1px solid rgba(201, 169, 97, 0.50);
+  border-bottom: 1px solid rgba(201, 169, 97, 0.50);
+}
+
+/* UX-2 (B11): eyebrow del rank-row "Tu rango". */
+.fc-pred-tile__rank-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.40);
 }
 
 /* DEPRECATED B9: superseded by .fc-pred-tile__hero + .__bars + .__bars-
@@ -574,21 +677,8 @@
   color: var(--ink-900);
 }
 
-.fc-pred-quick-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 16px;
-  background: rgba(201, 169, 97, 0.08);
-  border: 1px solid rgba(201, 169, 97, 0.3);
-  color: var(--fifa-gold);
-  border-radius: 999px;
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  transition: background 0.15s ease;
-}
-.fc-pred-quick-link:hover { background: rgba(201, 169, 97, 0.14); }
+/* B11-trionda UX-4: .fc-pred-quick-link ELIMINADO. Navegación cubierta
+   por bottom-tabs; el chip "Tu porra · X/104 →" ya no se renderiza. */
 
 /* ──────────────────────────────────────────────────────────────────────
    6. PredictionCard (B4)

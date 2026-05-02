@@ -398,3 +398,207 @@ async function loadPredictorRankingData() {
 
 window.loadPredictorRankingData = loadPredictorRankingData;
 
+// === [B11-trionda] getMundialProgress() — calcula progreso del Mundial 2026
+//     basado en live_scores. Lo consume ui-pred-shell.js para renderizar el
+//     timeline con balón Trionda. ===
+//
+// Algoritmo:
+//   - Pre-Mundial (Date.now() < KICKOFF) o sin _porraDb → fallback prematch.
+//   - Query live_scores: status='finished' AND is_historic=false.
+//   - Detección por match_key:
+//       * `wc2026_g[A-L]_*` → grupos (formato confirmado en repo).
+//       * KO match_keys aún sin formato definido (IDs SofaScore llegan
+//         ~28 jun 2026); se cuentan en total y se distribuyen lineal en
+//         phases 1-5 según rangos cronológicos esperados (1-16 → r32,
+//         17-24 → r16, 25-28 → qf, 29-30 → sf, 31-32 → final).
+//   - matchesPlayed >= 104 → ballState='finished' + badgeText placeholder.
+//   - Mock QA: window.__PRED_MOCK = { matchesPlayed: 23 } sobreescribe la
+//     query (útil para validar smoke con el balón en distintas posiciones).
+//
+// IIFE para no contaminar window con KICKOFF_TS_MUNDIAL/TOTAL_MATCHES/
+// PHASES_PROGRESS (que también declara ui-pred-shell.js dentro de su IIFE).
+
+(function () {
+  var KICKOFF_TS_MUNDIAL = Date.UTC(2026, 5, 11, 20, 0, 0);
+  var TOTAL_MATCHES = 104;
+  var PHASES_PROGRESS = [
+    { idx: 0, key: 'groups', label: 'Grupos', total: 72 },
+    { idx: 1, key: 'r32',    label: '1/16',   total: 16 },
+    { idx: 2, key: 'r16',    label: '1/8',    total: 8  },
+    { idx: 3, key: 'qf',     label: '1/4',    total: 4  },
+    { idx: 4, key: 'sf',     label: '1/2',    total: 2  },
+    { idx: 5, key: 'final',  label: 'Final',  total: 2  }
+  ];
+
+  function _phaseLabelLong(key) {
+    switch (key) {
+      case 'groups': return 'Grupos';
+      case 'r32':    return 'Dieciseisavos';
+      case 'r16':    return 'Octavos';
+      case 'qf':     return 'Cuartos';
+      case 'sf':     return 'Semis';
+      case 'final':  return 'Final';
+      default:       return 'Grupos';
+    }
+  }
+
+  function _buildMarks(currentPhaseIdx) {
+    var marks = [];
+    for (var i = 0; i < 6; i++) {
+      marks.push({
+        idx: i,
+        label: PHASES_PROGRESS[i].label,
+        isPassed: i < currentPhaseIdx,
+        isCurrent: i === currentPhaseIdx,
+        isFinalCurrent: i === 5 && currentPhaseIdx >= 5,
+        leftPct: i * 20
+      });
+    }
+    return marks;
+  }
+
+  function _buildPreMundialProgress() {
+    var now = Date.now();
+    var days = Math.max(0, Math.ceil((KICKOFF_TS_MUNDIAL - now) / 86400000));
+    return {
+      matchesPlayed: 0,
+      pctGlobal: 0,
+      currentPhaseIdx: 0,
+      ballPos: 0,
+      badgeText: '0% · ' + days + ' días',
+      ballState: 'prematch',
+      marks: _buildMarks(0)
+    };
+  }
+
+  function _buildProgressFromMatchesPlayed(matchesPlayed, groupsFinishedKnown) {
+    matchesPlayed = Number(matchesPlayed);
+    if (!isFinite(matchesPlayed) || matchesPlayed < 0) {
+      return _buildPreMundialProgress();
+    }
+
+    if (matchesPlayed >= TOTAL_MATCHES) {
+      return {
+        matchesPlayed: TOTAL_MATCHES,
+        pctGlobal: 100,
+        currentPhaseIdx: 6,
+        ballPos: 100,
+        badgeText: '🇦🇷 Campeón',
+        ballState: 'finished',
+        marks: _buildMarks(6)
+      };
+    }
+
+    var currentPhaseIdx = 0;
+    var matchesInCurrentPhase = 0;
+
+    if (groupsFinishedKnown < 72) {
+      currentPhaseIdx = 0;
+      matchesInCurrentPhase = matchesPlayed > 72 ? 72 : matchesPlayed;
+    } else {
+      var koPlayed = matchesPlayed - 72;
+      if (koPlayed <= 16) {
+        currentPhaseIdx = 1;
+        matchesInCurrentPhase = koPlayed;
+      } else if (koPlayed <= 24) {
+        currentPhaseIdx = 2;
+        matchesInCurrentPhase = koPlayed - 16;
+      } else if (koPlayed <= 28) {
+        currentPhaseIdx = 3;
+        matchesInCurrentPhase = koPlayed - 24;
+      } else if (koPlayed <= 30) {
+        currentPhaseIdx = 4;
+        matchesInCurrentPhase = koPlayed - 28;
+      } else if (koPlayed <= 32) {
+        currentPhaseIdx = 5;
+        matchesInCurrentPhase = koPlayed - 30;
+      } else {
+        currentPhaseIdx = 5;
+        matchesInCurrentPhase = 2;
+      }
+    }
+
+    var phase = PHASES_PROGRESS[currentPhaseIdx];
+    var phaseTotal = phase && phase.total ? phase.total : 1;
+
+    var ballPos = (currentPhaseIdx * 20) + (matchesInCurrentPhase / phaseTotal) * 20;
+    if (ballPos < 0) ballPos = 0;
+    if (ballPos > 100) ballPos = 100;
+
+    var pctGlobal = Math.round((matchesPlayed / TOTAL_MATCHES) * 100);
+    if (pctGlobal < 0) pctGlobal = 0;
+    if (pctGlobal > 100) pctGlobal = 100;
+
+    var ballState = matchesPlayed > 0 ? 'live' : 'prematch';
+    var badgeText;
+    if (matchesPlayed === 0) {
+      var d = Math.max(0, Math.ceil((KICKOFF_TS_MUNDIAL - Date.now()) / 86400000));
+      badgeText = '0% · ' + (d > 0 ? (d + ' días') : 'Grupos');
+    } else {
+      badgeText = pctGlobal + '% · ' + _phaseLabelLong(phase.key);
+    }
+
+    return {
+      matchesPlayed: matchesPlayed,
+      pctGlobal: pctGlobal,
+      currentPhaseIdx: currentPhaseIdx,
+      ballPos: ballPos,
+      badgeText: badgeText,
+      ballState: ballState,
+      marks: _buildMarks(currentPhaseIdx)
+    };
+  }
+
+  async function getMundialProgress() {
+    try {
+      // Mock para QA manual: window.__PRED_MOCK = { matchesPlayed: 23 }
+      if (typeof window !== 'undefined' && window.__PRED_MOCK
+          && typeof window.__PRED_MOCK.matchesPlayed !== 'undefined') {
+        var mockN = Number(window.__PRED_MOCK.matchesPlayed);
+        if (isFinite(mockN)) {
+          var mockGroupsFinished = (typeof window.__PRED_MOCK.groupsFinished === 'number')
+            ? window.__PRED_MOCK.groupsFinished
+            : Math.min(mockN, 72);
+          return _buildProgressFromMatchesPlayed(mockN, mockGroupsFinished);
+        }
+      }
+
+      if (Date.now() < KICKOFF_TS_MUNDIAL) {
+        return _buildPreMundialProgress();
+      }
+
+      if (typeof window === 'undefined' || !window._porraDb) {
+        return _buildPreMundialProgress();
+      }
+
+      var res = await window._porraDb
+        .from('live_scores')
+        .select('match_key')
+        .eq('status', 'finished')
+        .eq('is_historic', false);
+
+      if (res && res.error) {
+        console.warn('[getMundialProgress] Supabase error:', res.error.message || res.error);
+        return _buildPreMundialProgress();
+      }
+
+      var rows = (res && res.data) ? res.data : [];
+      var matchesPlayed = rows.length;
+
+      var groupsRegex = /^wc2026_g[A-L]_/;
+      var groupsFinished = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var mk = rows[i] && rows[i].match_key;
+        if (mk && groupsRegex.test(mk)) groupsFinished++;
+      }
+
+      return _buildProgressFromMatchesPlayed(matchesPlayed, groupsFinished);
+    } catch (err) {
+      console.warn('[getMundialProgress] excepción:', err && err.message ? err.message : err);
+      return _buildPreMundialProgress();
+    }
+  }
+
+  window.getMundialProgress = getMundialProgress;
+})();
+
