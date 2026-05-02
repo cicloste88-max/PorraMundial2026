@@ -472,11 +472,11 @@
 }
 .timeline-ball.is-prematch img { animation-play-state: paused; }
 .timeline-ball.is-finished img { animation: ball-spin 6s linear infinite; }
+/* B15-badge-clamp: badge con left dinámico y flecha móvil independiente */
 .timeline-badge {
   position: absolute;
   bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
+  /* left + transform los inyecta el JS como inline style según ballPos */
   background: linear-gradient(135deg, rgba(201, 169, 97, 0.22), rgba(201, 169, 97, 0.10));
   border: 1px solid rgba(201, 169, 97, 0.50);
   border-radius: 9px;
@@ -490,17 +490,19 @@
   box-shadow: 0 6px 16px rgba(201, 169, 97, 0.20);
   pointer-events: none;
 }
-.timeline-badge::after {
-  content: "";
+
+/* Flecha apuntadora con left dinámico independiente del badge */
+.timeline-badge-arrow {
   position: absolute;
   bottom: -4px;
-  left: 50%;
+  /* left lo inyecta el JS como inline style; centrada con transform */
   transform: translateX(-50%) rotate(45deg);
   width: 7px;
   height: 7px;
   background: rgba(201, 169, 97, 0.16);
   border-right: 1px solid rgba(201, 169, 97, 0.50);
   border-bottom: 1px solid rgba(201, 169, 97, 0.50);
+  pointer-events: none;
 }
 
 /* UX-2 (B11): eyebrow del rank-row "Tu rango". */

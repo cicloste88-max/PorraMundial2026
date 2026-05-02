@@ -136,6 +136,23 @@
         '</span>';
     }
 
+    // B15-badge-clamp: cuando el balón está cerca de los extremos, ancla el badge
+    // al borde del track pero mantén la flecha apuntando al balón.
+    // Track útil ≈ 280px en mobile, badge ≈ 110px → halfBadge ≈ 19.6%, redondeo a 20.
+    var BADGE_HALF_PCT = 20;
+    var badgeLeftPct;
+    var arrowLeftPct;
+    if (ballPos < BADGE_HALF_PCT) {
+      badgeLeftPct = BADGE_HALF_PCT;
+      arrowLeftPct = (ballPos / BADGE_HALF_PCT) * 50;
+    } else if (ballPos > 100 - BADGE_HALF_PCT) {
+      badgeLeftPct = 100 - BADGE_HALF_PCT;
+      arrowLeftPct = 50 + ((ballPos - badgeLeftPct) / BADGE_HALF_PCT) * 50;
+    } else {
+      badgeLeftPct = ballPos;
+      arrowLeftPct = 50;
+    }
+
     return '' +
       '<div class="timeline">' +
         '<div class="timeline-track">' +
@@ -146,7 +163,10 @@
           '<div class="' + ballClasses + '" style="left:' + ballPos + '%">' +
             '<div class="timeline-ball-glow"></div>' +
             '<img src="' + TRIONDA_URL + '" alt="Trionda" loading="lazy"/>' +
-            '<div class="timeline-badge">' + _esc(badgeText) + '</div>' +
+          '</div>' +
+          '<div class="timeline-badge" style="left:' + badgeLeftPct + '%;transform:translateX(-50%)">' +
+            _esc(badgeText) +
+            '<span class="timeline-badge-arrow" style="left:' + arrowLeftPct + '%"></span>' +
           '</div>' +
         '</div>' +
       '</div>';
