@@ -1445,3 +1445,16 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
 3. **Cloudflare no acepta hostnames con port** en site config — bloqueando dev local incluso con sitekey real.
 
 **No es bug del código.** Widget HTML/JS en `index.html` y `auth.js` permanece (no estorba — sin secret en Auth, `signInWithPassword` ignora `captchaToken`). Decisión documentada en `CHANGELOG.md`. NO se añade a `errores_conocidos_porra.md` (limitación de stack, no error).
+
+## 2026-05-02
+
+[10:03] PUSH: F7.7-VIS-11 (B11-trionda) timeline Trionda + 4 UX fixes — public/css/components/predictor-shell.css, public/js/ui-pred-shell.js, public/js/data.js (dfc8dc3)
+[14:45] PUSH: F7.7-VIS-12 (B12-info-fixes) eyebrow simplificado + badge X/104 — public/js/ui-pred-shell.js (ade6771)
+[18:15] PUSH: F7.7-VIS-13 (B13-fix-coherence) linea sigue balon + badge sin % — public/js/data.js, public/js/ui-pred-shell.js (69da6d6)
+[18:30] APLICAR: vistas SQL v_league_member_count + v_user_global_rank vía Supabase MCP apply_migration — supabase/migrations/20260430200000_predictor_ranking_views.sql (manual Claude.ai, Code sin acceso a apply_migration)
+[18:45] PUSH: F7.7-VIS-14 (B14-fix-phase-boundary) <= → < estricto + cleanup CLAUDE.md (-504 bytes) — public/js/data.js, CLAUDE.md (a89de71)
+[19:15] PUSH: F7.7-VIS-15 (B15-badge-clamp) clamp badge extremos + flecha movil independiente — public/css/components/predictor-shell.css, public/js/ui-pred-shell.js (dbaf9b7)
+[19:25] PUSH: F7.7-VIS-16 (B16-badge-spacing) bottom calc(100% + 10px) → calc(100% + 24px) — public/css/components/predictor-shell.css (a859d36)
+[19:38] CREAR: PR#46 F7.7-VIS Predictor mobile redesign + Trionda Timeline (B1..B16) vía Code Explorer extensión Chrome (api GitHub directa)
+[19:42] MERGEAR: PR#46 squash a main por San desde GitHub UI — SHA d1be8bf5
+[19:55] PUSH: sesión-close — CLAUDE.md Estado actual + Top-3 + CHANGELOG entrada F7.7-VIS + migration-log append (este commit)

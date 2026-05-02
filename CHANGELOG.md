@@ -2,6 +2,71 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-02 — F7.7-VIS Predictor mobile redesign + Trionda Timeline (PR#46)
+
+**Sprint completo cerrado.** 18 commits (B1..B16) mergeados a `main` vía PR#46 squash (SHA `d1be8bf5`). Diff +3784 / −13 LOC, 14 archivos. Bundle 188.61 KB (sin variación, los assets nuevos van en `public/` servidos verbatim).
+
+### Cambios principales
+
+**Frontend (4 archivos):**
+- `public/css/components/predictor-shell.css` — bloque `.timeline-*` con balón Trionda real (270 KB asset Supabase Storage en `miniatures/Ball/Trionda-official-ball.png`), animaciones spin + glow respirando, badge con clamp en extremos + flecha móvil independiente.
+- `public/js/ui-pred-shell.js` — render completo del Predictor (tile dorado, hero, rango, timeline, footer); cierra Gap A (chip rango con eyebrow "Tu rango") + Gap B (chips Liga/Global apilados con vistas SQL reales).
+- `public/js/data.js` — helper `getMundialProgress()` con cálculo por-fase + vistas SQL ranking (`v_league_member_count`, `v_user_global_rank`); B14 fix off-by-one en frontera de fase (cambio `<=` → `<` estricto en cadena KO).
+- `public/js/predictor-ranks.js` — sistema 10 niveles con thresholds 0/100/200/350/500/850/1400/2100/3000/4000 y frases (Chupetín → Sotanita → Pipero → Cuchara de madera → Forofo → Crack → Profeta → Oráculo → Sabio del VAR → Maestro Mundialista).
+
+**Backend:**
+- `supabase/migrations/20260430200000_predictor_ranking_views.sql` — 2 vistas para chips Liga + Global (`v_league_member_count` y `v_user_global_rank`). Aplicada a la BD remota por Claude.ai vía Supabase MCP `apply_migration` el 30 abr (Code en sandbox no podía).
+
+### Decisiones de producto cerradas (6 de 6)
+
+- Sistema rangos 10 niveles + frases — visible (chip + frase italic)
+- Ranking liga local — real desde `v_league_member_count`
+- Ranking global cross-league — real desde `v_user_global_rank`
+- % Aciertos cableado — llena automáticamente el 11 jun
+- Racha cableada — llena automáticamente el 11 jun
+- IA-jugador — diferido a F7.7-IA (sprint nuevo)
+- Tile pre-Mundial — visible y polished con countdown + badge `Faltan X días`
+- Trophy modal — funcional, 4 premios reusando `#modal`
+
+### Iteraciones críticas
+
+- **B11**: implementación inicial del balón Trionda con marcas equidistantes
+- **B12**: eyebrow simplificado + badge mid-Mundial `X/104`
+- **B13**: línea verde alineada con balón (mismo sistema por-fase) + badge sin `%` con nombre de fase legible
+- **B14**: off-by-one al cruzar frontera de fase (`<=` → `<` en cadena KO). Caso reportado por San: `matchesPlayed=100` mostraba "Cuartos" cuando debía mostrar "Semis"
+- **B15**: clamp del badge en extremos + flecha móvil independiente (resolvió badge cortado en pre-Mundial)
+- **B16**: subir badge 14px (`bottom: calc(100% + 24px)`) para compensar el cambio de contenedor en B15
+
+### Cleanup CLAUDE.md (B14 + sesión-close)
+
+CLAUDE.md de 10294 → 9790 bytes (-504 bytes en B14). Bug UI #3 cerrado eliminado, audit Postgres backlog comprimido. Esta sesión-close ajusta Estado actual y Top-3.
+
+### Pendientes diferidos
+
+- **F7.7-IA** (bot oficial IA-jugador C1..C6) — sprint candidato siguiente
+- B10-active mid-Mundial (footer "Última: ESP 2-1 BRA · Ver todo ›")
+- B11-points-cache cercano al 11 jun (`rank_global` con pts reales tras crear `user_points_cache` + trigger)
+- B12 trophy modal interior dark
+- Open-state cards internals dark
+- Limpieza CSS DEPRECATED B9 tras smoke producción
+- Admin chip especial "ADMIN" en lugar de fallback "—" cuando es admin
+
+### Validación
+
+- `npm run build` limpio en todos los commits
+- Pre-commit hook OK en cada commit
+- QA visual de San: 3 estados verificados (pre-Mundial 0%, mid 50%, finalizado 104%)
+- Test mock: `window.__PRED_MOCK = { matchesPlayed: N }` con N en {0, 23, 71, 72, 75, 88, 96, 100, 102, 104}
+- Vercel deploy automático tras merge
+
+### Patrones validados durante el sprint
+
+1. **Subagentes Haiku 4.5 paralelos** vía Task tool (B11: 3 agentes CSS+JS+data, padre Opus integra)
+2. **Patch persistente vía archivos en `.claude/briefs/`** (B15+B16): brief self-contained descargable, instrucción a Code "Lee el brief X y ejecútalo"
+3. **Claude.ai aplica migraciones SQL** que Code no puede (vía Supabase MCP `apply_migration`) — split de responsabilidades formalizado
+4. **Patrón Tiptap composer en Chrome MCP**: `execCommand('insertText')` sin disparar eventos sintéticos para no romper ProseMirror
+5. **PR creada por Code Explorer extensión Chrome** vía GitHub API directa (Code en container Anthropic no tiene gh CLI ni token)
+
 ## 2026-04-30 — Turnstile DESACTIVADO (Supabase Auth dashboard)
 
 **Auth / Decisión arquitectónica.** Tras 2 días con Cloudflare Turnstile en login (PR#39+PR#40, 29abr), CAPTCHA desactivado en Supabase Auth dashboard. Razones: app privada (porra entre amigos), fricción innecesaria, **Supabase Cloud expone un único secret slot por proyecto** (no se puede separar dev/prod) y **Cloudflare no acepta hostnames con port** (bloqueando `localhost:5173`). El widget HTML/JS en `index.html` y `auth.js` se mantiene intacto (no estorba; no ejecuta sin secret en Auth). No es bug del código — es limitación arquitectónica del stack. NO añadido a `errores_conocidos_porra.md` (no es ERR).

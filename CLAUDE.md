@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** HEAD `5ddb974` post-merge **F7.4-D-2** (PR#43, IA Predictor cleanup) + **F7.X** (PR#44, shell `#page-elim` rediseñado, +872 −66 LOC). ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** (app privada, fricción innecesaria). Branch activa `docs/predictor-design-source-v1` con sprint **F7.7-VIS** (B1..B14). IA Predictor Fases A–F cerradas (Python↔TS 46/46), EF `porra-ia-compute` v10 ACTIVE. Detalle en `CHANGELOG.md`.
+Rama activa **main** HEAD `d1be8bf5` post-merge **F7.7-VIS** (PR#46, sprint completo Predictor mobile redesign + Trionda Timeline, 18 commits B1..B16, +3784/−13 LOC). ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** (app privada). Predictor en producción con sistema rangos 10 niveles, ranking liga+global cross-league, balón Trionda oficial girando con progreso real del Mundial, trophy modal 4 premios. IA Predictor Fases A–F cerradas, EF `porra-ia-compute` v10 ACTIVE. Próximo sprint candidato: **F7.7-IA** (bot IA-jugador C1..C6) o backend pre-11jun. Detalle en `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
 Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr2026.md`. Top-3 críticos:
 
-1. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
-2. **GitHub Action CI** (build + `node --check` + tests cuando haya). Bloquea regresiones antes de merge.
-3. **F7.7 rediseño Predictor** (widgets) — completaría el sweep de pages dedicadas tras F7.X.
+1. **Backend pre-11jun core**: WhatsApp Meta migration (ticket 63016) + activar pg_cron `update-results` el 11 jun + cargar squads reales en `EQUIPOS[].players`. Sin esto la app no funciona el día del Mundial.
+2. **F7.7-IA**: bot oficial IA-jugador C1..C6 (sim 10 jun, miembro auto todas las ligas vía trigger, EF `porra-ia-compute` v11 con KO+awards+boost). Cierra la decisión #4 del Predictor.
+3. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 
 ## Pendientes — Bugs UI
 
