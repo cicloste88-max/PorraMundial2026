@@ -609,15 +609,15 @@ function _showJcardModal(matchKey) {
   overlay.id = 'jcard-modal-overlay';
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
-    'display:flex;align-items:center;justify-content:center;padding:16px;' +
+    'display:flex;align-items:flex-start;justify-content:center;padding:16px;' +
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-width:calc(100vw - 10px);max-height:calc(100vh - 32px);' +
+    'margin:0 auto;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);' +
     'overflow-x:hidden;overflow-y:auto;border-radius:16px;' +
-    'position:relative;box-sizing:border-box;';
+    'position:relative;box-sizing:border-box;left:0;right:0;';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '\u2715';
@@ -652,12 +652,17 @@ function _showJcardModal(matchKey) {
     el.style.pointerEvents = 'none';
   });
 
+  clone.style.margin = '0 auto';
+  clone.style.left = '0';
+  clone.style.right = '0';
+
   wrapper.appendChild(closeBtn);
   wrapper.appendChild(clone);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
   clone.style.width = (clone.offsetWidth - 5) + 'px';
+  clone.style.margin = '0 auto';
 }
 window.openJcardModal = openJcardModal;
 
