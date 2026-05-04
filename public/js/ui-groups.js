@@ -610,15 +610,17 @@ function _showJcardModal(matchKey) {
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
     'display:flex;align-items:center;justify-content:center;padding:16px;' +
-    'animation:fadeIn .15s ease;box-sizing:border-box;';
+    'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
-  // Wrapper: contiene la card en un viewport seguro. min() evita overflow
-  // horizontal en m\u00f3vil. 32px = 16px padding overlay \u00d7 2 lados.
+  // Wrapper: contiene la card. Sin overflow-x:hidden \u2014 la box-shadow de
+  // .card (0 20px 60px) se recortar\u00eda visualmente y dibujar\u00eda 'bordes
+  // cortados'. El clipping de viewport lo da el overlay (padding 16px +
+  // overflow:hidden a nivel fixed:inset:0). Vertical s\u00ed scrollea.
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
     'max-width:min(480px, calc(100vw - 32px));width:100%;' +
-    'max-height:calc(100vh - 32px);overflow:hidden auto;' +
+    'max-height:calc(100vh - 32px);overflow-x:visible;overflow-y:auto;' +
     'border-radius:16px;position:relative;box-sizing:border-box;';
 
   const closeBtn = document.createElement('button');
@@ -648,15 +650,20 @@ function _showJcardModal(matchKey) {
     else cloneInputs[i].value = inp.value;
   });
 
-  // Bug fix overflow m\u00f3vil: forzar la card y todos sus descendientes a
-  // respetar el viewport. La .card est\u00e1 pensada para grid minmax(360px,1fr)
-  // y no encoge bien por s\u00ed sola; min-width:0 + overflow:hidden contiene
-  // los hijos absolutos/flex que excedan el ancho.
-  clone.style.width    = '100%';
-  clone.style.maxWidth = 'calc(100vw - 32px)';
-  clone.style.minWidth = '0';
-  clone.style.boxSizing = 'border-box';
-  clone.style.overflow = 'hidden';
+  // Bug fix overflow m\u00f3vil:
+  //  - width 100% y max-width al viewport \u2014 la .card est\u00e1 pensada para
+  //    grid minmax(360px,1fr) y no encoge bien por s\u00ed sola.
+  //  - box-shadow:none \u2014 la sombra original (60px de spread) era la que
+  //    se 'recortaba' visualmente al estar el wrapper junto al borde
+  //    del viewport. Sin sombra el problema desaparece.
+  //  - margin:0 para evitar que cualquier herencia a\u00f1ada offsets.
+  clone.style.width      = '100%';
+  clone.style.maxWidth   = 'calc(100vw - 32px)';
+  clone.style.minWidth   = '0';
+  clone.style.boxSizing  = 'border-box';
+  clone.style.boxShadow  = 'none';
+  clone.style.margin     = '0';
+  clone.style.overflow   = 'hidden'; // contiene hijos absolute si alguno excediera
   clone.querySelectorAll('*').forEach(el => {
     el.style.minWidth  = '0';
     el.style.maxWidth  = '100%';
