@@ -665,22 +665,13 @@ function _showJcardModal(matchKey) {
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
-  // Encaje proporcional v\u00eda transform:scale \u2014 debe correr DESPU\u00c9S de
-  // appendChild (necesario para medir DOM). transform:scale no afecta al
-  // tama\u00f1o en flow, as\u00ed que asignamos width/height al wrapper para que
-  // ocupe el ancho/alto VISUAL post-scale.
-  const cardWidth  = clone.scrollWidth || clone.offsetWidth || 360;
-  const cardHeight = clone.offsetHeight || 0;
-  const availWidth = window.innerWidth - 32; // 16px padding overlay \u00d7 2
-  if (cardWidth > availWidth) {
-    const ratio = availWidth / cardWidth;
-    clone.style.transform       = 'scale(' + ratio + ')';
+  const cardW = clone.scrollWidth;
+  const availW = window.innerWidth - 32;
+  if (cardW > availW) {
+    const ratio = availW / cardW;
+    clone.style.transform = 'scale(' + ratio + ')';
     clone.style.transformOrigin = 'top center';
-    wrapper.style.width  = (cardWidth * ratio) + 'px';
-    wrapper.style.height = (cardHeight * ratio) + 'px';
-  } else {
-    wrapper.style.width  = cardWidth + 'px';
-    wrapper.style.height = cardHeight + 'px';
+    wrapper.style.height = (clone.offsetHeight * ratio) + 'px';
   }
 }
 window.openJcardModal = openJcardModal;
