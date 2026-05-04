@@ -609,17 +609,16 @@ function _showJcardModal(matchKey) {
   overlay.id = 'jcard-modal-overlay';
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
-    'display:flex;align-items:center;justify-content:center;padding:8px;' +
-    'animation:fadeIn .15s ease;';
+    'display:flex;align-items:center;justify-content:center;padding:16px;' +
+    'animation:fadeIn .15s ease;box-sizing:border-box;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   // Wrapper: contiene la card en un viewport seguro. min() evita overflow
-  // horizontal en m\u00f3vil cuando viewport < 480px (la card original tiene
-  // CSS pensado para grid minmax(360px, 1fr) y no encoge bien).
+  // horizontal en m\u00f3vil. 32px = 16px padding overlay \u00d7 2 lados.
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-width:min(480px, calc(100vw - 16px));width:100%;' +
-    'max-height:calc(100vh - 16px);overflow:hidden auto;' +
+    'max-width:min(480px, calc(100vw - 32px));width:100%;' +
+    'max-height:calc(100vh - 32px);overflow:hidden auto;' +
     'border-radius:16px;position:relative;box-sizing:border-box;';
 
   const closeBtn = document.createElement('button');
@@ -649,10 +648,20 @@ function _showJcardModal(matchKey) {
     else cloneInputs[i].value = inp.value;
   });
 
-  // Bug fix overflow m\u00f3vil: forzar la card clonada a respetar el wrapper.
+  // Bug fix overflow m\u00f3vil: forzar la card y todos sus descendientes a
+  // respetar el viewport. La .card est\u00e1 pensada para grid minmax(360px,1fr)
+  // y no encoge bien por s\u00ed sola; min-width:0 + overflow:hidden contiene
+  // los hijos absolutos/flex que excedan el ancho.
   clone.style.width    = '100%';
-  clone.style.maxWidth = '100%';
+  clone.style.maxWidth = 'calc(100vw - 32px)';
+  clone.style.minWidth = '0';
   clone.style.boxSizing = 'border-box';
+  clone.style.overflow = 'hidden';
+  clone.querySelectorAll('*').forEach(el => {
+    el.style.minWidth  = '0';
+    el.style.maxWidth  = '100%';
+    el.style.boxSizing = 'border-box';
+  });
 
   clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
   clone.querySelectorAll('button,input,select').forEach(el => {
