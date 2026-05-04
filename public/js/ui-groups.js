@@ -616,7 +616,7 @@ function _showJcardModal(matchKey) {
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
     'margin:0 auto;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);' +
-    'overflow-x:hidden;overflow-y:auto;border-radius:16px;' +
+    'overflow-x:hidden;overflow-y:auto;border-radius:16px;padding-bottom:24px;' +
     'position:relative;box-sizing:border-box;left:0;right:0;';
 
   const closeBtn = document.createElement('button');
