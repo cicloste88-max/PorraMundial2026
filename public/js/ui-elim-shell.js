@@ -114,7 +114,6 @@
       ? '<span class="fc-elim-header__admin-badge">ADMIN</span>'
       : '';
 
-    var misActiveClass     = state.activeAction === 'mis-pronosticos' ? ' is-active' : '';
     var cuadroActiveClass  = state.activeAction === 'cuadro' ? ' is-active' : '';
     var premiosActiveClass = state.activeAction === 'premios' ? ' is-active' : '';
 
@@ -131,7 +130,6 @@
         '</div>' +
       '</div>' +
       '<div class="fc-elim-header__actions">' +
-        '<button class="fc-elim-header__action fc-elim-header__action--mis' + misActiveClass + '" type="button">Mis pronósticos</button>' +
         '<button class="fc-elim-header__action fc-elim-header__action--cuadro' + cuadroActiveClass + '" type="button">Cuadro oficial</button>' +
         '<button class="fc-elim-header__action fc-elim-header__action--premios' + premiosActiveClass + '" type="button">Premios</button>' +
       '</div>' +
@@ -143,10 +141,6 @@
     var backBtn = mount.querySelector('.fc-elim-header__back');
     if (backBtn) backBtn.addEventListener('click', function () { showPage('welcome'); });
 
-    if (state.onMis) {
-      var misBtn = mount.querySelector('.fc-elim-header__action--mis');
-      if (misBtn) misBtn.addEventListener('click', state.onMis);
-    }
     if (state.onCuadro) {
       var cuadroBtn = mount.querySelector('.fc-elim-header__action--cuadro');
       if (cuadroBtn) cuadroBtn.addEventListener('click', state.onCuadro);
@@ -632,19 +626,15 @@
       points: _totalPoints(),
       subtitle: _getSubtitle(),
       activeAction: _state.activeAction,
-      onMis: function () {
-        if (_state.activeAction === 'mis-pronosticos') return;
-        _state.activeAction = 'mis-pronosticos';
-        renderElimShell();
-      },
+      // Click en subtab activa la vista; volver a clickar en una vista
+      // ya activa la deactiva → vuelve a 'mis-pronosticos' (estado base
+      // sin botón propio: stepper + list + dice).
       onCuadro: function () {
-        if (_state.activeAction === 'cuadro') return;
-        _state.activeAction = 'cuadro';
+        _state.activeAction = (_state.activeAction === 'cuadro') ? 'mis-pronosticos' : 'cuadro';
         renderElimShell();
       },
       onPremios: function () {
-        if (_state.activeAction === 'premios') return;
-        _state.activeAction = 'premios';
+        _state.activeAction = (_state.activeAction === 'premios') ? 'mis-pronosticos' : 'premios';
         renderElimShell();
       }
     });
