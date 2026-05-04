@@ -5,14 +5,14 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** HEAD `4fb8394` (post slim secrets, PR#47). En curso PR F7.7-IA C1+C2 — bot **IA Zayu** activo en 3 ligas (72 group + 32 KO + awards + groups_saved A-L lock), trigger DB replicate_bot_to_league + EF `porra-ia-compute` **v11** ACTIVE (SHA `af0f24a8`). Detalle en `CHANGELOG.md`. Próximo: cargar squads reales + ejecutar `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
+Rama activa **main** HEAD `137125e` (post Sprint A+B UI, PR#49 + bot IA Zayu PR#48). Bot IA Zayu activo en 3 ligas (72 group + 32 KO + awards lock), EF `porra-ia-compute` v11 ACTIVE. Sprint A+B 04-may cerrado: toggle Premios/Cuadro Fase Final + Jornada/Directo Design v2 + fix Ver tarjeta mobile (centrado sin scroll horizontal). Detalle en `CHANGELOG.md`. Próximo: cargar squads reales + ejecutar `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
 
 ## Top-3 pendientes inmediatos
 
 Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr2026.md`. Top-3 críticos:
 
 1. **Backend pre-11jun core**: WhatsApp Meta migration (ticket 63016) + activar pg_cron `update-results` el 11 jun + cargar squads reales en `EQUIPOS[].players`. Sin esto la app no funciona el día del Mundial.
-2. **F7.7-IA**: bot oficial IA-jugador C1..C6 (sim 10 jun, miembro auto todas las ligas vía trigger, EF `porra-ia-compute` v11 con KO+awards+boost). Cierra la decisión #4 del Predictor.
+2. **Cards embebidas grupos formato fase final** (próximo sprint UI): replicar formato Fase Final — cards embebidas por letra A-L. Ref: `ui-elim-shell.js` ElimRow+ElimExpanded. Toca `createMatchCard` + `renderAll` (`scoring.js:1289`) + `ui-groups-mobile.js` mobile-collapse.
 3. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
 
 ## Pendientes — Bugs UI
@@ -21,7 +21,8 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
 3. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
 4. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
-5. **Grupos compact view** (sprint diferido): replicar formato Fase Final — cards embebidas por letra A-L. Ref: `ui-elim-shell.js` ElimRow+ElimExpanded. Toca `createMatchCard` + `renderAll` (`scoring.js:1289`) + `ui-groups-mobile.js` mobile-collapse.
+
+**Resueltos sprint A+B (04-may)**: toggle Premios/Cuadro oficial Fase Final, restyling Jornada+Directo DS v2, fix Ver tarjeta mobile (goleador + centrado).
 
 ## Pendientes — Antes del 11 junio 2026
 

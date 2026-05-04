@@ -1479,3 +1479,14 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
   - FASE 5: verificación 3 ligas idénticas — preds=72, ko=32, awards=true, groups_locked=12/12 en Biwenger/Porrazo/Porrazo2.
 
 [19:24] SPRINT-A+B (4-may-2026): cierre items A (Awards toggle Fase Final, 4 commits A.1..A.4 — c5e9794/ecf809b/0a69d64/5c22530) + B1 Jornada v2 (fd093be) + B2 Directo v2 (10f3bd1) + fix(jornada) card-wrap-MATCHKEY id (d0176eb). Branch `claude/fix-awards-card-display-BZMg5`. CSS nuevos: `public/css/components/jornada-v2.css` (prefijo jv2-) + `public/css/components/directo-v2.css` (prefijo dv2-). C diferido — anotado en CLAUDE.md §Pendientes Bugs UI item 5 + CHANGELOG entrada del día con scope (`createMatchCard` + `renderAll` + `ui-groups-mobile.js` mobile-collapse).
+
+[20:30-21:00] VER-TARJETA-MOBILE — iteraciones de fix sobre `_showJcardModal` (`public/js/ui-groups.js`) en branch `claude/fix-awards-card-display-BZMg5` post-base. (1) intento `transform:scale(ratio)` con width/height del wrapper (5cbf7c3, 031c717) — descartado: scrollbar horizontal en mobile. (2) descartado `transform:scale` y width directo `clone.offsetWidth - 5` con `wrapper max-width:calc(100vw - 10px)` + `overflow-x:hidden` (aa5679f) — encajaba sin slider pero sin centrar. (3) centrado: overlay `align-items:flex-start`, wrapper `margin:0 auto;max-width:calc(100vw - 32px)`, clone `margin:0 auto` + limpieza left/right (62f4ce5). (4) `padding-bottom:24px` al wrapper para borde inferior visible (9ec4638).
+
+[21:05] PR#48 + PR#49 squash-merged a main por San (orden: PR#48 bot Zayu primero, PR#49 sprint A+B después). HEAD main = `137125e`. Auto-delete remoto de branch `claude/fix-awards-card-display-BZMg5`. Branch fantasma `claude/fix-awards-card-mobile-5hBvd` aún viva en remote (residual de sesión previa).
+
+[21:08] CIERRE-SESION: actualización docs post-PR#48+#49.
+  - CLAUDE.md: Estado actual (HEAD `137125e`, post Sprint A+B + bot Zayu); Top-3 reordenado (1) Backend pre-11jun, (2) Cards embebidas grupos formato fase final, (3) Tests motor puntuación; Bugs UI — quitado item 5 (Grupos compact view, ahora Top-3 #2) + añadido bloque "Resueltos sprint A+B".
+  - CHANGELOG.md: bloque fix(jornada) ampliado con detalle goleador (cloneNode no transfiere `.value` runtime → copy manual) + overflow mobile centrado (versión final tras 4 iteraciones).
+  - migration-log: este append.
+  - Cleanup branches remotas: `claude/fix-awards-card-display-BZMg5` ya auto-eliminada por squash-merge GitHub. Intento `git push origin --delete claude/fix-awards-card-mobile-5hBvd` desde Code → HTTP 403 (ERR-17, proxy git de Anthropic no permite delete refs). Pendiente que San borre la branch fantasma desde GitHub UI o `git push origin --delete` local.
+  - Pre-commit hook activado (`git config core.hooksPath .githooks`); tamaños finales CLAUDE.md 10082 / 10240 (margen 158 B), CHANGELOG.md 16595 / 30720.
