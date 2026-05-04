@@ -613,15 +613,11 @@ function _showJcardModal(matchKey) {
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
-  // Wrapper sin max-width \u2014 el clone debe poder medirse a su ancho
-  // intr\u00ednseco (~360px) para decidir si necesita scale. Si limitamos el
-  // wrapper a calc(100vw-32px), el clone se renderiza encogido y
-  // scrollWidth nunca supera availWidth \u2192 el scale nunca se aplica.
-  // El ancho final se asigna tras medir.
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-height:calc(100vh - 32px);overflow:visible auto;' +
-    'border-radius:16px;position:relative;box-sizing:border-box;';
+    'max-width:calc(100vw - 10px);max-height:calc(100vh - 32px);' +
+    'overflow-x:hidden;overflow-y:auto;border-radius:16px;' +
+    'position:relative;box-sizing:border-box;';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '\u2715';
@@ -633,10 +629,6 @@ function _showJcardModal(matchKey) {
   closeBtn.onclick = () => overlay.remove();
 
   const clone = cardEl.cloneNode(true);
-  // Forzar el ancho intrínseco que la .card espera (grid minmax(360px,1fr))
-  // ANTES de appendChild — así scrollWidth refleja el ancho 'natural' y no
-  // el del wrapper.
-  clone.style.width = '360px';
 
   // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
   // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
@@ -665,14 +657,7 @@ function _showJcardModal(matchKey) {
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
-  const cardW = clone.scrollWidth;
-  const availW = window.innerWidth - 32;
-  if (cardW > availW) {
-    const ratio = availW / cardW;
-    clone.style.transform = 'scale(' + ratio + ')';
-    clone.style.transformOrigin = 'top center';
-    wrapper.style.height = (clone.offsetHeight * ratio) + 'px';
-  }
+  clone.style.width = (clone.offsetWidth - 5) + 'px';
 }
 window.openJcardModal = openJcardModal;
 
