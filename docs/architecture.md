@@ -86,24 +86,9 @@ Necesarias porque onclick HTML resuelve en parse-time, antes de que el DOM cargu
 
 **Deploys EF**: NO usan MCP desde Claude Code. Requieren `SUPABASE_ACCESS_TOKEN` en máquina local o Claude.ai con su MCP de Supabase.
 
-## Secrets — clasificación
+## Secrets
 
-Regla mental: **Vault** = se consume desde SQL/pg_net (EFs entre sí, crons, flows MCP). **EF secrets** (`Deno.env.get`) = API keys externas consumidas directamente desde código de una EF.
-
-**Vault de Supabase** (`vault.decrypted_secrets`, acceso desde SQL o RPC `get_vault_secrets` — ver ERR-27):
-
-- `GITHUB_TOKEN`, `GITHUB_REPO` — `porra-patch-deploy`, `porra-fix-encoding`
-- `APIFY_TOKEN` — `porra-match-live` lanza actor Webshare
-- `PROXY_URL` — fallback scraping (legacy)
-- `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY`, `TWILIO_API_SECRET` — `porra-apify-webhook`, `porra-whatsapp-send`
-- `IA_CRON_KEY` (Fase E) — 64 chars hex. Header `X-Cron-Key` autentica pg_cron contra `porra-ia-compute`.
-- `SUPABASE_SERVICE_ROLE_KEY` — duplicado intencional del EF secret. Para que `net.http_post` desde SQL inserte `Authorization: Bearer ${service_role}`. Al rotar service_role: actualizar en AMBOS sitios.
-
-**EF secrets** (`Deno.env.get(...)`):
-
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` — inyectadas automáticamente por Supabase
-- `ANTHROPIC_API_KEY` (Fase E) — `porra-ia-compute` quipGenerator (Claude Haiku 4.5)
-- `FOOTBALL_DATA_API_KEY` — `update-results`
+Catálogo Vault + EF secrets + patrones de acceso en `docs/secrets.md`.
 
 ## Tooling de orquestación
 

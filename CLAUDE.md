@@ -37,7 +37,7 @@ Items 1-5 cerrados (PR#37). Pendiente: activar leaked password protection (HaveI
 
 ## Auth & Secrets
 
-Cloudflare Turnstile **DESACTIVADO 30abr2026** vía Supabase Auth dashboard. Decisión: app privada, fricción innecesaria + Supabase Cloud single-secret slot + Cloudflare no acepta ports localhost. Widget HTML/JS en `index.html` y `auth.js` permanecen (no estorban; no ejecutan sin secret en Auth). Catálogo Vault/EF en `.claude/rules/edge-functions.md` y `docs/architecture.md` §Secrets.
+Detalle Vault/EF + Turnstile DESACTIVADO 30abr2026 en `docs/secrets.md`.
 
 ## Reglas CRÍTICAS
 
@@ -71,7 +71,8 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 | Doc | Contenido | Cuándo consultarlo |
 |---|---|---|
-| `architecture.md` | Estructura JS, EFs, Stack, Secrets, tooling, historial dev | Cambios de organización del repo o tooling |
+| `architecture.md` | Estructura JS, EFs, Stack, tooling, historial dev | Cambios de organización del repo o tooling |
+| `secrets.md` | Vault, EF secrets, Cloudflare Turnstile, rotación | Cambios en credenciales o auth |
 | `ia-predictor.md` | Fórmula motor + 4 fuentes datos + mapping WC2026_TEAMS | Cambios IA Predictor o scrapers |
 | `live-scoring.md` | Pipeline async+webhook + actores Apify + SofaScore IDs | Bugs en live scores o nuevos eventIds |
 | `scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA | Cambios reglas de puntuación |
