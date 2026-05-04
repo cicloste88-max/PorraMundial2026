@@ -1466,4 +1466,14 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
   - CLAUDE.md: sección Auth & Secrets → puntero (-488 B); mapa documentación: split fila architecture en 2 (architecture sin Secrets + nueva fila secrets)
   - docs/architecture.md: ## Secrets — clasificación → puntero (-1144 B)
   - Tamaños finales: CLAUDE.md 9756 / 10240 (margen 484 B), architecture.md 8655 B, secrets.md 2315 B
-  - Commit: este commit (rama claude/extract-secrets-docs-1h5VT, push a main pendiente de decisión San)
+  - Commit: este commit (rama claude/extract-secrets-docs-1h5VT, mergeado a main vía PR#47 squash, SHA `4fb8394`)
+
+[14:00-14:25] F7.7-IA C1+C2 — Bot IA Zayu (branch `claude/f77-ia-c1-c2`).
+  - FASE 0: constraints UNIQUE/PK verificadas en predictions (league_id,user_id,match_id), ko_predictions (idem), award_picks (league_id,user_id), league_members (PK) → ON CONFLICT DO NOTHING viable en todas.
+  - FASE 1: DDL aplicado vía MCP `apply_migration` (`add_bot_user_replication_trigger` + `harden_bot_replication_functions`). Mirror local en supabase/migrations/20260504130246..317. Advisors: 3 nuevos atribuibles a la migration arreglados (search_path mutable + EXECUTE expuesto a anon/authenticated). Resto pre-existente.
+  - FASE 2: EF v11 escrita (2 acciones nuevas: seed_ia_user, seed_ia_user_predictions). Tamaño bundle 64705 B (63.2 KB) — under ERR-29 70 KB. Branch pusheada SHA `f4f3e7c`.
+  - FASE 2-D: deploy via CLI local por San (container Anthropic sin SUPABASE_ACCESS_TOKEN, MCP deploy_edge_function bloqueado por output cap del harness en Bash a ~2KB → no extraíble el bundle de 63KB para el tool call). EF v11 ACTIVE SHA `af0f24a8`.
+  - FASE 3a: 1ª llamada `seed_ia_user` (rid 1778) → 500 internal. Auth user creado en auth.users (`17ab3b59-…`) pero el INSERT a profiles falló (race con FK). Recovery: INSERT manual idempotente en profiles + league_members. Bot quedó funcional. Documentado como ERR-34.
+  - FASE 3b: `seed_ia_user_predictions` con `league_id=Biwenger` (rid 1782) → 200 OK en ~50s. Response: 72 group preds + 32 KO + champion=Francia + top4=[Francia, Argentina, España, Inglaterra] + awards (fallback determinista: Messi/Messi/Dibu/Lamine_Yamal). 5ª call Haiku integradora cayó al fallback (parsing JSON/tool-use). Awards aceptables; mejora prompt diferida.
+  - FASE 4: backfill via SQL `replicate_bot_to_league('17f0ceb4...')` (Porrazo) + `replicate_bot_to_league('6a24197e...')` (Porrazo 2). Instantáneo.
+  - FASE 5: verificación 3 ligas idénticas — preds=72, ko=32, awards=true, groups_locked=12/12 en Biwenger/Porrazo/Porrazo2.

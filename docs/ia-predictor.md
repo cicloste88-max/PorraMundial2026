@@ -197,3 +197,26 @@ Constante global en `supabase/functions/porra-ia-compute/index.ts`. Cada entry e
 
 1. **Dos `fetch('api.anthropic.com/...')` muertos** — ✅ resuelto en `87fd454` (PR #19, 24 abr 2026): `scoring.js::fetchIA` y `ui-nav.js::fetchIAforKO` eliminados. `iaPredictions` se puebla desde `loadIAPredictions` (auth.js); `iaKoPredictions` desde `loadKOIAHint` (ko.js) con callback `onDone`. Net -131 líneas.
 2. **Tooltip explainer del % en tarjetas KO** (pendiente): Fase F limitó scope a partidos de grupos. Las predicciones KO se computan on-demand (sessionStorage cache), pero el tooltip narrativo aún no se renderiza. Acción: leer `iaKoPredictions` + `findCachedPrediction` con raw context y portarlo a `ko.js`. Baja prioridad post-torneo.
+
+## Jugador IA Zayu (F7.7-IA C1+C2)
+
+**Modelo bot = humano.** El bot vive en `auth.users` + `profiles` (con `is_bot=true`). Sus filas en `predictions`, `ko_predictions`, `award_picks` y `league_members` son indistinguibles de las de un humano. Sin tablas paralelas, sin concepto "master con `league_id NULL`". Cada liga tiene una copia física idéntica de la porra del bot.
+
+**Source league**: Biwenger team (`8017e591-7996-4fe5-852b-bd66be49f17c`) — la 1ª en `joined_at`. Las predicciones se generan UNA vez sobre la source y luego se replican.
+
+**Replicación a ligas nuevas**: trigger `replicate_bot_on_new_league` AFTER INSERT en `leagues` invoca la función SECURITY DEFINER `replicate_bot_to_league(target_league_id)`. La función lee la porra del bot en su source y hace 4 INSERT-SELECT con `ON CONFLICT DO NOTHING` (atómicos). Backfill manual de ligas existentes con `SELECT replicate_bot_to_league('<uuid>')`.
+
+**Generación inicial — `seed_ia_user_predictions`** (action de `porra-ia-compute` v11, requiere `requireAdminOrCron`):
+
+1. **Groups (72)**: lee `ia_predictions` del snapshot ACTIVE (`is_ko_ondemand=false`). Para cada partido, deriva un marcador concreto desde `(sign, p_max)`:
+   - `'1'` con p_max≥0.7 → 2-0; ≥0.55 → 2-1; resto → 1-0.
+   - `'X'` → 1-1.
+   - `'2'` con p_max≥0.7 → 0-2; ≥0.55 → 1-2; resto → 0-1.
+2. **groups_saved**: `{A:true,…,L:true}` → bloquea las 12 fases de grupos del bot.
+3. **Standings**: `pts → goal_diff → goals_for` (replica `calcGroupTableAdvanced` en `public/js/scoring.js`, sin h2h). Top 2 de cada grupo + 8 mejores 3os para llenar slots `1A..2L` y `T_ABCDF..T_DEIJL`.
+4. **KO (32)**: itera `r32 → r16 → qf → sf → third → final`. Para cada match, resuelve home/away (slots → ISO3 → name_es), llama `predict()` del motor con ELO+H2H+racha del snapshot ACTIVE, deriva marcador igual que en groups, y propaga `W{id}` / `L{id}` a `resolvedSlots` para la siguiente ronda. Empates: `classifier` = equipo con mayor ELO.
+5. **Awards (4 + 1 Anthropic)**: 4 `web_search_20250305` queries (Balón / Bota / Guante / Joven sub21) → 5ª llamada Haiku 4.5 integradora con prompt que incluye: campeón predicho, top4, abreviados de los 4 search results, pools válidos (AW_PLAYERS keys + roles + YOUNG_PLAYERS keys + teams), y reglas. Devuelve JSON `{balon_oro, bota_oro, guante_oro, joven, razonamiento}`. **Fallback determinista** si Haiku falla o devuelve keys inválidas: primer jugador de cada categoría cuyo `team` esté en top4 (o el único GK del pool para guante).
+
+**Pendiente — `update_ia_scorers`**: tras cargar squads reales en `EQUIPOS[].players`, ejecutar action que rellene `predictions.scorer` y `ko_predictions.scorer` del bot (actualmente NULL). Lógica sugerida: por cada partido, si el bot predice gol del home_team, escoger el delantero más probable de su roster (ratio: forwards > mids > defenders); idem away_team. Determinista, sin Anthropic.
+
+**Limitación conocida**: el bot **no usa `boost_picks`** (decisión de producto: el boost es estratégico humano, no algorítmico).
