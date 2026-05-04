@@ -1251,3 +1251,100 @@
   letter-spacing: 0.02em;
   margin-top: 12px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 3 · RANKING LIGA (collapsible, reuses .collap)
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-ranking-share {
+  background: transparent;
+  border: 1px solid var(--ink-700);
+  color: var(--ink-100);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  margin: 0 8px 0 auto;
+}
+
+.pred-ranking-share:hover { background: rgba(255, 255, 255, 0.06); }
+
+.pred-ranking-list { list-style: none; margin: 0; padding: 0; }
+
+.pred-ranking-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto 28px;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink-700);
+  align-items: center;
+}
+
+.pred-ranking-row:last-child { border-bottom: 0; }
+
+.pred-ranking-row--me {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.02));
+}
+
+.pred-ranking-pos { font-weight: 700; font-size: 13px; color: var(--ink-100); }
+.pred-ranking-name { font-size: 13px; color: var(--ink-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pred-ranking-pts { font-size: 13px; font-weight: 700; color: var(--fifa-gold); }
+.pred-ranking-trend { font-size: 12px; color: var(--ink-400); text-align: center; }
+
+.pred-ranking__empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 4 · DESTACADOS DE TU LIGA (static list)
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-destacados {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+
+.pred-destacados__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-400);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.pred-destacados__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pred-destacados__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-100);
+}
+
+.pred-destacados__icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
+.pred-destacados__text { color: var(--ink-100); word-break: break-word; }
+
+.pred-destacados__skeleton {
+  height: 14px;
+  background: var(--ink-700);
+  border-radius: 4px;
+  opacity: 0.5;
+}
