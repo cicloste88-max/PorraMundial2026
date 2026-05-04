@@ -188,6 +188,15 @@ serve(async (req) => {
         return json(await handleComputeMatch(supa, body), 200, corsH);
       }
 
+      // ── F7.7-IA C2: Bot IA Zayu ───────────────────────────────────────
+      case "seed_ia_user":
+        await requireAdminOrCron(req, supa);
+        return json(await handleSeedIaUser(supa), 200, corsH);
+
+      case "seed_ia_user_predictions":
+        await requireAdminOrCron(req, supa);
+        return json(await handleSeedIaUserPredictions(supa, body), 200, corsH);
+
       default:
         return errJson("unknown_action", 400, origin);
     }
@@ -1109,4 +1118,610 @@ async function handleComputeMatch(supa: any, body: any) {
     snapshot_id,
     cached: false,
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// F7.7-IA C2 — Bot IA Zayu
+// ════════════════════════════════════════════════════════════════════════════
+// Diseño: el bot es un usuario auth normal (is_bot=true en profiles). Sus filas
+// en predictions/ko_predictions/award_picks son indistinguibles de las de un
+// humano. Trigger DB replicate_bot_on_new_league copia desde la liga "source"
+// (1ª en joined_at) cuando se crea una liga nueva. Esta EF cubre dos acciones:
+//
+//   1. seed_ia_user             → crea el bot (auth + profile + Biwenger member)
+//   2. seed_ia_user_predictions → genera 72 group preds + 32 KO + 4 awards
+//                                 SOLO para la liga indicada (source = Biwenger).
+//
+// Llamadas a Anthropic API: 4 web_search + 1 razonamiento integrador (5 total).
+// ════════════════════════════════════════════════════════════════════════════
+
+const BOT_EMAIL = "ia-bot@porramundial2026.local";
+const BOT_DISPLAY_NAME = "IA Zayu";
+const BIWENGER_LEAGUE_ID = "8017e591-7996-4fe5-852b-bd66be49f17c";
+
+// ISO3 → nombre español (debe coincidir con EQUIPOS[].name en public/js/data.js).
+const ISO3_TO_NAME_ES: Record<string, string> = {
+  ALG: "Argelia", ARG: "Argentina", AUS: "Australia", AUT: "Austria",
+  BEL: "Bélgica", BIH: "Bosnia y Herzegovina", BRA: "Brasil", CAN: "Canadá",
+  CIV: "Costa de Marfil", COD: "RD Congo", COL: "Colombia", CPV: "Cabo Verde",
+  CRO: "Croacia", CUW: "Curazao", CZE: "República Checa", ECU: "Ecuador",
+  EGY: "Egipto", ENG: "Inglaterra", ESP: "España", FRA: "Francia",
+  GER: "Alemania", GHA: "Ghana", HAI: "Haití", IRN: "RI de Irán",
+  IRQ: "Irak", JOR: "Jordania", JPN: "Japón", KOR: "República de Corea",
+  KSA: "Arabia Saudí", MAR: "Marruecos", MEX: "México", NED: "Países Bajos",
+  NOR: "Noruega", NZL: "Nueva Zelanda", PAN: "Panamá", PAR: "Paraguay",
+  POR: "Portugal", QAT: "Catar", RSA: "Sudáfrica", SCO: "Escocia",
+  SEN: "Senegal", SUI: "Suiza", SWE: "Suecia", TUN: "Túnez",
+  TUR: "Turquía", URU: "Uruguay", USA: "Estados Unidos", UZB: "Uzbekistán",
+};
+
+// Grupos A-L (debe coincidir con GRUPOS en public/js/data.js).
+const GROUP_TO_ISO3: Record<string, string[]> = {
+  A: ["MEX", "RSA", "KOR", "CZE"], B: ["CAN", "BIH", "QAT", "SUI"],
+  C: ["BRA", "MAR", "HAI", "SCO"], D: ["USA", "PAR", "AUS", "TUR"],
+  E: ["GER", "CUW", "CIV", "ECU"], F: ["NED", "JPN", "SWE", "TUN"],
+  G: ["BEL", "EGY", "IRN", "NZL"], H: ["ESP", "CPV", "KSA", "URU"],
+  I: ["FRA", "SEN", "IRQ", "NOR"], J: ["ARG", "ALG", "AUT", "JOR"],
+  K: ["POR", "COD", "UZB", "COL"], L: ["ENG", "CRO", "GHA", "PAN"],
+};
+
+const ISO3_TO_GROUP: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const [letra, list] of Object.entries(GROUP_TO_ISO3)) {
+    for (const iso of list) m[iso] = letra;
+  }
+  return m;
+})();
+
+// Bracket KO — debe coincidir con BRACKET en public/js/ko.js.
+type KOMatch = { id: number; home: string; away: string };
+const BRACKET_KO_ROUNDS: Array<{ round: string; matches: KOMatch[] }> = [
+  { round: "r32", matches: [
+    { id: 73, home: "2A", away: "2B" }, { id: 74, home: "1E", away: "T_ABCDF" },
+    { id: 75, home: "1F", away: "2C" }, { id: 76, home: "1C", away: "2F" },
+    { id: 77, home: "1I", away: "T_CDFGH" }, { id: 78, home: "2E", away: "2I" },
+    { id: 79, home: "1A", away: "T_CEFHI" }, { id: 80, home: "1L", away: "T_EHIJK" },
+    { id: 81, home: "1D", away: "T_BEFIJ" }, { id: 82, home: "1G", away: "T_AEHIJ" },
+    { id: 83, home: "2K", away: "2L" }, { id: 84, home: "1H", away: "2J" },
+    { id: 85, home: "1B", away: "T_EFGIJ" }, { id: 86, home: "1J", away: "2H" },
+    { id: 87, home: "1K", away: "T_DEIJL" }, { id: 88, home: "2D", away: "2G" },
+  ]},
+  { round: "r16", matches: [
+    { id: 89, home: "W74", away: "W77" }, { id: 90, home: "W73", away: "W75" },
+    { id: 91, home: "W76", away: "W78" }, { id: 92, home: "W79", away: "W80" },
+    { id: 93, home: "W83", away: "W84" }, { id: 94, home: "W81", away: "W82" },
+    { id: 95, home: "W86", away: "W88" }, { id: 96, home: "W85", away: "W87" },
+  ]},
+  { round: "qf", matches: [
+    { id: 97, home: "W89", away: "W90" }, { id: 98, home: "W93", away: "W94" },
+    { id: 99, home: "W91", away: "W92" }, { id: 100, home: "W95", away: "W96" },
+  ]},
+  { round: "sf", matches: [
+    { id: 101, home: "W97", away: "W98" }, { id: 102, home: "W99", away: "W100" },
+  ]},
+  { round: "third", matches: [{ id: 103, home: "L101", away: "L102" }] },
+  { round: "final", matches: [{ id: 104, home: "W101", away: "W102" }] },
+];
+
+// Slots T_* asignados en el orden declarado a los 8 mejores 3os (matches ko.js).
+const THIRD_SLOT_ORDER = [
+  "T_ABCDF", "T_CDFGH", "T_CEFHI", "T_EHIJK",
+  "T_BEFIJ", "T_AEHIJ", "T_EFGIJ", "T_DEIJL",
+];
+
+// Roster awards — sincronizado con AW_PLAYERS en public/js/scoring.js.
+const AW_PLAYERS_LIST = [
+  { key: "Messi", name: "Leo Messi", team: "Argentina", role: "fw" },
+  { key: "Alvarez", name: "Julián Álvarez", team: "Argentina", role: "fw" },
+  { key: "Dibu", name: "E. Martínez", team: "Argentina", role: "gk" },
+  { key: "Mbappe", name: "Kylian Mbappé", team: "Francia", role: "fw" },
+  { key: "Yamal", name: "Lamine Yamal", team: "España", role: "fw" },
+  { key: "Nico", name: "Nico Williams", team: "España", role: "fw" },
+  { key: "Morata", name: "Álvaro Morata", team: "España", role: "fw" },
+  { key: "Rodri", name: "Rodri", team: "España", role: "mf" },
+  { key: "Bellingham", name: "Jude Bellingham", team: "Inglaterra", role: "mf" },
+  { key: "Kane", name: "Harry Kane", team: "Inglaterra", role: "fw" },
+  { key: "Saka", name: "Bukayo Saka", team: "Inglaterra", role: "fw" },
+  { key: "Vinicius", name: "Vinícius Jr.", team: "Brasil", role: "fw" },
+  { key: "Endrick", name: "Endrick", team: "Brasil", role: "fw" },
+  { key: "Ronaldo", name: "C. Ronaldo", team: "Portugal", role: "fw" },
+  { key: "Bruno", name: "Bruno Fernandes", team: "Portugal", role: "mf" },
+  { key: "Musiala", name: "Jamal Musiala", team: "Alemania", role: "mf" },
+  { key: "Wirtz", name: "Florian Wirtz", team: "Alemania", role: "mf" },
+  { key: "VanDijk", name: "Virgil van Dijk", team: "Países Bajos", role: "df" },
+  { key: "Nunez", name: "Darwin Núñez", team: "Uruguay", role: "fw" },
+  { key: "Modric", name: "Luka Modrić", team: "Croacia", role: "mf" },
+  { key: "DeBruyne", name: "Kevin De Bruyne", team: "Bélgica", role: "mf" },
+  { key: "Haaland", name: "Erling Haaland", team: "Noruega", role: "fw" },
+];
+
+const YOUNG_PLAYERS_LIST = [
+  { key: "Lamine_Yamal", name: "Lamine Yamal", team: "España" },
+  { key: "Estevao", name: "Estevao", team: "Brasil" },
+  { key: "Pau_Cubarsi", name: "Pau Cubarsí", team: "España" },
+  { key: "Franco_Mastantuono", name: "Franco Mastantuono", team: "Argentina" },
+  { key: "Lennart_Karl", name: "Lennart Karl", team: "Alemania" },
+  { key: "Max_Dowman", name: "Max Dowman", team: "Inglaterra" },
+  { key: "Luka_Vuskovic", name: "Luka Vuskovic", team: "Croacia" },
+  { key: "Ayyoub_Bouaddi", name: "Ayyoub Bouaddi", team: "Marruecos" },
+  { key: "Geovany_Quenda", name: "Geovany Quenda", team: "Portugal" },
+  { key: "Ethan_Nwaneri", name: "Ethan Nwaneri", team: "Inglaterra" },
+  { key: "Rodrigo_Mora", name: "Rodrigo Mora", team: "Portugal" },
+  { key: "Ibrahim_Mbaye", name: "Ibrahim Mbaye", team: "Senegal" },
+  { key: "Konstantinos_Karetsas", name: "Konstantinos Karetsas", team: "Bélgica" },
+  { key: "Rio_Ngumoha", name: "Rio Ngumoha", team: "Inglaterra" },
+  { key: "Gilberto_Mora", name: "Gilberto Mora", team: "México" },
+  { key: "Marc_Bernal", name: "Marc Bernal", team: "España" },
+  { key: "Dro_Fernandez", name: "Dro Fernández", team: "Argentina" },
+  { key: "Mohamed_Kader_Meite", name: "Mohamed Kader Meite", team: "Costa de Marfil" },
+  { key: "Kendry_Paez", name: "Kendry Páez", team: "Ecuador" },
+  { key: "Jorthy_Mokio", name: "Jorthy Mokio", team: "Bélgica" },
+  { key: "Robinio_Vaz", name: "Robinio Vaz", team: "Países Bajos" },
+];
+
+// ──────────────────────────────────────────────────────────────────────────
+// Helpers — derivar marcador de la prediction IA + standings + bracket
+// ──────────────────────────────────────────────────────────────────────────
+
+// Convierte (sign, p_max) en un marcador concreto plausible. Determinista.
+function deriveScoreFromPrediction(
+  sign: "1" | "X" | "2",
+  pMax: number,
+): [number, number] {
+  if (sign === "X") return [1, 1];
+  if (sign === "1") {
+    if (pMax >= 0.7) return [2, 0];
+    if (pMax >= 0.55) return [2, 1];
+    return [1, 0];
+  }
+  if (pMax >= 0.7) return [0, 2];
+  if (pMax >= 0.55) return [1, 2];
+  return [0, 1];
+}
+
+type GroupStat = {
+  name: string;
+  pj: number;
+  g: number;
+  e: number;
+  p: number;
+  gf: number;
+  gc: number;
+  pts: number;
+  gd: number;
+};
+
+// Replica calcGroupTableAdvanced(letra) de public/js/scoring.js.
+// Toma un grupo + map de predicciones (key=`${group}_${home}_${away}`) y
+// devuelve standings ordenadas pts → gd → gf.
+function calcGroupStandings(
+  letra: string,
+  predictions: Record<string, { l: number; v: number }>,
+): GroupStat[] {
+  const teams = GROUP_TO_ISO3[letra].map((iso) => ISO3_TO_NAME_ES[iso]);
+  const stats: GroupStat[] = teams.map((name) => ({
+    name, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0, gd: 0,
+  }));
+  // Iterar todas las parejas dentro del grupo (6 partidos por grupo)
+  for (const home of teams) {
+    for (const away of teams) {
+      if (home === away) continue;
+      const key = `${letra}_${home}_${away}`;
+      const pred = predictions[key];
+      if (!pred) continue;
+      const h = stats.find((s) => s.name === home);
+      const a = stats.find((s) => s.name === away);
+      if (!h || !a) continue;
+      h.pj++; a.pj++;
+      h.gf += pred.l; h.gc += pred.v;
+      a.gf += pred.v; a.gc += pred.l;
+      if (pred.l > pred.v) { h.g++; h.pts += 3; a.p++; }
+      else if (pred.l < pred.v) { a.g++; a.pts += 3; h.p++; }
+      else { h.e++; a.e++; h.pts += 1; a.pts += 1; }
+    }
+  }
+  for (const s of stats) s.gd = s.gf - s.gc;
+  stats.sort((a, b) => (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf));
+  return stats;
+}
+
+// Mejores 8 terceros — mismo orden que getBestThirdsAll() del frontend.
+function getBestThirds(
+  tables: Record<string, GroupStat[]>,
+): string[] {
+  const thirds: Array<GroupStat & { group: string }> = [];
+  for (const [letra, table] of Object.entries(tables)) {
+    if (table[2]) thirds.push({ ...table[2], group: letra });
+  }
+  thirds.sort((a, b) => (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf));
+  return thirds.slice(0, 8).map((t) => t.name);
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// handleSeedIaUser — crea el bot (auth user + profile + Biwenger member)
+// ──────────────────────────────────────────────────────────────────────────
+// deno-lint-ignore no-explicit-any
+async function handleSeedIaUser(supa: any) {
+  const { data: existing } = await supa
+    .from("profiles")
+    .select("id, nombre")
+    .eq("is_bot", true)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) {
+    return { ok: true, bot_id: existing.id, created: false };
+  }
+
+  // Generar password 64 chars hex aleatorios
+  const pwBytes = new Uint8Array(32);
+  crypto.getRandomValues(pwBytes);
+  const password = Array.from(pwBytes)
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const adminRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": serviceRole,
+      "Authorization": `Bearer ${serviceRole}`,
+    },
+    body: JSON.stringify({
+      email: BOT_EMAIL,
+      password,
+      email_confirm: true,
+      user_metadata: { is_bot: true, display_name: BOT_DISPLAY_NAME },
+    }),
+  });
+  if (!adminRes.ok) {
+    const txt = await adminRes.text();
+    throw new Error(`auth_admin_create:${adminRes.status}:${txt.slice(0, 120)}`);
+  }
+  const userJson = await adminRes.json();
+  const botId: string | undefined = userJson?.id || userJson?.user?.id;
+  if (!botId) throw new Error("auth_admin_create:no_id");
+
+  const nowIso = new Date().toISOString();
+  const { error: profErr } = await supa.from("profiles").insert({
+    id: botId,
+    nombre: BOT_DISPLAY_NAME,
+    is_bot: true,
+    is_admin: false,
+    inscrito: true,
+    porra_cerrada: true,
+    cerrada_at: nowIso,
+  });
+  if (profErr) throw new Error(`profile_insert:${profErr.message}`);
+
+  const { error: lmErr } = await supa.from("league_members").insert({
+    league_id: BIWENGER_LEAGUE_ID,
+    user_id: botId,
+    joined_at: nowIso,
+    porra_cerrada: true,
+    cerrada_at: nowIso,
+    groups_saved: {},
+  });
+  if (lmErr) throw new Error(`league_member_insert:${lmErr.message}`);
+
+  return { ok: true, bot_id: botId, created: true };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// handleSeedIaUserPredictions — genera 72 group + 32 KO + 4 awards
+// ──────────────────────────────────────────────────────────────────────────
+// deno-lint-ignore no-explicit-any
+async function handleSeedIaUserPredictions(supa: any, body: any) {
+  const leagueId: string | undefined = body?.league_id;
+  if (!leagueId || typeof leagueId !== "string") throw new Error("bad_input");
+
+  const { data: bot } = await supa
+    .from("profiles").select("id").eq("is_bot", true).limit(1).maybeSingle();
+  if (!bot?.id) throw new Error("not_found:bot");
+  const botId: string = bot.id;
+
+  const { data: member } = await supa
+    .from("league_members").select("league_id")
+    .eq("user_id", botId).eq("league_id", leagueId).maybeSingle();
+  if (!member) throw new Error("forbidden");
+
+  // ── 1) Group predictions desde ia_predictions del snapshot ACTIVE ────
+  const active = await getActiveSnapshot(supa);
+  const { data: iaRows, error: iaErr } = await supa
+    .from("ia_predictions")
+    .select("home_code, away_code, sign, breakdown")
+    .eq("snapshot_id", active.id)
+    .eq("is_ko_ondemand", false);
+  if (iaErr) throw new Error(`ia_predictions_read:${iaErr.message}`);
+  if (!iaRows || iaRows.length === 0) throw new Error("not_found:ia_groups");
+
+  const groupPredictionsMap: Record<string, { l: number; v: number }> = {};
+  const groupRows: Array<{
+    user_id: string; match_id: string; local: number; visitante: number;
+    scorer: null; saved_at: string; league_id: string;
+  }> = [];
+  const nowIso = new Date().toISOString();
+
+  for (const row of iaRows) {
+    const homeIso = row.home_code as string;
+    const awayIso = row.away_code as string;
+    const homeName = ISO3_TO_NAME_ES[homeIso];
+    const awayName = ISO3_TO_NAME_ES[awayIso];
+    const letra = ISO3_TO_GROUP[homeIso];
+    if (!homeName || !awayName || !letra) continue;
+    const sign = row.sign as "1" | "X" | "2";
+    const pMax = (row.breakdown as { p_max?: number })?.p_max ?? 0.5;
+    const [l, v] = deriveScoreFromPrediction(sign, pMax);
+    const matchKey = `${letra}_${homeName}_${awayName}`;
+    groupPredictionsMap[matchKey] = { l, v };
+    groupRows.push({
+      user_id: botId, match_id: matchKey, local: l, visitante: v,
+      scorer: null, saved_at: nowIso, league_id: leagueId,
+    });
+  }
+  if (groupRows.length === 0) throw new Error("not_found:ia_mapped");
+
+  const { error: predErr } = await supa
+    .from("predictions")
+    .upsert(groupRows, { onConflict: "league_id,user_id,match_id" });
+  if (predErr) throw new Error(`predictions_upsert:${predErr.message}`);
+
+  // ── 2) groups_saved = {A:true,...,L:true} ────────────────────────────
+  const groupsSavedFlag: Record<string, boolean> = {};
+  for (const letra of Object.keys(GROUP_TO_ISO3)) groupsSavedFlag[letra] = true;
+  const { error: lmErr } = await supa.from("league_members")
+    .update({ groups_saved: groupsSavedFlag })
+    .eq("league_id", leagueId).eq("user_id", botId);
+  if (lmErr) throw new Error(`league_members_update:${lmErr.message}`);
+
+  // ── 3) Standings → resolvedSlots ─────────────────────────────────────
+  const tables: Record<string, GroupStat[]> = {};
+  for (const letra of Object.keys(GROUP_TO_ISO3)) {
+    tables[letra] = calcGroupStandings(letra, groupPredictionsMap);
+  }
+  const bestThirds = getBestThirds(tables);
+
+  const slots: Record<string, string> = {};
+  for (const [letra, table] of Object.entries(tables)) {
+    if (table[0]) slots["1" + letra] = table[0].name;
+    if (table[1]) slots["2" + letra] = table[1].name;
+    if (table[2]) slots["3" + letra] = table[2].name;
+  }
+  THIRD_SLOT_ORDER.forEach((slot, i) => {
+    if (bestThirds[i]) slots[slot] = bestThirds[i];
+  });
+
+  // ── 4) KO predictions: resolver, predict() de a pares, propagar ──────
+  const cache = await loadCache(supa);
+  const NAME_TO_ISO3: Record<string, string> = {};
+  for (const [iso, name] of Object.entries(ISO3_TO_NAME_ES)) NAME_TO_ISO3[name] = iso;
+
+  const koRows: Array<{
+    user_id: string; match_id: number; local: number; visitante: number;
+    classifier: string | null; scorer: null; saved_at: string; league_id: string;
+  }> = [];
+
+  for (const round of BRACKET_KO_ROUNDS) {
+    for (const m of round.matches) {
+      const homeName = slots[m.home];
+      const awayName = slots[m.away];
+      if (!homeName || !awayName || homeName === awayName) {
+        // Slot sin resolver — no debería pasar si standings están completos
+        continue;
+      }
+      const homeIso = NAME_TO_ISO3[homeName];
+      const awayIso = NAME_TO_ISO3[awayName];
+      if (!homeIso || !awayIso) continue;
+
+      let l: number, v: number, classifier: string | null = null;
+      try {
+        const eloHome = lookupElo(cache, homeIso);
+        const eloAway = lookupElo(cache, awayIso);
+        const h2h = lookupH2H(cache, homeIso, awayIso);
+        const racha = buildRachaData(cache, homeIso, awayIso);
+        const pred = predict(
+          { elo_home: eloHome, elo_away: eloAway, is_host_match: false, home_code: homeIso },
+          h2h,
+          racha,
+        );
+        [l, v] = deriveScoreFromPrediction(pred.sign, pred.p_max);
+        if (l === v) {
+          // Empate en KO — clasifica el de ELO más alto
+          classifier = eloHome >= eloAway ? homeName : awayName;
+        }
+      } catch (_e) {
+        // Fallback: el de ELO más alto gana 1-0 (o 0-0 con classifier al home)
+        l = 1; v = 0;
+      }
+
+      koRows.push({
+        user_id: botId, match_id: m.id, local: l, visitante: v,
+        classifier, scorer: null, saved_at: nowIso, league_id: leagueId,
+      });
+
+      // Propagar W/L slots para próximas rondas
+      let winner: string;
+      let loser: string;
+      if (l > v) { winner = homeName; loser = awayName; }
+      else if (v > l) { winner = awayName; loser = homeName; }
+      else { winner = classifier || homeName; loser = winner === homeName ? awayName : homeName; }
+      slots["W" + m.id] = winner;
+      slots["L" + m.id] = loser;
+    }
+  }
+
+  if (koRows.length > 0) {
+    const { error: koErr } = await supa
+      .from("ko_predictions")
+      .upsert(koRows, { onConflict: "league_id,user_id,match_id" });
+    if (koErr) throw new Error(`ko_predictions_upsert:${koErr.message}`);
+  }
+
+  // ── 5) Awards: 4 web_search + 1 razonamiento Haiku 4.5 ───────────────
+  const champion = slots["W104"] || null;
+  const top4 = [slots["W101"], slots["W102"], slots["W103"], slots["L103"]].filter(Boolean);
+
+  const awards = await pickAwardsViaAnthropic(champion, top4);
+
+  const { error: awErr } = await supa.from("award_picks").upsert({
+    user_id: botId,
+    golden_ball: awards.golden_ball,
+    golden_boot: awards.golden_boot,
+    golden_glove: awards.golden_glove,
+    young_player: awards.young_player,
+    saved_at: nowIso,
+    league_id: leagueId,
+  }, { onConflict: "league_id,user_id" });
+  if (awErr) throw new Error(`award_picks_upsert:${awErr.message}`);
+
+  return {
+    ok: true,
+    bot_id: botId,
+    league_id: leagueId,
+    groups_count: groupRows.length,
+    ko_count: koRows.length,
+    champion,
+    top4,
+    awards,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// pickAwardsViaAnthropic — 4 web_search + 1 razonamiento
+// ──────────────────────────────────────────────────────────────────────────
+async function pickAwardsViaAnthropic(
+  champion: string | null,
+  top4: string[],
+): Promise<{
+  golden_ball: string;
+  golden_boot: string;
+  golden_glove: string;
+  young_player: string;
+  razonamiento: string;
+}> {
+  const apiKey = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
+  // Fallback determinista si Anthropic no disponible o falla
+  const deterministicFallback = () => {
+    const fromTop = (list: typeof AW_PLAYERS_LIST) =>
+      list.find((p) => top4.includes(p.team)) || list[0];
+    const ball = fromTop(AW_PLAYERS_LIST.filter((p) => p.role !== "gk"));
+    const boot = fromTop(AW_PLAYERS_LIST.filter((p) => p.role === "fw"));
+    const glove = AW_PLAYERS_LIST.find((p) => p.role === "gk")!;
+    const young = (YOUNG_PLAYERS_LIST.find((p) => top4.includes(p.team)) || YOUNG_PLAYERS_LIST[0]);
+    return {
+      golden_ball: ball.key, golden_boot: boot.key,
+      golden_glove: glove.key, young_player: young.key,
+      razonamiento: champion
+        ? `Fallback determinista: campeón ${champion}, top4 ${top4.join(", ")}`
+        : "Fallback determinista (sin campeón resuelto)",
+    };
+  };
+  if (!apiKey) return deterministicFallback();
+
+  const queries = [
+    "Mundial 2026 Balón de Oro favoritos jugadores en forma 2026",
+    "Mundial 2026 favoritos máximo goleador Bota de Oro",
+    "Mundial 2026 favoritos mejor portero Guante de Oro",
+    "Mundial 2026 mejor jugador joven sub21 promesa",
+  ];
+  const results: string[] = [];
+  for (const q of queries) {
+    try {
+      const txt = await callAnthropicWebSearch(apiKey, q);
+      results.push(txt);
+    } catch (e) {
+      results.push(`(search_error: ${String((e as Error).message).slice(0, 80)})`);
+    }
+  }
+
+  // Razonamiento integrador
+  const ballPool = AW_PLAYERS_LIST.map((p) => `${p.key}=${p.name} (${p.team}, ${p.role})`).join("; ");
+  const youngPool = YOUNG_PLAYERS_LIST.map((p) => `${p.key}=${p.name} (${p.team})`).join("; ");
+  const prompt = [
+    `Predicción IA Mundial 2026:`,
+    champion ? `- Campeón predicho: ${champion}` : `- Campeón: indefinido`,
+    `- Top4 predicho: ${top4.join(", ") || "indefinido"}`,
+    ``,
+    `Resultados web_search abreviados:`,
+    `1) Balón de Oro: ${results[0].slice(0, 600)}`,
+    `2) Bota de Oro: ${results[1].slice(0, 600)}`,
+    `3) Guante de Oro: ${results[2].slice(0, 600)}`,
+    `4) Joven ≤21: ${results[3].slice(0, 600)}`,
+    ``,
+    `Pool jugadores (balón/bota/guante) — usa SOLO estas keys:`,
+    ballPool,
+    ``,
+    `Pool jóvenes (≤21) — usa SOLO estas keys:`,
+    youngPool,
+    ``,
+    `Reglas:`,
+    `- balon_oro: del campeón si posible (key del pool de jugadores)`,
+    `- bota_oro: rol fw, independiente del campeón`,
+    `- guante_oro: rol gk del top4 si hay; sino el único gk del pool (Dibu)`,
+    `- joven: ≤21 años, preferentemente del top4`,
+    ``,
+    `Devuelve SOLO JSON: {"balon_oro":"<key>","bota_oro":"<key>","guante_oro":"<key>","joven":"<key>","razonamiento":"<1-2 frases>"}`,
+  ].join("\n");
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 600,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`http_${res.status}`);
+    const data = await res.json();
+    const text = (data?.content || [])
+      .filter((b: { type: string }) => b.type === "text")
+      .map((b: { text: string }) => b.text).join("\n");
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no_json");
+    const parsed = JSON.parse(jsonMatch[0]);
+    const ballKeys = new Set(AW_PLAYERS_LIST.map((p) => p.key));
+    const youngKeys = new Set(YOUNG_PLAYERS_LIST.map((p) => p.key));
+    const validate = (key: string, set: Set<string>, fallback: string) =>
+      set.has(key) ? key : fallback;
+    const fb = deterministicFallback();
+    return {
+      golden_ball: validate(parsed.balon_oro, ballKeys, fb.golden_ball),
+      golden_boot: validate(parsed.bota_oro, ballKeys, fb.golden_boot),
+      golden_glove: validate(parsed.guante_oro, ballKeys, fb.golden_glove),
+      young_player: validate(parsed.joven, youngKeys, fb.young_player),
+      razonamiento: typeof parsed.razonamiento === "string"
+        ? parsed.razonamiento.slice(0, 400) : fb.razonamiento,
+    };
+  } catch (_e) {
+    return deterministicFallback();
+  }
+}
+
+async function callAnthropicWebSearch(apiKey: string, query: string): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content: query }],
+    }),
+  });
+  if (!res.ok) throw new Error(`http_${res.status}`);
+  const data = await res.json();
+  return (data?.content || [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text).join("\n");
 }
