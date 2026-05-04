@@ -14,6 +14,11 @@
   --fc-accent-2: #4b7fe8;
   --fc-live:     #ef4444;
 
+  /* Bottom-tab restyling (Sprint A · Group 5) */
+  --fc-tab-inactive:    #9aa0a6;
+  --fc-tab-bar-bg:      #16161a;
+  --fc-tab-top-border:  #2a2a2e;
+
   /* Layout */
   --fc-tab-h:     56px;
   --fc-header-h:  52px;

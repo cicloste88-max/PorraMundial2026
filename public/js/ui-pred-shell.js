@@ -208,34 +208,6 @@
     var days = Math.max(0, Number(state.daysToKickoff || 0));
     var daysLabel = days <= 0 ? 'Mañana arranca' : ('Faltan ' + days + (days === 1 ? ' día' : ' días'));
 
-    var gruposUser = Number(state.predicted || 0);
-    var koUser = Number(state.koPredicted || 0);
-    var doneAll = gruposUser + koUser;
-    var pendingAll = Math.max(0, TOTAL_MATCHES - doneAll);
-
-    // Chip Liga (gold-ghost). Lee state.league.position con fallback a .rank.
-    var league = state.league || {};
-    var leaguePos = Number(league.position || league.rank || 0);
-    var leagueTotal = Number(league.total || 0);
-    var ligaChipHtml;
-    if (leagueTotal > 0) {
-      ligaChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">' +
-        leaguePos + 'º de ' + leagueTotal + ' · Liga</span>';
-    } else {
-      ligaChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--liga">Líder · Liga</span>';
-    }
-
-    // Chip Global (neutro). Lee state.global.position con fallback a .rank.
-    var glob = state.global || {};
-    var globalPos = Number(glob.position || glob.rank || 0);
-    var globalChipHtml;
-    if (globalPos > 0) {
-      globalChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--global">' +
-        globalPos + 'º · Global</span>';
-    } else {
-      globalChipHtml = '<span class="fc-pred-tile__chip fc-pred-tile__chip--global">— · Global</span>';
-    }
-
     // Rank row (eyebrow + nombre + frase). Pre-Mundial todos a 0 pts → "Chupetín".
     var pts = Number(state.totalPts || state.pts || 0);
     var rank = { name: '—', phrase: '' };
@@ -261,32 +233,15 @@
 
     var watermark = _buildWatermark();
 
-    var footer =
-      '<button type="button" class="fc-pred-tile__footer" aria-label="Ir a partidos pendientes">' +
-        '<span class="fc-pred-tile__footer-flame" aria-hidden="true">🔥</span>' +
-        '<span class="fc-pred-tile__footer-text">Te quedan ' + pendingAll +
-          (pendingAll === 1 ? ' partido' : ' partidos') + ' por pronosticar</span>' +
-        _buildChevron() +
-      '</button>';
-
     return '' +
       '<div class="fc-pred-tile__body">' +
         watermark +
-        '<div class="fc-pred-tile__rank-stack">' +
-          ligaChipHtml +
-          globalChipHtml +
-        '</div>' +
-        '<div class="fc-pred-tile__row fc-pred-tile__row--top">' +
-          '<div class="fc-pred-tile__eyebrow">11 JUN – 19 JUL</div>' +
-        '</div>' +
         '<div class="fc-pred-tile__hero">' +
-          '<span class="fc-pred-tile__hero-emoji" aria-hidden="true">🏆</span>' +
           '<div class="fc-pred-tile__hero-text">' + _esc(daysLabel) + '</div>' +
         '</div>' +
         rankRowHtml +
         timelineHtml +
-      '</div>' +
-      footer;
+      '</div>';
   }
 
   function _renderTileActive(state) {
@@ -582,7 +537,7 @@
     if (!mount) return;
 
     if (!state || state.mode === 'pre-mundial' || !state.matches || state.matches.length === 0) {
-      mount.innerHTML = '<div class="fc-pred-list__empty"><span>No hay partidos en esta vista.</span></div>';
+      mount.innerHTML = '';
       return;
     }
 
@@ -1046,6 +1001,94 @@
     return st;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // [Sprint A · Group 5] Share CTAs + Web Share API handlers
+  // ─────────────────────────────────────────────────────────────
+  function _predToast(msg) {
+    var t = document.getElementById('pred-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'pred-toast';
+      t.className = 'pred-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._predToastTimer);
+    window._predToastTimer = setTimeout(function () {
+      t.classList.remove('show');
+    }, 1800);
+  }
+
+  function _shareOrCopy(payload) {
+    if (navigator.share) {
+      try {
+        var p = navigator.share(payload);
+        if (p && typeof p.then === 'function') {
+          p.catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            _fallbackClipboard(payload);
+          });
+          return;
+        }
+      } catch (err) { /* fall through */ }
+    }
+    _fallbackClipboard(payload);
+  }
+
+  function _fallbackClipboard(payload) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText((payload.text || '') + ' ' + (payload.url || ''))
+        .then(function () { _predToast('Copiado'); })
+        .catch(function () { _predToast('No se pudo copiar'); });
+    } else {
+      _predToast('No se pudo copiar');
+    }
+  }
+
+  window.sharePorra = function () {
+    var league = window._activeLeague || {};
+    var summary = 'Mi porra para Mundial 2026';
+    if (window._awPicks && window._awPicks.champion) {
+      summary = 'Mi pick: Campeón ' + window._awPicks.champion;
+      if (window._awPicks.golden_boot) summary += ' · Pichichi ' + window._awPicks.golden_boot;
+    }
+    _shareOrCopy({
+      title: 'Mi porra Mundial 2026',
+      text: summary + (league.nombre ? ' · Liga ' + league.nombre : ''),
+      url: window.location.href
+    });
+  };
+
+  window.shareRanking = function () {
+    var rows = window._leagueRanking || [];
+    var top5 = rows.slice(0, 5).map(function (r, i) {
+      return (i + 1) + '. ' + (r.nombre || '?') + ' (' + (r.points || 0) + ' pts)';
+    }).join('\n');
+    var league = window._activeLeague || {};
+    _shareOrCopy({
+      title: 'Ranking ' + (league.nombre || 'Porra Mundial 2026'),
+      text: 'Top 5:\n' + (top5 || 'sin datos aún'),
+      url: window.location.href
+    });
+  };
+
+  function _renderShareCtas(state) {
+    var mount = document.getElementById('fc-pred-share');
+    if (!mount) return;
+    mount.innerHTML =
+      '<div class="pred-share">' +
+        '<button class="pred-share__btn pred-share__btn--primary" type="button" onclick="window.sharePorra()">' +
+          '<span class="pred-share__icon">📤</span>' +
+          '<span>Compartir mi porra</span>' +
+        '</button>' +
+        '<button class="pred-share__btn pred-share__btn--secondary" type="button" onclick="window.shareRanking()">' +
+          '<span class="pred-share__icon">📊</span>' +
+          '<span>Ranking</span>' +
+        '</button>' +
+      '</div>';
+  }
+
   function mountPredShell() {
     if (!document.getElementById('page-predictor')) return;
     // Render inicial inmediato con datos cacheados (o fallback).
@@ -1055,6 +1098,7 @@
     _renderStats(st);
     _renderFilters(st);
     _renderList(st);
+    _renderShareCtas(st);
 
     // B10-traceability: kickoff async para llenar window._predictorRanking
     // (chips Liga + Global con datos reales). Tras resolver, re-render

@@ -8,8 +8,8 @@
   left: 0;
   right: 0;
   height: calc(var(--fc-tab-h) + var(--fc-safe-bottom));
-  background: var(--fc-surface);
-  border-top: 1px solid var(--fc-border);
+  background: var(--fc-tab-bar-bg);
+  border-top: 1px solid var(--fc-tab-top-border);
   display: none; /* activado por body.fc-shell-active en F7.4-B */
   align-items: flex-start;
   justify-content: space-around;
@@ -32,7 +32,7 @@
   cursor: pointer;
   border: none;
   background: transparent;
-  color: var(--fc-text-secondary);
+  color: var(--fc-tab-inactive);
   -webkit-tap-highlight-color: transparent;
   transition: color var(--fc-transition);
 }
@@ -54,6 +54,10 @@
 .fc-tabbar__icon svg {
   width: 100%;
   height: 100%;
+}
+
+.fc-tabbar__item.fc-tabbar__item--active .fc-tabbar__icon {
+  filter: drop-shadow(0 0 6px var(--fc-accent));
 }
 
 .fc-tabbar__label {
