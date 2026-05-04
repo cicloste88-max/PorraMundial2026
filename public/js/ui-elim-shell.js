@@ -15,13 +15,14 @@
   // ESTADO
   // ─────────────────────────────────────────────────────────────
   var _state = {
-    active: 'ko16',          // paso seleccionado del stepper (no 'grupos')
-    expandedPhase: null,     // phase key expandida en la lista (null = ninguna)
-    activeAction: 'cuadro'   // 'cuadro' (bracket+stepper visible) | 'premios' (awards-box4)
+    active: 'ko16',                  // paso seleccionado del stepper (no 'grupos')
+    expandedPhase: null,             // phase key expandida en la lista (null = ninguna)
+    activeAction: 'mis-pronosticos'  // 'mis-pronosticos' (default) | 'cuadro' (bracket oficial) | 'premios' (awards)
   };
 
-  // Placeholder para restaurar awards-box4 a su parent original al volver de 'premios'.
-  var _awardsPlaceholder = null;
+  // Placeholders para restaurar awards-box4 / brk-root a su parent original al volver al default.
+  var _awardsPlaceholder  = null;
+  var _bracketPlaceholder = null;
 
   var _PHASES = [
     { key: 'grupos', label: 'Grupos', total: 72 },
@@ -113,10 +114,9 @@
       ? '<span class="fc-elim-header__admin-badge">ADMIN</span>'
       : '';
 
-    var cuadroActiveClass = state.activeAction === 'cuadro' ? ' is-active' : '';
+    var misActiveClass     = state.activeAction === 'mis-pronosticos' ? ' is-active' : '';
+    var cuadroActiveClass  = state.activeAction === 'cuadro' ? ' is-active' : '';
     var premiosActiveClass = state.activeAction === 'premios' ? ' is-active' : '';
-    var cuadroDisabled = !state.onCuadro ? ' style="cursor:not-allowed;opacity:.5"' : '';
-    var premiosDisabled = !state.onPremios ? ' style="cursor:not-allowed;opacity:.5"' : '';
 
     var sub = (typeof escapeHtml === 'function')
       ? escapeHtml(state.subtitle || '')
@@ -131,8 +131,9 @@
         '</div>' +
       '</div>' +
       '<div class="fc-elim-header__actions">' +
-        '<button class="fc-elim-header__action fc-elim-header__action--cuadro' + cuadroActiveClass + '" type="button"' + cuadroDisabled + '>Cuadro oficial</button>' +
-        '<button class="fc-elim-header__action fc-elim-header__action--premios' + premiosActiveClass + '" type="button"' + premiosDisabled + '>Premios</button>' +
+        '<button class="fc-elim-header__action fc-elim-header__action--mis' + misActiveClass + '" type="button">Mis pronósticos</button>' +
+        '<button class="fc-elim-header__action fc-elim-header__action--cuadro' + cuadroActiveClass + '" type="button">Cuadro oficial</button>' +
+        '<button class="fc-elim-header__action fc-elim-header__action--premios' + premiosActiveClass + '" type="button">Premios</button>' +
       '</div>' +
       '<div class="fc-elim-header__points">' +
         'Puntos: <strong>' + Math.floor(state.points || 0) + '</strong>' +
@@ -142,6 +143,10 @@
     var backBtn = mount.querySelector('.fc-elim-header__back');
     if (backBtn) backBtn.addEventListener('click', function () { showPage('welcome'); });
 
+    if (state.onMis) {
+      var misBtn = mount.querySelector('.fc-elim-header__action--mis');
+      if (misBtn) misBtn.addEventListener('click', state.onMis);
+    }
     if (state.onCuadro) {
       var cuadroBtn = mount.querySelector('.fc-elim-header__action--cuadro');
       if (cuadroBtn) cuadroBtn.addEventListener('click', state.onCuadro);
@@ -504,46 +509,120 @@
   // ENTRY
   // ─────────────────────────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────
-  // ACTION VIEW — toggle Cuadro oficial ↔ Premios
-  // Mueve awards-box4 entre su parent original (#view-cinematic >
-  // .final-section > .final-row2) y #fc-elim-awards-pane usando un
-  // placeholder para poder restaurarlo en su sitio.
+  // ACTION VIEW — 3 estados:
+  //   'mis-pronosticos' → stepper + list + dice (default)
+  //   'cuadro'          → bracket oficial real (bracket-results.js en
+  //                       #fc-elim-bracket-pane, banner pre-torneo si
+  //                       hoy < 11-jun-2026)
+  //   'premios'         → awards-box4 (en #fc-elim-awards-pane)
+  // Awards y brk-root se mueven con placeholders Comment para poder
+  // restaurarlos a su parent original al volver al default.
   // ─────────────────────────────────────────────────────────────
-  function _applyActionView() {
-    var stepper = document.getElementById('fc-elim-stepper');
-    var list    = document.getElementById('fc-elim-list');
-    var dice    = document.getElementById('fc-elim-dice-banner');
-    var pane    = document.getElementById('fc-elim-awards-pane');
-    var box     = document.getElementById('awards-box4');
+  function _restoreAwardsBox() {
+    var box = document.getElementById('awards-box4');
+    if (box && _awardsPlaceholder && _awardsPlaceholder.parentNode &&
+        box.parentNode && box.parentNode.id === 'fc-elim-awards-pane') {
+      _awardsPlaceholder.parentNode.insertBefore(box, _awardsPlaceholder);
+      _awardsPlaceholder.parentNode.removeChild(_awardsPlaceholder);
+      _awardsPlaceholder = null;
+    }
+  }
 
-    if (_state.activeAction === 'premios') {
-      if (stepper) stepper.style.display = 'none';
-      if (list)    list.style.display    = 'none';
-      if (dice)    dice.style.display    = 'none';
-      if (pane) {
-        pane.style.display = 'block';
-        if (box && box.parentNode !== pane) {
+  function _restoreBrkRoot() {
+    var root = document.getElementById('brk-root');
+    if (root && _bracketPlaceholder && _bracketPlaceholder.parentNode &&
+        root.parentNode && root.parentNode.id === 'fc-elim-bracket-pane') {
+      _bracketPlaceholder.parentNode.insertBefore(root, _bracketPlaceholder);
+      _bracketPlaceholder.parentNode.removeChild(_bracketPlaceholder);
+      _bracketPlaceholder = null;
+    }
+  }
+
+  function _isPreTournament() {
+    // Mundial 2026 arranca 11 jun 2026. Banner activo hasta esa fecha.
+    return Date.now() < new Date('2026-06-11T00:00:00Z').getTime();
+  }
+
+  function _renderBracketBanner(pane) {
+    // Banner pre-torneo dentro del bracket pane. Se inserta antes de #brk-root.
+    if (!pane) return;
+    var existing = pane.querySelector('.fc-elim-bracket-banner');
+    if (_isPreTournament()) {
+      if (!existing) {
+        var banner = document.createElement('div');
+        banner.className = 'fc-elim-bracket-banner';
+        banner.style.cssText = 'margin:12px 16px 16px;padding:14px 16px;border-radius:12px;background:#10151f;border:1px solid #1e2738;color:#9ca3af;font-size:13px;line-height:1.5';
+        banner.innerHTML = '<strong style="color:#fbbf24">El cuadro oficial se actualizará cuando comience el Mundial</strong><br>' +
+                           'Inicio: 11 junio 2026 · Pre-torneo, los partidos aparecen como <em>Por definir</em>.';
+        pane.insertBefore(banner, pane.firstChild);
+      }
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  function _applyActionView() {
+    var stepper     = document.getElementById('fc-elim-stepper');
+    var list        = document.getElementById('fc-elim-list');
+    var dice        = document.getElementById('fc-elim-dice-banner');
+    var awardsPane  = document.getElementById('fc-elim-awards-pane');
+    var bracketPane = document.getElementById('fc-elim-bracket-pane');
+    var awardsBox   = document.getElementById('awards-box4');
+    var brkRoot     = document.getElementById('brk-root');
+
+    var action = _state.activeAction;
+
+    // Default visibility para stepper/list/dice
+    var showDefault = (action === 'mis-pronosticos');
+    if (stepper) stepper.style.display = showDefault ? '' : 'none';
+    if (list)    list.style.display    = showDefault ? '' : 'none';
+    if (dice)    dice.style.display    = showDefault ? '' : 'none';
+
+    // ── PREMIOS ──
+    if (action === 'premios') {
+      _restoreBrkRoot();
+      if (bracketPane) bracketPane.style.display = 'none';
+      if (awardsPane) {
+        awardsPane.style.display = 'block';
+        if (awardsBox && awardsBox.parentNode !== awardsPane) {
           if (!_awardsPlaceholder) {
             _awardsPlaceholder = document.createComment('awards-box4-placeholder');
           }
-          box.parentNode.insertBefore(_awardsPlaceholder, box);
-          pane.appendChild(box);
-        } else if (!box) {
-          pane.innerHTML = '<div style="padding:32px 16px;text-align:center;color:#9ca3af;font-size:13px">Completa la fase de grupos para desbloquear los premios.</div>';
+          awardsBox.parentNode.insertBefore(_awardsPlaceholder, awardsBox);
+          awardsPane.appendChild(awardsBox);
+        } else if (!awardsBox) {
+          awardsPane.innerHTML = '<div style="padding:32px 16px;text-align:center;color:#9ca3af;font-size:13px">Completa la fase de grupos para desbloquear los premios.</div>';
         }
       }
-    } else {
-      // Restaurar awards-box4 a su sitio original si lo movimos.
-      if (box && pane && box.parentNode === pane && _awardsPlaceholder && _awardsPlaceholder.parentNode) {
-        _awardsPlaceholder.parentNode.insertBefore(box, _awardsPlaceholder);
-        _awardsPlaceholder.parentNode.removeChild(_awardsPlaceholder);
-        _awardsPlaceholder = null;
-      }
-      if (pane) { pane.style.display = 'none'; pane.innerHTML = ''; }
-      if (stepper) stepper.style.display = '';
-      if (list)    list.style.display    = '';
-      if (dice)    dice.style.display    = '';
+      return;
     }
+
+    // ── CUADRO OFICIAL ──
+    if (action === 'cuadro') {
+      _restoreAwardsBox();
+      if (awardsPane) { awardsPane.style.display = 'none'; awardsPane.innerHTML = ''; }
+      if (bracketPane) {
+        bracketPane.style.display = 'block';
+        if (brkRoot && brkRoot.parentNode !== bracketPane) {
+          if (!_bracketPlaceholder) {
+            _bracketPlaceholder = document.createComment('brk-root-placeholder');
+          }
+          brkRoot.parentNode.insertBefore(_bracketPlaceholder, brkRoot);
+          bracketPane.appendChild(brkRoot);
+        }
+        if (typeof window.initBracketResults === 'function') {
+          try { window.initBracketResults(); } catch (e) { console.warn('[ui-elim-shell] initBracketResults error:', e); }
+        }
+        _renderBracketBanner(bracketPane);
+      }
+      return;
+    }
+
+    // ── MIS PRONÓSTICOS (default) ──
+    _restoreAwardsBox();
+    _restoreBrkRoot();
+    if (awardsPane)  { awardsPane.style.display  = 'none'; awardsPane.innerHTML = ''; }
+    if (bracketPane) { bracketPane.style.display = 'none'; }
   }
 
   function renderElimShell() {
@@ -553,6 +632,11 @@
       points: _totalPoints(),
       subtitle: _getSubtitle(),
       activeAction: _state.activeAction,
+      onMis: function () {
+        if (_state.activeAction === 'mis-pronosticos') return;
+        _state.activeAction = 'mis-pronosticos';
+        renderElimShell();
+      },
       onCuadro: function () {
         if (_state.activeAction === 'cuadro') return;
         _state.activeAction = 'cuadro';
@@ -573,8 +657,8 @@
         // Stepper key → row key (final stepper expande row 'final';
         // 'third' solo accesible vía click directo en su fila).
         _state.expandedPhase = key;
-        // Si el usuario interactúa con el stepper, asumimos que quiere ver el cuadro.
-        _state.activeAction = 'cuadro';
+        // Si el usuario interactúa con el stepper, está navegando sus pronósticos.
+        _state.activeAction = 'mis-pronosticos';
         renderElimShell();
       }
     });
