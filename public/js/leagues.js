@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 let _activeLeague = null;   // liga activa en esta sesión
 let _myLeagues    = [];     // ligas a las que pertenece el usuario
+let _loadInFlight = null;   // dedup de llamadas concurrentes a leagueLoadMyLeagues
 
 function getActiveLeague()   { return _activeLeague; }
 function getActiveLeagueId() { return _activeLeague?.id ?? null; }
@@ -21,33 +22,40 @@ function getActiveLeagueId() { return _activeLeague?.id ?? null; }
 // ─────────────────────────────────────────────────────────────
 async function leagueLoadMyLeagues() {
   if (!currentUser) return [];
+  // Dedup: si hay una carga en curso, esperar a la misma promesa.
+  // Evita doble query cuando showPage('welcome') se dispara dos veces
+  // próximas en el tiempo (runAuthInit + INITIAL_SESSION).
+  if (_loadInFlight) return _loadInFlight;
+  _loadInFlight = (async () => {
+    // Paso 1: obtener los IDs de liga y estado porra_cerrada
+    const { data: members, error: mErr } = await db
+      .from('league_members')
+      .select('league_id, porra_cerrada')
+      .eq('user_id', currentUser.id);
 
-  // Paso 1: obtener los IDs de liga y estado porra_cerrada
-  const { data: members, error: mErr } = await db
-    .from('league_members')
-    .select('league_id, porra_cerrada')
-    .eq('user_id', currentUser.id);
+    if (mErr) { console.warn('[leagues] Error leyendo membresías:', mErr.message); return []; }
+    if (!members || members.length === 0) { _myLeagues = []; return []; }
 
-  if (mErr) { console.warn('[leagues] Error leyendo membresías:', mErr.message); return []; }
-  if (!members || members.length === 0) { _myLeagues = []; return []; }
+    // Paso 2: obtener los datos de cada liga
+    const leagueIds = members.map(m => m.league_id);
+    const { data: leagues, error: lErr } = await db
+      .from('leagues')
+      .select('id, nombre, codigo, created_by')
+      .in('id', leagueIds);
 
-  // Paso 2: obtener los datos de cada liga
-  const leagueIds = members.map(m => m.league_id);
-  const { data: leagues, error: lErr } = await db
-    .from('leagues')
-    .select('id, nombre, codigo, created_by')
-    .in('id', leagueIds);
+    if (lErr) { console.warn('[leagues] Error leyendo ligas:', lErr.message); return []; }
 
-  if (lErr) { console.warn('[leagues] Error leyendo ligas:', lErr.message); return []; }
+    // Combinar
+    _myLeagues = (leagues ?? []).map(lg => {
+      const member = members.find(m => m.league_id === lg.id);
+      return { ...lg, porra_cerrada: member?.porra_cerrada ?? false };
+    });
 
-  // Combinar
-  _myLeagues = (leagues ?? []).map(lg => {
-    const member = members.find(m => m.league_id === lg.id);
-    return { ...lg, porra_cerrada: member?.porra_cerrada ?? false };
-  });
-
-  console.log('[leagues] Ligas cargadas:', _myLeagues.length, _myLeagues.map(l => l.nombre));
-  return _myLeagues;
+    console.debug('[leagues] Ligas cargadas:', _myLeagues.length, _myLeagues.map(l => l.nombre));
+    return _myLeagues;
+  })();
+  try { return await _loadInFlight; }
+  finally { _loadInFlight = null; }
 }
 
 // ─────────────────────────────────────────────────────────────

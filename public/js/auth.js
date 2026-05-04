@@ -385,8 +385,30 @@ const runAuthInit = async () => {
 
   // Registrar listener AHORA que todos los scripts están cargados
   db.auth.onAuthStateChange(async (event, session) => {
+    // TOKEN_REFRESHED / USER_UPDATED — solo refrescar token en memoria.
+    // Supabase emite TOKEN_REFRESHED al cambiar de pestaña; sin este guard
+    // se re-disparaba todo el flujo (loadUserData + showPage) y la app
+    // saltaba al selector de ligas perdiendo la vista actual.
+    if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+      if (session?.access_token) {
+        window._porraToken = session.access_token;
+        sessionStorage.setItem('porra_token', session.access_token);
+      }
+      return;
+    }
+
     if (session?.user) {
       window._porraToken = session.access_token; sessionStorage.setItem("porra_token", session.access_token);
+
+      // Si ya tenemos al mismo usuario hidratado, evitar reinicialización.
+      // Algunos escenarios de Supabase v2 reemiten SIGNED_IN al volver de
+      // segundo plano; sin este guard entrabamos en bucle de showPage.
+      if (currentUser && currentUser.id === session.user.id) {
+        renderAuthBar();
+        updateCTAs();
+        return;
+      }
+
       const { data: profile } = await db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single();
       currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {

@@ -44,20 +44,17 @@
     const container = document.getElementById('directo-container');
     if (container && container.style.display !== 'none' &&
         typeof window.renderVistaDirecto === 'function') {
-      console.log('[ui-directo] checkIsAdmin: cache actualizado, re-renderizando');
       window.renderVistaDirecto();
     }
   }
 
-  function _scheduleCheckRetry(reason) {
+  function _scheduleCheckRetry() {
     _checkAttempts++;
     if (_checkAttempts >= _MAX_CHECK_ATTEMPTS) {
-      console.log('[ui-directo] checkIsAdmin: máximo intentos (' + _MAX_CHECK_ATTEMPTS + ') alcanzado, asumiendo no-admin');
       window._isAdminCached = false;
       _triggerReRenderIfChanged();
       return;
     }
-    console.log('[ui-directo] checkIsAdmin: ' + reason + ', reintentando en 500ms (intento ' + (_checkAttempts + 1) + '/' + _MAX_CHECK_ATTEMPTS + ')');
     setTimeout(() => { checkIsAdmin(); }, 500);
   }
 
@@ -68,16 +65,14 @@
     if (_checkInProgress) return undefined;
     _checkInProgress = true;
     try {
-      console.log('[ui-directo] checkIsAdmin: iniciando (intento ' + (_checkAttempts + 1) + '/' + _MAX_CHECK_ATTEMPTS + ')');
       const db = window._porraDb;
       if (!db) {
-        _scheduleCheckRetry('_porraDb no disponible');
+        _scheduleCheckRetry();
         return undefined;
       }
       const { data: { user } } = await db.auth.getUser();
-      console.log('[ui-directo] checkIsAdmin: user =', user ? user.id : null);
       if (!user) {
-        _scheduleCheckRetry('sesión aún no hidratada');
+        _scheduleCheckRetry();
         return undefined;
       }
       const { data: profileData, error } = await db
@@ -91,13 +86,12 @@
         _triggerReRenderIfChanged();
         return false;
       }
-      console.log('[ui-directo] checkIsAdmin: is_admin =', profileData ? profileData.is_admin : null);
       window._isAdminCached = !!(profileData && profileData.is_admin);
       _triggerReRenderIfChanged();
       return window._isAdminCached;
     } catch (err) {
       console.warn('[ui-directo] checkIsAdmin: excepción:', err);
-      _scheduleCheckRetry('excepción');
+      _scheduleCheckRetry();
       return undefined;
     } finally {
       _checkInProgress = false;
