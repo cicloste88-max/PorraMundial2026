@@ -1089,6 +1089,103 @@
       '</div>';
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // [Sprint A · Group 2] TU POSICIÓN — collapsible card
+  // ─────────────────────────────────────────────────────────────
+  function _renderPosition(state) {
+    var mount = document.getElementById('fc-pred-position');
+    if (!mount) return;
+
+    var ranking = window._predictorRanking || null;
+    var isPreMundial = Date.now() < Date.UTC(2026, 5, 11, 0, 0, 0);
+
+    var leagueRank = '—';
+    var leagueTotal = 0;
+    var leaguePts = 0;
+    var globalRank = '—';
+    var globalTotal = 0;
+    var globalDelta = 0;
+
+    if (ranking && ranking.league) {
+      leagueRank = ranking.league.rank || ranking.league.position || '—';
+      leagueTotal = ranking.league.total || 0;
+      leaguePts = ranking.league.points || 0;
+    }
+    if (ranking && ranking.global && !isPreMundial) {
+      globalRank = ranking.global.rank || ranking.global.position || '—';
+      globalTotal = ranking.global.total || 0;
+      globalDelta = ranking.global.delta || 0;
+    }
+
+    var summaryLine;
+    if (isPreMundial) {
+      summaryLine = (leagueRank !== '—')
+        ? _esc(String(leagueRank)) + 'º en liga · global disponible 11 jun'
+        : 'global disponible 11 jun';
+    } else {
+      summaryLine = (leagueRank !== '—')
+        ? _esc(String(leagueRank)) + 'º en liga · ' + _esc(String(globalRank)) + ' global'
+        : 'sin posición aún';
+    }
+
+    var leagueRankSuffix = (leagueRank !== '—') ? 'º' : '';
+    var leagueCellHtml =
+      '<div class="pred-position__cell">' +
+        '<span class="pred-position__cell-label">EN TU LIGA</span>' +
+        '<span class="pred-position__rank-big">' + _esc(String(leagueRank)) + leagueRankSuffix + '</span>' +
+        '<span class="pred-position__rank-sub">de ' + _esc(String(leagueTotal)) + ' · ' + _esc(String(leaguePts)) + ' pts</span>' +
+      '</div>';
+
+    var globalCellHtml;
+    if (isPreMundial) {
+      globalCellHtml =
+        '<div class="pred-position__cell">' +
+          '<span class="pred-position__cell-label">GLOBAL</span>' +
+          '<span class="pred-position__rank-big">—</span>' +
+          '<span class="pred-position__rank-sub">disponible 11 jun</span>' +
+        '</div>';
+    } else {
+      var globalSuffix = (globalRank !== '—') ? 'º' : '';
+      var deltaTxt = (globalDelta > 0 ? '+' : '') + String(globalDelta);
+      globalCellHtml =
+        '<div class="pred-position__cell">' +
+          '<span class="pred-position__cell-label">GLOBAL</span>' +
+          '<span class="pred-position__rank-big">' + _esc(String(globalRank)) + globalSuffix + '</span>' +
+          '<span class="pred-position__rank-sub">de ' + _esc(String(globalTotal)) + ' · ' + _esc(deltaTxt) + '</span>' +
+        '</div>';
+    }
+
+    mount.innerHTML =
+      '<div class="collap pred-position">' +
+        '<button type="button" class="collap-toggle" aria-expanded="false">' +
+          '<span class="collap-toggle__title-block">' +
+            '<span>Tu Posición</span>' +
+            '<span class="collap-summary">' + summaryLine + '</span>' +
+          '</span>' +
+          '<span class="chev" aria-hidden="true">▾</span>' +
+        '</button>' +
+        '<div class="collap-body">' +
+          '<div class="collap-body-inner">' +
+            '<div class="pred-position__grid">' +
+              leagueCellHtml +
+              globalCellHtml +
+            '</div>' +
+            '<div class="pred-position__evolution-placeholder">Tu evolución (próximamente)</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var btn = mount.querySelector('.collap-toggle');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var collap = btn.closest('.collap');
+        if (!collap) return;
+        var open = collap.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    }
+  }
+
   function mountPredShell() {
     if (!document.getElementById('page-predictor')) return;
     // Render inicial inmediato con datos cacheados (o fallback).
@@ -1096,6 +1193,7 @@
     _renderHeader(st);
     _renderTile(st);
     _renderStats(st);
+    _renderPosition(st);
     _renderFilters(st);
     _renderList(st);
     _renderShareCtas(st);
@@ -1108,6 +1206,7 @@
         if (!ranking) return;
         var st2 = _computeStateForCurrentPage();
         _renderTile(st2);
+        _renderPosition(st2);
         _renderFilters(st2);
       }).catch(function (err) {
         console.warn('[predictor] loadPredictorRankingData failed', err);
