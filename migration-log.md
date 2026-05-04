@@ -1458,3 +1458,12 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
 [19:38] CREAR: PR#46 F7.7-VIS Predictor mobile redesign + Trionda Timeline (B1..B16) vía Code Explorer extensión Chrome (api GitHub directa)
 [19:42] MERGEAR: PR#46 squash a main por San desde GitHub UI — SHA d1be8bf5
 [19:55] PUSH: sesión-close — CLAUDE.md Estado actual + Top-3 + CHANGELOG entrada F7.7-VIS + migration-log append (este commit)
+
+## 2026-05-04
+
+[12:08] DOCS-SLIM-SECRETS — preámbulo F7.7-IA.
+  - docs/secrets.md (nuevo, consolida Auth + Vault + EF secrets + patrones de acceso)
+  - CLAUDE.md: sección Auth & Secrets → puntero (-488 B); mapa documentación: split fila architecture en 2 (architecture sin Secrets + nueva fila secrets)
+  - docs/architecture.md: ## Secrets — clasificación → puntero (-1144 B)
+  - Tamaños finales: CLAUDE.md 9756 / 10240 (margen 484 B), architecture.md 8655 B, secrets.md 2315 B
+  - Commit: este commit (rama claude/extract-secrets-docs-1h5VT, push a main pendiente de decisión San)
