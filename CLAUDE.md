@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** HEAD `d1be8bf5` post-merge **F7.7-VIS** (PR#46, sprint completo Predictor mobile redesign + Trionda Timeline, 18 commits B1..B16, +3784/−13 LOC). ERR-31 cosmético pendiente. **Turnstile DESACTIVADO 30abr** (app privada). Predictor en producción con sistema rangos 10 niveles, ranking liga+global cross-league, balón Trionda oficial girando con progreso real del Mundial, trophy modal 4 premios. IA Predictor Fases A–F cerradas, EF `porra-ia-compute` v10 ACTIVE. Próximo sprint candidato: **F7.7-IA** (bot IA-jugador C1..C6) o backend pre-11jun. Detalle en `CHANGELOG.md`.
+Rama activa **main** HEAD `4fb8394` (post slim secrets, PR#47). En curso PR F7.7-IA C1+C2 — bot **IA Zayu** activo en 3 ligas (72 group + 32 KO + awards + groups_saved A-L lock), trigger DB replicate_bot_to_league + EF `porra-ia-compute` **v11** ACTIVE (SHA `af0f24a8`). Detalle en `CHANGELOG.md`. Próximo: cargar squads reales + ejecutar `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
 
 ## Top-3 pendientes inmediatos
 
@@ -26,7 +26,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked).
 2. Activar pg_cron `update-results` el 11 jun.
-3. Cargar convocatorias reales (`EQUIPOS[].players`).
+3. Cargar convocatorias reales (`EQUIPOS[].players`) y luego ejecutar action `update_ia_scorers` de `porra-ia-compute` para rellenar `predictions.scorer`/`ko_predictions.scorer` del bot IA Zayu (actualmente NULL en las 3 ligas).
 4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos al usuario.
 5. Verificar estructura JSON `_results.ko_results` con `update-results` real (11 jun).
 6. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos).
