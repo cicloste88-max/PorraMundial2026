@@ -536,6 +536,10 @@ function showPage(page) {
     window.scrollTo(0,0);
     koInit(); // resuelve slots para que buildKOCard tenga equipos.
     // F7.X.4: shell visual nuevo. Si ui-elim-shell.js cargado, render.
+    // Reset activeAction → 'mis-pronosticos' antes del render: cada
+    // re-entrada al tab 'Fase final' arranca en estado base (no hereda
+    // un subtab Cuadro/Premios de la sesión anterior).
+    if (typeof window.elimShellResetAction === 'function') window.elimShellResetAction();
     if (typeof window.renderElimShell === 'function') window.renderElimShell();
   }
   if(page === 'grupos') {

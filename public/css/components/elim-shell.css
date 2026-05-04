@@ -53,7 +53,16 @@
 }
 .fc-elim-header__action--cuadro { color: #60A5FA; }
 .fc-elim-header__action--premios { color: #FFD700; }
-.fc-elim-header__action.is-active { background: var(--ink-700); }
+/* Subtab activo: resaltado claramente — fondo distinto, borde acento del color del subtab,
+   ligero box-shadow para destacar sobre el header. Re-click vuelve a 'mis-pronosticos'. */
+.fc-elim-header__action.is-active {
+  background: var(--ink-100);
+  color: var(--ink-900);
+  border-color: var(--ink-100);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.fc-elim-header__action--cuadro.is-active  { background: #60A5FA; border-color: #60A5FA; color: #0a0a0b; }
+.fc-elim-header__action--premios.is-active { background: #FFD700; border-color: #FFD700; color: #0a0a0b; }
 .fc-elim-header__points {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; color: var(--ink-300);

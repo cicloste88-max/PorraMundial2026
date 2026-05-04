@@ -121,9 +121,15 @@
       ? escapeHtml(state.subtitle || '')
       : (state.subtitle || '');
 
+    // Botón superior contextual:
+    //   subtab activo → "← Volver" (reset a mis-pronosticos).
+    //   estado base   → "← Inicio" (showPage('welcome')).
+    var inSubtab = (state.activeAction === 'cuadro' || state.activeAction === 'premios');
+    var backLabel = inSubtab ? 'Volver' : 'Inicio';
+
     mount.innerHTML =
       '<div class="fc-elim-header__top">' +
-        '<button class="fc-elim-header__back" type="button">' + backIcon + ' Inicio</button>' +
+        '<button class="fc-elim-header__back" type="button" data-action="' + (inSubtab ? 'reset' : 'home') + '">' + backIcon + ' ' + backLabel + '</button>' +
         '<div class="fc-elim-header__brand">' +
           '<div class="fc-elim-header__brand-title">Porra Mundial 2026</div>' +
           '<div class="fc-elim-header__brand-sub">' + sub + '</div>' +
@@ -139,7 +145,15 @@
       '</div>';
 
     var backBtn = mount.querySelector('.fc-elim-header__back');
-    if (backBtn) backBtn.addEventListener('click', function () { showPage('welcome'); });
+    if (backBtn) {
+      backBtn.addEventListener('click', function () {
+        if (backBtn.getAttribute('data-action') === 'reset' && typeof state.onBack === 'function') {
+          state.onBack();
+        } else {
+          showPage('welcome');
+        }
+      });
+    }
 
     if (state.onCuadro) {
       var cuadroBtn = mount.querySelector('.fc-elim-header__action--cuadro');
@@ -626,6 +640,12 @@
       points: _totalPoints(),
       subtitle: _getSubtitle(),
       activeAction: _state.activeAction,
+      // Botón superior contextual: cuando hay subtab activo, "← Volver"
+      // resetea a estado base (mis-pronosticos). En estado base es "← Inicio".
+      onBack: function () {
+        _state.activeAction = 'mis-pronosticos';
+        renderElimShell();
+      },
       // Click en subtab activa la vista; volver a clickar en una vista
       // ya activa la deactiva → vuelve a 'mis-pronosticos' (estado base
       // sin botón propio: stepper + list + dice).
@@ -657,6 +677,14 @@
     _applyActionView();
   }
 
-  window.renderElimShell = renderElimShell;
-  window._elimShellState = _state; // expuesto para debug
+  // Reset al estado base (mis-pronosticos). Lo llama showPage('elim') en
+  // ui-nav.js para que cada entrada/re-entrada al tab 'Fase final' arranque
+  // limpia, sin un subtab heredado de la sesión anterior.
+  function elimShellResetAction() {
+    _state.activeAction = 'mis-pronosticos';
+  }
+
+  window.renderElimShell      = renderElimShell;
+  window.elimShellResetAction = elimShellResetAction;
+  window._elimShellState      = _state; // expuesto para debug
 })();
