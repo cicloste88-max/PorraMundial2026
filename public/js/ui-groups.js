@@ -613,14 +613,14 @@ function _showJcardModal(matchKey) {
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
-  // Wrapper: contiene la card. Sin overflow-x:hidden \u2014 la box-shadow de
-  // .card (0 20px 60px) se recortar\u00eda visualmente y dibujar\u00eda 'bordes
-  // cortados'. El clipping de viewport lo da el overlay (padding 16px +
-  // overflow:hidden a nivel fixed:inset:0). Vertical s\u00ed scrollea.
+  // Wrapper sin overflow horizontal \u2014 el clone se escala con
+  // transform:scale() para encajar en el viewport sin parchar
+  // propiedades individuales (min-width, max-width, etc.). El wrapper
+  // simplemente contiene la versi\u00f3n escalada y compensa la altura.
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
     'max-width:min(480px, calc(100vw - 32px));width:100%;' +
-    'max-height:calc(100vh - 32px);overflow-x:visible;overflow-y:auto;' +
+    'max-height:calc(100vh - 32px);overflow:visible auto;' +
     'border-radius:16px;position:relative;box-sizing:border-box;';
 
   const closeBtn = document.createElement('button');
@@ -650,26 +650,6 @@ function _showJcardModal(matchKey) {
     else cloneInputs[i].value = inp.value;
   });
 
-  // Bug fix overflow m\u00f3vil:
-  //  - width 100% y max-width al viewport \u2014 la .card est\u00e1 pensada para
-  //    grid minmax(360px,1fr) y no encoge bien por s\u00ed sola.
-  //  - box-shadow:none \u2014 la sombra original (60px de spread) era la que
-  //    se 'recortaba' visualmente al estar el wrapper junto al borde
-  //    del viewport. Sin sombra el problema desaparece.
-  //  - margin:0 para evitar que cualquier herencia a\u00f1ada offsets.
-  clone.style.width      = '100%';
-  clone.style.maxWidth   = 'calc(100vw - 32px)';
-  clone.style.minWidth   = '0';
-  clone.style.boxSizing  = 'border-box';
-  clone.style.boxShadow  = 'none';
-  clone.style.margin     = '0';
-  clone.style.overflow   = 'hidden'; // contiene hijos absolute si alguno excediera
-  clone.querySelectorAll('*').forEach(el => {
-    el.style.minWidth  = '0';
-    el.style.maxWidth  = '100%';
-    el.style.boxSizing = 'border-box';
-  });
-
   clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
   clone.querySelectorAll('button,input,select').forEach(el => {
     el.disabled = true;
@@ -680,6 +660,19 @@ function _showJcardModal(matchKey) {
   wrapper.appendChild(clone);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
+
+  // Encaje proporcional v\u00eda transform:scale \u2014 debe correr DESPU\u00c9S de
+  // appendChild para poder medir scrollWidth/offsetWidth/Height del clone.
+  // transform:scale no afecta al tama\u00f1o en flow, as\u00ed que compensamos la
+  // altura del wrapper para que ocupe lo correcto y haga scroll vertical.
+  const cardWidth  = clone.scrollWidth || clone.offsetWidth || 360;
+  const availWidth = window.innerWidth - 32; // 16px padding overlay \u00d7 2
+  if (cardWidth > availWidth) {
+    const ratio = availWidth / cardWidth;
+    clone.style.transform       = 'scale(' + ratio + ')';
+    clone.style.transformOrigin = 'top center';
+    wrapper.style.height        = (clone.offsetHeight * ratio) + 'px';
+  }
 }
 window.openJcardModal = openJcardModal;
 
