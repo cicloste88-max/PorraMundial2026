@@ -613,13 +613,13 @@ function _showJcardModal(matchKey) {
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
-  // Wrapper sin overflow horizontal \u2014 el clone se escala con
-  // transform:scale() para encajar en el viewport sin parchar
-  // propiedades individuales (min-width, max-width, etc.). El wrapper
-  // simplemente contiene la versi\u00f3n escalada y compensa la altura.
+  // Wrapper sin max-width \u2014 el clone debe poder medirse a su ancho
+  // intr\u00ednseco (~360px) para decidir si necesita scale. Si limitamos el
+  // wrapper a calc(100vw-32px), el clone se renderiza encogido y
+  // scrollWidth nunca supera availWidth \u2192 el scale nunca se aplica.
+  // El ancho final se asigna tras medir.
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-width:min(480px, calc(100vw - 32px));width:100%;' +
     'max-height:calc(100vh - 32px);overflow:visible auto;' +
     'border-radius:16px;position:relative;box-sizing:border-box;';
 
@@ -633,6 +633,10 @@ function _showJcardModal(matchKey) {
   closeBtn.onclick = () => overlay.remove();
 
   const clone = cardEl.cloneNode(true);
+  // Forzar el ancho intrínseco que la .card espera (grid minmax(360px,1fr))
+  // ANTES de appendChild — así scrollWidth refleja el ancho 'natural' y no
+  // el del wrapper.
+  clone.style.width = '360px';
 
   // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
   // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
@@ -662,16 +666,21 @@ function _showJcardModal(matchKey) {
   document.body.appendChild(overlay);
 
   // Encaje proporcional v\u00eda transform:scale \u2014 debe correr DESPU\u00c9S de
-  // appendChild para poder medir scrollWidth/offsetWidth/Height del clone.
-  // transform:scale no afecta al tama\u00f1o en flow, as\u00ed que compensamos la
-  // altura del wrapper para que ocupe lo correcto y haga scroll vertical.
+  // appendChild (necesario para medir DOM). transform:scale no afecta al
+  // tama\u00f1o en flow, as\u00ed que asignamos width/height al wrapper para que
+  // ocupe el ancho/alto VISUAL post-scale.
   const cardWidth  = clone.scrollWidth || clone.offsetWidth || 360;
+  const cardHeight = clone.offsetHeight || 0;
   const availWidth = window.innerWidth - 32; // 16px padding overlay \u00d7 2
   if (cardWidth > availWidth) {
     const ratio = availWidth / cardWidth;
     clone.style.transform       = 'scale(' + ratio + ')';
     clone.style.transformOrigin = 'top center';
-    wrapper.style.height        = (clone.offsetHeight * ratio) + 'px';
+    wrapper.style.width  = (cardWidth * ratio) + 'px';
+    wrapper.style.height = (cardHeight * ratio) + 'px';
+  } else {
+    wrapper.style.width  = cardWidth + 'px';
+    wrapper.style.height = cardHeight + 'px';
   }
 }
 window.openJcardModal = openJcardModal;
