@@ -609,14 +609,18 @@ function _showJcardModal(matchKey) {
   overlay.id = 'jcard-modal-overlay';
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
-    'display:flex;align-items:center;justify-content:center;padding:16px;' +
+    'display:flex;align-items:center;justify-content:center;padding:8px;' +
     'animation:fadeIn .15s ease;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
+  // Wrapper: contiene la card en un viewport seguro. min() evita overflow
+  // horizontal en m\u00f3vil cuando viewport < 480px (la card original tiene
+  // CSS pensado para grid minmax(360px, 1fr) y no encoge bien).
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-width:480px;width:100%;max-height:90vh;overflow-y:auto;' +
-    'border-radius:16px;position:relative;';
+    'max-width:min(480px, calc(100vw - 16px));width:100%;' +
+    'max-height:calc(100vh - 16px);overflow:hidden auto;' +
+    'border-radius:16px;position:relative;box-sizing:border-box;';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '\u2715';
@@ -628,8 +632,30 @@ function _showJcardModal(matchKey) {
   closeBtn.onclick = () => overlay.remove();
 
   const clone = cardEl.cloneNode(true);
+
+  // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
+  // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
+  // toca la propiedad, no el atributo selected), as\u00ed que el clone perd\u00eda
+  // el goleador. Copiamos los valores manualmente del original al clone
+  // (mismo orden de selects, mismo orden de inputs/checkbox).
+  const origSelects  = cardEl.querySelectorAll('select');
+  const cloneSelects = clone.querySelectorAll('select');
+  origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
+  const origInputs  = cardEl.querySelectorAll('input');
+  const cloneInputs = clone.querySelectorAll('input');
+  origInputs.forEach((inp, i) => {
+    if (!cloneInputs[i]) return;
+    if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
+    else cloneInputs[i].value = inp.value;
+  });
+
+  // Bug fix overflow m\u00f3vil: forzar la card clonada a respetar el wrapper.
+  clone.style.width    = '100%';
+  clone.style.maxWidth = '100%';
+  clone.style.boxSizing = 'border-box';
+
   clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  clone.querySelectorAll('button,input').forEach(el => {
+  clone.querySelectorAll('button,input,select').forEach(el => {
     el.disabled = true;
     el.style.pointerEvents = 'none';
   });
