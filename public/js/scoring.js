@@ -643,6 +643,7 @@ function createMatchCard(match, idx) {
 
   const card = document.createElement('div');
   card.className = 'card';
+  card.id = 'card-wrap-' + matchKey;
   card.setAttribute('data-match-idx', String(idx));
   card.setAttribute('data-grupo', match.group);
 

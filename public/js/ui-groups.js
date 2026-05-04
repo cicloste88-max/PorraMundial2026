@@ -322,140 +322,202 @@ function renderVistaJornada() {
   let sectionsHtml = '';
   dias.forEach((date, dIdx) => {
     const jNum = dIdx + 1;
-    const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {
-      weekday: 'long', day: 'numeric', month: 'long'
-    });
+    const matchesOfDay = jornadasMap[date];
     const boostKey  = boostPicks[date];
-    const boostDone = !!boostKey;
-    const badgeCls  = boostDone ? 'jornada-boost-badge done' : 'jornada-boost-badge';
-    const badgeTxt  = boostDone ? '✅ Boost asignado' : '🔥 Pendiente';
 
-    sectionsHtml += '<div class="jornada-section" id="jornada-' + date + '">';
-    sectionsHtml += '<div class="jornada-header">';
-    sectionsHtml += '<span class="jornada-label">J' + jNum + '</span>';
-    sectionsHtml += '<span class="jornada-date">' + dayLabel + '</span>';
-    sectionsHtml += '<span class="' + badgeCls + '">' + badgeTxt + '</span>';
-    sectionsHtml += '</div>';
-
-    jornadasMap[date].forEach(({ m, idx }) => {
-      sectionsHtml += _buildJCard(m, idx, date, boostKey);
+    // Separar finalizados / por jugar usando _liveScoresByMatchKey (status=finished).
+    // Pre-mundial todos van a 'porJugar' — la sección 'FINALIZADOS' simplemente no se renderiza.
+    const liveByKey = window._liveScoresByMatchKey || {};
+    const finalizados = [];
+    const porJugar    = [];
+    matchesOfDay.forEach(({ m, idx }) => {
+      const dk = (typeof window.matchKeyFor === 'function') ? window.matchKeyFor(m) : null;
+      const live = dk ? liveByKey[dk] : null;
+      if (live && live.status === 'finished') finalizados.push({ m, idx, live });
+      else porJugar.push({ m, idx, live });
     });
 
-    sectionsHtml += '</div>'; // jornada-section
+    // Fecha humana corta para el header (rango si la jornada cubre >1 día — aquí siempre 1 día por agrupación).
+    const dateObj = new Date(date + 'T12:00:00');
+    const dayLabel = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    const dateShort = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).toUpperCase();
+
+    const subTitle = matchesOfDay.length + ' partido' + (matchesOfDay.length === 1 ? '' : 's') +
+                     ' · ' + finalizados.length + ' finalizado' + (finalizados.length === 1 ? '' : 's') +
+                     ' · ' + porJugar.length + ' por jugar';
+
+    const prevDate = dias[dIdx - 1] || null;
+    const nextDate = dias[dIdx + 1] || null;
+    const prevAttr = prevDate ? 'data-jump="jornada-' + prevDate + '"' : 'disabled';
+    const nextAttr = nextDate ? 'data-jump="jornada-' + nextDate + '"' : 'disabled';
+
+    let cardsHtml = '';
+    if (finalizados.length) {
+      cardsHtml += '<div class="jv2-section-label">Finalizados</div>';
+      finalizados.forEach(({ m, idx, live }) => {
+        cardsHtml += _buildJCard(m, idx, date, boostKey, live);
+      });
+    }
+    if (porJugar.length) {
+      cardsHtml += '<div class="jv2-section-label">Por jugar</div>';
+      porJugar.forEach(({ m, idx, live }) => {
+        cardsHtml += _buildJCard(m, idx, date, boostKey, live);
+      });
+    }
+
+    sectionsHtml +=
+      '<div class="jv2-section" id="jornada-' + date + '">' +
+        '<div class="jv2-jornada-header">' +
+          '<button class="jv2-nav-arrow" type="button" ' + prevAttr + ' aria-label="Jornada anterior">‹</button>' +
+          '<div class="jv2-jornada-title">' +
+            '<div class="jv2-jornada-name">JORNADA ' + jNum + ' · GRUPOS</div>' +
+            '<div class="jv2-jornada-date">' + dateShort + ' · ' + dayLabel + '</div>' +
+          '</div>' +
+          '<button class="jv2-nav-arrow" type="button" ' + nextAttr + ' aria-label="Jornada siguiente">›</button>' +
+        '</div>' +
+        '<div class="jv2-results-block">' +
+          '<div class="jv2-results-title">Resultados</div>' +
+          '<div class="jv2-results-sub">' + subTitle + '</div>' +
+        '</div>' +
+        cardsHtml +
+      '</div>';
   });
 
   // Layout: columna de jornadas + sidebar única sticky
   container.innerHTML =
     '<div class="jornada-wrap">' +
-      '<div class="jornada-main">' + sectionsHtml + '</div>' +
+      '<div class="jornada-main jv2-main">' + sectionsHtml + '</div>' +
       '<div class="jornada-sidebar">' + sidebarHtml + '</div>' +
     '</div>';
+
+  // Wire nav arrows (scroll suave a la sección anterior/siguiente).
+  container.querySelectorAll('.jv2-nav-arrow[data-jump]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.getAttribute('data-jump'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 
   // Cinta usuario móvil
   _renderUserStrip();
 }
 window.renderVistaJornada = renderVistaJornada;
 
-function _buildJCard(m, idx, date, boostKey) {
+// _buildJCard — tarjeta dark de Jornada (Design v2):
+//   Top: 🏟️ estadio | día + hora.
+//   Mid: bandera circular | marcador grande | bandera circular (códigos debajo).
+//   Chips de acierto (solo finalizados): 1X2 ✓/✗, Exacto ✓/✗, Goleador ✓/✗, vs IA ✓/✗
+//                                        + chip dorado pts ganados (con marca ×2 si boost+exacto).
+//   Boost row debajo de chips.
+// `live` es la fila de window._liveScoresByMatchKey si existe (puede ser null).
+function _buildJCard(m, idx, date, boostKey, live) {
   const matchKey = getMatchKey(m);
   const pred = predictions[matchKey] || {};
   const isBoost = boostKey === matchKey;
+  const isFinished = !!(live && live.status === 'finished');
 
   // Equipos y banderas
   const hTeam = EQUIPOS.find(e => e.name === m.home);
   const aTeam = EQUIPOS.find(e => e.name === m.away);
   const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
   const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
+  const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
+  const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
 
   // Estado del pronóstico
-  const hasScore = pred.l !== null && pred.l !== undefined && pred.v !== null && pred.v !== undefined;
+  const hasPred = pred.l !== null && pred.l !== undefined && pred.v !== null && pred.v !== undefined;
 
-  // Marcador pronosticado
-  const lTxt = hasScore ? pred.l : '—';
-  const vTxt = hasScore ? pred.v : '—';
-  const scoreCls = hasScore ? 'jcard-score' : 'jcard-score pending';
-
-  // Chips
-  const ia = iaPredictions[matchKey];
-  const mySign = getMySign(pred);
-  const showIA = hasScore && ia && mySign && mySign !== ia.sign;
-  const chips =
-    (hasScore ? '<span class="jcard-chip on">1X2</span>' : '<span class="jcard-chip">1X2</span>') +
-    (hasScore ? '<span class="jcard-chip on">Exacto</span>' : '') +
-    (pred.gol ? '<span class="jcard-chip on">⚽ ' + pred.gol + '</span>' : '') +
-    (showIA   ? '<span class="jcard-chip on">vs IA</span>' : '');
-
-  // Pts posibles
-  let maxPts = 0;
-  if (hasScore) {
-    maxPts = 4;
-    if (pred.gol) maxPts += 2;
-    if (showIA)   maxPts += 1;
+  // Marcador a mostrar:
+  //   - finalizado → score real desde live (o realHome/realAway como fallback).
+  //   - no finalizado → predicción del usuario o '—'.
+  let scoreL, scoreR;
+  if (isFinished) {
+    scoreL = (live && live.score_home != null) ? live.score_home : (m.realHome != null ? m.realHome : '—');
+    scoreR = (live && live.score_away != null) ? live.score_away : (m.realAway != null ? m.realAway : '—');
+  } else {
+    scoreL = hasPred ? pred.l : '—';
+    scoreR = hasPred ? pred.v : '—';
   }
-  const ptsVal  = isBoost ? maxPts * 2 : maxPts;
-  const ptsCls  = isBoost ? 'jcard-pts-num boost' : (maxPts > 0 ? 'jcard-pts-num' : 'jcard-pts-num pending');
-  const ptsDisp = ptsVal || '—';
 
   // Hora y estadio
-  const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-  const stadium = m.stadium ? m.stadium.replace(' Stadium','').replace(' Estadio','') : '';
+  const dt = new Date(m.date);
+  const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '').toUpperCase();
+  const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
 
-  // Color lateral por grupo
-  const gc = {A:'#4ade80',B:'#60a5fa',C:'#f472b6',D:'#fb923c',E:'#a78bfa',
-    F:'#34d399',G:'#fbbf24',H:'#f87171',I:'#38bdf8',J:'#c084fc',K:'#86efac',L:'#fcd34d'}[m.group] || '#4ade80';
+  // Chips de acierto + pts ganados — solo si finalizado y tenemos resultado real numérico.
+  let chipsHtml = '';
+  let goldChipHtml = '';
+  if (isFinished && hasPred && typeof scoreL === 'number' && typeof scoreR === 'number') {
+    const realL = scoreL;
+    const realR = scoreR;
+    const predWithSaved = Object.assign({}, pred, { saved: pred.saved !== false });
 
-  // Boost row
+    const isExact = pred.l === realL && pred.v === realR;
+    const signMatch = Math.sign(pred.l - pred.v) === Math.sign(realL - realR);
+    // Goleador: replicamos la lógica de calcMatchPoints.
+    let golMatch = false;
+    if (pred.gol && realL !== realR) {
+      const winnerTeamName = realL > realR ? m.home : m.away;
+      const winnerTeam = EQUIPOS.find(e => e.name === winnerTeamName);
+      const realScorer = winnerTeam?.players?.[0]?.key || null;
+      golMatch = !!(realScorer && pred.gol === realScorer);
+    }
+    const iaBonus = (typeof iaBonusWillApply === 'function') ? iaBonusWillApply(matchKey, predWithSaved, realL, realR) : false;
+
+    const chip = (label, ok) => {
+      const cls = ok ? 'jv2-chip jv2-chip--ok' : 'jv2-chip jv2-chip--ko';
+      const mark = ok ? '✓' : '✗';
+      return '<span class="' + cls + '">' + label + ' ' + mark + '</span>';
+    };
+    chipsHtml = chip('1X2', signMatch) + chip('Exacto', isExact);
+    if (pred.gol) chipsHtml += chip('Goleador', golMatch);
+    // vs IA: chip solo si había contra-IA (mySign !== ia.sign). Si ni siquiera había contra-IA, no se muestra.
+    const ia = (typeof iaPredictions === 'object') ? iaPredictions[matchKey] : null;
+    const mySign = (typeof getMySign === 'function') ? getMySign(pred) : null;
+    if (ia && ia.sign && mySign && mySign !== ia.sign) chipsHtml += chip('vs IA', iaBonus);
+
+    const pts = (typeof calcMatchPoints === 'function') ? calcMatchPoints(predWithSaved, realL, realR, matchKey) : 0;
+    const isBoostX2 = isBoost && isExact;
+    goldChipHtml = '<span class="jv2-chip jv2-chip--gold">+' + pts + ' pts' + (isBoostX2 ? ' ×2' : '') + '</span>';
+  }
+
+  const boostRowCls = isBoost ? 'jv2-boost active' : 'jv2-boost';
+  const boostLabel = isBoost
+    ? '<span class="jv2-boost-label active">🔥 Boost activo</span>'
+    : '<span class="jv2-boost-label">🔥 Boost a este partido</span>';
   const chkChecked = isBoost ? 'checked' : '';
-  const boostRowCls = isBoost ? 'jcard-boost active' : 'jcard-boost';
-  const boostLabel  = isBoost
-    ? '<span style="font-size:11px;color:#fb923c;font-weight:600">🔥 Boost activo</span>'
-    : '<span style="font-size:11px;color:#6b7280">🔥 Boost a este partido</span>';
 
   return (
-    '<div class="jcard' + (isBoost ? ' boost-active' : '') + '" id="jcard-' + idx + '">' +
-      '<div class="jcard-main">' +
-        '<div class="jcard-stripe" style="--gc:' + gc + ';background:' + gc + '"></div>' +
-        '<div class="jcard-body">' +
-          '<div class="jcard-teams-row">' +
-            '<div class="jcard-team">' +
-              '<div class="jcard-flag"><img src="' + hFlag + '" loading="lazy"></div>' +
-              '<span class="jcard-team-name">' + m.home + '</span>' +
-            '</div>' +
-            '<div class="jcard-score-wrap">' +
-              '<span class="' + scoreCls + '">' + lTxt + '</span>' +
-              '<span class="jcard-score-sep">:</span>' +
-              '<span class="' + scoreCls + '">' + vTxt + '</span>' +
-            '</div>' +
-            '<div class="jcard-team" style="justify-content:flex-end">' +
-              '<span class="jcard-team-name" style="text-align:right">' + m.away + '</span>' +
-              '<div class="jcard-flag"><img src="' + aFlag + '" loading="lazy"></div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="jcard-venue">' +
-            '<span>🏟️ ' + stadium + '</span>' +
-            '<span style="color:#3a3a3e">·</span>' +
-            '<span>⏰ ' + hora + '</span>' +
-            '<span style="color:#3a3a3e">·</span>' +
-            '<span style="color:#4b5563">Grupo ' + m.group + '</span>' +
-          '</div>' +
-          (chips ? '<div class="jcard-chips">' + chips + '</div>' : '') +
+    '<div class="jv2-card' + (isBoost ? ' is-boost' : '') + (isFinished ? ' is-finished' : '') + '" id="jcard-' + idx + '">' +
+      '<div class="jv2-card-top">' +
+        '<div class="jv2-card-stadium">🏟️ ' + stadium + '</div>' +
+        '<div class="jv2-card-when">' + dayShort + ' · ' + hora + '</div>' +
+      '</div>' +
+      '<div class="jv2-card-mid">' +
+        '<div class="jv2-team">' +
+          '<div class="jv2-flag"><img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
+          '<div class="jv2-team-code">' + hCode + '</div>' +
         '</div>' +
-        '<div class="jcard-pts">' +
-          '<div class="' + ptsCls + '">' + ptsDisp + '</div>' +
-          '<div class="jcard-pts-label">' + (isBoost ? 'PTS ×2' : 'PTS posibles') + '</div>' +
+        '<div class="jv2-score">' +
+          '<span class="jv2-score-num">' + scoreL + '</span>' +
+          '<span class="jv2-score-sep">:</span>' +
+          '<span class="jv2-score-num">' + scoreR + '</span>' +
+        '</div>' +
+        '<div class="jv2-team">' +
+          '<div class="jv2-flag"><img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
+          '<div class="jv2-team-code">' + aCode + '</div>' +
         '</div>' +
       '</div>' +
+      (chipsHtml || goldChipHtml
+        ? '<div class="jv2-chips">' + chipsHtml + goldChipHtml + '</div>'
+        : '') +
       '<div class="' + boostRowCls + '">' +
         '<input type="checkbox" ' + chkChecked + ' ' +
           'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
-          'style="width:16px;height:16px;accent-color:#ea580c;cursor:pointer;flex-shrink:0">' +
+          'class="jv2-boost-check">' +
         boostLabel +
-        '<button onclick="openJcardModal(\'' + matchKey + '\')" ' +
-          'style="margin-left:auto;font-size:10px;color:#4b5563;background:none;border:none;' +
-          'cursor:pointer;padding:2px 8px;border-radius:6px;border:1px solid #27272a;' +
-          'transition:all .15s" ' +
-          'onmouseover="this.style.borderColor=\'#4ade80\';this.style.color=\'#4ade80\'" ' +
-          'onmouseout="this.style.borderColor=\'#27272a\';this.style.color=\'#4b5563\'">🔍 Ver tarjeta</button>' +
+        '<button onclick="openJcardModal(\'' + matchKey + '\')" class="jv2-card-link" type="button">🔍 Ver tarjeta</button>' +
       '</div>' +
     '</div>'
   );
@@ -547,14 +609,15 @@ function _showJcardModal(matchKey) {
   overlay.id = 'jcard-modal-overlay';
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
-    'display:flex;align-items:center;justify-content:center;padding:16px;' +
-    'animation:fadeIn .15s ease;';
+    'display:flex;align-items:flex-start;justify-content:center;padding:16px;' +
+    'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'max-width:480px;width:100%;max-height:90vh;overflow-y:auto;' +
-    'border-radius:16px;position:relative;';
+    'margin:0 auto;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);' +
+    'overflow-x:hidden;overflow-y:auto;border-radius:16px;padding-bottom:24px;' +
+    'position:relative;box-sizing:border-box;left:0;right:0;';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '\u2715';
@@ -566,16 +629,40 @@ function _showJcardModal(matchKey) {
   closeBtn.onclick = () => overlay.remove();
 
   const clone = cardEl.cloneNode(true);
+
+  // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
+  // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
+  // toca la propiedad, no el atributo selected), as\u00ed que el clone perd\u00eda
+  // el goleador. Copiamos los valores manualmente del original al clone
+  // (mismo orden de selects, mismo orden de inputs/checkbox).
+  const origSelects  = cardEl.querySelectorAll('select');
+  const cloneSelects = clone.querySelectorAll('select');
+  origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
+  const origInputs  = cardEl.querySelectorAll('input');
+  const cloneInputs = clone.querySelectorAll('input');
+  origInputs.forEach((inp, i) => {
+    if (!cloneInputs[i]) return;
+    if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
+    else cloneInputs[i].value = inp.value;
+  });
+
   clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  clone.querySelectorAll('button,input').forEach(el => {
+  clone.querySelectorAll('button,input,select').forEach(el => {
     el.disabled = true;
     el.style.pointerEvents = 'none';
   });
+
+  clone.style.margin = '0 auto';
+  clone.style.left = '0';
+  clone.style.right = '0';
 
   wrapper.appendChild(closeBtn);
   wrapper.appendChild(clone);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
+
+  clone.style.width = (clone.offsetWidth - 5) + 'px';
+  clone.style.margin = '0 auto';
 }
 window.openJcardModal = openJcardModal;
 

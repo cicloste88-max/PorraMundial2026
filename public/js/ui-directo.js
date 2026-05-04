@@ -225,142 +225,228 @@
   // ─────────────────────────────────────────────────────────────
   // Construir una tarjeta Directo
   // ─────────────────────────────────────────────────────────────
-  function _buildDCard(m, idx) {
+  // ─────────────────────────────────────────────────────────────
+  // Helper: extrae el contexto live de un partido del Mundial.
+  //   { directoKey, liveRow, status, isLive, isFinal, scoreH, scoreA,
+  //     events, hasScore, minuteStr, matchKey, pred, hasPred }
+  // ─────────────────────────────────────────────────────────────
+  function _getMatchCtx(m) {
     const directoKey = getDirectoKey(m);
     const liveRow = directoKey ? (window._liveScoresByMatchKey[directoKey] || null) : null;
 
-    // Datos de equipos y flags (desde data.js)
-    const hTeam = EQUIPOS.find(e => e.name === m.home);
-    const aTeam = EQUIPOS.find(e => e.name === m.away);
-    const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
-    const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
-
-    // Color lateral por grupo
-    const gc = {A:'#4ade80',B:'#60a5fa',C:'#f472b6',D:'#fb923c',E:'#a78bfa',
-      F:'#34d399',G:'#fbbf24',H:'#f87171',I:'#38bdf8',J:'#c084fc',K:'#86efac',L:'#fcd34d'}[m.group] || '#4ade80';
-
-    // Determinar marcador y estado
     let scoreH = null, scoreA = null, status = 'notstarted', events = [];
     let teamsSwapped = false;
     if (liveRow) {
       status = liveRow.status || 'notstarted';
-      // live-sync.js nos da el row con los scores YA desde la perspectiva de data.js
-      // (ya ha aplicado teams_swapped antes de cachear). Pero guardamos teams_swapped
-      // para traducir events.
       teamsSwapped = !!liveRow._teams_swapped;
       scoreH = liveRow.score_home;
       scoreA = liveRow.score_away;
       events = extractRelevantEvents(liveRow.events, teamsSwapped, m.home, m.away);
     }
 
-    const hasScore  = scoreH != null && scoreA != null;
-    const isLive    = status === 'inprogress' || status === 'halftime' ||
-                      status === 'overtime'   || status === 'penalties';
-    const isFinal   = status === 'finished';
+    const hasScore = scoreH != null && scoreA != null;
+    const isLive   = status === 'inprogress' || status === 'halftime' ||
+                     status === 'overtime'   || status === 'penalties';
+    const isFinal  = status === 'finished';
 
-    // Labels de marcador
-    const lTxt = hasScore ? String(scoreH) : '—';
-    const vTxt = hasScore ? String(scoreA) : '—';
-    const scoreCls = hasScore ? 'dcard-score' : 'dcard-score pending';
-
-    // Estado pill
-    const { txt: statusTxt, cls: statusCls } = statusLabel(status);
     let minuteStr = '';
     if (isLive && liveRow) {
-      if (status === 'inprogress' && liveRow.minute != null) {
-        minuteStr = liveRow.minute + "'";
-      }
+      if (status === 'inprogress' && liveRow.minute != null) minuteStr = liveRow.minute + "'";
+      else if (status === 'halftime') minuteStr = 'DESCANSO';
     }
 
-    // Pronóstico + puntos vivos
-    const matchKey = typeof getMatchKey === 'function' ? getMatchKey(m) : null;
+    const matchKey = (typeof getMatchKey === 'function') ? getMatchKey(m) : null;
     const pred = matchKey ? (predictions[matchKey] || {}) : {};
     const hasPred = pred.l !== null && pred.l !== undefined &&
                     pred.v !== null && pred.v !== undefined;
 
-    let predScoreHtml = '<span class="dcard-pred-score pending">—:—</span>';
-    if (hasPred) {
-      predScoreHtml = '<span class="dcard-pred-score">' + pred.l + ':' + pred.v + '</span>';
+    return { directoKey, liveRow, status, isLive, isFinal, scoreH, scoreA,
+             events, hasScore, minuteStr, matchKey, pred, hasPred };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Calcula puntos vivos del usuario para un partido.
+  // Devuelve { pts, isExact, isBoost, finalPts } o null si no aplica.
+  // ─────────────────────────────────────────────────────────────
+  function _getLivePts(ctx, m) {
+    if (!ctx.hasPred || !ctx.hasScore || !(ctx.isLive || ctx.isFinal)) return null;
+    if (typeof calcMatchPoints !== 'function') return null;
+    const predWithFlag = Object.assign({}, ctx.pred, { saved: ctx.pred.saved !== false });
+    const pts = calcMatchPoints(predWithFlag, ctx.scoreH, ctx.scoreA, ctx.matchKey);
+    const bpSource = (typeof boostPicks !== 'undefined') ? boostPicks : {};
+    const boostKey = bpSource[m.date?.substring(0, 10)];
+    const isBoost  = boostKey === ctx.matchKey;
+    const isExact  = ctx.pred.l === ctx.scoreH && ctx.pred.v === ctx.scoreA;
+    // calcMatchPoints ya aplica el x2 internamente cuando boost+exact.
+    return { pts, isExact, isBoost, finalPts: pts };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // _buildDMini — fila compacta clickable (estado base de Directo).
+  // ─────────────────────────────────────────────────────────────
+  function _buildDMini(m, idx) {
+    const ctx = _getMatchCtx(m);
+    const hTeam = EQUIPOS.find(e => e.name === m.home);
+    const aTeam = EQUIPOS.find(e => e.name === m.away);
+    const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
+    const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
+    const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
+    const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
+
+    const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
+    const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
+
+    let rightHtml;
+    if (ctx.isLive) {
+      rightHtml = '<span class="dv2-mini-live"><span class="dv2-mini-live-dot"></span>' +
+                  (ctx.minuteStr || 'EN VIVO') + '</span>';
+    } else if (ctx.isFinal) {
+      rightHtml = '<span class="dv2-mini-status final">FINAL</span>';
+    } else {
+      const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      rightHtml = '<span class="dv2-mini-status">⏰ ' + hora + '</span>';
     }
 
-    // Puntos vivos (solo si hay pronóstico y marcador)
-    let ptsHtml = '';
-    if (hasPred && hasScore && (isLive || isFinal) && typeof calcMatchPoints === 'function') {
-      const predWithFlag = Object.assign({}, pred, { saved: pred.saved !== false });
-      const pts = calcMatchPoints(predWithFlag, scoreH, scoreA, matchKey);
-      // boostPicks es const global de data.js
-      const bpSource = (typeof boostPicks !== 'undefined') ? boostPicks : {};
-      const boostKey = bpSource[m.date?.substring(0, 10)];
-      const isBoost = boostKey === matchKey;
-      const isExact = pred.l === scoreH && pred.v === scoreA;
-      const finalPts = isBoost && isExact ? pts * 2 : pts;
-      const ptsCls = finalPts === 0 ? 'dcard-pts-live zero' :
-                     (isBoost && isExact ? 'dcard-pts-live won boost' : 'dcard-pts-live won');
-      ptsHtml = '<div class="' + ptsCls + '">' +
-                (finalPts >= 0 ? '+' : '') + finalPts + ' pt' + (finalPts === 1 ? '' : 's') +
-                '</div>';
-    }
-
-    // Hora de inicio + estadio
-    const hora = new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-    const stadium = m.stadium ? m.stadium.replace(' Stadium','').replace(' Estadio','') : '';
-
-    // Eventos HTML
-    let eventsHtml = '';
-    if (events.length > 0) {
-      eventsHtml = '<div class="dcard-events">';
-      for (const ev of events) {
-        const extraHtml = ev.extra ? '<span class="evt-extra">(' + ev.extra + ')</span>' : '';
-        eventsHtml += '<div class="dcard-event ' + ev.kind + '">' +
-          '<span class="evt-icon">' + ev.icon + '</span>' +
-          "<span class=\"evt-min\">" + ev.minute + "'</span>" +
-          '<span class="evt-player">' + ev.player + '</span>' +
-          extraHtml +
-          '<span style="font-size:10px;color:#4b5563">· ' + ev.team + '</span>' +
-        '</div>';
-      }
-      eventsHtml += '</div>';
-    }
-
-    const classes = 'dcard' + (isLive ? ' is-live' : '') + (isFinal ? ' is-final' : '');
+    const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
 
     return (
-      '<div class="' + classes + '" id="dcard-' + idx + '" data-match-key="' + (directoKey || '') + '">' +
-        '<div class="dcard-main">' +
-          '<div class="dcard-stripe" style="background:' + gc + '"></div>' +
-          '<div class="dcard-body">' +
-            '<div class="dcard-teams-row">' +
-              '<div class="dcard-team">' +
-                '<div class="dcard-flag"><img src="' + hFlag + '" loading="lazy"></div>' +
-                '<span class="dcard-team-name">' + m.home + '</span>' +
-              '</div>' +
-              '<div class="dcard-score-wrap">' +
-                '<span class="' + scoreCls + '">' + lTxt + '</span>' +
-                '<span class="dcard-score-sep">:</span>' +
-                '<span class="' + scoreCls + '">' + vTxt + '</span>' +
-              '</div>' +
-              '<div class="dcard-team" style="justify-content:flex-end">' +
-                '<span class="dcard-team-name" style="text-align:right">' + m.away + '</span>' +
-                '<div class="dcard-flag"><img src="' + aFlag + '" loading="lazy"></div>' +
-              '</div>' +
-            '</div>' +
-            '<div class="dcard-status">' +
-              '<span class="dcard-status-pill ' + statusCls + '">' + statusTxt + '</span>' +
-              (minuteStr ? '<span>' + minuteStr + '</span>' : '') +
-              (status === 'notstarted' ? '<span>⏰ ' + hora + '</span>' : '') +
-              '<span class="sep">·</span>' +
-              '<span>🏟️ ' + stadium + '</span>' +
-              '<span class="sep">·</span>' +
-              '<span style="color:#4b5563">Grupo ' + m.group + '</span>' +
-            '</div>' +
-            eventsHtml +
+      '<button class="' + classes + '" type="button" id="dcard-' + idx + '" ' +
+        'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
+        '<span class="dv2-mini-team">' +
+          '<span class="dv2-mini-flag">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</span>' +
+          '<span class="dv2-mini-code">' + hCode + '</span>' +
+        '</span>' +
+        '<span class="dv2-mini-score">' +
+          '<span class="dv2-mini-score-num">' + lTxt + '</span>' +
+          '<span class="dv2-mini-score-sep">:</span>' +
+          '<span class="dv2-mini-score-num">' + vTxt + '</span>' +
+        '</span>' +
+        '<span class="dv2-mini-team right">' +
+          '<span class="dv2-mini-code">' + aCode + '</span>' +
+          '<span class="dv2-mini-flag">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</span>' +
+        '</span>' +
+        '<span class="dv2-mini-right">' + rightHtml + '</span>' +
+      '</button>'
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // _buildDExpanded — card grande con todos los detalles del partido.
+  // ─────────────────────────────────────────────────────────────
+  function _buildDExpanded(m, idx) {
+    const ctx = _getMatchCtx(m);
+    const hTeam = EQUIPOS.find(e => e.name === m.home);
+    const aTeam = EQUIPOS.find(e => e.name === m.away);
+    const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
+    const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
+
+    const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
+    const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
+    const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
+    const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const dayShort = new Date(m.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    // Header: badge de estado
+    let headerHtml;
+    if (ctx.isLive) {
+      headerHtml = '<div class="dv2-exp-header live">' +
+        '<span class="dv2-exp-live-dot"></span>' +
+        '<span class="dv2-exp-live-label">EN VIVO</span>' +
+        (ctx.minuteStr ? '<span class="dv2-exp-live-min">· ' + ctx.minuteStr + '</span>' : '') +
+        '</div>';
+    } else if (ctx.isFinal) {
+      headerHtml = '<div class="dv2-exp-header final"><span class="dv2-exp-live-label">FINAL</span></div>';
+    } else {
+      headerHtml = '<div class="dv2-exp-header upcoming">' +
+        '<span class="dv2-exp-live-label">PRÓXIMO</span>' +
+        '<span class="dv2-exp-live-min">· ' + dayShort + ' · ' + hora + '</span>' +
+        '</div>';
+    }
+
+    // Tiempo de juego (verde) si live
+    let periodHtml = '';
+    if (ctx.isLive && ctx.minuteStr) {
+      const period = ctx.status === 'halftime' ? 'DESCANSO'
+                   : (ctx.liveRow && ctx.liveRow.minute != null && ctx.liveRow.minute > 45 ? '2T · ' + ctx.minuteStr : '1T · ' + ctx.minuteStr);
+      periodHtml = '<div class="dv2-exp-period">' + period + '</div>';
+    }
+
+    // Goleadores: dos columnas (local | visitante).
+    let scorersHtml = '';
+    if (ctx.events && ctx.events.length > 0) {
+      const homeEv = ctx.events.filter(e => e.team === m.home);
+      const awayEv = ctx.events.filter(e => e.team === m.away);
+      const renderEv = (ev) => {
+        const extra = ev.extra ? ' <span class="dv2-exp-ev-extra">(' + ev.extra + ')</span>' : '';
+        return '<div class="dv2-exp-ev ' + ev.kind + '">' +
+          '<span class="dv2-exp-ev-icon">' + ev.icon + '</span>' +
+          '<span class="dv2-exp-ev-min">' + ev.minute + "'</span>" +
+          '<span class="dv2-exp-ev-player">' + ev.player + '</span>' +
+          extra +
+        '</div>';
+      };
+      scorersHtml =
+        '<div class="dv2-exp-scorers">' +
+          '<div class="dv2-exp-scorers-title">Goleadores</div>' +
+          '<div class="dv2-exp-scorers-cols">' +
+            '<div class="dv2-exp-scorers-col">' + (homeEv.length ? homeEv.map(renderEv).join('') : '<div class="dv2-exp-ev-empty">—</div>') + '</div>' +
+            '<div class="dv2-exp-scorers-col right">' + (awayEv.length ? awayEv.map(renderEv).join('') : '<div class="dv2-exp-ev-empty">—</div>') + '</div>' +
           '</div>' +
-          '<div class="dcard-pred">' +
-            '<div class="dcard-pred-label">Tu pronóstico</div>' +
-            predScoreHtml +
-            ptsHtml +
+        '</div>';
+    }
+
+    // Tu predicción
+    let predHtml = '';
+    if (ctx.matchKey) {
+      const pred = ctx.pred;
+      const predScoreTxt = ctx.hasPred ? (pred.l + ':' + pred.v) : '—:—';
+      const golLabel = pred.gol ? '⚽ ' + pred.gol : '—';
+
+      // Estado: VAS GANANDO / 0 PTS / pre-match (sin estado)
+      let predStatusHtml = '';
+      const live = _getLivePts(ctx, m);
+      if (live && (ctx.isLive || ctx.isFinal)) {
+        const cls = live.finalPts > 0 ? 'win' : 'zero';
+        const verb = ctx.isFinal ? (live.finalPts > 0 ? 'GANASTE' : 'SIN PUNTOS')
+                                 : (live.finalPts > 0 ? 'VAS GANANDO' : '0 PTS POR AHORA');
+        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isBoost && live.isExact ? ' ×2' : '') : '';
+        predStatusHtml = '<div class="dv2-exp-pred-status ' + cls + '">' + verb + (ptsTxt ? ' ' + ptsTxt : '') + '</div>';
+      }
+
+      predHtml =
+        '<div class="dv2-exp-pred">' +
+          '<div class="dv2-exp-pred-title">Tu predicción</div>' +
+          '<div class="dv2-exp-pred-row">' +
+            '<span class="dv2-exp-pred-score">' + predScoreTxt + '</span>' +
+            '<span class="dv2-exp-pred-gol">' + golLabel + '</span>' +
+          '</div>' +
+          predStatusHtml +
+        '</div>';
+    }
+
+    return (
+      '<div class="dv2-exp" id="dcard-' + idx + '" data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
+        headerHtml +
+        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
+        '<div class="dv2-exp-mid">' +
+          '<div class="dv2-exp-team">' +
+            '<div class="dv2-exp-flag">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</div>' +
+            '<div class="dv2-exp-team-name">' + m.home + '</div>' +
+          '</div>' +
+          '<div class="dv2-exp-score">' +
+            '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
+            '<span class="dv2-exp-score-sep">:</span>' +
+            '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
+          '</div>' +
+          '<div class="dv2-exp-team">' +
+            '<div class="dv2-exp-flag">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</div>' +
+            '<div class="dv2-exp-team-name">' + m.away + '</div>' +
           '</div>' +
         '</div>' +
+        periodHtml +
+        scorersHtml +
+        predHtml +
+        '<button class="dv2-exp-collapse" type="button" data-collapse="1" aria-label="Contraer tarjeta">▲ Contraer</button>' +
       '</div>'
     );
   }
@@ -465,6 +551,12 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // Estado local: matchKey de la card expandida (null = ninguna).
+  // Solo UNA expandida a la vez. Click en mini-row alterna.
+  // ─────────────────────────────────────────────────────────────
+  let _expandedKey = null;
+
+  // ─────────────────────────────────────────────────────────────
   // Render completo de la vista Directo
   // ─────────────────────────────────────────────────────────────
   function renderVistaDirecto() {
@@ -495,11 +587,50 @@
     });
     const dias = Object.keys(jornadasMap).sort();
 
+    // Resolver expanded match (validar que existe en PARTIDOS y aún tiene matchKey)
+    let expandedEntry = null;
+    if (_expandedKey) {
+      for (let i = 0; i < PARTIDOS.length; i++) {
+        if (getDirectoKey(PARTIDOS[i]) === _expandedKey) {
+          expandedEntry = { m: PARTIDOS[i], idx: i };
+          break;
+        }
+      }
+      if (!expandedEntry) _expandedKey = null;
+    }
+
+    // Recolectar partidos en vivo (excluyendo el expandido).
+    const otherLive = [];
+    PARTIDOS.forEach((m, idx) => {
+      const dk = getDirectoKey(m);
+      if (!dk || dk === _expandedKey) return;
+      const row = window._liveScoresByMatchKey[dk];
+      if (row && (row.status === 'inprogress' || row.status === 'halftime' ||
+                  row.status === 'overtime'   || row.status === 'penalties')) {
+        otherLive.push({ m, idx });
+      }
+    });
+    const otherLiveKeys = new Set(otherLive.map(x => getDirectoKey(x.m)));
+
     // Reusa la función de ranking de jornada si existe
     const sidebarHtml = (typeof window._buildJornadaRanking === 'function')
       ? window._buildJornadaRanking()
       : '';
 
+    // ── Bloque expanded + "Otros partidos en vivo" (si aplica) ──
+    let topHtml = '';
+    if (expandedEntry) {
+      topHtml += '<div class="dv2-expanded-wrap">' + _buildDExpanded(expandedEntry.m, expandedEntry.idx) + '</div>';
+      if (otherLive.length > 0) {
+        topHtml += '<div class="dv2-section-label">Otros partidos en vivo</div>';
+        topHtml += '<div class="dv2-mini-list">';
+        otherLive.forEach(({ m, idx }) => { topHtml += _buildDMini(m, idx); });
+        topHtml += '</div>';
+      }
+    }
+
+    // ── Listado por día con mini-rows ──
+    // Excluir: el expandido y los inprogress que ya están en "Otros en vivo".
     let sectionsHtml = '';
     dias.forEach((date, dIdx) => {
       const jNum = dIdx + 1;
@@ -507,7 +638,14 @@
         weekday: 'long', day: 'numeric', month: 'long'
       });
 
-      // Contar cuántos partidos están EN VIVO hoy
+      const matchesOfDay = jornadasMap[date].filter(({ m }) => {
+        const dk = getDirectoKey(m);
+        if (dk === _expandedKey) return false;
+        if (otherLiveKeys.has(dk)) return false;
+        return true;
+      });
+      if (matchesOfDay.length === 0) return;
+
       let liveCount = 0;
       jornadasMap[date].forEach(({ m }) => {
         const dk = getDirectoKey(m);
@@ -525,28 +663,49 @@
       sectionsHtml += '<span class="directo-date">' + dayLabel + '</span>';
       sectionsHtml += liveBadge;
       sectionsHtml += '</div>';
-
-      jornadasMap[date].forEach(({ m, idx }) => {
-        sectionsHtml += _buildDCard(m, idx);
-      });
-
+      sectionsHtml += '<div class="dv2-mini-list">';
+      matchesOfDay.forEach(({ m, idx }) => { sectionsHtml += _buildDMini(m, idx); });
+      sectionsHtml += '</div>';
       sectionsHtml += '</div>';
     });
 
     // Sección simulacros (solo admin, solo si hay alguno)
     const simsHtml = (window._isAdminCached === true) ? _buildSimulacrosSectionHtml() : '';
 
+    const mainHtml = simsHtml + topHtml + sectionsHtml;
+
     if (sidebarHtml) {
       container.innerHTML =
         '<div class="directo-wrap">' +
-          '<div class="directo-main">' + simsHtml + sectionsHtml + '</div>' +
+          '<div class="directo-main">' + mainHtml + '</div>' +
           '<div class="directo-sidebar">' + sidebarHtml + '</div>' +
         '</div>';
     } else {
-      container.innerHTML = '<div class="directo-main">' + simsHtml + sectionsHtml + '</div>';
+      container.innerHTML = '<div class="directo-main">' + mainHtml + '</div>';
     }
+
+    // Wire click handler delegado (asignación directa para no acumular listeners
+    // en sucesivos render — sustituye el handler anterior si existía).
+    container.onclick = _onDirectoClick;
   }
   window.renderVistaDirecto = renderVistaDirecto;
+
+  // Click delegado: alterna expandido al pulsar mini-row;
+  // pulsar Contraer (botón en la expanded) la cierra.
+  function _onDirectoClick(e) {
+    const collapseBtn = e.target.closest('[data-collapse]');
+    if (collapseBtn) {
+      _expandedKey = null;
+      renderVistaDirecto();
+      return;
+    }
+    const mini = e.target.closest('.dv2-mini');
+    if (!mini) return;
+    const key = mini.getAttribute('data-match-key');
+    if (!key) return;
+    _expandedKey = (_expandedKey === key) ? null : key;
+    renderVistaDirecto();
+  }
 
   // ─────────────────────────────────────────────────────────────
   // Actualizar una tarjeta de SIMULACRO (llamado por live-sync.js)
@@ -584,18 +743,26 @@
     const container = document.getElementById('directo-container');
     if (!container || container.style.display === 'none') return;
 
-    // Buscar la tarjeta existente por data-match-key
+    // Buscar la tarjeta existente por data-match-key. Puede ser un mini o el
+    // expanded; el atributo está presente en ambos.
     const existing = container.querySelector('[data-match-key="' + matchKey + '"]');
     if (!existing) return;
 
-    const idx = parseInt(existing.id.replace('dcard-', ''), 10);
+    const idx = parseInt(existing.getAttribute('data-match-idx') ||
+                         (existing.id ? existing.id.replace('dcard-', '') : ''), 10);
     if (isNaN(idx)) return;
     const m = PARTIDOS[idx];
     if (!m) return;
 
-    // Reemplazar con versión actualizada
+    // Si un partido pasa a inprogress y no tenemos nada expandido, podríamos
+    // re-render para que aparezca en "Otros en vivo" — por simplicidad solo
+    // hacemos repintado in-place del nodo. Cambios estructurales (e.g. de
+    // notstarted → inprogress fuera del expandido) se reflejan en el siguiente
+    // renderVistaDirecto natural.
+    const isExpanded = existing.classList && existing.classList.contains('dv2-exp');
+    const html = isExpanded ? _buildDExpanded(m, idx) : _buildDMini(m, idx);
     const tmp = document.createElement('div');
-    tmp.innerHTML = _buildDCard(m, idx);
+    tmp.innerHTML = html;
     const newCard = tmp.firstElementChild;
     if (newCard) existing.replaceWith(newCard);
   }

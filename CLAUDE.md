@@ -21,6 +21,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
 3. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
 4. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
+5. **Grupos compact view** (sprint diferido): replicar formato Fase Final — cards embebidas por letra A-L. Ref: `ui-elim-shell.js` ElimRow+ElimExpanded. Toca `createMatchCard` + `renderAll` (`scoring.js:1289`) + `ui-groups-mobile.js` mobile-collapse.
 
 ## Pendientes — Antes del 11 junio 2026
 

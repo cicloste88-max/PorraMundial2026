@@ -15,9 +15,14 @@
   // ESTADO
   // ─────────────────────────────────────────────────────────────
   var _state = {
-    active: 'ko16',          // paso seleccionado del stepper (no 'grupos')
-    expandedPhase: null      // phase key expandida en la lista (null = ninguna)
+    active: 'ko16',                  // paso seleccionado del stepper (no 'grupos')
+    expandedPhase: null,             // phase key expandida en la lista (null = ninguna)
+    activeAction: 'mis-pronosticos'  // 'mis-pronosticos' (default) | 'cuadro' (bracket oficial) | 'premios' (awards)
   };
+
+  // Placeholders para restaurar awards-box4 / brk-root a su parent original al volver al default.
+  var _awardsPlaceholder  = null;
+  var _bracketPlaceholder = null;
 
   var _PHASES = [
     { key: 'grupos', label: 'Grupos', total: 72 },
@@ -109,26 +114,30 @@
       ? '<span class="fc-elim-header__admin-badge">ADMIN</span>'
       : '';
 
-    var cuadroActiveClass = state.activeAction === 'cuadro' ? ' is-active' : '';
+    var cuadroActiveClass  = state.activeAction === 'cuadro' ? ' is-active' : '';
     var premiosActiveClass = state.activeAction === 'premios' ? ' is-active' : '';
-    var cuadroDisabled = !state.onCuadro ? ' style="cursor:not-allowed;opacity:.5"' : '';
-    var premiosDisabled = !state.onPremios ? ' style="cursor:not-allowed;opacity:.5"' : '';
 
     var sub = (typeof escapeHtml === 'function')
       ? escapeHtml(state.subtitle || '')
       : (state.subtitle || '');
 
+    // Botón superior contextual:
+    //   subtab activo → "← Volver" (reset a mis-pronosticos).
+    //   estado base   → "← Inicio" (showPage('welcome')).
+    var inSubtab = (state.activeAction === 'cuadro' || state.activeAction === 'premios');
+    var backLabel = inSubtab ? 'Volver' : 'Inicio';
+
     mount.innerHTML =
       '<div class="fc-elim-header__top">' +
-        '<button class="fc-elim-header__back" type="button">' + backIcon + ' Inicio</button>' +
+        '<button class="fc-elim-header__back" type="button" data-action="' + (inSubtab ? 'reset' : 'home') + '">' + backIcon + ' ' + backLabel + '</button>' +
         '<div class="fc-elim-header__brand">' +
           '<div class="fc-elim-header__brand-title">Porra Mundial 2026</div>' +
           '<div class="fc-elim-header__brand-sub">' + sub + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="fc-elim-header__actions">' +
-        '<button class="fc-elim-header__action fc-elim-header__action--cuadro' + cuadroActiveClass + '" type="button"' + cuadroDisabled + '>Cuadro oficial</button>' +
-        '<button class="fc-elim-header__action fc-elim-header__action--premios' + premiosActiveClass + '" type="button"' + premiosDisabled + '>Premios</button>' +
+        '<button class="fc-elim-header__action fc-elim-header__action--cuadro' + cuadroActiveClass + '" type="button">Cuadro oficial</button>' +
+        '<button class="fc-elim-header__action fc-elim-header__action--premios' + premiosActiveClass + '" type="button">Premios</button>' +
       '</div>' +
       '<div class="fc-elim-header__points">' +
         'Puntos: <strong>' + Math.floor(state.points || 0) + '</strong>' +
@@ -136,7 +145,15 @@
       '</div>';
 
     var backBtn = mount.querySelector('.fc-elim-header__back');
-    if (backBtn) backBtn.addEventListener('click', function () { showPage('welcome'); });
+    if (backBtn) {
+      backBtn.addEventListener('click', function () {
+        if (backBtn.getAttribute('data-action') === 'reset' && typeof state.onBack === 'function') {
+          state.onBack();
+        } else {
+          showPage('welcome');
+        }
+      });
+    }
 
     if (state.onCuadro) {
       var cuadroBtn = mount.querySelector('.fc-elim-header__action--cuadro');
@@ -499,15 +516,147 @@
   // ─────────────────────────────────────────────────────────────
   // ENTRY
   // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // ACTION VIEW — 3 estados:
+  //   'mis-pronosticos' → stepper + list + dice (default)
+  //   'cuadro'          → bracket oficial real (bracket-results.js en
+  //                       #fc-elim-bracket-pane, banner pre-torneo si
+  //                       hoy < 11-jun-2026)
+  //   'premios'         → awards-box4 (en #fc-elim-awards-pane)
+  // Awards y brk-root se mueven con placeholders Comment para poder
+  // restaurarlos a su parent original al volver al default.
+  // ─────────────────────────────────────────────────────────────
+  function _restoreAwardsBox() {
+    var box = document.getElementById('awards-box4');
+    if (box && _awardsPlaceholder && _awardsPlaceholder.parentNode &&
+        box.parentNode && box.parentNode.id === 'fc-elim-awards-pane') {
+      _awardsPlaceholder.parentNode.insertBefore(box, _awardsPlaceholder);
+      _awardsPlaceholder.parentNode.removeChild(_awardsPlaceholder);
+      _awardsPlaceholder = null;
+    }
+  }
+
+  function _restoreBrkRoot() {
+    var root = document.getElementById('brk-root');
+    if (root && _bracketPlaceholder && _bracketPlaceholder.parentNode &&
+        root.parentNode && root.parentNode.id === 'fc-elim-bracket-pane') {
+      _bracketPlaceholder.parentNode.insertBefore(root, _bracketPlaceholder);
+      _bracketPlaceholder.parentNode.removeChild(_bracketPlaceholder);
+      _bracketPlaceholder = null;
+    }
+  }
+
+  function _isPreTournament() {
+    // Mundial 2026 arranca 11 jun 2026. Banner activo hasta esa fecha.
+    return Date.now() < new Date('2026-06-11T00:00:00Z').getTime();
+  }
+
+  function _renderBracketBanner(pane) {
+    // Banner pre-torneo dentro del bracket pane. Se inserta antes de #brk-root.
+    if (!pane) return;
+    var existing = pane.querySelector('.fc-elim-bracket-banner');
+    if (_isPreTournament()) {
+      if (!existing) {
+        var banner = document.createElement('div');
+        banner.className = 'fc-elim-bracket-banner';
+        banner.style.cssText = 'margin:12px 16px 16px;padding:14px 16px;border-radius:12px;background:#10151f;border:1px solid #1e2738;color:#9ca3af;font-size:13px;line-height:1.5';
+        banner.innerHTML = '<strong style="color:#fbbf24">El cuadro oficial se actualizará cuando comience el Mundial</strong><br>' +
+                           'Inicio: 11 junio 2026 · Pre-torneo, los partidos aparecen como <em>Por definir</em>.';
+        pane.insertBefore(banner, pane.firstChild);
+      }
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  function _applyActionView() {
+    var stepper     = document.getElementById('fc-elim-stepper');
+    var list        = document.getElementById('fc-elim-list');
+    var dice        = document.getElementById('fc-elim-dice-banner');
+    var awardsPane  = document.getElementById('fc-elim-awards-pane');
+    var bracketPane = document.getElementById('fc-elim-bracket-pane');
+    var awardsBox   = document.getElementById('awards-box4');
+    var brkRoot     = document.getElementById('brk-root');
+
+    var action = _state.activeAction;
+
+    // Default visibility para stepper/list/dice
+    var showDefault = (action === 'mis-pronosticos');
+    if (stepper) stepper.style.display = showDefault ? '' : 'none';
+    if (list)    list.style.display    = showDefault ? '' : 'none';
+    if (dice)    dice.style.display    = showDefault ? '' : 'none';
+
+    // ── PREMIOS ──
+    if (action === 'premios') {
+      _restoreBrkRoot();
+      if (bracketPane) bracketPane.style.display = 'none';
+      if (awardsPane) {
+        awardsPane.style.display = 'block';
+        if (awardsBox && awardsBox.parentNode !== awardsPane) {
+          if (!_awardsPlaceholder) {
+            _awardsPlaceholder = document.createComment('awards-box4-placeholder');
+          }
+          awardsBox.parentNode.insertBefore(_awardsPlaceholder, awardsBox);
+          awardsPane.appendChild(awardsBox);
+        } else if (!awardsBox) {
+          awardsPane.innerHTML = '<div style="padding:32px 16px;text-align:center;color:#9ca3af;font-size:13px">Completa la fase de grupos para desbloquear los premios.</div>';
+        }
+      }
+      return;
+    }
+
+    // ── CUADRO OFICIAL ──
+    if (action === 'cuadro') {
+      _restoreAwardsBox();
+      if (awardsPane) { awardsPane.style.display = 'none'; awardsPane.innerHTML = ''; }
+      if (bracketPane) {
+        bracketPane.style.display = 'block';
+        if (brkRoot && brkRoot.parentNode !== bracketPane) {
+          if (!_bracketPlaceholder) {
+            _bracketPlaceholder = document.createComment('brk-root-placeholder');
+          }
+          brkRoot.parentNode.insertBefore(_bracketPlaceholder, brkRoot);
+          bracketPane.appendChild(brkRoot);
+        }
+        if (typeof window.initBracketResults === 'function') {
+          try { window.initBracketResults(); } catch (e) { console.warn('[ui-elim-shell] initBracketResults error:', e); }
+        }
+        _renderBracketBanner(bracketPane);
+      }
+      return;
+    }
+
+    // ── MIS PRONÓSTICOS (default) ──
+    _restoreAwardsBox();
+    _restoreBrkRoot();
+    if (awardsPane)  { awardsPane.style.display  = 'none'; awardsPane.innerHTML = ''; }
+    if (bracketPane) { bracketPane.style.display = 'none'; }
+  }
+
   function renderElimShell() {
     var progress = _computeProgress();
 
     _renderPorraHeader({
       points: _totalPoints(),
       subtitle: _getSubtitle(),
-      activeAction: null,
-      onCuadro: null,
-      onPremios: null
+      activeAction: _state.activeAction,
+      // Botón superior contextual: cuando hay subtab activo, "← Volver"
+      // resetea a estado base (mis-pronosticos). En estado base es "← Inicio".
+      onBack: function () {
+        _state.activeAction = 'mis-pronosticos';
+        renderElimShell();
+      },
+      // Click en subtab activa la vista; volver a clickar en una vista
+      // ya activa la deactiva → vuelve a 'mis-pronosticos' (estado base
+      // sin botón propio: stepper + list + dice).
+      onCuadro: function () {
+        _state.activeAction = (_state.activeAction === 'cuadro') ? 'mis-pronosticos' : 'cuadro';
+        renderElimShell();
+      },
+      onPremios: function () {
+        _state.activeAction = (_state.activeAction === 'premios') ? 'mis-pronosticos' : 'premios';
+        renderElimShell();
+      }
     });
 
     _renderPhaseStepper({
@@ -518,13 +667,24 @@
         // Stepper key → row key (final stepper expande row 'final';
         // 'third' solo accesible vía click directo en su fila).
         _state.expandedPhase = key;
+        // Si el usuario interactúa con el stepper, está navegando sus pronósticos.
+        _state.activeAction = 'mis-pronosticos';
         renderElimShell();
       }
     });
 
     _renderList();
+    _applyActionView();
   }
 
-  window.renderElimShell = renderElimShell;
-  window._elimShellState = _state; // expuesto para debug
+  // Reset al estado base (mis-pronosticos). Lo llama showPage('elim') en
+  // ui-nav.js para que cada entrada/re-entrada al tab 'Fase final' arranque
+  // limpia, sin un subtab heredado de la sesión anterior.
+  function elimShellResetAction() {
+    _state.activeAction = 'mis-pronosticos';
+  }
+
+  window.renderElimShell      = renderElimShell;
+  window.elimShellResetAction = elimShellResetAction;
+  window._elimShellState      = _state; // expuesto para debug
 })();
