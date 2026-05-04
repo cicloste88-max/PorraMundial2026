@@ -547,19 +547,17 @@ function _showJcardModal(matchKey) {
   overlay.id = 'jcard-modal-overlay';
   overlay.style.cssText =
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
-    'display:flex;align-items:center;justify-content:center;padding:16px;' +
-    'animation:fadeIn .15s ease;';
+    'display:flex;align-items:flex-start;justify-content:center;padding:16px;' +
+    'overflow-y:auto;animation:fadeIn .15s ease;';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   const wrapper = document.createElement('div');
-  wrapper.style.cssText =
-    'max-width:480px;width:100%;max-height:90vh;overflow-y:auto;' +
-    'border-radius:16px;position:relative;';
+  wrapper.style.cssText = 'max-width:480px;width:100%;position:relative;';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '\u2715';
   closeBtn.style.cssText =
-    'position:sticky;top:8px;float:right;margin:8px 8px 0 0;z-index:1;' +
+    'position:absolute;top:8px;right:8px;z-index:2;' +
     'background:rgba(0,0,0,.6);border:1px solid #3a3a3e;color:#9ca3af;' +
     'width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;' +
     'display:flex;align-items:center;justify-content:center;';
@@ -576,6 +574,15 @@ function _showJcardModal(matchKey) {
   wrapper.appendChild(clone);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
+
+  const available = window.innerWidth - 32;
+  const cloneW = clone.scrollWidth;
+  if (cloneW > available) {
+    const ratio = available / cloneW;
+    clone.style.transform = 'scale(' + ratio + ')';
+    clone.style.transformOrigin = 'top center';
+    wrapper.style.height = (clone.offsetHeight * ratio) + 'px';
+  }
 }
 window.openJcardModal = openJcardModal;
 
