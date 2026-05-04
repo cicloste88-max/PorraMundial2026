@@ -16,8 +16,12 @@
   // ─────────────────────────────────────────────────────────────
   var _state = {
     active: 'ko16',          // paso seleccionado del stepper (no 'grupos')
-    expandedPhase: null      // phase key expandida en la lista (null = ninguna)
+    expandedPhase: null,     // phase key expandida en la lista (null = ninguna)
+    activeAction: 'cuadro'   // 'cuadro' (bracket+stepper visible) | 'premios' (awards-box4)
   };
+
+  // Placeholder para restaurar awards-box4 a su parent original al volver de 'premios'.
+  var _awardsPlaceholder = null;
 
   var _PHASES = [
     { key: 'grupos', label: 'Grupos', total: 72 },
@@ -499,15 +503,66 @@
   // ─────────────────────────────────────────────────────────────
   // ENTRY
   // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // ACTION VIEW — toggle Cuadro oficial ↔ Premios
+  // Mueve awards-box4 entre su parent original (#view-cinematic >
+  // .final-section > .final-row2) y #fc-elim-awards-pane usando un
+  // placeholder para poder restaurarlo en su sitio.
+  // ─────────────────────────────────────────────────────────────
+  function _applyActionView() {
+    var stepper = document.getElementById('fc-elim-stepper');
+    var list    = document.getElementById('fc-elim-list');
+    var dice    = document.getElementById('fc-elim-dice-banner');
+    var pane    = document.getElementById('fc-elim-awards-pane');
+    var box     = document.getElementById('awards-box4');
+
+    if (_state.activeAction === 'premios') {
+      if (stepper) stepper.style.display = 'none';
+      if (list)    list.style.display    = 'none';
+      if (dice)    dice.style.display    = 'none';
+      if (pane) {
+        pane.style.display = 'block';
+        if (box && box.parentNode !== pane) {
+          if (!_awardsPlaceholder) {
+            _awardsPlaceholder = document.createComment('awards-box4-placeholder');
+          }
+          box.parentNode.insertBefore(_awardsPlaceholder, box);
+          pane.appendChild(box);
+        } else if (!box) {
+          pane.innerHTML = '<div style="padding:32px 16px;text-align:center;color:#9ca3af;font-size:13px">Completa la fase de grupos para desbloquear los premios.</div>';
+        }
+      }
+    } else {
+      // Restaurar awards-box4 a su sitio original si lo movimos.
+      if (box && pane && box.parentNode === pane && _awardsPlaceholder && _awardsPlaceholder.parentNode) {
+        _awardsPlaceholder.parentNode.insertBefore(box, _awardsPlaceholder);
+        _awardsPlaceholder.parentNode.removeChild(_awardsPlaceholder);
+        _awardsPlaceholder = null;
+      }
+      if (pane) { pane.style.display = 'none'; pane.innerHTML = ''; }
+      if (stepper) stepper.style.display = '';
+      if (list)    list.style.display    = '';
+      if (dice)    dice.style.display    = '';
+    }
+  }
+
   function renderElimShell() {
     var progress = _computeProgress();
 
     _renderPorraHeader({
       points: _totalPoints(),
       subtitle: _getSubtitle(),
-      activeAction: null,
-      onCuadro: null,
-      onPremios: null
+      activeAction: _state.activeAction,
+      onCuadro: function () {
+        if (_state.activeAction === 'cuadro') return;
+        _state.activeAction = 'cuadro';
+        renderElimShell();
+      },
+      onPremios: function () {
+        if (_state.activeAction === 'premios') return;
+        _state.activeAction = 'premios';
+        renderElimShell();
+      }
     });
 
     _renderPhaseStepper({
@@ -518,11 +573,14 @@
         // Stepper key → row key (final stepper expande row 'final';
         // 'third' solo accesible vía click directo en su fila).
         _state.expandedPhase = key;
+        // Si el usuario interactúa con el stepper, asumimos que quiere ver el cuadro.
+        _state.activeAction = 'cuadro';
         renderElimShell();
       }
     });
 
     _renderList();
+    _applyActionView();
   }
 
   window.renderElimShell = renderElimShell;
