@@ -268,10 +268,13 @@
 }
 .fc-grupos-carousel::-webkit-scrollbar { display: none; }
 
+/* Slot responsive: en viewports >376px se queda en 320px (compromiso óptimo
+   con maquetación interna de la tarjeta editable). En mobile <376px reduce
+   al ancho disponible (100vw - 56px = 14px×2 carousel padding + 14px×2 card
+   margin) para que UN slot quepa completo + sneak peek del siguiente. */
 .fc-grupos-slot {
   flex-shrink: 0;
-  width: 320px;
-  min-width: 320px;
+  width: min(320px, calc(100vw - 56px));
   scroll-snap-align: center;
 }
 

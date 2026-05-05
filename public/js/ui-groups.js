@@ -955,8 +955,8 @@ function _renderGruposCardShell(letra, partidosCount) {
     '<div class="collap-body">' +
       '<div class="collap-body-inner">' +
         '<div class="fc-grupos-card__carousel-mount" data-letra="' + letra + '"></div>' +
-        '<div class="cards-grid" id="grid-' + letra + '" hidden></div>' +
-        '<div id="gtable-' + letra + '" class="group-table-card" hidden></div>' +
+        '<div class="cards-grid" id="grid-' + letra + '"></div>' +
+        '<div id="gtable-' + letra + '" class="group-table-card"></div>' +
       '</div>' +
     '</div>';
 
