@@ -952,3 +952,75 @@ function _renderGruposCarousel(letra, cardEls, gtableEl) {
 }
 
 window._renderGruposCarousel = _renderGruposCarousel;
+
+// ─────────────────────────────────────────────────────────────────────
+// G4 · Slot 7 tabla clasificación restilada. Reusa calcGroupTableAdvanced
+// (scoring.js:234) — NO reinventa el cálculo, solo restila el output.
+// Override de renderGroupTableCard (cargado desde scoring.js:268) — esta
+// definición gana porque ui-groups.js carga DESPUÉS (main-entry.js:57-58).
+// Mantiene el contrato: pinta dentro de #gtable-{letra} para que
+// refreshGroupTables siga funcionando.
+// ─────────────────────────────────────────────────────────────────────
+
+function _renderGruposStandings(letra) {
+  if (typeof calcGroupTableAdvanced !== 'function') return null;
+  var rows = calcGroupTableAdvanced(letra) || [];
+  var rowsHtml = rows.slice(0, 4).map(function (t, idx) {
+    var team = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === t.name || e.slug === t.slug; }) : null;
+    var code = (team && team.flag) ? team.flag : (t.name || '').slice(0, 3).toUpperCase();
+    var src = (team && team.flag && typeof SB !== 'undefined') ? (SB + '/flags/' + team.flag + '.png') : '';
+    var qualifClass = idx < 2 ? ' fc-grupos-standings__row--qualif' : '';
+    var gd = t.gd != null ? t.gd : ((t.gf || 0) - (t.gc || 0));
+    var gdLabel = gd > 0 ? '+' + gd : String(gd);
+    return (
+      '<div class="fc-grupos-standings__row' + qualifClass + '" role="row">' +
+        '<span class="fc-grupos-standings__pos">' + (idx + 1) + '</span>' +
+        '<span class="fc-grupos-standings__flag">' +
+          (src ? '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(code) + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-fallback\');"/>' : '') +
+          '<span class="fc-grupos-standings__flag-code">' + escapeHtml(code) + '</span>' +
+        '</span>' +
+        '<span class="fc-grupos-standings__name">' + escapeHtml(t.name || '') + '</span>' +
+        '<span class="fc-grupos-standings__pj">' + (t.pj || 0) + '</span>' +
+        '<span class="fc-grupos-standings__gd">' + gdLabel + '</span>' +
+        '<span class="fc-grupos-standings__pts">' + (t.pts || 0) + '</span>' +
+      '</div>'
+    );
+  }).join('');
+
+  var headerHtml =
+    '<div class="fc-grupos-standings__head" role="row">' +
+      '<span class="fc-grupos-standings__pos">#</span>' +
+      '<span class="fc-grupos-standings__flag"></span>' +
+      '<span class="fc-grupos-standings__name">EQUIPO</span>' +
+      '<span class="fc-grupos-standings__pj">PJ</span>' +
+      '<span class="fc-grupos-standings__gd">GD</span>' +
+      '<span class="fc-grupos-standings__pts">PTS</span>' +
+    '</div>';
+
+  var card = document.createElement('div');
+  card.className = 'fc-grupos-standings';
+  card.innerHTML =
+    '<h3 class="fc-grupos-standings__title">CLASIFICACIÓN GRUPO ' + letra + '</h3>' +
+    '<div class="fc-grupos-standings__table" role="table">' +
+      headerHtml +
+      rowsHtml +
+    '</div>' +
+    '<div class="fc-grupos-standings__footer">Top 2 → 1/16 · 8 mejores 3os clasifican</div>';
+
+  return card;
+}
+
+window._renderGruposStandings = _renderGruposStandings;
+
+// Override renderGroupTableCard — wins over scoring.js:268 by load order.
+// Conserva el contrato: pinta en #gtable-{letra} para que refreshGroupTables
+// + diceSimulateGroup + savePredictions sigan funcionando.
+function renderGroupTableCard(letra) {
+  var gtable = document.getElementById('gtable-' + letra);
+  if (!gtable) return;
+  gtable.innerHTML = '';
+  var card = window._renderGruposStandings && window._renderGruposStandings(letra);
+  if (card) gtable.appendChild(card);
+}
+
+window.renderGroupTableCard = renderGroupTableCard;

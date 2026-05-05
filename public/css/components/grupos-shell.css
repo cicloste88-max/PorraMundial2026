@@ -309,3 +309,103 @@
 @media (max-width: 640px) {
   .fc-grupos-carousel__arrow { display: none !important; }
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   G4 — Slot 7 tabla clasificación (restyling)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-standings {
+  background: linear-gradient(180deg, #1a1a1e 0%, #16161a 100%);
+  border: 1px solid rgba(245, 158, 11, 0.20);
+  border-radius: 14px;
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fc-grupos-standings__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #f59e0b;
+  margin: 0 0 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.fc-grupos-standings__table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.fc-grupos-standings__head,
+.fc-grupos-standings__row {
+  display: grid;
+  grid-template-columns: 18px 18px 1fr 24px 28px 28px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 4px;
+  border-radius: 6px;
+}
+
+.fc-grupos-standings__head {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  text-transform: uppercase;
+  border-bottom: 1px solid #2a2a2e;
+}
+
+.fc-grupos-standings__row {
+  font-size: 12px;
+  color: #d1d5db;
+}
+
+.fc-grupos-standings__row--qualif {
+  background: rgba(74, 222, 128, 0.06);
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.fc-grupos-standings__pos { text-align: center; font-weight: 700; }
+
+.fc-grupos-standings__flag {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2a2a2e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.fc-grupos-standings__flag img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.fc-grupos-standings__flag-code { font-size: 6px; font-weight: 700; color: #f0f0f0; position: absolute; display: none; }
+.fc-grupos-standings__flag.is-fallback .fc-grupos-standings__flag-code { display: inline; }
+
+.fc-grupos-standings__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-grupos-standings__pj,
+.fc-grupos-standings__gd { text-align: center; font-weight: 600; }
+.fc-grupos-standings__pts { text-align: right; font-weight: 800; }
+
+.fc-grupos-standings__footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #2a2a2e;
+  font-size: 9px;
+  color: #6b7280;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
