@@ -589,16 +589,20 @@ function _renderUserStrip() {
 }
 window._renderUserStrip = _renderUserStrip;
 
-function openJcardModal(matchKey) {
+function openJcardModal(matchKey, opts) {
+  opts = opts || {};
   const cardEl = document.getElementById('card-wrap-' + matchKey);
   if (!cardEl) {
-    renderAll(() => _showJcardModal(matchKey));
+    renderAll(() => _showJcardModal(matchKey, opts));
     return;
   }
-  _showJcardModal(matchKey);
+  _showJcardModal(matchKey, opts);
 }
 
-function _showJcardModal(matchKey) {
+function _showJcardModal(matchKey, opts) {
+  opts = opts || {};
+  const editable = !!opts.editable;
+
   const prev = document.getElementById('jcard-modal-overlay');
   if (prev) prev.remove();
 
@@ -611,7 +615,6 @@ function _showJcardModal(matchKey) {
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
     'display:flex;align-items:flex-start;justify-content:center;padding:16px;' +
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
@@ -626,43 +629,77 @@ function _showJcardModal(matchKey) {
     'background:rgba(0,0,0,.6);border:1px solid #3a3a3e;color:#9ca3af;' +
     'width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;' +
     'display:flex;align-items:center;justify-content:center;';
-  closeBtn.onclick = () => overlay.remove();
 
-  const clone = cardEl.cloneNode(true);
+  let target;                     // Element shown inside the modal
+  let originalParent = null;      // Para restituir en modo editable
+  let originalNextSibling = null; // Anchor exacto de inserci\u00f3n
+  let originalStyleAttr = null;   // style attribute string original
 
-  // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
-  // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
-  // toca la propiedad, no el atributo selected), as\u00ed que el clone perd\u00eda
-  // el goleador. Copiamos los valores manualmente del original al clone
-  // (mismo orden de selects, mismo orden de inputs/checkbox).
-  const origSelects  = cardEl.querySelectorAll('select');
-  const cloneSelects = clone.querySelectorAll('select');
-  origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
-  const origInputs  = cardEl.querySelectorAll('input');
-  const cloneInputs = clone.querySelectorAll('input');
-  origInputs.forEach((inp, i) => {
-    if (!cloneInputs[i]) return;
-    if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
-    else cloneInputs[i].value = inp.value;
-  });
+  if (editable) {
+    // MOVER el original. Save anchors for exact restoration on close.
+    originalParent = cardEl.parentNode;
+    originalNextSibling = cardEl.nextSibling;
+    originalStyleAttr = cardEl.getAttribute('style');
+    target = cardEl;
+  } else {
+    // CLONE + disable (Jornada "Ver tarjeta" read-only path).
+    const clone = cardEl.cloneNode(true);
+    // cloneNode(true) NO transfiere el .value runtime de <select>; auth.js
+    // asigna gselEl.value = pred.gol solo a la propiedad \u2014 el clone perd\u00eda
+    // el goleador. Copiamos manualmente.
+    const origSelects  = cardEl.querySelectorAll('select');
+    const cloneSelects = clone.querySelectorAll('select');
+    origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
+    const origInputs  = cardEl.querySelectorAll('input');
+    const cloneInputs = clone.querySelectorAll('input');
+    origInputs.forEach((inp, i) => {
+      if (!cloneInputs[i]) return;
+      if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
+      else cloneInputs[i].value = inp.value;
+    });
 
-  clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  clone.querySelectorAll('button,input,select').forEach(el => {
-    el.disabled = true;
-    el.style.pointerEvents = 'none';
-  });
+    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    clone.querySelectorAll('button,input,select').forEach(el => {
+      el.disabled = true;
+      el.style.pointerEvents = 'none';
+    });
+    target = clone;
+  }
 
-  clone.style.margin = '0 auto';
-  clone.style.left = '0';
-  clone.style.right = '0';
+  // Layout adjustments (mismas para clone y original).
+  target.style.margin = '0 auto';
+  target.style.left = '0';
+  target.style.right = '0';
 
   wrapper.appendChild(closeBtn);
-  wrapper.appendChild(clone);
+  wrapper.appendChild(target);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
-  clone.style.width = (clone.offsetWidth - 5) + 'px';
-  clone.style.margin = '0 auto';
+  target.style.width = (target.offsetWidth - 5) + 'px';
+  target.style.margin = '0 auto';
+
+  function closeModal() {
+    if (editable && originalParent) {
+      // Restituir style attribute original exacto.
+      if (originalStyleAttr === null) target.removeAttribute('style');
+      else target.setAttribute('style', originalStyleAttr);
+      // Restituir al lugar exacto del DOM.
+      if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
+        originalParent.insertBefore(target, originalNextSibling);
+      } else {
+        originalParent.appendChild(target);
+      }
+      // Notificar a consumidores (compact card preview, chip count, standings).
+      try {
+        document.dispatchEvent(new CustomEvent('jcard:updated', { detail: { matchKey: matchKey } }));
+      } catch (e) { /* no-op */ }
+    }
+    overlay.remove();
+  }
+
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+  closeBtn.onclick = closeModal;
 }
 window.openJcardModal = openJcardModal;
 
@@ -890,8 +927,9 @@ function _renderGruposCompactCard(match) {
   var card = document.createElement('div');
   card.className = 'ko-card fc-grupos-mini' + (pred.saved ? ' ko-saved' : '');
   card.style.cursor = 'pointer';
+  card.setAttribute('data-match-key', matchKey);
   card.addEventListener('click', function () {
-    if (typeof openJcardModal === 'function') openJcardModal(matchKey);
+    if (typeof openJcardModal === 'function') openJcardModal(matchKey, { editable: true });
   });
 
   var hHalf = hTeam
@@ -934,6 +972,57 @@ function _renderGruposCompactCard(match) {
 }
 
 window._renderGruposCompactCard = _renderGruposCompactCard;
+
+// Sprint B fix · al cerrar el modal editable, refrescar:
+//   1) compact card preview en el carrusel (estado/marcador del chip),
+//   2) chip count del letterbar (N/6),
+//   3) tabla clasificación del grupo afectado.
+// Listener registrado UNA vez (guard con flag en window).
+if (!window._jcardUpdatedListenerRegistered) {
+  window._jcardUpdatedListenerRegistered = true;
+  document.addEventListener('jcard:updated', function (ev) {
+    var mk = ev && ev.detail && ev.detail.matchKey;
+    if (!mk) return;
+    var match = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(function (m) {
+      return (typeof getMatchKey === 'function') ? getMatchKey(m) === mk : false;
+    }) : null;
+    if (!match) return;
+    // 1) Compact preview
+    var existing = document.querySelector('.fc-grupos-mini[data-match-key="' + mk + '"]');
+    if (existing && typeof _renderGruposCompactCard === 'function') {
+      var fresh = _renderGruposCompactCard(match);
+      if (fresh) existing.replaceWith(fresh);
+    }
+    // 2) Letterbar chip count
+    if (typeof _refreshGruposLetterBar === 'function') _refreshGruposLetterBar();
+    // 3) Standings table del grupo
+    if (typeof renderGroupTableCard === 'function' && match.group) {
+      renderGroupTableCard(match.group);
+    }
+    // 4) Header progress N/6 + state class del card colapsable
+    var cardSection = document.getElementById('grupo-card-' + match.group);
+    if (cardSection) {
+      var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === match.group; }) : [];
+      var done = partidos.filter(function (m) {
+        var p = (typeof predictions !== 'undefined') ? predictions[(typeof getMatchKey === 'function') ? getMatchKey(m) : null] : null;
+        return p && p.l != null && p.v != null;
+      }).length;
+      var total = partidos.length;
+      var stateClass = (done === total && total > 0) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
+      var bar = cardSection.querySelector('.fc-grupos-card__bar');
+      if (bar) {
+        bar.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+        bar.classList.add(stateClass);
+      }
+      var prog = cardSection.querySelector('.fc-grupos-card__progress');
+      if (prog) {
+        prog.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+        prog.classList.add(stateClass);
+        prog.textContent = done + '/' + total;
+      }
+    }
+  });
+}
 
 function _renderGruposCarousel(letra, matches, gtableEl) {
   var wrap = document.createElement('div');
