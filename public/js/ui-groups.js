@@ -857,7 +857,27 @@ function _getGroupCount(letra) {
   return done;
 }
 
+// Sprint Globo MVP: monta cinta dorada como sibling previo de #dice-global-bar.
+// Idempotente. Llamado desde _renderGruposLetterBar() para garantizar montaje
+// en cada render del page-grupos sin tocar index.html.
+function _ensureGloboCintaMount() {
+  var diceBar = document.getElementById('dice-global-bar');
+  if (!diceBar || !diceBar.parentNode) return;
+  var mount = document.getElementById('fc-globo-cinta-mount');
+  if (!mount) {
+    mount = document.createElement('div');
+    mount.id = 'fc-globo-cinta-mount';
+    diceBar.parentNode.insertBefore(mount, diceBar);
+  } else if (mount.nextSibling !== diceBar) {
+    diceBar.parentNode.insertBefore(mount, diceBar);
+  }
+  if (typeof window._mountGloboCinta === 'function') {
+    window._mountGloboCinta(mount);
+  }
+}
+
 function _renderGruposLetterBar() {
+  _ensureGloboCintaMount();
   var bar = document.getElementById('grupos-letter-bar');
   if (!bar) return;
   var letras = (typeof GRUPOS !== 'undefined' ? GRUPOS : []).map(function (g) { return g.letra; });
