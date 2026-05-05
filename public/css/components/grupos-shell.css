@@ -12,70 +12,37 @@
    G4 — .fc-grupos-standings / table / qualif row */
 
 /* ──────────────────────────────────────────────────────────────────────
-   G1 — Chips carousel A-L (top horizontal scroll)
+   G1 — Letter-bar A-L · replica visual del stepper Fase Final.
+   Reusa .fc-elim-stepper / .fc-elim-stepper__item / states existentes
+   en elim-shell.css. Este wrapper solo añade sticky-position y un
+   tweak mínimo de ajuste (12 items vs 6 del stepper original).
    ────────────────────────────────────────────────────────────────────── */
 
-.fc-grupos-letterbar {
-  display: flex;
-  gap: 8px;
-  padding: 10px 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-snap-type: x proximity;
-  margin-bottom: 8px;
-  background: #0d0f1a;
+.fc-grupos-stepper-wrap {
   position: sticky;
   top: 0;
   z-index: 50;
-}
-.fc-grupos-letterbar::-webkit-scrollbar { display: none; }
-
-.fc-grupos-chip {
-  flex-shrink: 0;
-  background: #1a1a1e;
-  border: 1px solid #2a2a2e;
-  border-radius: 12px;
-  padding: 8px 14px;
-  min-width: 64px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  font-family: inherit;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  scroll-snap-align: start;
+  background: var(--ink-900);
+  margin-bottom: 8px;
 }
 
-.fc-grupos-chip__letra {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1;
+/* Override del padding lateral del stepper para encajar con el listado de
+   cards (margin 0 14px). Mantiene gap, items y states del original. */
+.fc-grupos-stepper {
+  padding: 10px 14px;
+  gap: 4px;
 }
 
-.fc-grupos-chip__count {
-  font-size: 10px;
-  font-weight: 600;
-  color: #9aa0a6;
-  letter-spacing: 0.04em;
+/* El stepper original usa flex:1 para repartir 6 items. Con 12 letras
+   necesitamos que cada item respete su ancho mínimo y el contenedor
+   haga scroll horizontal cuando no caben. */
+.fc-grupos-stepper .fc-elim-stepper__item {
+  flex: 0 0 auto;
+  min-width: 48px;
 }
-
-.fc-grupos-chip.is-completo .fc-grupos-chip__letra { color: #4ade80; }
-.fc-grupos-chip.is-parcial  .fc-grupos-chip__letra { color: #f59e0b; }
-.fc-grupos-chip.is-vacio    .fc-grupos-chip__letra { color: #6b7280; }
-
-.fc-grupos-chip.is-active {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+.fc-grupos-stepper .fc-elim-stepper__item.is-active {
+  flex: 0 0 auto;
 }
-
-.fc-grupos-chip:hover { border-color: #3a3a3e; }
-.fc-grupos-chip:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
 
 /* ──────────────────────────────────────────────────────────────────────
    G2 — Card colapsable header (12 grupos A-L)
@@ -243,8 +210,9 @@
   scroll-snap-align: center;
 }
 
-/* La .card no tiene width propio; rellenará el slot por defecto. */
-.fc-grupos-slot--match > .card {
+/* Compact preview cards (.ko-card visual style replicado) llenan el slot. */
+.fc-grupos-slot--match > .ko-card,
+.fc-grupos-slot--match > .fc-grupos-mini {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -254,6 +222,11 @@
   width: 100%;
   box-sizing: border-box;
 }
+
+/* fc-grupos-mini compact preview — ajustes mínimos sobre el .ko-card de
+   Fase Final. Hero 130px ya es suficientemente compact. */
+.fc-grupos-mini { animation-delay: 0s !important; }
+.fc-grupos-mini:hover { transform: translateY(-2px); }
 
 /* Dots */
 .fc-grupos-carousel__dots {

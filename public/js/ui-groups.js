@@ -733,18 +733,23 @@ function _renderGruposLetterBar() {
   var bar = document.getElementById('grupos-letter-bar');
   if (!bar) return;
   var letras = (typeof GRUPOS !== 'undefined' ? GRUPOS : []).map(function (g) { return g.letra; });
-  var html = '<div class="fc-grupos-letterbar" role="tablist">';
+  // Replica visual del stepper de Fase Final (.fc-elim-stepper) — mismas
+  // pills, mismos states (is-active dorado / is-complete verde / is-locked).
+  // Sticky position via wrapper class .fc-grupos-stepper-wrap.
+  var html = '<div class="fc-grupos-stepper-wrap"><div class="fc-elim-stepper fc-grupos-stepper" role="tablist">';
   letras.forEach(function (letra) {
     var count = _getGroupCount(letra);
-    var state = count === 6 ? 'is-completo' : (count > 0 ? 'is-parcial' : 'is-vacio');
-    html += '<button type="button" class="fc-grupos-chip ' + state + '" data-letra="' + escapeHtml(letra) +
-              '" role="tab" aria-label="Grupo ' + escapeHtml(letra) +
-              '" onclick="_scrollToGrupoCard(\'' + escapeHtml(letra) + '\')">' +
-              '<span class="fc-grupos-chip__letra">' + escapeHtml(letra) + '</span>' +
-              '<span class="fc-grupos-chip__count">' + count + '/6</span>' +
+    var classes = 'fc-elim-stepper__item';
+    if (count === 6)        classes += ' is-complete';
+    var lbl = (typeof escapeHtml === 'function') ? escapeHtml(letra) : letra;
+    html += '<button type="button" class="' + classes +
+              '" data-letra="' + lbl + '" role="tab" aria-label="Grupo ' + lbl +
+              '" onclick="_scrollToGrupoCard(\'' + lbl + '\')">' +
+              '<span class="fc-elim-stepper__label">' + lbl + '</span>' +
+              '<span class="fc-elim-stepper__counter">' + count + '/6</span>' +
             '</button>';
   });
-  html += '</div>';
+  html += '</div></div>';
   bar.innerHTML = html;
 }
 
@@ -755,20 +760,19 @@ function _scrollToGrupoCard(letra) {
 }
 
 function _setActiveChip(letra) {
-  var chips = document.querySelectorAll('.fc-grupos-chip');
+  var chips = document.querySelectorAll('.fc-grupos-stepper .fc-elim-stepper__item');
   chips.forEach(function (c) {
     c.classList.toggle('is-active', c.getAttribute('data-letra') === letra);
   });
 }
 
 function _refreshGruposLetterBar() {
-  var chips = document.querySelectorAll('.fc-grupos-chip');
+  var chips = document.querySelectorAll('.fc-grupos-stepper .fc-elim-stepper__item');
   chips.forEach(function (c) {
     var letra = c.getAttribute('data-letra');
     var count = _getGroupCount(letra);
-    c.classList.remove('is-completo', 'is-parcial', 'is-vacio');
-    c.classList.add(count === 6 ? 'is-completo' : (count > 0 ? 'is-parcial' : 'is-vacio'));
-    var cnt = c.querySelector('.fc-grupos-chip__count');
+    c.classList.toggle('is-complete', count === 6);
+    var cnt = c.querySelector('.fc-elim-stepper__counter');
     if (cnt) cnt.textContent = count + '/6';
   });
 }
@@ -847,7 +851,91 @@ window._renderGruposCardShell = _renderGruposCardShell;
 // listeners de attachEvents porque appendChild mueve el Element.
 // ─────────────────────────────────────────────────────────────────────
 
-function _renderGruposCarousel(letra, cardEls, gtableEl) {
+// Compact preview card replicando el patrón visual de Fase Final (.ko-card).
+// NO renderiza la tarjeta editable inline — esa vive en hidden #grid-{letra}
+// para que openJcardModal pueda clonarla. Click compact → openJcardModal.
+function _renderGruposCompactCard(match) {
+  var matchKey = (typeof getMatchKey === 'function')
+    ? getMatchKey(match)
+    : (match.group + '_' + match.home + '_' + match.away);
+
+  var hTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === match.home; }) : null;
+  var aTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === match.away; }) : null;
+
+  var hKit = (hTeam && typeof kitUrl === 'function') ? kitUrl(hTeam.slug, 'home') : '';
+  var aKit = (aTeam && typeof kitUrl === 'function') ? kitUrl(aTeam.slug, 'away') : '';
+  var hFlag = hTeam ? ((typeof SB !== 'undefined' ? SB : '') + '/flags/' + hTeam.flag + '.png') : '';
+  var aFlag = aTeam ? ((typeof SB !== 'undefined' ? SB : '') + '/flags/' + aTeam.flag + '.png') : '';
+
+  var pred = (typeof predictions !== 'undefined') ? (predictions[matchKey] || {}) : {};
+  var estado = (typeof getEstadoPartido === 'function') ? getEstadoPartido(match) : 'open';
+
+  var statusCls = 'open';
+  var statusTxt = 'Pronosticar →';
+  if (pred.saved) {
+    statusCls = 'saved';
+    if (pred.l != null && pred.v != null) statusTxt = '✓ ' + pred.l + '–' + pred.v;
+    else statusTxt = '✓ Guardado';
+  } else if (estado === 'closed') { statusCls = 'locked'; statusTxt = '🔒 Cerrado'; }
+  else if (estado === 'live')     { statusCls = 'live';   statusTxt = '🔴 En vivo'; }
+  else if (estado === 'done')     { statusCls = 'done';   statusTxt = 'Finalizado'; }
+
+  var hLabel = (match.home || '');
+  var aLabel = (match.away || '');
+  if (hLabel.length > 11) hLabel = hLabel.substring(0, 10) + '.';
+  if (aLabel.length > 11) aLabel = aLabel.substring(0, 10) + '.';
+  var dateLabel = (typeof fmtDate === 'function') ? fmtDate(match.date) : '';
+  var timeLabel = (typeof fmtTime === 'function') ? fmtTime(match.date) : '';
+
+  var card = document.createElement('div');
+  card.className = 'ko-card fc-grupos-mini' + (pred.saved ? ' ko-saved' : '');
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', function () {
+    if (typeof openJcardModal === 'function') openJcardModal(matchKey);
+  });
+
+  var hHalf = hTeam
+    ? '<div class="ko-half L"><div class="ko-color" style="background:#fff"></div>' +
+        '<div class="ko-kit" style="background-image:linear-gradient(to bottom, rgba(10,10,20,0.5) 0%, transparent 35%),linear-gradient(to bottom, transparent 60%, rgba(10,10,20,0.6) 100%),url(\'' + hKit + '\')"></div>' +
+        '<div class="ko-vign"></div></div>'
+    : '';
+  var aHalf = aTeam
+    ? '<div class="ko-half R"><div class="ko-color" style="background:#fff"></div>' +
+        '<div class="ko-kit" style="background-image:linear-gradient(to bottom, rgba(10,10,20,0.5) 0%, transparent 35%),linear-gradient(to bottom, transparent 60%, rgba(10,10,20,0.6) 100%),url(\'' + aKit + '\')"></div>' +
+        '<div class="ko-vign"></div></div>'
+    : '';
+
+  card.innerHTML =
+    '<div class="ko-hero">' +
+      hHalf + aHalf +
+      '<div class="ko-fade"></div>' +
+      '<div class="ko-team home">' +
+        '<div class="ko-flag">' + (hTeam ? '<img src="' + hFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
+        '<div class="ko-tname">' + escapeHtml(hLabel) + '</div>' +
+        '<div class="ko-trole">local</div>' +
+      '</div>' +
+      '<div class="ko-team away">' +
+        '<div class="ko-flag">' + (aTeam ? '<img src="' + aFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
+        '<div class="ko-tname">' + escapeHtml(aLabel) + '</div>' +
+        '<div class="ko-trole">visitante</div>' +
+      '</div>' +
+      '<div class="ko-center">' +
+        '<div class="ko-vs-circle"><div class="ko-ball-bg"></div><span class="ko-vs-text">VS</span></div>' +
+        '<div class="ko-pill">' + escapeHtml(match.venue || ('Grupo ' + match.group)) + '</div>' +
+        '<div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);margin-top:3px;text-align:center;letter-spacing:.04em">' + escapeHtml(timeLabel) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ko-footer">' +
+      '<span class="ko-date">' + escapeHtml(dateLabel) + '</span>' +
+      '<span class="ko-status ' + statusCls + '">' + escapeHtml(statusTxt) + '</span>' +
+    '</div>';
+
+  return card;
+}
+
+window._renderGruposCompactCard = _renderGruposCompactCard;
+
+function _renderGruposCarousel(letra, matches, gtableEl) {
   var wrap = document.createElement('div');
   wrap.className = 'fc-grupos-carousel-wrap';
 
@@ -856,12 +944,15 @@ function _renderGruposCarousel(letra, cardEls, gtableEl) {
   carousel.setAttribute('role', 'region');
   carousel.setAttribute('aria-label', 'Partidos del grupo ' + letra);
 
-  // 6 match slots — mover Element original (preserva listeners attachEvents)
-  for (var i = 0; i < cardEls.length && i < 6; i++) {
+  // 6 match slots — compact preview cards (estilo Fase Final). Click → openJcardModal.
+  // Las tarjetas editables siguen viviendo en hidden #grid-{letra} para que el
+  // modal pueda clonarlas via cardEl = document.getElementById('card-wrap-{matchKey}').
+  for (var i = 0; i < matches.length && i < 6; i++) {
     var slot = document.createElement('div');
     slot.className = 'fc-grupos-slot fc-grupos-slot--match';
     slot.setAttribute('data-slot-idx', String(i));
-    slot.appendChild(cardEls[i]);
+    var compact = _renderGruposCompactCard(matches[i]);
+    if (compact) slot.appendChild(compact);
     carousel.appendChild(slot);
   }
 
@@ -880,7 +971,7 @@ function _renderGruposCarousel(letra, cardEls, gtableEl) {
   var dotsEl = document.createElement('div');
   dotsEl.className = 'fc-grupos-carousel__dots';
   dotsEl.setAttribute('data-letra', letra);
-  var slotCount = (cardEls.length || 0) + (gtableEl ? 1 : 0);
+  var slotCount = (matches ? Math.min(matches.length, 6) : 0) + (gtableEl ? 1 : 0);
   for (var j = 0; j < slotCount; j++) {
     var dot = document.createElement('button');
     dot.type = 'button';

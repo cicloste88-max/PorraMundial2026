@@ -1323,11 +1323,13 @@ function renderAll(onComplete) {
       attachEvents(card, globalIdx, match);
     });
     renderGroupTableCard(grupo.letra);
-    // Sprint B · mover tarjetas + tabla al carrusel scroll-snap (G3)
+    // Sprint B · construir compact preview cards en el carrusel.
+    // Las tarjetas editables creadas por createMatchCard quedan en hidden
+    // #grid-{letra} para que openJcardModal pueda clonarlas (preserva id
+    // card-wrap-{matchKey} y los listeners de attachEvents).
     if (typeof window._renderGruposCarousel === 'function') {
       const gtable = section.querySelector('#gtable-' + grupo.letra);
-      const cardEls = Array.from(grid.children);
-      const carouselEl = window._renderGruposCarousel(grupo.letra, cardEls, gtable);
+      const carouselEl = window._renderGruposCarousel(grupo.letra, partidosGrupo, gtable);
       const mount = section.querySelector('.fc-grupos-card__carousel-mount[data-letra="' + grupo.letra + '"]');
       if (mount && carouselEl) mount.appendChild(carouselEl);
     }
