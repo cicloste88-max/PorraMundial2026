@@ -1,0 +1,112 @@
+<style>
+.h-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.gw{background:#070b14;border-radius:12px;overflow:hidden;position:relative;height:540px;width:100%;font-family:'Inter',system-ui,sans-serif}
+.gw-hdr{position:absolute;top:0;left:0;right:0;padding:10px 14px;z-index:10;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(7,11,20,.85),transparent);pointer-events:none}
+.gw-tit{font-size:12px;font-weight:700;color:#fff;letter-spacing:.06em}
+.gw-tit .g{color:#e8b830}
+.gw-st{font-size:10px;color:#8899aa}
+.gw-msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#cfd6e0;font-size:13px;z-index:5;text-align:center;background:rgba(10,16,28,.85);padding:14px 20px;border-radius:10px;border:1px solid rgba(232,184,48,.3);max-width:80%;line-height:1.6;transition:opacity .5s}
+.gw-msg.ok{opacity:0;pointer-events:none}
+.gw-msg.err{border-color:rgba(231,76,60,.5);color:#ffb4a8}
+.gw-leg{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:14px;z-index:5;font-size:10px;color:#cfd6e0;background:rgba(10,16,28,.75);padding:6px 14px;border-radius:50px;border:1px solid rgba(255,255,255,.08);pointer-events:none}
+.gw-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.gw-gold{background:#e8b830;box-shadow:0 0 6px #e8b830}
+.gw-white{background:#fff;box-shadow:0 0 6px #fff}
+.gw-canvas{width:100%;height:100%;position:absolute;top:0;left:0}
+.gw-canvas canvas{display:block}
+</style>
+<h2 class="h-sr">Globo del Mundial 2026 con lista oficial de 48 clasificados, incluyendo Curaçao y Cabo Verde, usando GeoJSON Natural Earth 50m.</h2>
+
+<div class="gw">
+  <div class="gw-hdr">
+    <span class="gw-tit">🌍 GLOBO MUNDIAL <span class="g">2026</span></span>
+    <span class="gw-st">48 reales · NE 50m</span>
+  </div>
+  <div class="gw-msg" id="gw-msg">cargando 3 MB de GeoJSON detallado...</div>
+  <div class="gw-canvas" id="gm"></div>
+  <div class="gw-leg">
+    <span><span class="gw-dot gw-gold"></span>clasificados</span>
+    <span><span class="gw-dot gw-white"></span>sedes</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.33.0/dist/globe.gl.min.js"></script>
+<script>
+(function(){
+  function ready(fn){if(document.readyState!=='loading')fn();else document.addEventListener('DOMContentLoaded',fn);}
+  ready(function(){
+    var msg=document.getElementById('gw-msg');
+    var cont=document.getElementById('gm');
+    function fail(t){msg.className='gw-msg err';msg.innerHTML='⚠ '+t;}
+    if(typeof Globe==='undefined'){fail('globe.gl no se cargó');return;}
+    try{
+      // === LISTA REAL DE 48 (nombres alineados con NE 50m) ===
+      var PAISES=new Set([
+        'United States','Mexico','Canada',
+        'Argentina','Brazil','Uruguay','Ecuador','Colombia','Paraguay',
+        'Spain','United Kingdom','France','Germany','Netherlands','Portugal','Belgium','Croatia','Switzerland','Austria','Sweden','Norway','Bosnia and Herz.','Czechia','Turkey',
+        'Japan','Iran','South Korea','Saudi Arabia','Australia','Uzbekistan','Qatar','Jordan',
+        'Morocco','Senegal','Egypt',"Côte d'Ivoire",'Algeria','Tunisia','South Africa','Cabo Verde','Ghana',
+        'Panama','Curaçao','Haiti',
+        'New Zealand',
+        'Dem. Rep. Congo','Iraq'
+      ]);
+      // Aliases: nombres comunes → nombres NE 50m
+      var ALIAS={
+        'United States of America':'United States','USA':'United States',
+        'England':'United Kingdom','Scotland':'United Kingdom',
+        'Bosnia and Herzegovina':'Bosnia and Herz.','Czech Republic':'Czechia','Türkiye':'Turkey',
+        'Korea':'South Korea','Republic of Korea':'South Korea',
+        'Ivory Coast':"Côte d'Ivoire",'DR Congo':'Dem. Rep. Congo','Cape Verde':'Cabo Verde'
+      };
+      var norm=function(n){return n&&ALIAS[n]?ALIAS[n]:(n||'').trim();};
+
+      var SEDES=[{name:'Los Ángeles',lat:34.05,lng:-118.24},{name:'San Francisco',lat:37.35,lng:-121.95},{name:'Seattle',lat:47.61,lng:-122.33},{name:'Dallas',lat:32.74,lng:-97.09},{name:'Houston',lat:29.76,lng:-95.37},{name:'Kansas City',lat:39.10,lng:-94.58},{name:'Atlanta',lat:33.75,lng:-84.39},{name:'Miami',lat:25.96,lng:-80.24},{name:'Boston',lat:42.07,lng:-71.25},{name:'Nueva York',lat:40.82,lng:-74.07},{name:'Filadelfia',lat:39.90,lng:-75.17},{name:'CDMX',lat:19.43,lng:-99.13},{name:'Monterrey',lat:25.67,lng:-100.31},{name:'Guadalajara',lat:20.67,lng:-103.35},{name:'Vancouver',lat:49.26,lng:-123.11},{name:'Toronto',lat:43.65,lng:-79.38}];
+
+      var COL_OCEAN='#1e4d6b';var COL_LAND='#3d4f2e';var COL_LAND_STROKE='#5d6f4a';var COL_LAND_SIDE='#2a3520';
+      var COL_GOLD='#e8b830';var COL_GOLD_STROKE='#ffd866';var COL_GOLD_SIDE='#c89420';var COL_ATMOS='#7eb6d8';
+
+      var c=document.createElement('canvas');c.width=4;c.height=4;c.getContext('2d').fillStyle=COL_OCEAN;c.getContext('2d').fillRect(0,0,4,4);var oceanTex=c.toDataURL();
+      var globe=Globe();
+      globe(cont);
+      globe.globeImageUrl(oceanTex).backgroundImageUrl('').atmosphereColor(COL_ATMOS).atmosphereAltitude(0.18).showGraticules(false);
+      globe.width(cont.clientWidth);globe.height(cont.clientHeight);
+      var ctrl=globe.controls();
+      if(ctrl){ctrl.autoRotate=true;ctrl.autoRotateSpeed=0.4;ctrl.enableZoom=true;}
+      globe.pointOfView({lat:20,lng:0,altitude:2.2});
+
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_0_countries.geojson')
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+        .then(function(geo){
+          var feats=(geo.features||[]).map(function(f){
+            var n=(f.properties&&(f.properties.NAME||f.properties.ADMIN))||'';
+            var es=PAISES.has(norm(n));
+            return Object.assign({},f,{properties:Object.assign({},f.properties,{name:n,esMundial:es})});
+          });
+          var encontrados=feats.filter(function(f){return f.properties.esMundial;});
+          var faltan=[];
+          PAISES.forEach(function(p){if(!encontrados.some(function(f){return f.properties.name===p;}))faltan.push(p);});
+          console.log('Globo · '+encontrados.length+'/47 nombres únicos en NE pintados (UK cubre England+Scotland → 48 selecciones)');
+          if(faltan.length)console.warn('No encontrados:',faltan);
+
+          globe.polygonsData(feats)
+            .polygonCapColor(function(f){return f.properties.esMundial?COL_GOLD:COL_LAND;})
+            .polygonStrokeColor(function(f){return f.properties.esMundial?COL_GOLD_STROKE:COL_LAND_STROKE;})
+            .polygonAltitude(function(f){return f.properties.esMundial?0.022:0.006;})
+            .polygonSideColor(function(f){return f.properties.esMundial?COL_GOLD_SIDE:COL_LAND_SIDE;})
+            .polygonLabel(function(f){var n=f.properties.name||'';var b=f.properties.esMundial?' <span style="background:#e8b830;color:#000;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700">⚽ CLASIFICADO</span>':'';return '<div style="background:rgba(20,28,44,.95);border:1px solid rgba(232,184,48,.4);border-radius:6px;padding:6px 10px;color:#fff;font-size:11px"><b>'+n+'</b>'+b+'</div>';});
+          globe.pointsData(SEDES.map(function(s){return {lat:s.lat,lng:s.lng,name:s.name};}))
+            .pointColor(function(){return '#ffffff';})
+            .pointAltitude(0.04).pointRadius(0.5).pointResolution(20)
+            .pointLabel(function(p){return '<div style="background:rgba(20,28,44,.95);border:1px solid rgba(232,184,48,.4);border-radius:6px;padding:6px 10px;color:#fff;font-size:11px"><b>📍 '+p.name+'</b><br><span style="color:#aaa;font-size:10px">Sede Mundial 2026</span></div>';});
+          msg.classList.add('ok');
+        })
+        .catch(function(e){fail('Error GeoJSON: '+e.message);});
+
+      var t;
+      cont.addEventListener('pointerdown',function(){clearTimeout(t);if(ctrl)ctrl.autoRotateSpeed=0.08;});
+      cont.addEventListener('pointerup',function(){t=setTimeout(function(){if(ctrl)ctrl.autoRotateSpeed=0.4;},1500);});
+    }catch(e){fail('Init error: '+e.message);}
+  });
+})();
+</script>
