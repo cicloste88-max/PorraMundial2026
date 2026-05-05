@@ -589,21 +589,25 @@ function _renderUserStrip() {
 }
 window._renderUserStrip = _renderUserStrip;
 
-function openJcardModal(matchKey) {
+function openJcardModal(matchKey, opts) {
+  opts = opts || {};
   const cardEl = document.getElementById('card-wrap-' + matchKey);
   if (!cardEl) {
-    renderAll(() => _showJcardModal(matchKey));
+    renderAll(() => _showJcardModal(matchKey, opts));
     return;
   }
-  _showJcardModal(matchKey);
+  _showJcardModal(matchKey, opts);
 }
 
-function _showJcardModal(matchKey) {
+function _showJcardModal(matchKey, opts) {
+  opts = opts || {};
+  const editable = !!opts.editable;
+
   const prev = document.getElementById('jcard-modal-overlay');
   if (prev) prev.remove();
 
-  const cardEl = document.getElementById('card-wrap-' + matchKey);
-  if (!cardEl) return;
+  const initialCardEl = document.getElementById('card-wrap-' + matchKey);
+  if (!initialCardEl) return;
 
   const overlay = document.createElement('div');
   overlay.id = 'jcard-modal-overlay';
@@ -611,7 +615,6 @@ function _showJcardModal(matchKey) {
     'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;' +
     'display:flex;align-items:flex-start;justify-content:center;padding:16px;' +
     'animation:fadeIn .15s ease;box-sizing:border-box;overflow:hidden;';
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
@@ -626,43 +629,168 @@ function _showJcardModal(matchKey) {
     'background:rgba(0,0,0,.6);border:1px solid #3a3a3e;color:#9ca3af;' +
     'width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;' +
     'display:flex;align-items:center;justify-content:center;';
-  closeBtn.onclick = () => overlay.remove();
 
-  const clone = cardEl.cloneNode(true);
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // READ-ONLY (Jornada Ver tarjeta) \u2014 clone path intact.
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  if (!editable) {
+    const clone = initialCardEl.cloneNode(true);
+    const origSelects  = initialCardEl.querySelectorAll('select');
+    const cloneSelects = clone.querySelectorAll('select');
+    origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
+    const origInputs  = initialCardEl.querySelectorAll('input');
+    const cloneInputs = clone.querySelectorAll('input');
+    origInputs.forEach((inp, i) => {
+      if (!cloneInputs[i]) return;
+      if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
+      else cloneInputs[i].value = inp.value;
+    });
+    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    clone.querySelectorAll('button,input,select').forEach(el => {
+      el.disabled = true;
+      el.style.pointerEvents = 'none';
+    });
+    clone.style.margin = '0 auto';
+    clone.style.left = '0';
+    clone.style.right = '0';
+    wrapper.appendChild(closeBtn);
+    wrapper.appendChild(clone);
+    overlay.appendChild(wrapper);
+    document.body.appendChild(overlay);
+    clone.style.width = (clone.offsetWidth - 5) + 'px';
+    clone.style.margin = '0 auto';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    closeBtn.onclick = () => overlay.remove();
+    return;
+  }
 
-  // Bug fix: cloneNode(true) no transfiere el .value runtime de <select>.
-  // auth.js asigna gselEl.value = pred.gol tras el render inicial (solo
-  // toca la propiedad, no el atributo selected), as\u00ed que el clone perd\u00eda
-  // el goleador. Copiamos los valores manualmente del original al clone
-  // (mismo orden de selects, mismo orden de inputs/checkbox).
-  const origSelects  = cardEl.querySelectorAll('select');
-  const cloneSelects = clone.querySelectorAll('select');
-  origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
-  const origInputs  = cardEl.querySelectorAll('input');
-  const cloneInputs = clone.querySelectorAll('input');
-  origInputs.forEach((inp, i) => {
-    if (!cloneInputs[i]) return;
-    if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
-    else cloneInputs[i].value = inp.value;
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // EDITABLE (Grupos compact card click) \u2014 MOVE original + nav.
+  // Replica el patr\u00f3n de Fase Final (_renderElimExpanded): flechas
+  // \u2039 \u203a + counter "X/N" para navegar entre los partidos del mismo
+  // grupo. Cada navegaci\u00f3n restituye el actual y mueve el siguiente.
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  const startMatch = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(function (m) {
+    return (typeof getMatchKey === 'function') ? getMatchKey(m) === matchKey : false;
+  }) : null;
+  const matchList = (startMatch && typeof PARTIDOS !== 'undefined')
+    ? PARTIDOS.filter(function (m) { return m.group === startMatch.group; })
+    : [];
+  let currentIdx = matchList.findIndex(function (m) {
+    return (typeof getMatchKey === 'function') ? getMatchKey(m) === matchKey : false;
   });
+  if (currentIdx < 0) currentIdx = 0;
 
-  clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-  clone.querySelectorAll('button,input,select').forEach(el => {
-    el.disabled = true;
-    el.style.pointerEvents = 'none';
-  });
+  // Nav header (counter + arrows). Solo si hay >1 partido en el grupo.
+  let navHeader = null;
+  let prevBtn = null;
+  let nextBtn = null;
+  let counterEl = null;
+  if (matchList.length > 1) {
+    navHeader = document.createElement('div');
+    navHeader.className = 'jcard-nav';
 
-  clone.style.margin = '0 auto';
-  clone.style.left = '0';
-  clone.style.right = '0';
+    prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'jcard-nav__arrow jcard-nav__arrow--prev';
+    prevBtn.setAttribute('aria-label', 'Partido anterior');
+    prevBtn.textContent = '\u2039';
+
+    counterEl = document.createElement('span');
+    counterEl.className = 'jcard-nav__counter';
+
+    nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'jcard-nav__arrow jcard-nav__arrow--next';
+    nextBtn.setAttribute('aria-label', 'Partido siguiente');
+    nextBtn.textContent = '\u203a';
+
+    navHeader.appendChild(prevBtn);
+    navHeader.appendChild(counterEl);
+    navHeader.appendChild(nextBtn);
+    wrapper.appendChild(navHeader);
+  }
 
   wrapper.appendChild(closeBtn);
-  wrapper.appendChild(clone);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
-  clone.style.width = (clone.offsetWidth - 5) + 'px';
-  clone.style.margin = '0 auto';
+  // Estado de la tarjeta actualmente en el modal.
+  let currentTarget = null;
+  let currentAnchors = null; // { parent, nextSibling, styleAttr, matchKey }
+
+  function _restoreCurrent() {
+    if (!currentAnchors || !currentTarget) return;
+    const t = currentTarget;
+    const a = currentAnchors;
+    if (a.styleAttr === null) t.removeAttribute('style');
+    else t.setAttribute('style', a.styleAttr);
+    if (a.nextSibling && a.nextSibling.parentNode === a.parent) {
+      a.parent.insertBefore(t, a.nextSibling);
+    } else {
+      a.parent.appendChild(t);
+    }
+    try {
+      document.dispatchEvent(new CustomEvent('jcard:updated', { detail: { matchKey: a.matchKey } }));
+    } catch (e) { /* no-op */ }
+    currentTarget = null;
+    currentAnchors = null;
+  }
+
+  function _placeIntoModal(mk) {
+    const cardEl = document.getElementById('card-wrap-' + mk);
+    if (!cardEl) return null;
+    currentAnchors = {
+      parent: cardEl.parentNode,
+      nextSibling: cardEl.nextSibling,
+      styleAttr: cardEl.getAttribute('style'),
+      matchKey: mk
+    };
+    cardEl.style.margin = '0 auto';
+    cardEl.style.left = '0';
+    cardEl.style.right = '0';
+    wrapper.appendChild(cardEl);
+    cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
+    cardEl.style.margin = '0 auto';
+    currentTarget = cardEl;
+    // Volver al top del wrapper en cada navegaci\u00f3n.
+    wrapper.scrollTop = 0;
+    return cardEl;
+  }
+
+  function _updateNavHeader() {
+    if (!navHeader) return;
+    counterEl.textContent = (currentIdx + 1) + ' / ' + matchList.length;
+    if (currentIdx <= 0) prevBtn.setAttribute('aria-disabled', 'true');
+    else prevBtn.removeAttribute('aria-disabled');
+    if (currentIdx >= matchList.length - 1) nextBtn.setAttribute('aria-disabled', 'true');
+    else nextBtn.removeAttribute('aria-disabled');
+  }
+
+  function _navigateTo(idx) {
+    if (idx < 0 || idx >= matchList.length) return;
+    if (idx === currentIdx && currentTarget) return;
+    _restoreCurrent();
+    currentIdx = idx;
+    const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
+    if (!newKey) return;
+    _placeIntoModal(newKey);
+    _updateNavHeader();
+  }
+
+  function closeModal() {
+    _restoreCurrent();
+    overlay.remove();
+  }
+
+  if (prevBtn) prevBtn.addEventListener('click', function () { _navigateTo(currentIdx - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { _navigateTo(currentIdx + 1); });
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+  closeBtn.onclick = closeModal;
+
+  // Initial placement.
+  _placeIntoModal(matchKey);
+  _updateNavHeader();
 }
 window.openJcardModal = openJcardModal;
 
@@ -708,3 +836,556 @@ function initGrupos() {
 }
 
 
+
+// ─────────────────────────────────────────────────────────────────────
+// Sprint B · Grupos redesign helpers (G1: chips A-L, G2: card shell)
+// G3 (carousel) y G4 (standings) viven más abajo. Reusa .collap pattern
+// de predictor-shell.css. Ver docs: PR Sprint B.
+// ─────────────────────────────────────────────────────────────────────
+
+function _getGroupCount(letra) {
+  if (typeof getGroupCompleted === 'function') return getGroupCompleted(letra);
+  var matches = (typeof PARTIDOS !== 'undefined' ? PARTIDOS : []).filter(function (m) {
+    return m.group === letra;
+  });
+  var done = 0;
+  matches.forEach(function (m) {
+    var matchKey = (typeof getMatchKey === 'function') ? getMatchKey(m) : null;
+    var pred = (typeof predictions !== 'undefined' && matchKey) ? predictions[matchKey] : null;
+    if (pred && pred.l != null && pred.v != null) done++;
+  });
+  return done;
+}
+
+function _renderGruposLetterBar() {
+  var bar = document.getElementById('grupos-letter-bar');
+  if (!bar) return;
+  var letras = (typeof GRUPOS !== 'undefined' ? GRUPOS : []).map(function (g) { return g.letra; });
+  // Replica visual del stepper de Fase Final (.fc-elim-stepper) — mismas
+  // pills, mismos states (is-active dorado / is-complete verde / is-locked).
+  // Sticky position via wrapper class .fc-grupos-stepper-wrap.
+  var html = '<div class="fc-grupos-stepper-wrap"><div class="fc-elim-stepper fc-grupos-stepper" role="tablist">';
+  letras.forEach(function (letra) {
+    var count = _getGroupCount(letra);
+    var classes = 'fc-elim-stepper__item';
+    if (count === 6)        classes += ' is-complete';
+    var lbl = (typeof escapeHtml === 'function') ? escapeHtml(letra) : letra;
+    html += '<button type="button" class="' + classes +
+              '" data-letra="' + lbl + '" role="tab" aria-label="Grupo ' + lbl +
+              '" onclick="_scrollToGrupoCard(\'' + lbl + '\')">' +
+              '<span class="fc-elim-stepper__label">' + lbl + '</span>' +
+              '<span class="fc-elim-stepper__counter">' + count + '/6</span>' +
+            '</button>';
+  });
+  html += '</div></div>';
+  bar.innerHTML = html;
+}
+
+function _scrollToGrupoCard(letra) {
+  var card = document.getElementById('grupo-card-' + letra);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  _setActiveChip(letra);
+}
+
+function _setActiveChip(letra) {
+  var chips = document.querySelectorAll('.fc-grupos-stepper .fc-elim-stepper__item');
+  chips.forEach(function (c) {
+    c.classList.toggle('is-active', c.getAttribute('data-letra') === letra);
+  });
+}
+
+function _refreshGruposLetterBar() {
+  var chips = document.querySelectorAll('.fc-grupos-stepper .fc-elim-stepper__item');
+  chips.forEach(function (c) {
+    var letra = c.getAttribute('data-letra');
+    var count = _getGroupCount(letra);
+    c.classList.toggle('is-complete', count === 6);
+    var cnt = c.querySelector('.fc-elim-stepper__counter');
+    if (cnt) cnt.textContent = count + '/6';
+  });
+}
+
+window._renderGruposLetterBar = _renderGruposLetterBar;
+window._refreshGruposLetterBar = _refreshGruposLetterBar;
+window._scrollToGrupoCard = _scrollToGrupoCard;
+window._setActiveChip = _setActiveChip;
+
+// ─────────────────────────────────────────────────────────────────────
+// G2 · Card colapsable header (12 grupos A-L). Reusa .collap pattern.
+// El body interno mantiene #grid-{letra} y #gtable-{letra} hidden para
+// que createMatchCard / renderGroupTableCard sigan teniendo destino.
+// ─────────────────────────────────────────────────────────────────────
+
+function _renderGruposCardShell(letra, partidosCount) {
+  var grupo = (typeof GRUPOS !== 'undefined') ? GRUPOS.find(function (g) { return g.letra === letra; }) : null;
+  if (!grupo) return null;
+  var equipos = grupo.equipos || [];
+  var done = (partidosCount && partidosCount.done != null) ? partidosCount.done : 0;
+  var total = (partidosCount && partidosCount.total != null) ? partidosCount.total : 6;
+  var stateClass = (done === total) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
+
+  var section = document.createElement('section');
+  section.className = 'fc-grupos-card collap';
+  section.id = 'grupo-card-' + letra;
+
+  var flagsHtml = equipos.slice(0, 4).map(function (teamName) {
+    var team = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === teamName; }) : null;
+    var code = (team && team.flag) ? team.flag : (teamName || '').slice(0, 3).toUpperCase();
+    var src = (team && team.flag && typeof SB !== 'undefined') ? (SB + '/flags/' + team.flag + '.png') : '';
+    return '<span class="fc-grupos-card__flag" data-code="' + escapeHtml(code) + '">' +
+             (src ? '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(code) + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-fallback\');"/>' : '') +
+             '<span class="fc-grupos-card__flag-code">' + escapeHtml(code) + '</span>' +
+           '</span>';
+  }).join('');
+
+  section.innerHTML =
+    '<button type="button" class="collap-toggle fc-grupos-card__toggle" aria-expanded="false">' +
+      '<span class="fc-grupos-card__bar ' + stateClass + '"></span>' +
+      '<span class="fc-grupos-card__title-block">' +
+        '<span class="fc-grupos-card__label">GRUPO</span>' +
+        '<span class="fc-grupos-card__letra">' + letra + '</span>' +
+      '</span>' +
+      '<span class="fc-grupos-card__flags">' + flagsHtml + '</span>' +
+      '<span class="fc-grupos-card__spacer"></span>' +
+      '<span class="fc-grupos-card__dice" role="button" aria-label="Simular grupo ' + letra +
+        '" onclick="event.stopPropagation(); diceSimulateGroup(\'' + letra + '\');">🎲</span>' +
+      '<span class="fc-grupos-card__progress ' + stateClass + '">' + done + '/' + total + '</span>' +
+      '<span class="chev" aria-hidden="true">▾</span>' +
+    '</button>' +
+    // Source hidden: grid (tarjetas editables) + gtable (tabla clasificación).
+    // El expanded se monta como SIBLING (insertAfter). El gtable se mueve al
+    // slot 7 del carousel cuando se abre y se restituye al cerrar.
+    '<div class="collap-body-inner fc-grupos-card__source">' +
+      '<div class="cards-grid" id="grid-' + letra + '"></div>' +
+      '<div id="gtable-' + letra + '" class="group-table-card"></div>' +
+    '</div>';
+
+  var btn = section.querySelector('.collap-toggle');
+  btn.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.closest && ev.target.closest('.fc-grupos-card__dice')) return;
+    if (typeof _toggleGruposExpanded === 'function') _toggleGruposExpanded(letra, section);
+  });
+
+  return section;
+}
+
+window._renderGruposCardShell = _renderGruposCardShell;
+
+// Sprint B fix · monta el carousel expandido como SIBLING de la card del
+// grupo (no anidado dentro). Replica el patrón de Fase Final donde
+// .fc-elim-expanded vive como hermano del row → carousel container ~347px,
+// slot 86vw (322px) cabe completo. Anidar dentro del card consumía
+// 126px de margins+padding+borders → carousel solo 249px → overflow.
+function _toggleGruposExpanded(letra, sectionEl) {
+  if (!sectionEl) return;
+  var existing = document.querySelector('.fc-grupos-expanded');
+  var sameLetra = existing && existing.getAttribute('data-letra') === letra;
+
+  // Cerrar cualquier expanded actual (también restituye su gtable a la source).
+  if (existing) {
+    var oldLetra = existing.getAttribute('data-letra');
+    var oldSection = document.getElementById('grupo-card-' + oldLetra);
+    var oldGtable = existing.querySelector('#gtable-' + oldLetra);
+    if (oldGtable && oldSection) {
+      var oldSource = oldSection.querySelector('.fc-grupos-card__source');
+      if (oldSource) oldSource.appendChild(oldGtable);
+    }
+    existing.remove();
+    if (oldSection) {
+      oldSection.classList.remove('open');
+      var oldBtn = oldSection.querySelector('.collap-toggle');
+      if (oldBtn) oldBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+  // Si era el mismo letra, ya cerramos — no abrir de nuevo.
+  if (sameLetra) return;
+
+  // Construir el expanded sibling. Refrescar la tabla (la regenerá el
+  // override de renderGroupTableCard) antes de moverla al slot 7.
+  if (typeof renderGroupTableCard === 'function') renderGroupTableCard(letra);
+
+  var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === letra; }) : [];
+  var gtable = sectionEl.querySelector('#gtable-' + letra);
+  var carouselEl = (typeof _renderGruposCarousel === 'function') ? _renderGruposCarousel(letra, partidos, gtable) : null;
+  if (!carouselEl) return;
+
+  var expanded = document.createElement('section');
+  expanded.className = 'fc-grupos-expanded';
+  expanded.setAttribute('data-letra', letra);
+  expanded.appendChild(carouselEl);
+
+  // Insertar como sibling después de la card.
+  if (sectionEl.parentNode) sectionEl.parentNode.insertBefore(expanded, sectionEl.nextSibling);
+
+  // Marcar la card como abierta (chev rotation) y a11y.
+  sectionEl.classList.add('open');
+  var btn = sectionEl.querySelector('.collap-toggle');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+}
+
+window._toggleGruposExpanded = _toggleGruposExpanded;
+
+// ─────────────────────────────────────────────────────────────────────
+// G3 · Carrusel scroll-snap (replica patrón Fase Final ui-elim-shell)
+// Recibe tarjetas YA CREADAS por createMatchCard. NO las recrea —
+// solo las MUEVE a slots con scroll-snap-align:center. Preserva
+// listeners de attachEvents porque appendChild mueve el Element.
+// ─────────────────────────────────────────────────────────────────────
+
+// Compact preview card replicando el patrón visual de Fase Final (.ko-card).
+// NO renderiza la tarjeta editable inline — esa vive en hidden #grid-{letra}
+// para que openJcardModal pueda clonarla. Click compact → openJcardModal.
+function _renderGruposCompactCard(match) {
+  var matchKey = (typeof getMatchKey === 'function')
+    ? getMatchKey(match)
+    : (match.group + '_' + match.home + '_' + match.away);
+
+  var hTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === match.home; }) : null;
+  var aTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === match.away; }) : null;
+
+  var hKit = (hTeam && typeof kitUrl === 'function') ? kitUrl(hTeam.slug, 'home') : '';
+  var aKit = (aTeam && typeof kitUrl === 'function') ? kitUrl(aTeam.slug, 'away') : '';
+  var hFlag = hTeam ? ((typeof SB !== 'undefined' ? SB : '') + '/flags/' + hTeam.flag + '.png') : '';
+  var aFlag = aTeam ? ((typeof SB !== 'undefined' ? SB : '') + '/flags/' + aTeam.flag + '.png') : '';
+
+  var pred = (typeof predictions !== 'undefined') ? (predictions[matchKey] || {}) : {};
+  var estado = (typeof getEstadoPartido === 'function') ? getEstadoPartido(match) : 'open';
+
+  var statusCls = 'open';
+  var statusTxt = 'Pronosticar →';
+  if (pred.saved) {
+    statusCls = 'saved';
+    if (pred.l != null && pred.v != null) statusTxt = '✓ ' + pred.l + '–' + pred.v;
+    else statusTxt = '✓ Guardado';
+  } else if (estado === 'closed') { statusCls = 'locked'; statusTxt = '🔒 Cerrado'; }
+  else if (estado === 'live')     { statusCls = 'live';   statusTxt = '🔴 En vivo'; }
+  else if (estado === 'done')     { statusCls = 'done';   statusTxt = 'Finalizado'; }
+
+  // Truncate 14 chars sin sufijo — réplica de buildKOCard (ko.js:322).
+  var hLabel = hTeam ? (match.home || '').substring(0, 14) : (match.home || '');
+  var aLabel = aTeam ? (match.away || '').substring(0, 14) : (match.away || '');
+  var dateLabel = (typeof fmtDate === 'function') ? fmtDate(match.date) : '';
+  var timeLabel = (typeof fmtTime === 'function') ? fmtTime(match.date) : '';
+
+  // Réplica EXACTA de buildKOCard (ko.js:251): mismas clases .ko-* + onclick directo.
+  // No añadimos .fc-grupos-mini — esa clase introducía hover overrides que rompían
+  // el match visual con Fase Final.
+  var card = document.createElement('div');
+  card.className = 'ko-card' + (pred.saved ? ' ko-saved' : '');
+  card.setAttribute('data-match-key', matchKey);
+  card.onclick = function () {
+    if (typeof openJcardModal === 'function') openJcardModal(matchKey, { editable: true });
+  };
+
+  var hHalf = hTeam
+    ? '<div class="ko-half L"><div class="ko-color" style="background:#fff"></div>' +
+        '<div class="ko-kit" style="background-image:linear-gradient(to bottom, rgba(10,10,20,0.5) 0%, transparent 35%),linear-gradient(to bottom, transparent 60%, rgba(10,10,20,0.6) 100%),url(\'' + hKit + '\')"></div>' +
+        '<div class="ko-vign"></div></div>'
+    : '';
+  var aHalf = aTeam
+    ? '<div class="ko-half R"><div class="ko-color" style="background:#fff"></div>' +
+        '<div class="ko-kit" style="background-image:linear-gradient(to bottom, rgba(10,10,20,0.5) 0%, transparent 35%),linear-gradient(to bottom, transparent 60%, rgba(10,10,20,0.6) 100%),url(\'' + aKit + '\')"></div>' +
+        '<div class="ko-vign"></div></div>'
+    : '';
+
+  // Body section — replica espacio que dejaba el align-items:stretch del
+  // carousel. Si pred saved muestra marcador grande + goleador. Si no,
+  // CTA "Pronostica este partido →". Solo visible en .fc-grupos-carousel
+  // (CSS scope), Fase Final no lo renderiza ni lo necesita.
+  var bodyHtml;
+  if (pred.saved && pred.l != null && pred.v != null) {
+    var golLabel = '';
+    if (pred.gol) {
+      var golTeam = pred.gol.startsWith && pred.gol.indexOf('-') > 0 ? pred.gol.split('-')[0] : '';
+      var golName = pred.gol.indexOf('-') > 0 ? pred.gol.split('-').slice(1).join('-') : pred.gol;
+      golLabel = '<span class="ko-body__gol">⚽ ' + escapeHtml(golName.replace(/_/g, ' ')) + '</span>';
+    }
+    bodyHtml =
+      '<div class="ko-body ko-body--saved">' +
+        '<span class="ko-body__label">TU PRONÓSTICO</span>' +
+        '<span class="ko-body__score">' + pred.l + ' <span class="ko-body__sep">–</span> ' + pred.v + '</span>' +
+        golLabel +
+      '</div>';
+  } else {
+    bodyHtml =
+      '<div class="ko-body ko-body--empty">' +
+        '<span class="ko-body__cta">⚡ Toca para pronosticar</span>' +
+      '</div>';
+  }
+
+  card.innerHTML =
+    '<div class="ko-hero">' +
+      hHalf + aHalf +
+      '<div class="ko-fade"></div>' +
+      '<div class="ko-team home">' +
+        '<div class="ko-flag">' + (hTeam ? '<img src="' + hFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
+        '<div class="ko-tname' + (!hTeam ? ' tbd' : '') + '">' + escapeHtml(hLabel) + '</div>' +
+        '<div class="ko-trole">local</div>' +
+      '</div>' +
+      '<div class="ko-team away">' +
+        '<div class="ko-flag">' + (aTeam ? '<img src="' + aFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
+        '<div class="ko-tname' + (!aTeam ? ' tbd' : '') + '">' + escapeHtml(aLabel) + '</div>' +
+        '<div class="ko-trole">visitante</div>' +
+      '</div>' +
+      '<div class="ko-center">' +
+        '<div class="ko-vs-circle"><div class="ko-ball-bg"></div><span class="ko-vs-text">VS</span></div>' +
+        '<div class="ko-pill">' + escapeHtml(match.venue || ('Grupo ' + match.group)) + '</div>' +
+        '<div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);margin-top:3px;text-align:center;letter-spacing:.04em">' + escapeHtml(timeLabel) + '</div>' +
+      '</div>' +
+    '</div>' +
+    bodyHtml +
+    '<div class="ko-ia-hint" style="display:none"></div>' +
+    '<div class="ko-footer">' +
+      '<span class="ko-date">' + escapeHtml(dateLabel) + '</span>' +
+      '<span class="ko-status ' + statusCls + '">' + escapeHtml(statusTxt) + '</span>' +
+    '</div>';
+
+  return card;
+}
+
+window._renderGruposCompactCard = _renderGruposCompactCard;
+
+// Sprint B fix · al cerrar el modal editable, refrescar:
+//   1) compact card preview en el carrusel (estado/marcador del chip),
+//   2) chip count del letterbar (N/6),
+//   3) tabla clasificación del grupo afectado.
+// Listener registrado UNA vez (guard con flag en window).
+if (!window._jcardUpdatedListenerRegistered) {
+  window._jcardUpdatedListenerRegistered = true;
+  document.addEventListener('jcard:updated', function (ev) {
+    var mk = ev && ev.detail && ev.detail.matchKey;
+    if (!mk) return;
+    var match = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(function (m) {
+      return (typeof getMatchKey === 'function') ? getMatchKey(m) === mk : false;
+    }) : null;
+    if (!match) return;
+    // 1) Compact preview — selector corregido tras commit 98f4550 que
+    // dropeó la clase .fc-grupos-mini. Ahora el data-match-key vive en
+    // .ko-card directo. Scope a .fc-grupos-carousel para evitar matching
+    // accidental con KO cards de Fase Final si compartieran attr.
+    var existing = document.querySelector('.fc-grupos-carousel .ko-card[data-match-key="' + mk + '"]');
+    if (existing && typeof _renderGruposCompactCard === 'function') {
+      var fresh = _renderGruposCompactCard(match);
+      if (fresh) existing.replaceWith(fresh);
+    }
+    // 2) Letterbar chip count
+    if (typeof _refreshGruposLetterBar === 'function') _refreshGruposLetterBar();
+    // 3) Standings table del grupo
+    if (typeof renderGroupTableCard === 'function' && match.group) {
+      renderGroupTableCard(match.group);
+    }
+    // 4) Header progress N/6 + state class del card colapsable
+    var cardSection = document.getElementById('grupo-card-' + match.group);
+    if (cardSection) {
+      var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === match.group; }) : [];
+      var done = partidos.filter(function (m) {
+        var p = (typeof predictions !== 'undefined') ? predictions[(typeof getMatchKey === 'function') ? getMatchKey(m) : null] : null;
+        return p && p.l != null && p.v != null;
+      }).length;
+      var total = partidos.length;
+      var stateClass = (done === total && total > 0) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
+      var bar = cardSection.querySelector('.fc-grupos-card__bar');
+      if (bar) {
+        bar.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+        bar.classList.add(stateClass);
+      }
+      var prog = cardSection.querySelector('.fc-grupos-card__progress');
+      if (prog) {
+        prog.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+        prog.classList.add(stateClass);
+        prog.textContent = done + '/' + total;
+      }
+    }
+  });
+}
+
+function _renderGruposCarousel(letra, matches, gtableEl) {
+  var wrap = document.createElement('div');
+  wrap.className = 'fc-grupos-carousel-wrap';
+
+  var carousel = document.createElement('div');
+  carousel.className = 'fc-grupos-carousel';
+  carousel.setAttribute('role', 'region');
+  carousel.setAttribute('aria-label', 'Partidos del grupo ' + letra);
+
+  // 6 match slots — compact preview cards (estilo Fase Final). Click → openJcardModal.
+  // Las tarjetas editables siguen viviendo en hidden #grid-{letra} para que el
+  // modal pueda clonarlas via cardEl = document.getElementById('card-wrap-{matchKey}').
+  for (var i = 0; i < matches.length && i < 6; i++) {
+    var slot = document.createElement('div');
+    slot.className = 'fc-grupos-slot fc-grupos-slot--match';
+    slot.setAttribute('data-slot-idx', String(i));
+    var compact = _renderGruposCompactCard(matches[i]);
+    if (compact) slot.appendChild(compact);
+    carousel.appendChild(slot);
+  }
+
+  // Slot 7: standings (mover gtable Element — id preservado para refreshGroupTables)
+  if (gtableEl) {
+    var sslot = document.createElement('div');
+    sslot.className = 'fc-grupos-slot fc-grupos-slot--standings';
+    sslot.setAttribute('data-slot-idx', '6');
+    sslot.appendChild(gtableEl);
+    carousel.appendChild(sslot);
+  }
+
+  wrap.appendChild(carousel);
+
+  // Dots indicator
+  var dotsEl = document.createElement('div');
+  dotsEl.className = 'fc-grupos-carousel__dots';
+  dotsEl.setAttribute('data-letra', letra);
+  var slotCount = (matches ? Math.min(matches.length, 6) : 0) + (gtableEl ? 1 : 0);
+  for (var j = 0; j < slotCount; j++) {
+    var dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'fc-grupos-carousel__dot' + (j === 0 ? ' is-active' : '');
+    dot.setAttribute('data-dot-idx', String(j));
+    dot.setAttribute('aria-label', 'Slot ' + (j + 1));
+    dotsEl.appendChild(dot);
+  }
+  wrap.appendChild(dotsEl);
+
+  // Arrows (desktop only via CSS)
+  var prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'fc-grupos-carousel__arrow fc-grupos-carousel__arrow--prev';
+  prev.setAttribute('aria-label', 'Anterior');
+  prev.textContent = '‹';
+  var next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'fc-grupos-carousel__arrow fc-grupos-carousel__arrow--next';
+  next.setAttribute('aria-label', 'Siguiente');
+  next.textContent = '›';
+  wrap.appendChild(prev);
+  wrap.appendChild(next);
+
+  function getSlotWidth() {
+    var first = carousel.querySelector('.fc-grupos-slot');
+    return first ? first.getBoundingClientRect().width + 12 : 1;
+  }
+  function setActiveDot(idx) {
+    var dots = dotsEl.querySelectorAll('.fc-grupos-carousel__dot');
+    for (var k = 0; k < dots.length; k++) {
+      dots[k].classList.toggle('is-active', k === idx);
+    }
+    // Réplica patrón Fase Final: slot actual sin scale/opacity, los demás
+    // con scale(.92) + opacity .55 (regla CSS .fc-grupos-slot:not(.is-current)).
+    var slots = carousel.querySelectorAll('.fc-grupos-slot');
+    for (var s = 0; s < slots.length; s++) {
+      slots[s].classList.toggle('is-current', s === idx);
+    }
+  }
+  function scrollToSlot(idx) {
+    var slots = carousel.querySelectorAll('.fc-grupos-slot');
+    var slot = slots[idx];
+    if (slot) slot.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+  // Marcar el primer slot como current al montar.
+  var initialSlots = carousel.querySelectorAll('.fc-grupos-slot');
+  if (initialSlots[0]) initialSlots[0].classList.add('is-current');
+
+  var rafPending = false;
+  carousel.addEventListener('scroll', function () {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () {
+      rafPending = false;
+      var sw = getSlotWidth();
+      var idx = Math.round(carousel.scrollLeft / sw);
+      setActiveDot(Math.max(0, Math.min(slotCount - 1, idx)));
+    });
+  });
+  dotsEl.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.fc-grupos-carousel__dot');
+    if (!btn) return;
+    var idx = Number(btn.getAttribute('data-dot-idx'));
+    scrollToSlot(idx);
+  });
+  prev.addEventListener('click', function () {
+    var sw = getSlotWidth();
+    var cur = Math.round(carousel.scrollLeft / sw);
+    scrollToSlot(Math.max(0, cur - 1));
+  });
+  next.addEventListener('click', function () {
+    var sw = getSlotWidth();
+    var cur = Math.round(carousel.scrollLeft / sw);
+    scrollToSlot(Math.min(slotCount - 1, cur + 1));
+  });
+
+  return wrap;
+}
+
+window._renderGruposCarousel = _renderGruposCarousel;
+
+// ─────────────────────────────────────────────────────────────────────
+// G4 · Slot 7 tabla clasificación restilada. Reusa calcGroupTableAdvanced
+// (scoring.js:234) — NO reinventa el cálculo, solo restila el output.
+// Override de renderGroupTableCard (cargado desde scoring.js:268) — esta
+// definición gana porque ui-groups.js carga DESPUÉS (main-entry.js:57-58).
+// Mantiene el contrato: pinta dentro de #gtable-{letra} para que
+// refreshGroupTables siga funcionando.
+// ─────────────────────────────────────────────────────────────────────
+
+function _renderGruposStandings(letra) {
+  if (typeof calcGroupTableAdvanced !== 'function') return null;
+  var rows = calcGroupTableAdvanced(letra) || [];
+  var rowsHtml = rows.slice(0, 4).map(function (t, idx) {
+    var team = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === t.name || e.slug === t.slug; }) : null;
+    var code = (team && team.flag) ? team.flag : (t.name || '').slice(0, 3).toUpperCase();
+    var src = (team && team.flag && typeof SB !== 'undefined') ? (SB + '/flags/' + team.flag + '.png') : '';
+    var qualifClass = idx < 2 ? ' fc-grupos-standings__row--qualif' : '';
+    var gd = t.gd != null ? t.gd : ((t.gf || 0) - (t.gc || 0));
+    var gdLabel = gd > 0 ? '+' + gd : String(gd);
+    return (
+      '<div class="fc-grupos-standings__row' + qualifClass + '" role="row">' +
+        '<span class="fc-grupos-standings__pos">' + (idx + 1) + '</span>' +
+        '<span class="fc-grupos-standings__flag">' +
+          (src ? '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(code) + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-fallback\');"/>' : '') +
+          '<span class="fc-grupos-standings__flag-code">' + escapeHtml(code) + '</span>' +
+        '</span>' +
+        '<span class="fc-grupos-standings__name">' + escapeHtml(t.name || '') + '</span>' +
+        '<span class="fc-grupos-standings__pj">' + (t.pj || 0) + '</span>' +
+        '<span class="fc-grupos-standings__gd">' + gdLabel + '</span>' +
+        '<span class="fc-grupos-standings__pts">' + (t.pts || 0) + '</span>' +
+      '</div>'
+    );
+  }).join('');
+
+  var headerHtml =
+    '<div class="fc-grupos-standings__head" role="row">' +
+      '<span class="fc-grupos-standings__pos">#</span>' +
+      '<span class="fc-grupos-standings__flag"></span>' +
+      '<span class="fc-grupos-standings__name">EQUIPO</span>' +
+      '<span class="fc-grupos-standings__pj">PJ</span>' +
+      '<span class="fc-grupos-standings__gd">GD</span>' +
+      '<span class="fc-grupos-standings__pts">PTS</span>' +
+    '</div>';
+
+  var card = document.createElement('div');
+  card.className = 'fc-grupos-standings';
+  card.innerHTML =
+    '<h3 class="fc-grupos-standings__title">CLASIFICACIÓN GRUPO ' + letra + '</h3>' +
+    '<div class="fc-grupos-standings__table" role="table">' +
+      headerHtml +
+      rowsHtml +
+    '</div>' +
+    '<div class="fc-grupos-standings__footer">Top 2 → 1/16 · 8 mejores 3os clasifican</div>';
+
+  return card;
+}
+
+window._renderGruposStandings = _renderGruposStandings;
+
+// Override renderGroupTableCard — wins over scoring.js:268 by load order.
+// Conserva el contrato: pinta en #gtable-{letra} para que refreshGroupTables
+// + diceSimulateGroup + savePredictions sigan funcionando.
+function renderGroupTableCard(letra) {
+  var gtable = document.getElementById('gtable-' + letra);
+  if (!gtable) return;
+  gtable.innerHTML = '';
+  var card = window._renderGruposStandings && window._renderGruposStandings(letra);
+  if (card) gtable.appendChild(card);
+}
+
+window.renderGroupTableCard = renderGroupTableCard;

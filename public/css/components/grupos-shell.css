@@ -1,0 +1,569 @@
+/* ──────────────────────────────────────────────────────────────────────
+   Grupos Shell — Sprint B (Mundial 2026)
+   Estructura: chips A-L + 12 cards colapsables + carrusel scroll-snap +
+   tabla clasificación slot 7. Reusa .collap pattern de predictor-shell.css.
+   Selectors namespaced .fc-grupos-* para evitar colisiones.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Bloques poblados por las 4 oleadas:
+   G1 — .fc-grupos-letterbar / .fc-grupos-chip / states
+   G2 — .fc-grupos-card / header / banderas overlap / progress / chev
+   G3 — .fc-grupos-carousel / .fc-grupos-slot / dots / arrows
+   G4 — .fc-grupos-standings / table / qualif row */
+
+/* ──────────────────────────────────────────────────────────────────────
+   G1 — Letter-bar A-L · replica visual del stepper Fase Final.
+   Reusa .fc-elim-stepper / .fc-elim-stepper__item / states existentes
+   en elim-shell.css. Este wrapper solo añade sticky-position y un
+   tweak mínimo de ajuste (12 items vs 6 del stepper original).
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-stepper-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--ink-900);
+  margin-bottom: 8px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Container · padding centralizado (réplica del patrón .fc-elim-list).
+   Diferencia vs Fase Final: #page-elim está top-level mientras que
+   #page-grupos vive dentro de <div class="container"> (legacy wrapper)
+   que añade padding 0 20px 60px (ko.css). Eso comía 40px más que
+   Fase Final → cards visualmente más estrechas. Neutralizamos
+   .container dentro de #page-grupos y dejamos que #groups-container
+   controle el padding (idéntico a .fc-elim-list).
+   ────────────────────────────────────────────────────────────────────── */
+#page-grupos > .container {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+#groups-container {
+  padding: 0 12px 80px;
+  box-sizing: border-box;
+}
+
+/* Letterbar wrapper — mismo padding lateral 12px para paridad visual. */
+.fc-grupos-stepper {
+  padding: 10px 12px;
+  gap: 4px;
+}
+
+/* El stepper original usa flex:1 para repartir 6 items. Con 12 letras
+   necesitamos que cada item respete su ancho mínimo y el contenedor
+   haga scroll horizontal cuando no caben. */
+.fc-grupos-stepper .fc-elim-stepper__item {
+  flex: 0 0 auto;
+  min-width: 48px;
+}
+.fc-grupos-stepper .fc-elim-stepper__item.is-active {
+  flex: 0 0 auto;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   G2 — Card colapsable header (12 grupos A-L)
+   ────────────────────────────────────────────────────────────────────── */
+.fc-grupos-card {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  margin: 0 0 10px;
+  overflow: hidden;
+  scroll-margin-top: 80px;
+}
+
+.fc-grupos-card__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+.fc-grupos-card__toggle:hover { background-color: rgba(255, 255, 255, 0.04); }
+.fc-grupos-card__toggle:focus-visible { outline: 2px solid var(--fifa-gold); outline-offset: -2px; }
+
+.fc-grupos-card__bar {
+  width: 3px;
+  height: 42px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.fc-grupos-card__bar.is-completo { background: #4ade80; }
+.fc-grupos-card__bar.is-parcial  { background: #f59e0b; }
+.fc-grupos-card__bar.is-vacio    { background: #3a3a3e; }
+
+.fc-grupos-card__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.fc-grupos-card__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.fc-grupos-card__letra {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink-100);
+  line-height: 1;
+}
+
+.fc-grupos-card__flags {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
+.fc-grupos-card__flag {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  border: 1.5px solid var(--ink-800);
+  margin-left: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.fc-grupos-card__flag:first-child { margin-left: 0; }
+
+.fc-grupos-card__flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fc-grupos-card__flag-code {
+  font-size: 7px;
+  font-weight: 700;
+  color: var(--ink-100);
+  position: absolute;
+  display: none;
+}
+.fc-grupos-card__flag.is-fallback .fc-grupos-card__flag-code { display: inline; }
+
+.fc-grupos-card__spacer { flex: 1; }
+
+.fc-grupos-card__dice {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6652c9, #4c3a9c);
+  border: 0;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-grupos-card__dice:hover { filter: brightness(1.1); }
+
+.fc-grupos-card__progress {
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.fc-grupos-card__progress.is-completo { color: #4ade80; }
+.fc-grupos-card__progress.is-parcial  { color: #f59e0b; }
+.fc-grupos-card__progress.is-vacio    { color: var(--ink-400); }
+
+.fc-grupos-card .chev { transition: transform 0.2s ease; font-size: 14px; color: var(--ink-400); flex-shrink: 0; }
+.fc-grupos-card.open .chev { transform: rotate(180deg); }
+
+/* Source hidden: grid (tarjetas editables) + gtable (tabla clasificación
+   antes de moverse al slot 7 del carousel expandido). Vive como hijo
+   directo de la card pero NO se renderiza visualmente. .cards-grid pisa
+   el [hidden] attr por specificity equal — forzamos display:none scoped. */
+.fc-grupos-card__source {
+  display: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Expanded sibling — replica EXACTA del patrón Fase Final.
+   Se monta como hermano de .fc-grupos-card via insertBefore(nextSibling).
+   Recupera el ancho disponible completo (margin del card, no padding
+   anidado) → carousel container ~347px → slot 86vw (322px) cabe.
+   ────────────────────────────────────────────────────────────────────── */
+.fc-grupos-expanded {
+  background: var(--ink-900);
+  border: 1px solid var(--win, #4ade80);
+  border-radius: 12px;
+  margin: 0 0 10px;
+  padding: 14px 0 18px;
+  overflow: hidden;
+  animation: fcGruposExpandIn 0.22s ease both;
+}
+@keyframes fcGruposExpandIn {
+  from { opacity: 0; transform: translateY(-4px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 1200px; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Modal nav header (Bug 2 — replica patrón Fase Final con flechas)
+   ────────────────────────────────────────────────────────────────────── */
+.jcard-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(20, 20, 24, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #2a2a2e;
+  margin: 0 0 8px;
+  border-radius: 16px 16px 0 0;
+}
+
+.jcard-nav__counter {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f59e0b;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+  text-align: center;
+}
+
+.jcard-nav__arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(40, 40, 48, 0.9);
+  border: 1px solid #3a3a3e;
+  color: #f0f0f0;
+  font-size: 18px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease, transform 0.05s ease;
+}
+.jcard-nav__arrow:hover { background: rgba(60, 60, 70, 0.9); }
+.jcard-nav__arrow:active { transform: scale(0.94); }
+.jcard-nav__arrow:disabled,
+.jcard-nav__arrow[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   G3 — Carrusel scroll-snap (replica patrón Fase Final)
+   Slot 320px — bump desde 288px tras smoke: .cards-grid baseline usa
+   minmax(360px,1fr) y .hero altura fija 220px; 288 comprimía kits.
+   320 es el compromiso entre snap UX (mobile) y respetar la maquetación
+   interna de la tarjeta editable.
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-carousel-wrap {
+  position: relative;
+  padding: 12px 0 8px;
+}
+
+.fc-grupos-carousel {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  /* Padding lateral 5vw — tweak desde 7vw para mobile <380px. Con slot
+     de 86vw + scroll-snap-align:center, 5vw deja menos solapamiento de
+     los slots vecinos (scale .92) con los bordes del expanded. */
+  padding: 4px 5vw 4px 5vw;
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.fc-grupos-carousel::-webkit-scrollbar { display: none; }
+
+/* Slot · réplica EXACTA de .fc-elim-carousel__slide (Fase Final).
+   86vw + max-width 360px + scale/opacity para no-current da el efecto
+   de "focus" sobre el slot actual con sneak peek de los vecinos. */
+.fc-grupos-slot {
+  flex: 0 0 auto;
+  width: 86vw;
+  max-width: 360px;
+  scroll-snap-align: center;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  will-change: transform, opacity;
+}
+.fc-grupos-slot:not(.is-current) {
+  transform: scale(0.92);
+  opacity: 0.55;
+}
+
+/* La .ko-card llena el slot — réplica del rule .fc-elim-carousel__slide > .ko-card */
+.fc-grupos-slot--match > .ko-card { width: 100%; }
+.fc-grupos-slot--standings > * { width: 100%; box-sizing: border-box; }
+
+/* Dots */
+.fc-grupos-carousel__dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 4px;
+}
+
+.fc-grupos-carousel__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  transition: width 0.2s ease, background 0.2s ease, border-radius 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-grupos-carousel__dot.is-active {
+  width: 14px;
+  background: #f59e0b;
+  border-radius: 3px;
+}
+
+/* Arrows desktop */
+.fc-grupos-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(20, 20, 24, 0.85);
+  border: 1px solid #2a2a2e;
+  color: #f0f0f0;
+  font-size: 18px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.fc-grupos-carousel__arrow--prev { left: 4px; }
+.fc-grupos-carousel__arrow--next { right: 4px; }
+
+@media (min-width: 1024px) {
+  .fc-grupos-carousel__arrow { display: inline-flex; }
+}
+
+@media (max-width: 640px) {
+  .fc-grupos-carousel__arrow { display: none !important; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   G4 — Slot 7 tabla clasificación (restyling)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-standings {
+  background: linear-gradient(180deg, #1a1a1e 0%, #16161a 100%);
+  border: 1px solid rgba(245, 158, 11, 0.20);
+  border-radius: 14px;
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fc-grupos-standings__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #f59e0b;
+  margin: 0 0 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.fc-grupos-standings__table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.fc-grupos-standings__head,
+.fc-grupos-standings__row {
+  display: grid;
+  grid-template-columns: 18px 18px 1fr 24px 28px 28px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 4px;
+  border-radius: 6px;
+}
+
+.fc-grupos-standings__head {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  text-transform: uppercase;
+  border-bottom: 1px solid #2a2a2e;
+}
+
+.fc-grupos-standings__row {
+  font-size: 12px;
+  color: #d1d5db;
+}
+
+.fc-grupos-standings__row--qualif {
+  background: rgba(74, 222, 128, 0.06);
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.fc-grupos-standings__pos { text-align: center; font-weight: 700; }
+
+.fc-grupos-standings__flag {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2a2a2e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.fc-grupos-standings__flag img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.fc-grupos-standings__flag-code { font-size: 6px; font-weight: 700; color: #f0f0f0; position: absolute; display: none; }
+.fc-grupos-standings__flag.is-fallback .fc-grupos-standings__flag-code { display: inline; }
+
+.fc-grupos-standings__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-grupos-standings__pj,
+.fc-grupos-standings__gd { text-align: center; font-weight: 600; }
+.fc-grupos-standings__pts { text-align: right; font-weight: 800; }
+
+.fc-grupos-standings__footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #2a2a2e;
+  font-size: 9px;
+  color: #6b7280;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Compact card · usa dimensiones NATURALES de Fase Final (.ko-card de
+   ko.css). Los overrides verticales agresivos del commit 7d8f9c6 fueron
+   revertidos — comprimían la card a 112px y dejaban hueco gigante (~150px)
+   bajo el carousel porque el slot 7 (standings) es ~340px y el flex
+   stretch igualaba todos los slots a esa altura.
+   Card a su altura natural ~168px + body section flex absorbe el resto.
+   El slot--match centra verticalmente el card para repartir el residual.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Slot match centra verticalmente la card para que el espacio sobrante
+   se reparta arriba y abajo en vez de quedar todo abajo. */
+.fc-grupos-slot--match {
+  display: flex;
+  align-items: center;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Body section — rellena espacio sobrante dentro de la .ko-card stretched.
+   Solo en .fc-grupos-carousel — Fase Final no lo emite.
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-carousel .ko-card {
+  display: flex;
+  flex-direction: column;
+}
+.fc-grupos-carousel .ko-hero { flex: 0 0 auto; }
+.fc-grupos-carousel .ko-footer { flex: 0 0 auto; margin-top: auto; }
+
+.fc-grupos-carousel .ko-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 12px;
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0) 0%, rgba(20, 20, 22, 0.6) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fc-grupos-carousel .ko-body--saved { /* override por estado */ }
+.fc-grupos-carousel .ko-body--empty {
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0) 0%, rgba(245, 158, 11, 0.04) 100%);
+}
+
+.fc-grupos-carousel .ko-body__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--text-3, #6b7280);
+  text-transform: uppercase;
+}
+
+.fc-grupos-carousel .ko-body__score {
+  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ink-100, #f0f0f0);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.fc-grupos-carousel .ko-body__sep {
+  color: var(--text-3, #6b7280);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0 4px;
+}
+
+.fc-grupos-carousel .ko-body__gol {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--green, #4ade80);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.fc-grupos-carousel .ko-body__cta {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f59e0b;
+  text-transform: uppercase;
+}
