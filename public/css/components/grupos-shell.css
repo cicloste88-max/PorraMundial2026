@@ -1,0 +1,12 @@
+/* ──────────────────────────────────────────────────────────────────────
+   Grupos Shell — Sprint B (Mundial 2026)
+   Estructura: chips A-L + 12 cards colapsables + carrusel scroll-snap +
+   tabla clasificación slot 7. Reusa .collap pattern de predictor-shell.css.
+   Selectors namespaced .fc-grupos-* para evitar colisiones.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Bloques poblados por las 4 oleadas:
+   G1 — .fc-grupos-letterbar / .fc-grupos-chip / states
+   G2 — .fc-grupos-card / header / banderas overlap / progress / chev
+   G3 — .fc-grupos-carousel / .fc-grupos-slot / dots / arrows
+   G4 — .fc-grupos-standings / table / qualif row */
