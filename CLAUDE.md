@@ -82,6 +82,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
 | `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
+| `scrapling-methodology.md` | Scrapling vs stack + patrones extrapolables | Añadir scraper o endurecimiento anti-bot |
 
 ### `.claude/rules/` — auto-cargadas por path-scoping
 
