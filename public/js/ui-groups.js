@@ -839,3 +839,116 @@ function _renderGruposCardShell(letra, partidosCount) {
 }
 
 window._renderGruposCardShell = _renderGruposCardShell;
+
+// ─────────────────────────────────────────────────────────────────────
+// G3 · Carrusel scroll-snap (replica patrón Fase Final ui-elim-shell)
+// Recibe tarjetas YA CREADAS por createMatchCard. NO las recrea —
+// solo las MUEVE a slots con scroll-snap-align:center. Preserva
+// listeners de attachEvents porque appendChild mueve el Element.
+// ─────────────────────────────────────────────────────────────────────
+
+function _renderGruposCarousel(letra, cardEls, gtableEl) {
+  var wrap = document.createElement('div');
+  wrap.className = 'fc-grupos-carousel-wrap';
+
+  var carousel = document.createElement('div');
+  carousel.className = 'fc-grupos-carousel';
+  carousel.setAttribute('role', 'region');
+  carousel.setAttribute('aria-label', 'Partidos del grupo ' + letra);
+
+  // 6 match slots — mover Element original (preserva listeners attachEvents)
+  for (var i = 0; i < cardEls.length && i < 6; i++) {
+    var slot = document.createElement('div');
+    slot.className = 'fc-grupos-slot fc-grupos-slot--match';
+    slot.setAttribute('data-slot-idx', String(i));
+    slot.appendChild(cardEls[i]);
+    carousel.appendChild(slot);
+  }
+
+  // Slot 7: standings (mover gtable Element — id preservado para refreshGroupTables)
+  if (gtableEl) {
+    var sslot = document.createElement('div');
+    sslot.className = 'fc-grupos-slot fc-grupos-slot--standings';
+    sslot.setAttribute('data-slot-idx', '6');
+    sslot.appendChild(gtableEl);
+    carousel.appendChild(sslot);
+  }
+
+  wrap.appendChild(carousel);
+
+  // Dots indicator
+  var dotsEl = document.createElement('div');
+  dotsEl.className = 'fc-grupos-carousel__dots';
+  dotsEl.setAttribute('data-letra', letra);
+  var slotCount = (cardEls.length || 0) + (gtableEl ? 1 : 0);
+  for (var j = 0; j < slotCount; j++) {
+    var dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'fc-grupos-carousel__dot' + (j === 0 ? ' is-active' : '');
+    dot.setAttribute('data-dot-idx', String(j));
+    dot.setAttribute('aria-label', 'Slot ' + (j + 1));
+    dotsEl.appendChild(dot);
+  }
+  wrap.appendChild(dotsEl);
+
+  // Arrows (desktop only via CSS)
+  var prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'fc-grupos-carousel__arrow fc-grupos-carousel__arrow--prev';
+  prev.setAttribute('aria-label', 'Anterior');
+  prev.textContent = '‹';
+  var next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'fc-grupos-carousel__arrow fc-grupos-carousel__arrow--next';
+  next.setAttribute('aria-label', 'Siguiente');
+  next.textContent = '›';
+  wrap.appendChild(prev);
+  wrap.appendChild(next);
+
+  function getSlotWidth() {
+    var first = carousel.querySelector('.fc-grupos-slot');
+    return first ? first.getBoundingClientRect().width + 12 : 1;
+  }
+  function setActiveDot(idx) {
+    var dots = dotsEl.querySelectorAll('.fc-grupos-carousel__dot');
+    for (var k = 0; k < dots.length; k++) {
+      dots[k].classList.toggle('is-active', k === idx);
+    }
+  }
+  function scrollToSlot(idx) {
+    var slots = carousel.querySelectorAll('.fc-grupos-slot');
+    var s = slots[idx];
+    if (s) s.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+  var rafPending = false;
+  carousel.addEventListener('scroll', function () {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () {
+      rafPending = false;
+      var sw = getSlotWidth();
+      var idx = Math.round(carousel.scrollLeft / sw);
+      setActiveDot(Math.max(0, Math.min(slotCount - 1, idx)));
+    });
+  });
+  dotsEl.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.fc-grupos-carousel__dot');
+    if (!btn) return;
+    var idx = Number(btn.getAttribute('data-dot-idx'));
+    scrollToSlot(idx);
+  });
+  prev.addEventListener('click', function () {
+    var sw = getSlotWidth();
+    var cur = Math.round(carousel.scrollLeft / sw);
+    scrollToSlot(Math.max(0, cur - 1));
+  });
+  next.addEventListener('click', function () {
+    var sw = getSlotWidth();
+    var cur = Math.round(carousel.scrollLeft / sw);
+    scrollToSlot(Math.min(slotCount - 1, cur + 1));
+  });
+
+  return wrap;
+}
+
+window._renderGruposCarousel = _renderGruposCarousel;
