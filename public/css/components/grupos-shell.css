@@ -10,3 +10,201 @@
    G2 — .fc-grupos-card / header / banderas overlap / progress / chev
    G3 — .fc-grupos-carousel / .fc-grupos-slot / dots / arrows
    G4 — .fc-grupos-standings / table / qualif row */
+
+/* ──────────────────────────────────────────────────────────────────────
+   G1 — Chips carousel A-L (top horizontal scroll)
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-letterbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+  margin-bottom: 8px;
+  background: #0d0f1a;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.fc-grupos-letterbar::-webkit-scrollbar { display: none; }
+
+.fc-grupos-chip {
+  flex-shrink: 0;
+  background: #1a1a1e;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  padding: 8px 14px;
+  min-width: 64px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  scroll-snap-align: start;
+}
+
+.fc-grupos-chip__letra {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.fc-grupos-chip__count {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9aa0a6;
+  letter-spacing: 0.04em;
+}
+
+.fc-grupos-chip.is-completo .fc-grupos-chip__letra { color: #4ade80; }
+.fc-grupos-chip.is-parcial  .fc-grupos-chip__letra { color: #f59e0b; }
+.fc-grupos-chip.is-vacio    .fc-grupos-chip__letra { color: #6b7280; }
+
+.fc-grupos-chip.is-active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.fc-grupos-chip:hover { border-color: #3a3a3e; }
+.fc-grupos-chip:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   G2 — Card colapsable header (12 grupos A-L)
+   ────────────────────────────────────────────────────────────────────── */
+.fc-grupos-card {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  margin: 0 14px 10px;
+  overflow: hidden;
+  scroll-margin-top: 80px;
+}
+
+.fc-grupos-card__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+.fc-grupos-card__toggle:hover { background-color: rgba(255, 255, 255, 0.04); }
+.fc-grupos-card__toggle:focus-visible { outline: 2px solid var(--fifa-gold); outline-offset: -2px; }
+
+.fc-grupos-card__bar {
+  width: 3px;
+  height: 42px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.fc-grupos-card__bar.is-completo { background: #4ade80; }
+.fc-grupos-card__bar.is-parcial  { background: #f59e0b; }
+.fc-grupos-card__bar.is-vacio    { background: #3a3a3e; }
+
+.fc-grupos-card__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.fc-grupos-card__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.fc-grupos-card__letra {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink-100);
+  line-height: 1;
+}
+
+.fc-grupos-card__flags {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
+.fc-grupos-card__flag {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  border: 1.5px solid var(--ink-800);
+  margin-left: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.fc-grupos-card__flag:first-child { margin-left: 0; }
+
+.fc-grupos-card__flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fc-grupos-card__flag-code {
+  font-size: 7px;
+  font-weight: 700;
+  color: var(--ink-100);
+  position: absolute;
+  display: none;
+}
+.fc-grupos-card__flag.is-fallback .fc-grupos-card__flag-code { display: inline; }
+
+.fc-grupos-card__spacer { flex: 1; }
+
+.fc-grupos-card__dice {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6652c9, #4c3a9c);
+  border: 0;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.fc-grupos-card__dice:hover { filter: brightness(1.1); }
+
+.fc-grupos-card__progress {
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.fc-grupos-card__progress.is-completo { color: #4ade80; }
+.fc-grupos-card__progress.is-parcial  { color: #f59e0b; }
+.fc-grupos-card__progress.is-vacio    { color: var(--ink-400); }
+
+.fc-grupos-card .collap-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.fc-grupos-card.open .collap-body { max-height: 2400px; }
+.fc-grupos-card .chev { transition: transform 0.2s ease; font-size: 14px; color: var(--ink-400); flex-shrink: 0; }
+.fc-grupos-card.open .chev { transform: rotate(180deg); }

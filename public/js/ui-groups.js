@@ -708,3 +708,134 @@ function initGrupos() {
 }
 
 
+
+// ─────────────────────────────────────────────────────────────────────
+// Sprint B · Grupos redesign helpers (G1: chips A-L, G2: card shell)
+// G3 (carousel) y G4 (standings) viven más abajo. Reusa .collap pattern
+// de predictor-shell.css. Ver docs: PR Sprint B.
+// ─────────────────────────────────────────────────────────────────────
+
+function _getGroupCount(letra) {
+  if (typeof getGroupCompleted === 'function') return getGroupCompleted(letra);
+  var matches = (typeof PARTIDOS !== 'undefined' ? PARTIDOS : []).filter(function (m) {
+    return m.group === letra;
+  });
+  var done = 0;
+  matches.forEach(function (m) {
+    var matchKey = (typeof getMatchKey === 'function') ? getMatchKey(m) : null;
+    var pred = (typeof predictions !== 'undefined' && matchKey) ? predictions[matchKey] : null;
+    if (pred && pred.l != null && pred.v != null) done++;
+  });
+  return done;
+}
+
+function _renderGruposLetterBar() {
+  var bar = document.getElementById('grupos-letter-bar');
+  if (!bar) return;
+  var letras = (typeof GRUPOS !== 'undefined' ? GRUPOS : []).map(function (g) { return g.letra; });
+  var html = '<div class="fc-grupos-letterbar" role="tablist">';
+  letras.forEach(function (letra) {
+    var count = _getGroupCount(letra);
+    var state = count === 6 ? 'is-completo' : (count > 0 ? 'is-parcial' : 'is-vacio');
+    html += '<button type="button" class="fc-grupos-chip ' + state + '" data-letra="' + escapeHtml(letra) +
+              '" role="tab" aria-label="Grupo ' + escapeHtml(letra) +
+              '" onclick="_scrollToGrupoCard(\'' + escapeHtml(letra) + '\')">' +
+              '<span class="fc-grupos-chip__letra">' + escapeHtml(letra) + '</span>' +
+              '<span class="fc-grupos-chip__count">' + count + '/6</span>' +
+            '</button>';
+  });
+  html += '</div>';
+  bar.innerHTML = html;
+}
+
+function _scrollToGrupoCard(letra) {
+  var card = document.getElementById('grupo-card-' + letra);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  _setActiveChip(letra);
+}
+
+function _setActiveChip(letra) {
+  var chips = document.querySelectorAll('.fc-grupos-chip');
+  chips.forEach(function (c) {
+    c.classList.toggle('is-active', c.getAttribute('data-letra') === letra);
+  });
+}
+
+function _refreshGruposLetterBar() {
+  var chips = document.querySelectorAll('.fc-grupos-chip');
+  chips.forEach(function (c) {
+    var letra = c.getAttribute('data-letra');
+    var count = _getGroupCount(letra);
+    c.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+    c.classList.add(count === 6 ? 'is-completo' : (count > 0 ? 'is-parcial' : 'is-vacio'));
+    var cnt = c.querySelector('.fc-grupos-chip__count');
+    if (cnt) cnt.textContent = count + '/6';
+  });
+}
+
+window._renderGruposLetterBar = _renderGruposLetterBar;
+window._refreshGruposLetterBar = _refreshGruposLetterBar;
+window._scrollToGrupoCard = _scrollToGrupoCard;
+window._setActiveChip = _setActiveChip;
+
+// ─────────────────────────────────────────────────────────────────────
+// G2 · Card colapsable header (12 grupos A-L). Reusa .collap pattern.
+// El body interno mantiene #grid-{letra} y #gtable-{letra} hidden para
+// que createMatchCard / renderGroupTableCard sigan teniendo destino.
+// ─────────────────────────────────────────────────────────────────────
+
+function _renderGruposCardShell(letra, partidosCount) {
+  var grupo = (typeof GRUPOS !== 'undefined') ? GRUPOS.find(function (g) { return g.letra === letra; }) : null;
+  if (!grupo) return null;
+  var equipos = grupo.equipos || [];
+  var done = (partidosCount && partidosCount.done != null) ? partidosCount.done : 0;
+  var total = (partidosCount && partidosCount.total != null) ? partidosCount.total : 6;
+  var stateClass = (done === total) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
+
+  var section = document.createElement('section');
+  section.className = 'fc-grupos-card collap';
+  section.id = 'grupo-card-' + letra;
+
+  var flagsHtml = equipos.slice(0, 4).map(function (teamName) {
+    var team = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === teamName; }) : null;
+    var code = (team && team.flag) ? team.flag : (teamName || '').slice(0, 3).toUpperCase();
+    var src = (team && team.flag && typeof SB !== 'undefined') ? (SB + '/flags/' + team.flag + '.png') : '';
+    return '<span class="fc-grupos-card__flag" data-code="' + escapeHtml(code) + '">' +
+             (src ? '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(code) + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-fallback\');"/>' : '') +
+             '<span class="fc-grupos-card__flag-code">' + escapeHtml(code) + '</span>' +
+           '</span>';
+  }).join('');
+
+  section.innerHTML =
+    '<button type="button" class="collap-toggle fc-grupos-card__toggle" aria-expanded="false">' +
+      '<span class="fc-grupos-card__bar ' + stateClass + '"></span>' +
+      '<span class="fc-grupos-card__title-block">' +
+        '<span class="fc-grupos-card__label">GRUPO</span>' +
+        '<span class="fc-grupos-card__letra">' + letra + '</span>' +
+      '</span>' +
+      '<span class="fc-grupos-card__flags">' + flagsHtml + '</span>' +
+      '<span class="fc-grupos-card__spacer"></span>' +
+      '<span class="fc-grupos-card__dice" role="button" aria-label="Simular grupo ' + letra +
+        '" onclick="event.stopPropagation(); diceSimulateGroup(\'' + letra + '\');">🎲</span>' +
+      '<span class="fc-grupos-card__progress ' + stateClass + '">' + done + '/' + total + '</span>' +
+      '<span class="chev" aria-hidden="true">▾</span>' +
+    '</button>' +
+    '<div class="collap-body">' +
+      '<div class="collap-body-inner">' +
+        '<div class="fc-grupos-card__carousel-mount" data-letra="' + letra + '"></div>' +
+        '<div class="cards-grid" id="grid-' + letra + '" hidden></div>' +
+        '<div id="gtable-' + letra + '" class="group-table-card" hidden></div>' +
+      '</div>' +
+    '</div>';
+
+  var btn = section.querySelector('.collap-toggle');
+  btn.addEventListener('click', function (ev) {
+    if (ev.target && ev.target.closest && ev.target.closest('.fc-grupos-card__dice')) return;
+    var open = section.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  return section;
+}
+
+window._renderGruposCardShell = _renderGruposCardShell;

@@ -1290,6 +1290,8 @@ function checkKitConflict(card, idx, homeTeam, awayTeam, hKitType, aKitType) {
 function renderAll(onComplete) {
   const container = document.getElementById('groups-container');
   container.innerHTML = '';
+  // Sprint B · top chips A-L (sticky letterbar)
+  if (typeof window._renderGruposLetterBar === 'function') window._renderGruposLetterBar();
   // Renderizar grupo a grupo con setTimeout(0) para no bloquear el hilo principal
   // Permite que el navegador procese eventos entre grupos
   let i = 0;
@@ -1297,11 +1299,23 @@ function renderAll(onComplete) {
     if(i >= GRUPOS.length) { if(onComplete) onComplete(); return; }
     const grupo = GRUPOS[i++];
     const partidosGrupo = PARTIDOS.filter(p => p.group === grupo.letra);
-    const section = document.createElement('div');
-    section.className = 'group-section';
-    section.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Grupo ${grupo.letra}</h2><button class="dice-btn" onclick="diceSimulateGroup('${grupo.letra}')" title="Simular grupo ${grupo.letra} al azar"><span class="dice-icon">🎲</span> Simular grupo ${grupo.letra}</button></div><div class="group-layout"><div class="cards-grid" id="grid-${grupo.letra}"></div><div id="gtable-${grupo.letra}" class="group-table-card"></div></div>`;
+    // Sprint B · card colapsable A-L con grid+gtable hidden dentro
+    const doneCount = partidosGrupo.filter(m => {
+      const p = predictions[getMatchKey(m)];
+      return p && p.l != null && p.v != null;
+    }).length;
+    let section;
+    if (typeof window._renderGruposCardShell === 'function') {
+      section = window._renderGruposCardShell(grupo.letra, { done: doneCount, total: partidosGrupo.length });
+    }
+    if (!section) {
+      // fallback al layout legacy si el shell no está cargado
+      section = document.createElement('div');
+      section.className = 'group-section';
+      section.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h2 style="margin:0">Grupo ${grupo.letra}</h2><button class="dice-btn" onclick="diceSimulateGroup('${grupo.letra}')"><span class="dice-icon">🎲</span> Simular grupo ${grupo.letra}</button></div><div class="group-layout"><div class="cards-grid" id="grid-${grupo.letra}"></div><div id="gtable-${grupo.letra}" class="group-table-card"></div></div>`;
+    }
     container.appendChild(section);
-    const grid = section.querySelector('.cards-grid');
+    const grid = section.querySelector('#grid-' + grupo.letra) || section.querySelector('.cards-grid');
     partidosGrupo.forEach((match) => {
       const globalIdx = PARTIDOS.findIndex(p => p === match);
       const card = createMatchCard(match, globalIdx);
@@ -1309,9 +1323,20 @@ function renderAll(onComplete) {
       attachEvents(card, globalIdx, match);
     });
     renderGroupTableCard(grupo.letra);
+    // Sprint B · mover tarjetas + tabla al carrusel scroll-snap (G3)
+    if (typeof window._renderGruposCarousel === 'function') {
+      const gtable = section.querySelector('#gtable-' + grupo.letra);
+      const cardEls = Array.from(grid.children);
+      const carouselEl = window._renderGruposCarousel(grupo.letra, cardEls, gtable);
+      const mount = section.querySelector('.fc-grupos-card__carousel-mount[data-letra="' + grupo.letra + '"]');
+      if (mount && carouselEl) mount.appendChild(carouselEl);
+    }
     // Bloquear tarjetas si porra cerrada, justo después de renderizar
     if (window._porraCerrada) requestAnimationFrame(() => lockAllCardsIfCerrada());
-    if (typeof window.applyMobileGroupCollapse === 'function') {
+    // Sprint B · gate mobile-focus-layer: el carrusel scroll-snap ya da la
+    // experiencia equivalente. Evita double-wrap de los Elements de card.
+    const isMobile = (typeof window.matchMedia === 'function') && window.matchMedia('(max-width: 640px)').matches;
+    if (!isMobile && typeof window.applyMobileGroupCollapse === 'function') {
       window.applyMobileGroupCollapse(section, grupo.letra);
     }
     setTimeout(renderNextGroup, 0); // cede control al navegador entre grupos
