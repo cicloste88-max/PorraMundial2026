@@ -1159,8 +1159,11 @@ if (!window._jcardUpdatedListenerRegistered) {
       return (typeof getMatchKey === 'function') ? getMatchKey(m) === mk : false;
     }) : null;
     if (!match) return;
-    // 1) Compact preview
-    var existing = document.querySelector('.fc-grupos-mini[data-match-key="' + mk + '"]');
+    // 1) Compact preview — selector corregido tras commit 98f4550 que
+    // dropeó la clase .fc-grupos-mini. Ahora el data-match-key vive en
+    // .ko-card directo. Scope a .fc-grupos-carousel para evitar matching
+    // accidental con KO cards de Fase Final si compartieran attr.
+    var existing = document.querySelector('.fc-grupos-carousel .ko-card[data-match-key="' + mk + '"]');
     if (existing && typeof _renderGruposCompactCard === 'function') {
       var fresh = _renderGruposCompactCard(match);
       if (fresh) existing.replaceWith(fresh);
