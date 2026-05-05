@@ -26,10 +26,22 @@
   margin-bottom: 8px;
 }
 
-/* Override del padding lateral del stepper para encajar con el listado de
-   cards (margin 0 14px). Mantiene gap, items y states del original. */
+/* ──────────────────────────────────────────────────────────────────────
+   Container · padding centralizado (réplica del patrón .fc-elim-list).
+   Antes: cada .fc-grupos-card y .fc-grupos-expanded tenía margin lateral
+   propio (14px×2 = 28px consumidos). Ahora el padding vive en el
+   container padre → cards y expanded ocupan width:100% → más aire.
+   Equivalencia: viewport 375px - 24px (12×2) = 351px disponibles
+   (vs 347px que daba el margin individual).
+   ────────────────────────────────────────────────────────────────────── */
+#groups-container {
+  padding: 0 12px 80px;
+  box-sizing: border-box;
+}
+
+/* Letterbar wrapper — mismo padding lateral 12px para paridad visual. */
 .fc-grupos-stepper {
-  padding: 10px 14px;
+  padding: 10px 12px;
   gap: 4px;
 }
 
@@ -51,7 +63,7 @@
   background: var(--ink-800);
   border: 1px solid var(--ink-700);
   border-radius: 14px;
-  margin: 0 14px 10px;
+  margin: 0 0 10px;
   overflow: hidden;
   scroll-margin-top: 80px;
 }
@@ -192,7 +204,7 @@
   background: var(--ink-900);
   border: 1px solid var(--win, #4ade80);
   border-radius: 12px;
-  margin: 0 12px 10px;
+  margin: 0 0 10px;
   padding: 14px 0 18px;
   overflow: hidden;
   animation: fcGruposExpandIn 0.22s ease both;
@@ -274,10 +286,10 @@
   position: relative;
   display: flex;
   gap: 10px;
-  /* Padding lateral 7vw replica el patrón de .fc-elim-carousel: con slot
-     de 86vw + scroll-snap-align:center, los slides quedan perfectamente
-     centrados sin compensar margenes. */
-  padding: 4px 7vw 4px 7vw;
+  /* Padding lateral 5vw — tweak desde 7vw para mobile <380px. Con slot
+     de 86vw + scroll-snap-align:center, 5vw deja menos solapamiento de
+     los slots vecinos (scale .92) con los bordes del expanded. */
+  padding: 4px 5vw 4px 5vw;
   overflow-x: auto;
   overflow-y: visible;
   scroll-snap-type: x mandatory;
