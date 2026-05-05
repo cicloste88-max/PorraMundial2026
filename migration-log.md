@@ -1490,3 +1490,45 @@ Integrado Cloudflare Turnstile en el formulario de login para cerrar el WARN `au
   - migration-log: este append.
   - Cleanup branches remotas: `claude/fix-awards-card-display-BZMg5` ya auto-eliminada por squash-merge GitHub. Intento `git push origin --delete claude/fix-awards-card-mobile-5hBvd` desde Code → HTTP 403 (ERR-17, proxy git de Anthropic no permite delete refs). Pendiente que San borre la branch fantasma desde GitHub UI o `git push origin --delete` local.
   - Pre-commit hook activado (`git config core.hooksPath .githooks`); tamaños finales CLAUDE.md 10082 / 10240 (margen 158 B), CHANGELOG.md 16595 / 30720.
+
+## 2026-05-05
+
+[~10:00-22:00] SPRINT-B Grupos screen redesign (PR#52, branch `claude/sprint-b-grupos-redesign`):
+
+Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squash-mergeados a main vía PR#52 (SHA `aebbd22`). Patrón validado: 4 subagentes Haiku 4.5 paralelos (G1 chips A-L, G2 card colapsable, G3 carousel scroll-snap, G4 tabla clasificación) integrados por Opus padre en oleadas A→B→C.
+
+**Commits principales**:
+- `5a223eb` scaffold mount points + grupos-shell.css skeleton.
+- `26d2658` Oleada A — chips A-L + card colapsable shell (4 subagentes paralelos).
+- `31ff5d8` Oleada B — carousel scroll-snap (slot 288→320 tras smoke).
+- `1d35651` Oleada C — tabla clasificación restilada (override `renderGroupTableCard`).
+- `00ac929` letterbar replica Fase Final + compact preview cards.
+- `4785883` modal editable MOVE-original (preserva listeners attachEvents).
+- `a900757` Bug 1 `[hidden]` UA stylesheet + Bug 2 nav flechas modal.
+- `67399b9` slot responsive + tabla visible (drop attr `hidden`).
+- `98f4550` compact card visual replica EXACTA Fase Final.
+- `7d8f9c6` compact card más estrecha (revertido en `7f9b9ff`).
+- `05f5dd4` expanded como SIBLING (no anidado) — root cause overflow.
+- `2d8aec8` padding centralizado réplica `.fc-elim-list`.
+- `b66aea9` neutralizar `.container` legacy padding 20px lateral.
+- `412fddf` ko-body fill space (TU PRONÓSTICO + marcador / CTA).
+- `7f9b9ff` revert compresión vertical agresiva + centrar card en slot.
+- `8cad0d3` fix selector stale `.fc-grupos-mini` post-class-drop.
+
+**Root causes encontradas** (todas via DOM inspector + getComputedStyle por San):
+- ERR-37: scroll-snap carousel anidado en container colapsable consume 60-100px → overflow. Modelo correcto: SIBLING tras `parentNode.insertBefore(expanded, sectionEl.nextSibling)`.
+- ERR-36: `.container` legacy `padding: 0 20px 60px` (ko.css) eats 40px laterales solo en pages anidadas. `#page-elim` está top-level y no sufre. Override scoped `#page-grupos > .container { padding: 0 }`.
+- ERR-35: stale querySelector `.fc-grupos-mini[data-match-key=...]` tras drop de clase en commit 98f4550 → null → preview congelado tras Deshacer en modal.
+
+**Lecciones técnicas**:
+- MOVE-original > clone para modales editables: `appendChild` mueve preservando listeners de `attachEvents`. `originalParent` + `originalNextSibling` + `originalStyleAttr` para restitución exacta. Compatible con navegación prev/next dentro del modal.
+- `[hidden]` HTML attribute persiste tras `appendChild` (no se limpia automáticamente). Para hidden-source patterns: drop el attr y usar CSS scoped (`.fc-grupos-card__source { display: none !important }`).
+- Reuso de clases CSS de otra screen (`.ko-card`, `.fc-elim-stepper__item`) con override scoped al carousel padre evita reinventar y mantiene paridad visual al 100%.
+
+[22:00] CIERRE-SESION SPRINT-B (este commit, branch `claude/post-sprint-b-docs`):
+- CLAUDE.md: Estado actual HEAD `aebbd22`, Top-3 reordenado (1) Backend pre-11jun, (2) Tests motor puntuación, (3) Pulido UI residual. Bugs UI table-índice ampliada con ERR-34..37.
+- CHANGELOG.md: nueva sección 2026-05-05 con 14 commits del Sprint B + lecciones técnicas.
+- errores_conocidos_porra.md: añadidos ERR-34 (seed_ia_user race), ERR-35 (stale querySelector), ERR-36 (.container legacy), ERR-37 (carousel anidado).
+- docs/architecture.md: nueva sección "Pantallas y patrones de carrusel" documentando Fase Final + Grupos post-Sprint B + modal editable MOVE-original.
+- .claude/rules/frontend-css.md: añadidas notas sobre .container legacy + stale querySelector + scroll-snap sibling pattern.
+- Pre-commit hook validado: CLAUDE.md 10230 / 10240, CHANGELOG.md ~21KB / 30720.

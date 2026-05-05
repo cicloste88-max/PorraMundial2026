@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-ma
 
 ## Estado actual
 
-Rama activa **main** HEAD `137125e` (post Sprint A+B UI, PR#49 + bot IA Zayu PR#48). Bot IA Zayu activo en 3 ligas (72 group + 32 KO + awards lock), EF `porra-ia-compute` v11 ACTIVE. Sprint A+B 04-may cerrado: toggle Premios/Cuadro Fase Final + Jornada/Directo Design v2 + fix Ver tarjeta mobile (centrado sin scroll horizontal). Detalle en `CHANGELOG.md`. Próximo: cargar squads reales + ejecutar `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
+Rama activa **main** HEAD `aebbd22` (post Sprint B PR#52, Sprint A PR#51, Sprint A+B UI PR#49, bot IA Zayu PR#48). Sprint B 05-may cerrado: Grupos screen completo replicando patrón Fase Final + modal editable MOVE-original + nav flechas + body TU PRONÓSTICO. Patrón validado: 4 subagentes Haiku paralelos integrados por Opus en oleadas A→B→C. Próximo: squads reales + `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
 
 ## Top-3 pendientes inmediatos
 
 Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr2026.md`. Top-3 críticos:
 
 1. **Backend pre-11jun core**: WhatsApp Meta migration (ticket 63016) + activar pg_cron `update-results` el 11 jun + cargar squads reales en `EQUIPOS[].players`. Sin esto la app no funciona el día del Mundial.
-2. **Cards embebidas grupos formato fase final** (próximo sprint UI): replicar formato Fase Final — cards embebidas por letra A-L. Ref: `ui-elim-shell.js` ElimRow+ElimExpanded. Toca `createMatchCard` + `renderAll` (`scoring.js:1289`) + `ui-groups-mobile.js` mobile-collapse.
-3. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
+2. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
+3. **Pulido UI residual**: bugs Pendientes — Bugs UI ítems 1-4 (cinta tabs ronda mobile, hora CEST, Pichichi auto, frases IA wiring final).
 
 ## Pendientes — Bugs UI
 
@@ -22,7 +22,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 3. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
 4. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
 
-**Resueltos sprint A+B (04-may)**: toggle Premios/Cuadro oficial Fase Final, restyling Jornada+Directo DS v2, fix Ver tarjeta mobile (goleador + centrado).
+**Resueltos recientes**: Sprint A+B 04-may (Premios/Cuadro, Jornada+Directo v2, Ver tarjeta), Sprint B 05-may (Grupos redesign — letterbar+cards+carousel sibling+modal editable). Ver `CHANGELOG.md`.
 
 ## Pendientes — Antes del 11 junio 2026
 
@@ -132,6 +132,10 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente) |
 | ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ PR#33) |
 | ERR-33 | `REVOKE FROM PUBLIC` en función usada por RLS rompe `authenticated` |
+| ERR-34 | `seed_ia_user` race auth.users vs profiles INSERT |
+| ERR-35 | Stale querySelector tras refactor de clase CSS |
+| ERR-36 | `.container` legacy padding rompe paridad de pages |
+| ERR-37 | Scroll-snap carousel anidado → overflow (debe ser sibling) |
 
 ### Otros ficheros de contexto
 
