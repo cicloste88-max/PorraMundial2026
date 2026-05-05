@@ -952,25 +952,78 @@ function _renderGruposCardShell(letra, partidosCount) {
       '<span class="fc-grupos-card__progress ' + stateClass + '">' + done + '/' + total + '</span>' +
       '<span class="chev" aria-hidden="true">▾</span>' +
     '</button>' +
-    '<div class="collap-body">' +
-      '<div class="collap-body-inner">' +
-        '<div class="fc-grupos-card__carousel-mount" data-letra="' + letra + '"></div>' +
-        '<div class="cards-grid" id="grid-' + letra + '"></div>' +
-        '<div id="gtable-' + letra + '" class="group-table-card"></div>' +
-      '</div>' +
+    // Source hidden: grid (tarjetas editables) + gtable (tabla clasificación).
+    // El expanded se monta como SIBLING (insertAfter). El gtable se mueve al
+    // slot 7 del carousel cuando se abre y se restituye al cerrar.
+    '<div class="collap-body-inner fc-grupos-card__source">' +
+      '<div class="cards-grid" id="grid-' + letra + '"></div>' +
+      '<div id="gtable-' + letra + '" class="group-table-card"></div>' +
     '</div>';
 
   var btn = section.querySelector('.collap-toggle');
   btn.addEventListener('click', function (ev) {
     if (ev.target && ev.target.closest && ev.target.closest('.fc-grupos-card__dice')) return;
-    var open = section.classList.toggle('open');
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (typeof _toggleGruposExpanded === 'function') _toggleGruposExpanded(letra, section);
   });
 
   return section;
 }
 
 window._renderGruposCardShell = _renderGruposCardShell;
+
+// Sprint B fix · monta el carousel expandido como SIBLING de la card del
+// grupo (no anidado dentro). Replica el patrón de Fase Final donde
+// .fc-elim-expanded vive como hermano del row → carousel container ~347px,
+// slot 86vw (322px) cabe completo. Anidar dentro del card consumía
+// 126px de margins+padding+borders → carousel solo 249px → overflow.
+function _toggleGruposExpanded(letra, sectionEl) {
+  if (!sectionEl) return;
+  var existing = document.querySelector('.fc-grupos-expanded');
+  var sameLetra = existing && existing.getAttribute('data-letra') === letra;
+
+  // Cerrar cualquier expanded actual (también restituye su gtable a la source).
+  if (existing) {
+    var oldLetra = existing.getAttribute('data-letra');
+    var oldSection = document.getElementById('grupo-card-' + oldLetra);
+    var oldGtable = existing.querySelector('#gtable-' + oldLetra);
+    if (oldGtable && oldSection) {
+      var oldSource = oldSection.querySelector('.fc-grupos-card__source');
+      if (oldSource) oldSource.appendChild(oldGtable);
+    }
+    existing.remove();
+    if (oldSection) {
+      oldSection.classList.remove('open');
+      var oldBtn = oldSection.querySelector('.collap-toggle');
+      if (oldBtn) oldBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+  // Si era el mismo letra, ya cerramos — no abrir de nuevo.
+  if (sameLetra) return;
+
+  // Construir el expanded sibling. Refrescar la tabla (la regenerá el
+  // override de renderGroupTableCard) antes de moverla al slot 7.
+  if (typeof renderGroupTableCard === 'function') renderGroupTableCard(letra);
+
+  var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === letra; }) : [];
+  var gtable = sectionEl.querySelector('#gtable-' + letra);
+  var carouselEl = (typeof _renderGruposCarousel === 'function') ? _renderGruposCarousel(letra, partidos, gtable) : null;
+  if (!carouselEl) return;
+
+  var expanded = document.createElement('section');
+  expanded.className = 'fc-grupos-expanded';
+  expanded.setAttribute('data-letra', letra);
+  expanded.appendChild(carouselEl);
+
+  // Insertar como sibling después de la card.
+  if (sectionEl.parentNode) sectionEl.parentNode.insertBefore(expanded, sectionEl.nextSibling);
+
+  // Marcar la card como abierta (chev rotation) y a11y.
+  sectionEl.classList.add('open');
+  var btn = sectionEl.querySelector('.collap-toggle');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+}
+
+window._toggleGruposExpanded = _toggleGruposExpanded;
 
 // ─────────────────────────────────────────────────────────────────────
 // G3 · Carrusel scroll-snap (replica patrón Fase Final ui-elim-shell)

@@ -171,19 +171,35 @@
 .fc-grupos-card__progress.is-parcial  { color: #f59e0b; }
 .fc-grupos-card__progress.is-vacio    { color: var(--ink-400); }
 
-.fc-grupos-card .collap-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-.fc-grupos-card.open .collap-body { max-height: 2400px; }
 .fc-grupos-card .chev { transition: transform 0.2s ease; font-size: 14px; color: var(--ink-400); flex-shrink: 0; }
 .fc-grupos-card.open .chev { transform: rotate(180deg); }
 
-/* Hide editable cards baseline + gtable while live in collap-body-inner.
-   Las tarjetas editables solo viven aquí como source para openJcardModal:
-   el modal mueve el Element original al overlay y lo restituye al cerrar.
-   .cards-grid pisa el [hidden] attr (specificity equal, .cards-grid es user-rule),
-   por eso forzamos display:none scoped con specificity superior. */
-.fc-grupos-card .collap-body-inner > .cards-grid,
-.fc-grupos-card .collap-body-inner > .group-table-card {
+/* Source hidden: grid (tarjetas editables) + gtable (tabla clasificación
+   antes de moverse al slot 7 del carousel expandido). Vive como hijo
+   directo de la card pero NO se renderiza visualmente. .cards-grid pisa
+   el [hidden] attr por specificity equal — forzamos display:none scoped. */
+.fc-grupos-card__source {
   display: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Expanded sibling — replica EXACTA del patrón Fase Final.
+   Se monta como hermano de .fc-grupos-card via insertBefore(nextSibling).
+   Recupera el ancho disponible completo (margin del card, no padding
+   anidado) → carousel container ~347px → slot 86vw (322px) cabe.
+   ────────────────────────────────────────────────────────────────────── */
+.fc-grupos-expanded {
+  background: var(--ink-900);
+  border: 1px solid var(--win, #4ade80);
+  border-radius: 12px;
+  margin: 0 12px 10px;
+  padding: 14px 0 18px;
+  overflow: hidden;
+  animation: fcGruposExpandIn 0.22s ease both;
+}
+@keyframes fcGruposExpandIn {
+  from { opacity: 0; transform: translateY(-4px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 1200px; }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -255,16 +271,19 @@
 }
 
 .fc-grupos-carousel {
+  position: relative;
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  /* Padding lateral 7vw replica el patrón de .fc-elim-carousel: con slot
+     de 86vw + scroll-snap-align:center, los slides quedan perfectamente
+     centrados sin compensar margenes. */
+  padding: 4px 7vw 4px 7vw;
   overflow-x: auto;
   overflow-y: visible;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: 14px;
-  padding: 0 14px 4px;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
 }
 .fc-grupos-carousel::-webkit-scrollbar { display: none; }
 

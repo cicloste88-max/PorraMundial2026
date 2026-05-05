@@ -1323,16 +1323,11 @@ function renderAll(onComplete) {
       attachEvents(card, globalIdx, match);
     });
     renderGroupTableCard(grupo.letra);
-    // Sprint B · construir compact preview cards en el carrusel.
-    // Las tarjetas editables creadas por createMatchCard quedan en hidden
-    // #grid-{letra} para que openJcardModal pueda clonarlas (preserva id
-    // card-wrap-{matchKey} y los listeners de attachEvents).
-    if (typeof window._renderGruposCarousel === 'function') {
-      const gtable = section.querySelector('#gtable-' + grupo.letra);
-      const carouselEl = window._renderGruposCarousel(grupo.letra, partidosGrupo, gtable);
-      const mount = section.querySelector('.fc-grupos-card__carousel-mount[data-letra="' + grupo.letra + '"]');
-      if (mount && carouselEl) mount.appendChild(carouselEl);
-    }
+    // Sprint B · El carrusel expandido se construye on-demand en
+    // _toggleGruposExpanded (click en el header del card) e inserta
+    // como SIBLING de la card. Las tarjetas editables creadas por
+    // createMatchCard quedan en hidden #grid-{letra} para que el modal
+    // editable las extraiga preservando listeners de attachEvents.
     // Bloquear tarjetas si porra cerrada, justo después de renderizar
     if (window._porraCerrada) requestAnimationFrame(() => lockAllCardsIfCerrada());
     // Sprint B · gate mobile-focus-layer: el carrusel scroll-snap ya da la
