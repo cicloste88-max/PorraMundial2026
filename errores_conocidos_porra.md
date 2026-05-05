@@ -499,3 +499,93 @@ Tres fallos encadenados que requirieron solución combinada.
   Si devuelve filas → **NO** revocar de `PUBLIC`. Aplicar solo `SET search_path = public, pg_temp`.
 - **Caso conocido:** `is_porra_abierta(uuid, uuid)` en sesión audit Postgres 28abr2026 — usada en 8 policies (`predictions`/`ko_predictions`/`award_picks`/`boost_picks` × INSERT/UPDATE).
 - **Fecha detección:** 28 abr 2026 (sesión audit Postgres, atajado pre-apply gracias a verificación de Claude.ai vía MCP).
+
+---
+
+## ERR-34 — `seed_ia_user` race condition: auth.users creado pero INSERT a profiles falla
+
+- **Síntoma:** primera invocación de `seed_ia_user` action en EF `porra-ia-compute` v11 (rid 1778, F7.7-IA C1+C2) responde con HTTP 500 internal error. Inspección DB: el usuario fue creado en `auth.users` (id `17ab3b59-...`) pero NO existe entry correspondiente en `profiles` (FK target).
+- **Causa:** race condition entre el `auth.admin.createUser({ email, password })` y el INSERT a `profiles`. El trigger automático de Supabase que replica auth.users → profiles aún no había completado cuando la EF ejecutó el INSERT manual a profiles. La FK `profiles.id → auth.users.id` ya existía pero el trigger interno tarda algunos ms en correr → segundo INSERT con el mismo id colisiona.
+- **Fix aplicado (recovery):** INSERT manual idempotente en `profiles` + `league_members` desde SQL editor:
+  ```sql
+  INSERT INTO profiles (id, nombre, is_admin, is_bot)
+  VALUES ('17ab3b59-...', 'IA Zayu', false, true)
+  ON CONFLICT (id) DO NOTHING;
+  ```
+  Bot quedó funcional sin re-deploy de EF.
+- **Pendiente (deuda):** retry/backoff en la propia EF — esperar 200ms tras `auth.admin.createUser` antes del INSERT a profiles, o usar `getUserById` con polling hasta confirmar que el trigger replicó. No urgente porque el seed es operación one-shot manual.
+- **Fecha detección:** 04 may 2026 (F7.7-IA C1+C2, primera ejecución `seed_ia_user`).
+
+---
+
+## ERR-35 — Stale querySelector tras refactor de clase CSS
+
+- **Síntoma:** tras editar pronóstico en modal de Grupos + pulsar Deshacer + cerrar modal, la compact card en el carrusel sigue mostrando el marcador y goleador anteriores. El estado limpio NO se refleja aunque `predictions[matchKey]` ya está mutado a empty.
+- **Causa:** en commit `98f4550` del Sprint B se dropeó la clase `.fc-grupos-mini` de la compact card (rompía el `:hover` original de `.ko-card`). El listener de `jcard:updated` en `ui-groups.js` seguía buscando esa clase obsoleta:
+  ```js
+  document.querySelector('.fc-grupos-mini[data-match-key="' + mk + '"]')  // → null
+  ```
+  El `replaceWith(fresh)` nunca corría → preview congelado en el render anterior. Todo lo demás del flow (Deshacer, savePredictions, jcard:updated dispatch, pred lectura fresca) funcionaba correctamente.
+- **Fix aplicado (commit `8cad0d3`):** actualizar selector a `.fc-grupos-carousel .ko-card[data-match-key="..."]`. Scope a `.fc-grupos-carousel` evita matching accidental con KO cards de Fase Final si compartieran attr.
+- **Patrón preventivo:** cuando se rename/drop de clase CSS, **grep TODOS los selectores en JS** antes del commit:
+  ```bash
+  # Buscar uso de la clase en cualquier selector JS
+  grep -rn "\.fc-grupos-mini" public/js/ js/
+  # También en MutationObserver, classList, matches, closest
+  grep -rn "fc-grupos-mini" public/js/ js/
+  ```
+  Si hay matches → renombrar/actualizar antes de eliminar la clase del HTML. Aplica también a `data-*` attributes y IDs.
+- **Fecha detección:** 05 may 2026 (Sprint B Grupos redesign — bug post-merge oleadas de clases).
+
+---
+
+## ERR-36 — `.container` legacy padding rompe paridad de pages
+
+- **Síntoma:** la pantalla Grupos se ve visualmente más estrecha que Fase Final (cards 287px vs 343-347px de Fase Final). Cards comprimidas y carrusel scroll-snap con slots desbordando lateralmente. Discrepancia de ~64px no atribuible a margins de la propia card.
+- **Causa:** `ko.css:55` define `.container { max-width: 1440px; margin: 0 auto; padding: 0 20px 60px }` que aplica como wrapper global. `#page-grupos` está envuelto en `<div class="container">` (legacy de la migración Vite) → consume 40px lateral (20×2) que `#page-elim` NO sufre porque está top-level (sin wrapper).
+  ```
+  Cadena medida con DOM inspector:
+    body padding 32 (16×2)
+  + .container padding 40 (20×2)   ← legacy wrapper
+  + #groups-container 24 (12×2)    ← padding propio del list
+  + .fc-grupos-expanded border 2
+  = 98px perdidos
+  Viewport 375 - 98 = 277px (ancho real medido en screenshot 287×340)
+  ```
+- **Fix aplicado (commit `b66aea9`):** override scoped que neutraliza el padding legacy solo para Grupos:
+  ```css
+  #page-grupos > .container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  ```
+  El padding lateral lo provee ahora `#groups-container { padding: 0 12px 80px }` (réplica exacta de `.fc-elim-list`).
+- **Patrón preventivo:** verificar en futuras pages nuevas si dependen del wrapper `.container` o están top-level. Si dependen, el padding lateral 40px aplicará automáticamente y romperá la paridad visual con Fase Final. Para pages nuevas con scroll-snap carousels o layouts width-sensitive, **usar el mismo override scoped** o mover la page a top-level.
+- **Caso conocido:** `#page-grupos` en Sprint B. `#page-elim` está top-level (correcto). `#page-jornada`, `#page-directo`, `#page-predictor` requieren auditoría para confirmar paridad.
+- **Fecha detección:** 05 may 2026 (Sprint B Grupos redesign — root cause encontrada por San con DOM inspector + getComputedStyle).
+
+---
+
+## ERR-37 — Scroll-snap carousel anidado en container colapsable → overflow
+
+- **Síntoma:** carrusel con slots `width: 86vw` (~322px) renderizado dentro de un container colapsable (.fc-grupos-card > .collap-body) consume el ancho disponible vía margins + padding internos. Slots desbordan o se comprimen visualmente. Compact cards "cortadas" al lado derecho del viewport.
+- **Causa:** anidamiento crea overhead de padding:
+  ```
+  .fc-grupos-card { margin: 0 14px 10px; border: 1px solid }     → 30px
+  .fc-grupos-card .collap-body                                    → 0
+  .fc-grupos-card .collap-body-inner { padding-toggle 14px×2 }    → 28px
+  .fc-grupos-card border ×2                                        → 2px
+  Total consumido: ~60-100px
+  Carousel ancho útil: viewport - body - container - card overhead ≈ 249px
+  Slot pedía: 322px → overflow → compresión visual
+  ```
+- **Fix aplicado (commit `05f5dd4` + `2d8aec8`):** replicar patrón de Fase Final donde `.fc-elim-expanded` vive como **SIBLING** del `.fc-elim-row`, no como hijo. La card del grupo solo contiene el header (toggle + banderas + dado), y al hacer click se inserta un `<section class="fc-grupos-expanded">` después de la card via `parentNode.insertBefore(expanded, sectionEl.nextSibling)`. El padding lateral lo da el container padre (`#groups-container { padding: 0 12px 80px }`), NO la card individual. La card y el expanded ambos ocupan `width: 100%` del container.
+  ```js
+  // Patrón correcto (commit 05f5dd4 _toggleGruposExpanded):
+  if (sectionEl.parentNode) {
+    sectionEl.parentNode.insertBefore(expanded, sectionEl.nextSibling);
+  }
+  ```
+- **Patrón preventivo:** scroll-snap carousels con slots ≥80vw NO deben anidarse dentro de containers colapsables con padding interno. Modelo correcto: el carousel/expanded como hermano del header. Si necesitas hidden source elements (e.g. tarjetas editables que el modal extrae), pueden vivir dentro del card via `display: none !important` scoped, pero el carousel como sibling.
+- **Caso conocido:** Sprint B Grupos redesign — primera iteración (commits `26d2658` → `1d35651`) anidaba el carousel dentro de `.collap-body-inner`, refactorizada en `05f5dd4` a sibling pattern.
+- **Fecha detección:** 05 may 2026 (Sprint B Grupos redesign — root cause encontrada por San con DOM inspector tras varias iteraciones de fix superficiales).
