@@ -28,12 +28,18 @@
 
 /* ──────────────────────────────────────────────────────────────────────
    Container · padding centralizado (réplica del patrón .fc-elim-list).
-   Antes: cada .fc-grupos-card y .fc-grupos-expanded tenía margin lateral
-   propio (14px×2 = 28px consumidos). Ahora el padding vive en el
-   container padre → cards y expanded ocupan width:100% → más aire.
-   Equivalencia: viewport 375px - 24px (12×2) = 351px disponibles
-   (vs 347px que daba el margin individual).
+   Diferencia vs Fase Final: #page-elim está top-level mientras que
+   #page-grupos vive dentro de <div class="container"> (legacy wrapper)
+   que añade padding 0 20px 60px (ko.css). Eso comía 40px más que
+   Fase Final → cards visualmente más estrechas. Neutralizamos
+   .container dentro de #page-grupos y dejamos que #groups-container
+   controle el padding (idéntico a .fc-elim-list).
    ────────────────────────────────────────────────────────────────────── */
+#page-grupos > .container {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 #groups-container {
   padding: 0 12px 80px;
   box-sizing: border-box;
