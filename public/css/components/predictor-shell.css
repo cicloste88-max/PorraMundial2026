@@ -1055,3 +1055,296 @@
   background: var(--ink-200);
   outline: none;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 5 · Share CTAs + Web Share API (Sprint A)
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-share {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.pred-share__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid;
+  transition: filter 0.15s ease, transform 0.05s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pred-share__btn:hover { filter: brightness(1.1); }
+.pred-share__btn:active { transform: translateY(1px); }
+
+.pred-share__btn--primary {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.13), rgba(245, 158, 11, 0.07));
+  border-color: rgba(245, 158, 11, 0.33);
+  color: #f59e0b;
+}
+
+.pred-share__btn--secondary {
+  background: rgba(40, 40, 48, 0.8);
+  border-color: var(--ink-700);
+  color: #ccc;
+}
+
+.pred-share__icon { font-size: 16px; line-height: 1; }
+
+.pred-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 24, 0.95);
+  color: var(--ink-100);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--ink-700);
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.pred-toast.show { opacity: 1; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 2 · Collapsible foundation (reused by Groups 3 + 4)
+   ────────────────────────────────────────────────────────────────────── */
+
+.collap {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.collap-toggle {
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-100);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+
+.collap-toggle:hover { background-color: rgba(255, 255, 255, 0.04); }
+.collap-toggle:focus-visible { outline: 2px solid var(--fifa-gold); outline-offset: -2px; }
+
+.collap-toggle__title-block { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.collap-summary {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-400);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chev {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.collap.open .chev { transform: rotate(180deg); }
+
+.collap-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.collap.open .collap-body { max-height: 1200px; }
+.collap-body-inner { padding: 12px 16px 16px; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   TU POSICIÓN · Group 2
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-position__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pred-position__cell {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.pred-position__cell-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.pred-position__rank-big {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.pred-position__rank-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-400);
+  letter-spacing: 0.02em;
+}
+
+.pred-position__evolution-placeholder {
+  border: 1px dashed rgba(201, 169, 97, 0.30);
+  border-radius: 8px;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin-top: 12px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 3 · RANKING LIGA (collapsible, reuses .collap)
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-ranking-share {
+  background: transparent;
+  border: 1px solid var(--ink-700);
+  color: var(--ink-100);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  margin: 0 8px 0 auto;
+}
+
+.pred-ranking-share:hover { background: rgba(255, 255, 255, 0.06); }
+
+.pred-ranking-list { list-style: none; margin: 0; padding: 0; }
+
+.pred-ranking-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto 28px;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink-700);
+  align-items: center;
+}
+
+.pred-ranking-row:last-child { border-bottom: 0; }
+
+.pred-ranking-row--me {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.02));
+}
+
+.pred-ranking-pos { font-weight: 700; font-size: 13px; color: var(--ink-100); }
+.pred-ranking-name { font-size: 13px; color: var(--ink-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pred-ranking-pts { font-size: 13px; font-weight: 700; color: var(--fifa-gold); }
+.pred-ranking-trend { font-size: 12px; color: var(--ink-400); text-align: center; }
+
+.pred-ranking__empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Group 4 · DESTACADOS DE TU LIGA (static list)
+   ────────────────────────────────────────────────────────────────────── */
+
+.pred-destacados {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+
+.pred-destacados__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-400);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.pred-destacados__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pred-destacados__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-100);
+}
+
+.pred-destacados__icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }
+.pred-destacados__text { color: var(--ink-100); word-break: break-word; }
+
+.pred-destacados__skeleton {
+  height: 14px;
+  background: var(--ink-700);
+  border-radius: 4px;
+  opacity: 0.5;
+}

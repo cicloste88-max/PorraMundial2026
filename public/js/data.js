@@ -398,6 +398,128 @@ async function loadPredictorRankingData() {
 
 window.loadPredictorRankingData = loadPredictorRankingData;
 
+// === [Sprint A · Group 3] loadLeagueRanking — lista completa de miembros
+//     de la liga con nombre + is_bot + posición. Pre-Mundial todos a 0 pts
+//     (Sprint B: leer puntos reales de user_points_cache cuando exista). ===
+async function loadLeagueRanking(leagueId) {
+  if (!leagueId || !window._porraDb) return [];
+  var db = window._porraDb;
+  var res = await db
+    .from('league_members')
+    .select('user_id, profiles(nombre, is_bot)')
+    .eq('league_id', leagueId);
+  if (res.error) {
+    console.warn('[loadLeagueRanking] error', res.error.message);
+    return [];
+  }
+  var members = res.data || [];
+  // Orden natural por nombre alfabético — Pre-Mundial todos empatados a 0 pts.
+  // Sprint B: ORDER BY points DESC.
+  var rows = members.map(function (m) {
+    return {
+      user_id: m.user_id,
+      nombre: (m.profiles && m.profiles.nombre) ? m.profiles.nombre : 'Usuario',
+      is_bot: !!(m.profiles && m.profiles.is_bot),
+      points: 0
+    };
+  });
+  rows.sort(function (a, b) {
+    return a.nombre.localeCompare(b.nombre, 'es');
+  });
+  rows.forEach(function (r, i) { r.position = i + 1; });
+  return rows;
+}
+window.loadLeagueRanking = loadLeagueRanking;
+
+// === [Sprint A · Group 4] loadLeagueHighlights — 3 frases dinámicas
+//     contextuales para la sección DESTACADOS DE TU LIGA. ===
+async function loadLeagueHighlights(leagueId, userId) {
+  if (!leagueId || !userId || !window._porraDb) return [];
+  var db = window._porraDb;
+  var items = [];
+
+  // Item A — Pick contrarian en KO: equipos que solo 1-2 miembros eligen
+  // y el usuario actual está entre ellos.
+  try {
+    var koRes = await db
+      .from('ko_predictions')
+      .select('user_id, winner_team, round')
+      .eq('league_id', leagueId);
+    var koPreds = (koRes && koRes.data) || [];
+    if (koPreds.length > 0) {
+      var byTeam = {};
+      for (var i = 0; i < koPreds.length; i++) {
+        var t = koPreds[i].winner_team;
+        if (!t) continue;
+        if (!byTeam[t]) byTeam[t] = { users: [], round: koPreds[i].round || 'Eliminatorias' };
+        if (byTeam[t].users.indexOf(koPreds[i].user_id) === -1) byTeam[t].users.push(koPreds[i].user_id);
+      }
+      var teams = Object.keys(byTeam);
+      for (var j = 0; j < teams.length; j++) {
+        var info = byTeam[teams[j]];
+        if ((info.users.length === 1 || info.users.length === 2) && info.users.indexOf(userId) !== -1) {
+          if (info.users.length === 1) {
+            items.push({ icon: '🎯', text: 'Solo tú apuestas por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
+          } else {
+            items.push({ icon: '🎯', text: 'Solo tú y otro apostáis por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
+          }
+          break;
+        }
+      }
+    }
+  } catch (e) { console.warn('[highlights] item A', e); }
+
+  // Item B — Coincidencia campeón.
+  try {
+    var awRes = await db
+      .from('award_picks')
+      .select('user_id, champion')
+      .eq('league_id', leagueId);
+    var aw = (awRes && awRes.data) || [];
+    var mine = aw.find ? aw.find(function (a) { return a.user_id === userId; }) : null;
+    if (mine && mine.champion) {
+      var others = aw.filter(function (a) { return a.champion === mine.champion && a.user_id !== userId; }).length;
+      var total = aw.length;
+      if (others === 0) {
+        items.push({ icon: '🥇', text: 'Solo tú apuestas por ' + mine.champion + ' campeón.' });
+      } else {
+        items.push({ icon: '🥇', text: 'Tu campeón ' + mine.champion + ' coincide con ' + others + ' de ' + total + ' de tu liga.' });
+      }
+    }
+  } catch (e) { console.warn('[highlights] item B', e); }
+
+  // Item C — IA Zayu en top 3 (depende de window._leagueRanking poblado).
+  try {
+    var ranking = window._leagueRanking || [];
+    var bot = ranking.find ? ranking.find(function (r) { return r.is_bot === true; }) : null;
+    if (bot && bot.position && bot.position <= 3) {
+      items.push({ icon: '🤖', text: 'IA Zayu va Nº' + bot.position + ' — atento, te puede pasar.' });
+    }
+  } catch (e) { console.warn('[highlights] item C', e); }
+
+  // Fallback hasta llegar a 3.
+  if (items.length < 3) {
+    try {
+      var lmRes = await db
+        .from('league_members')
+        .select('porra_cerrada')
+        .eq('league_id', leagueId);
+      var lm = (lmRes && lmRes.data) || [];
+      var cerradas = lm.filter(function (m) { return m.porra_cerrada === true; }).length;
+      var totalLm = lm.length;
+      var pendientes = totalLm - cerradas;
+      while (items.length < 3) {
+        items.push({ icon: '📊', text: 'Tu liga tiene ' + cerradas + ' porras cerradas / ' + pendientes + ' pendientes.' });
+        break;
+      }
+    } catch (e) { console.warn('[highlights] fallback', e); }
+  }
+
+  while (items.length < 3) items.push({ icon: '📊', text: 'Tu liga está lista para jugar.' });
+  return items.slice(0, 3);
+}
+window.loadLeagueHighlights = loadLeagueHighlights;
+
 // === [B11-trionda] getMundialProgress() — calcula progreso del Mundial 2026
 //     basado en live_scores. Lo consume ui-pred-shell.js para renderizar el
 //     timeline con balón Trionda. ===
