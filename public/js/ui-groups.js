@@ -1088,6 +1088,31 @@ function _renderGruposCompactCard(match) {
         '<div class="ko-vign"></div></div>'
     : '';
 
+  // Body section — replica espacio que dejaba el align-items:stretch del
+  // carousel. Si pred saved muestra marcador grande + goleador. Si no,
+  // CTA "Pronostica este partido →". Solo visible en .fc-grupos-carousel
+  // (CSS scope), Fase Final no lo renderiza ni lo necesita.
+  var bodyHtml;
+  if (pred.saved && pred.l != null && pred.v != null) {
+    var golLabel = '';
+    if (pred.gol) {
+      var golTeam = pred.gol.startsWith && pred.gol.indexOf('-') > 0 ? pred.gol.split('-')[0] : '';
+      var golName = pred.gol.indexOf('-') > 0 ? pred.gol.split('-').slice(1).join('-') : pred.gol;
+      golLabel = '<span class="ko-body__gol">⚽ ' + escapeHtml(golName.replace(/_/g, ' ')) + '</span>';
+    }
+    bodyHtml =
+      '<div class="ko-body ko-body--saved">' +
+        '<span class="ko-body__label">TU PRONÓSTICO</span>' +
+        '<span class="ko-body__score">' + pred.l + ' <span class="ko-body__sep">–</span> ' + pred.v + '</span>' +
+        golLabel +
+      '</div>';
+  } else {
+    bodyHtml =
+      '<div class="ko-body ko-body--empty">' +
+        '<span class="ko-body__cta">⚡ Toca para pronosticar</span>' +
+      '</div>';
+  }
+
   card.innerHTML =
     '<div class="ko-hero">' +
       hHalf + aHalf +
@@ -1108,6 +1133,7 @@ function _renderGruposCompactCard(match) {
         '<div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);margin-top:3px;text-align:center;letter-spacing:.04em">' + escapeHtml(timeLabel) + '</div>' +
       '</div>' +
     '</div>' +
+    bodyHtml +
     '<div class="ko-ia-hint" style="display:none"></div>' +
     '<div class="ko-footer">' +
       '<span class="ko-date">' + escapeHtml(dateLabel) + '</span>' +

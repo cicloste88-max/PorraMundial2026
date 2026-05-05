@@ -540,3 +540,75 @@
   padding: 1px 6px;
   border-radius: 8px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Body section — rellena el espacio vertical que queda al stretch
+   los slots match (align-items:stretch del flex). Visible solo en
+   .fc-grupos-carousel — Fase Final no lo emite.
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-carousel .ko-card {
+  display: flex;
+  flex-direction: column;
+}
+.fc-grupos-carousel .ko-hero { flex: 0 0 auto; }
+.fc-grupos-carousel .ko-footer { flex: 0 0 auto; margin-top: auto; }
+
+.fc-grupos-carousel .ko-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 12px;
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0) 0%, rgba(20, 20, 22, 0.6) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fc-grupos-carousel .ko-body--saved { /* override por estado */ }
+.fc-grupos-carousel .ko-body--empty {
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0) 0%, rgba(245, 158, 11, 0.04) 100%);
+}
+
+.fc-grupos-carousel .ko-body__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--text-3, #6b7280);
+  text-transform: uppercase;
+}
+
+.fc-grupos-carousel .ko-body__score {
+  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ink-100, #f0f0f0);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.fc-grupos-carousel .ko-body__sep {
+  color: var(--text-3, #6b7280);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0 4px;
+}
+
+.fc-grupos-carousel .ko-body__gol {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--green, #4ade80);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.fc-grupos-carousel .ko-body__cta {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f59e0b;
+  text-transform: uppercase;
+}
