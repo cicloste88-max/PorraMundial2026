@@ -268,33 +268,25 @@
 }
 .fc-grupos-carousel::-webkit-scrollbar { display: none; }
 
-/* Slot responsive: en viewports >376px se queda en 320px (compromiso óptimo
-   con maquetación interna de la tarjeta editable). En mobile <376px reduce
-   al ancho disponible (100vw - 56px = 14px×2 carousel padding + 14px×2 card
-   margin) para que UN slot quepa completo + sneak peek del siguiente. */
+/* Slot · réplica EXACTA de .fc-elim-carousel__slide (Fase Final).
+   86vw + max-width 360px + scale/opacity para no-current da el efecto
+   de "focus" sobre el slot actual con sneak peek de los vecinos. */
 .fc-grupos-slot {
-  flex-shrink: 0;
-  width: min(320px, calc(100vw - 56px));
+  flex: 0 0 auto;
+  width: 86vw;
+  max-width: 360px;
   scroll-snap-align: center;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  will-change: transform, opacity;
+}
+.fc-grupos-slot:not(.is-current) {
+  transform: scale(0.92);
+  opacity: 0.55;
 }
 
-/* Compact preview cards (.ko-card visual style replicado) llenan el slot. */
-.fc-grupos-slot--match > .ko-card,
-.fc-grupos-slot--match > .fc-grupos-mini {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.fc-grupos-slot--standings > * {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* fc-grupos-mini compact preview — ajustes mínimos sobre el .ko-card de
-   Fase Final. Hero 130px ya es suficientemente compact. */
-.fc-grupos-mini { animation-delay: 0s !important; }
-.fc-grupos-mini:hover { transform: translateY(-2px); }
+/* La .ko-card llena el slot — réplica del rule .fc-elim-carousel__slide > .ko-card */
+.fc-grupos-slot--match > .ko-card { width: 100%; }
+.fc-grupos-slot--standings > * { width: 100%; box-sizing: border-box; }
 
 /* Dots */
 .fc-grupos-carousel__dots {

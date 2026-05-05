@@ -1008,20 +1008,21 @@ function _renderGruposCompactCard(match) {
   else if (estado === 'live')     { statusCls = 'live';   statusTxt = '🔴 En vivo'; }
   else if (estado === 'done')     { statusCls = 'done';   statusTxt = 'Finalizado'; }
 
-  var hLabel = (match.home || '');
-  var aLabel = (match.away || '');
-  if (hLabel.length > 11) hLabel = hLabel.substring(0, 10) + '.';
-  if (aLabel.length > 11) aLabel = aLabel.substring(0, 10) + '.';
+  // Truncate 14 chars sin sufijo — réplica de buildKOCard (ko.js:322).
+  var hLabel = hTeam ? (match.home || '').substring(0, 14) : (match.home || '');
+  var aLabel = aTeam ? (match.away || '').substring(0, 14) : (match.away || '');
   var dateLabel = (typeof fmtDate === 'function') ? fmtDate(match.date) : '';
   var timeLabel = (typeof fmtTime === 'function') ? fmtTime(match.date) : '';
 
+  // Réplica EXACTA de buildKOCard (ko.js:251): mismas clases .ko-* + onclick directo.
+  // No añadimos .fc-grupos-mini — esa clase introducía hover overrides que rompían
+  // el match visual con Fase Final.
   var card = document.createElement('div');
-  card.className = 'ko-card fc-grupos-mini' + (pred.saved ? ' ko-saved' : '');
-  card.style.cursor = 'pointer';
+  card.className = 'ko-card' + (pred.saved ? ' ko-saved' : '');
   card.setAttribute('data-match-key', matchKey);
-  card.addEventListener('click', function () {
+  card.onclick = function () {
     if (typeof openJcardModal === 'function') openJcardModal(matchKey, { editable: true });
-  });
+  };
 
   var hHalf = hTeam
     ? '<div class="ko-half L"><div class="ko-color" style="background:#fff"></div>' +
@@ -1040,12 +1041,12 @@ function _renderGruposCompactCard(match) {
       '<div class="ko-fade"></div>' +
       '<div class="ko-team home">' +
         '<div class="ko-flag">' + (hTeam ? '<img src="' + hFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
-        '<div class="ko-tname">' + escapeHtml(hLabel) + '</div>' +
+        '<div class="ko-tname' + (!hTeam ? ' tbd' : '') + '">' + escapeHtml(hLabel) + '</div>' +
         '<div class="ko-trole">local</div>' +
       '</div>' +
       '<div class="ko-team away">' +
         '<div class="ko-flag">' + (aTeam ? '<img src="' + aFlag + '" alt="" onerror="this.remove()"/>' : '❓') + '</div>' +
-        '<div class="ko-tname">' + escapeHtml(aLabel) + '</div>' +
+        '<div class="ko-tname' + (!aTeam ? ' tbd' : '') + '">' + escapeHtml(aLabel) + '</div>' +
         '<div class="ko-trole">visitante</div>' +
       '</div>' +
       '<div class="ko-center">' +
@@ -1054,6 +1055,7 @@ function _renderGruposCompactCard(match) {
         '<div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);margin-top:3px;text-align:center;letter-spacing:.04em">' + escapeHtml(timeLabel) + '</div>' +
       '</div>' +
     '</div>' +
+    '<div class="ko-ia-hint" style="display:none"></div>' +
     '<div class="ko-footer">' +
       '<span class="ko-date">' + escapeHtml(dateLabel) + '</span>' +
       '<span class="ko-status ' + statusCls + '">' + escapeHtml(statusTxt) + '</span>' +
@@ -1185,12 +1187,22 @@ function _renderGruposCarousel(letra, matches, gtableEl) {
     for (var k = 0; k < dots.length; k++) {
       dots[k].classList.toggle('is-active', k === idx);
     }
+    // Réplica patrón Fase Final: slot actual sin scale/opacity, los demás
+    // con scale(.92) + opacity .55 (regla CSS .fc-grupos-slot:not(.is-current)).
+    var slots = carousel.querySelectorAll('.fc-grupos-slot');
+    for (var s = 0; s < slots.length; s++) {
+      slots[s].classList.toggle('is-current', s === idx);
+    }
   }
   function scrollToSlot(idx) {
     var slots = carousel.querySelectorAll('.fc-grupos-slot');
-    var s = slots[idx];
-    if (s) s.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    var slot = slots[idx];
+    if (slot) slot.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }
+  // Marcar el primer slot como current al montar.
+  var initialSlots = carousel.querySelectorAll('.fc-grupos-slot');
+  if (initialSlots[0]) initialSlots[0].classList.add('is-current');
+
   var rafPending = false;
   carousel.addEventListener('scroll', function () {
     if (rafPending) return;
