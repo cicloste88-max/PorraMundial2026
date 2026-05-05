@@ -606,8 +606,8 @@ function _showJcardModal(matchKey, opts) {
   const prev = document.getElementById('jcard-modal-overlay');
   if (prev) prev.remove();
 
-  const cardEl = document.getElementById('card-wrap-' + matchKey);
-  if (!cardEl) return;
+  const initialCardEl = document.getElementById('card-wrap-' + matchKey);
+  if (!initialCardEl) return;
 
   const overlay = document.createElement('div');
   overlay.id = 'jcard-modal-overlay';
@@ -630,76 +630,167 @@ function _showJcardModal(matchKey, opts) {
     'width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;' +
     'display:flex;align-items:center;justify-content:center;';
 
-  let target;                     // Element shown inside the modal
-  let originalParent = null;      // Para restituir en modo editable
-  let originalNextSibling = null; // Anchor exacto de inserci\u00f3n
-  let originalStyleAttr = null;   // style attribute string original
-
-  if (editable) {
-    // MOVER el original. Save anchors for exact restoration on close.
-    originalParent = cardEl.parentNode;
-    originalNextSibling = cardEl.nextSibling;
-    originalStyleAttr = cardEl.getAttribute('style');
-    target = cardEl;
-  } else {
-    // CLONE + disable (Jornada "Ver tarjeta" read-only path).
-    const clone = cardEl.cloneNode(true);
-    // cloneNode(true) NO transfiere el .value runtime de <select>; auth.js
-    // asigna gselEl.value = pred.gol solo a la propiedad \u2014 el clone perd\u00eda
-    // el goleador. Copiamos manualmente.
-    const origSelects  = cardEl.querySelectorAll('select');
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // READ-ONLY (Jornada Ver tarjeta) \u2014 clone path intact.
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  if (!editable) {
+    const clone = initialCardEl.cloneNode(true);
+    const origSelects  = initialCardEl.querySelectorAll('select');
     const cloneSelects = clone.querySelectorAll('select');
     origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
-    const origInputs  = cardEl.querySelectorAll('input');
+    const origInputs  = initialCardEl.querySelectorAll('input');
     const cloneInputs = clone.querySelectorAll('input');
     origInputs.forEach((inp, i) => {
       if (!cloneInputs[i]) return;
       if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
       else cloneInputs[i].value = inp.value;
     });
-
     clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
     clone.querySelectorAll('button,input,select').forEach(el => {
       el.disabled = true;
       el.style.pointerEvents = 'none';
     });
-    target = clone;
+    clone.style.margin = '0 auto';
+    clone.style.left = '0';
+    clone.style.right = '0';
+    wrapper.appendChild(closeBtn);
+    wrapper.appendChild(clone);
+    overlay.appendChild(wrapper);
+    document.body.appendChild(overlay);
+    clone.style.width = (clone.offsetWidth - 5) + 'px';
+    clone.style.margin = '0 auto';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    closeBtn.onclick = () => overlay.remove();
+    return;
   }
 
-  // Layout adjustments (mismas para clone y original).
-  target.style.margin = '0 auto';
-  target.style.left = '0';
-  target.style.right = '0';
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // EDITABLE (Grupos compact card click) \u2014 MOVE original + nav.
+  // Replica el patr\u00f3n de Fase Final (_renderElimExpanded): flechas
+  // \u2039 \u203a + counter "X/N" para navegar entre los partidos del mismo
+  // grupo. Cada navegaci\u00f3n restituye el actual y mueve el siguiente.
+  // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  const startMatch = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(function (m) {
+    return (typeof getMatchKey === 'function') ? getMatchKey(m) === matchKey : false;
+  }) : null;
+  const matchList = (startMatch && typeof PARTIDOS !== 'undefined')
+    ? PARTIDOS.filter(function (m) { return m.group === startMatch.group; })
+    : [];
+  let currentIdx = matchList.findIndex(function (m) {
+    return (typeof getMatchKey === 'function') ? getMatchKey(m) === matchKey : false;
+  });
+  if (currentIdx < 0) currentIdx = 0;
+
+  // Nav header (counter + arrows). Solo si hay >1 partido en el grupo.
+  let navHeader = null;
+  let prevBtn = null;
+  let nextBtn = null;
+  let counterEl = null;
+  if (matchList.length > 1) {
+    navHeader = document.createElement('div');
+    navHeader.className = 'jcard-nav';
+
+    prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'jcard-nav__arrow jcard-nav__arrow--prev';
+    prevBtn.setAttribute('aria-label', 'Partido anterior');
+    prevBtn.textContent = '\u2039';
+
+    counterEl = document.createElement('span');
+    counterEl.className = 'jcard-nav__counter';
+
+    nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'jcard-nav__arrow jcard-nav__arrow--next';
+    nextBtn.setAttribute('aria-label', 'Partido siguiente');
+    nextBtn.textContent = '\u203a';
+
+    navHeader.appendChild(prevBtn);
+    navHeader.appendChild(counterEl);
+    navHeader.appendChild(nextBtn);
+    wrapper.appendChild(navHeader);
+  }
 
   wrapper.appendChild(closeBtn);
-  wrapper.appendChild(target);
   overlay.appendChild(wrapper);
   document.body.appendChild(overlay);
 
-  target.style.width = (target.offsetWidth - 5) + 'px';
-  target.style.margin = '0 auto';
+  // Estado de la tarjeta actualmente en el modal.
+  let currentTarget = null;
+  let currentAnchors = null; // { parent, nextSibling, styleAttr, matchKey }
+
+  function _restoreCurrent() {
+    if (!currentAnchors || !currentTarget) return;
+    const t = currentTarget;
+    const a = currentAnchors;
+    if (a.styleAttr === null) t.removeAttribute('style');
+    else t.setAttribute('style', a.styleAttr);
+    if (a.nextSibling && a.nextSibling.parentNode === a.parent) {
+      a.parent.insertBefore(t, a.nextSibling);
+    } else {
+      a.parent.appendChild(t);
+    }
+    try {
+      document.dispatchEvent(new CustomEvent('jcard:updated', { detail: { matchKey: a.matchKey } }));
+    } catch (e) { /* no-op */ }
+    currentTarget = null;
+    currentAnchors = null;
+  }
+
+  function _placeIntoModal(mk) {
+    const cardEl = document.getElementById('card-wrap-' + mk);
+    if (!cardEl) return null;
+    currentAnchors = {
+      parent: cardEl.parentNode,
+      nextSibling: cardEl.nextSibling,
+      styleAttr: cardEl.getAttribute('style'),
+      matchKey: mk
+    };
+    cardEl.style.margin = '0 auto';
+    cardEl.style.left = '0';
+    cardEl.style.right = '0';
+    wrapper.appendChild(cardEl);
+    cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
+    cardEl.style.margin = '0 auto';
+    currentTarget = cardEl;
+    // Volver al top del wrapper en cada navegaci\u00f3n.
+    wrapper.scrollTop = 0;
+    return cardEl;
+  }
+
+  function _updateNavHeader() {
+    if (!navHeader) return;
+    counterEl.textContent = (currentIdx + 1) + ' / ' + matchList.length;
+    if (currentIdx <= 0) prevBtn.setAttribute('aria-disabled', 'true');
+    else prevBtn.removeAttribute('aria-disabled');
+    if (currentIdx >= matchList.length - 1) nextBtn.setAttribute('aria-disabled', 'true');
+    else nextBtn.removeAttribute('aria-disabled');
+  }
+
+  function _navigateTo(idx) {
+    if (idx < 0 || idx >= matchList.length) return;
+    if (idx === currentIdx && currentTarget) return;
+    _restoreCurrent();
+    currentIdx = idx;
+    const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
+    if (!newKey) return;
+    _placeIntoModal(newKey);
+    _updateNavHeader();
+  }
 
   function closeModal() {
-    if (editable && originalParent) {
-      // Restituir style attribute original exacto.
-      if (originalStyleAttr === null) target.removeAttribute('style');
-      else target.setAttribute('style', originalStyleAttr);
-      // Restituir al lugar exacto del DOM.
-      if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
-        originalParent.insertBefore(target, originalNextSibling);
-      } else {
-        originalParent.appendChild(target);
-      }
-      // Notificar a consumidores (compact card preview, chip count, standings).
-      try {
-        document.dispatchEvent(new CustomEvent('jcard:updated', { detail: { matchKey: matchKey } }));
-      } catch (e) { /* no-op */ }
-    }
+    _restoreCurrent();
     overlay.remove();
   }
 
+  if (prevBtn) prevBtn.addEventListener('click', function () { _navigateTo(currentIdx - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { _navigateTo(currentIdx + 1); });
   overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
   closeBtn.onclick = closeModal;
+
+  // Initial placement.
+  _placeIntoModal(matchKey);
+  _updateNavHeader();
 }
 window.openJcardModal = openJcardModal;
 
