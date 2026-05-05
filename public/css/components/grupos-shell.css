@@ -442,3 +442,64 @@
   text-align: center;
   letter-spacing: 0.04em;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Compact card — overrides scoped a .fc-grupos-carousel para reducir
+   altura sin afectar Fase Final. Target: ~120-130px de altura total
+   (era ~170px). Hero 85px + footer 30px + bordes/padding mínimos.
+   ────────────────────────────────────────────────────────────────────── */
+
+.fc-grupos-carousel .ko-card { border-radius: 14px; }
+
+/* Hero: 130 → 85px */
+.fc-grupos-carousel .ko-hero { height: 85px; }
+
+/* Fade gradient más pequeño para hero más bajo */
+.fc-grupos-carousel .ko-fade { height: 35px; }
+
+/* Equipos: bottom 14 → 8, gap 4 → 2 */
+.fc-grupos-carousel .ko-team { bottom: 8px; gap: 2px; }
+.fc-grupos-carousel .ko-team.home { left: 10px; }
+.fc-grupos-carousel .ko-team.away { right: 10px; }
+
+/* Bandera circular: 38 → 26px */
+.fc-grupos-carousel .ko-flag {
+  width: 26px;
+  height: 26px;
+  border-width: 1.5px;
+}
+
+/* Nombre equipo: 11 → 10px, max-width acortado */
+.fc-grupos-carousel .ko-tname {
+  font-size: 10px;
+  max-width: 72px;
+}
+
+/* Role label: 7px se mantiene compacto, solo letter-spacing menor */
+.fc-grupos-carousel .ko-trole { font-size: 6px; letter-spacing: 0.06em; }
+
+/* VS circle: 38 → 28px */
+.fc-grupos-carousel .ko-vs-circle {
+  width: 28px;
+  height: 28px;
+}
+.fc-grupos-carousel .ko-vs-text { font-size: 8px; }
+
+/* Pill venue: font 8 → 7px, padding más estrecho */
+.fc-grupos-carousel .ko-pill {
+  font-size: 7px;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* Center stack: gap 5 → 3 */
+.fc-grupos-carousel .ko-center { gap: 3px; }
+
+/* Footer: padding 9 13 → 6 10 */
+.fc-grupos-carousel .ko-footer { padding: 6px 10px; }
+.fc-grupos-carousel .ko-date { font-size: 9px; }
+.fc-grupos-carousel .ko-status {
+  font-size: 8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
