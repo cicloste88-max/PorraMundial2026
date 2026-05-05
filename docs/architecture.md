@@ -49,6 +49,71 @@ ui-nav → auth → scoreboard → close-porra → admin → ui-directo → live
 
 Cada módulo exporta funciones que se ejecutan o se registran como event listeners. `auth.js` inicializa la sesión y carga predicciones, resultados KO, premios y grupos guardados desde la DB.
 
+## Pantallas y patrones de carrusel
+
+### Fase Final (#page-elim) — patrón de referencia
+
+Página top-level (NO envuelta en `.container` legacy). Estructura:
+
+```
+#page-elim
+  .fc-elim-header
+  .fc-elim-stepper           pills 6 fases (grupos/16/8/4/3/F)
+  .fc-elim-list { padding: 0 12px 80px }
+    .fc-elim-row             header colapsable de cada fase
+    .fc-elim-expanded        SIBLING insertado tras click
+      .fc-elim-carousel
+        .fc-elim-carousel__slide × N    width 86vw, max-width 360px
+                                        scroll-snap-align:center
+                                        :not(.is-current) → scale .92 opacity .55
+        .fc-elim-dots / .fc-elim-arrow
+```
+
+Click en `.fc-elim-row` inserta `.fc-elim-expanded` como hermano (no anidado) → carousel container ~347px → slot 86vw cabe holgado.
+
+### Grupos (#page-grupos) — réplica del patrón Fase Final post-Sprint B
+
+Página anidada en `<div class="container">` (legacy wrapper); requiere override `#page-grupos > .container { padding: 0 }` para neutralizar 40px lateral (ver ERR-36). Estructura:
+
+```
+#page-grupos > .container (override)
+  #grupos-letter-bar
+    .fc-grupos-stepper-wrap (sticky)
+      .fc-elim-stepper.fc-grupos-stepper      reusa CSS de Fase Final
+        .fc-elim-stepper__item × 12 (A-L)
+  #groups-container { padding: 0 12px 80px }
+    .fc-grupos-card                            header colapsable
+      .collap-toggle (barra estado + GRUPO X + 4 banderas + dado + N/6 + chev)
+      .fc-grupos-card__source                  HIDDEN (display:none)
+        #grid-{letra}                           tarjetas editables (source)
+        #gtable-{letra}                         tabla clasificación (source)
+    .fc-grupos-expanded                        SIBLING tras click
+      .fc-grupos-carousel-wrap
+        .fc-grupos-carousel { padding: 4px 5vw }
+          .fc-grupos-slot--match × 6           compact .ko-card replicada
+          .fc-grupos-slot--standings           gtable MOVIDO aquí on-open
+        .fc-grupos-carousel__dots / __arrows
+```
+
+**`_toggleGruposExpanded(letra, sectionEl)`** maneja el toggle: cierra cualquier expanded actual (restituye gtable a su source), construye carousel via `_renderGruposCarousel(letra, partidos, gtable)`, lo envuelve en `<section class="fc-grupos-expanded">` e inserta como sibling via `parentNode.insertBefore(expanded, sectionEl.nextSibling)`.
+
+**Compact card** (`_renderGruposCompactCard`) replica `.ko-card` de Fase Final exactamente (mismas clases `.ko-hero`/`.ko-team`/`.ko-vs-circle`/`.ko-pill`/`.ko-footer`) + body section adicional `.ko-body--saved` (TU PRONÓSTICO + marcador grande + goleador) o `.ko-body--empty` (CTA dorado). Click → `openJcardModal(matchKey, {editable: true})`.
+
+### Modal editable Grupos — MOVE-original con navegación
+
+`openJcardModal(matchKey, opts)` → `_showJcardModal(matchKey, opts)` con dos paths:
+
+- **`opts.editable = false`** (default, Jornada `Ver tarjeta`): clone + disable inputs (read-only).
+- **`opts.editable = true`** (Grupos compact click): MOVE el `cardEl` original al wrapper del modal preservando `originalParent`/`originalNextSibling`/`originalStyleAttr`. Listeners de `attachEvents` (boost, save, IA, ▲▼ marcador, dropdown goleador) quedan vivos en el Element. Al cerrar/navegar, `_restoreCurrent()` restituye style attr + posición exacta + dispatch `CustomEvent('jcard:updated', {detail:{matchKey}})`.
+
+Si la lista del grupo (`PARTIDOS.filter(group=letra)`) tiene >1 partido, se renderiza nav header sticky con flechas ‹ › + counter `idx/N` que permite navegar entre partidos del mismo grupo sin cerrar el modal. Cada navegación restituye el actual y mueve el siguiente, manteniendo edición funcional en cada paso.
+
+Listener `jcard:updated` registrado una vez (guard `window._jcardUpdatedListenerRegistered`) refresca:
+1. Compact preview en `.fc-grupos-carousel .ko-card[data-match-key=...]` via `replaceWith(_renderGruposCompactCard(match))`.
+2. Letterbar chip count via `_refreshGruposLetterBar()`.
+3. Standings table via `renderGroupTableCard(match.group)`.
+4. Card colapsable header (bar color + N/6) actualizados in-place sin rebuild.
+
 ## Shims inline en index.html
 
 Dos funciones declaradas en `<script>` inline (líneas 1440-1445):
