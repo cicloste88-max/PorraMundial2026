@@ -289,17 +289,25 @@
     flagsEl._fcRendered = true;
 
     var html = arr.map(function (e) {
-      var flag   = getFlagEmoji(e);
       var name   = e.name || e.name_en || '';
       var nameEn = e.name_en || name;
       var lat    = (typeof e.lat === 'number') ? e.lat : 0;
       var lng    = (typeof e.lng === 'number') ? e.lng : 0;
+      var badgeUrl = (typeof getBadgeUrl === 'function') ? getBadgeUrl(e.slug) : null;
+      // Patrón badge-with-flag-fallback (CLAUDE.md): badge Supabase visible
+      // por defecto, emoji oculto con [hidden]. Si img falla (404, red), su
+      // onerror oculta el img y revela el emoji. HTML entity &#39; para
+      // sortear el anidado de comillas simples en el string JS.
+      var flagContent = badgeUrl
+        ? '<img src="' + badgeUrl + '" alt="' + name.replace(/"/g, '&quot;') + '" class="fc-globo-flag-btn__img" loading="lazy" onerror="this.style.display=&#39;none&#39;;var s=this.nextElementSibling;if(s)s.removeAttribute(&#39;hidden&#39;);">' +
+          '<span class="fc-globo-flag-btn__flag" hidden>' + getFlagEmoji(e) + '</span>'
+        : '<span class="fc-globo-flag-btn__flag">' + getFlagEmoji(e) + '</span>';
       return (
         '<button type="button" class="fc-globo-flag-btn" ' +
           'data-name-en="' + nameEn.replace(/"/g, '&quot;') + '" ' +
           'data-lat="' + lat + '" data-lng="' + lng + '" ' +
           'title="' + name + '">' +
-          '<span class="fc-globo-flag-btn__flag">' + flag + '</span>' +
+          flagContent +
           '<span class="fc-globo-flag-btn__name">' + name + '</span>' +
         '</button>'
       );

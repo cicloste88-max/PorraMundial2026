@@ -295,6 +295,14 @@
   display: block;
 }
 
+.fc-globo-flag-btn__img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 3px;
+  display: block;
+}
+
 /* Texto del país oculto — el title attr sirve de tooltip */
 .fc-globo-flag-btn__name {
   display: none;
