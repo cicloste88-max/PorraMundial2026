@@ -174,11 +174,18 @@
         var globe = Globe();
         globe(canvasEl);
 
+        // Limitar pixel ratio retina (mobile 2x/3x → 1.5 max). Nitidez
+        // suficiente sin overdraw en displays de alta densidad.
+        var renderer = globe.renderer && globe.renderer();
+        if (renderer && typeof renderer.setPixelRatio === 'function') {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        }
+
         globe
           .globeImageUrl(oceanTex)
           .backgroundImageUrl('')
           .atmosphereColor(COL.ATMOS)
-          .atmosphereAltitude(0.18)
+          .atmosphereAltitude(0.10)
           .showGraticules(false);
         globe.width(canvasEl.clientWidth);
         globe.height(canvasEl.clientHeight);
@@ -191,7 +198,7 @@
         }
         // Altitude responsive: mobile (<768) cámara más lejos para que el
         // globo entre completo en el ancho del viewport vertical estrecho.
-        var initialAlt = window.innerWidth < 768 ? 7.0 : 6.2;
+        var initialAlt = window.innerWidth < 768 ? 5.0 : 4.2;
         globe.pointOfView({ lat: 20, lng: 0, altitude: initialAlt });
 
         // Pause autoRotate durante interacción
@@ -212,7 +219,7 @@
         var onResize = function () {
           globe.width(canvasEl.clientWidth);
           globe.height(canvasEl.clientHeight);
-          var newAlt = window.innerWidth < 768 ? 7.0 : 6.2;
+          var newAlt = window.innerWidth < 768 ? 5.0 : 4.2;
           var pov = globe.pointOfView();
           if (pov && Math.abs(pov.altitude - newAlt) > 0.5) {
             globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: newAlt }, 400);
