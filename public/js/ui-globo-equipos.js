@@ -54,6 +54,24 @@
     { name: 'Toronto',          lat: 43.65, lng:  -79.38, nameKey: 'Toronto' }
   ];
 
+  // Coordenadas manuales para países con bounding box engañoso
+  // (territorios remotos: Alaska, Hawaii, Guayana francesa, etc.)
+  // Se aplican antes que el centroide de polygonsData.
+  var COUNTRY_LATLNG_OVERRIDE = {
+    'United States':  { lat: 39.5, lng:  -98.5 },
+    'USA':            { lat: 39.5, lng:  -98.5 },
+    'Canada':         { lat: 56.0, lng: -106.0 },
+    'France':         { lat: 46.6, lng:    2.5 },
+    'United Kingdom': { lat: 54.0, lng:   -2.5 },
+    'England':        { lat: 52.5, lng:   -1.5 },
+    'Scotland':       { lat: 56.5, lng:   -4.0 },
+    'Norway':         { lat: 64.0, lng:   11.0 },
+    'New Zealand':    { lat: -41.0, lng: 174.0 },
+    'Brazil':         { lat: -10.5, lng: -53.0 },
+    'Russia':         { lat: 60.0, lng:   95.0 },
+    'Australia':      { lat: -25.0, lng: 134.0 }
+  };
+
   // ── Lookup EQUIPOS.name_en → clave en WIKI_SELECCIONES ───────
   var ALIAS_WIKI = {
     'Bosnia & Herzegovina':      'Bosnia & Herzegovina',
@@ -144,6 +162,8 @@
 
   // Estado: nombre NE del país actualmente resaltado en rojo (o null).
   var _selectedNE = null;
+  // Estado: nombre de la sede actualmente resaltada en rojo (o null).
+  var _selectedSede = null;
 
   // ── HTML templates ──────────────────────────────────────────
   var CINTA_HTML =
@@ -211,8 +231,33 @@
     }
   }
 
+  // Highlight de sede activa: re-render de pointsData para que los
+  // callbacks pointColor/Altitude/Radius vean el nuevo _selectedSede.
+  function selectSede(name, globe) {
+    _selectedSede = name || null;
+    if (globe && typeof globe.pointsData === 'function') {
+      globe.pointsData(globe.pointsData());
+    }
+  }
+
+  // globe.gl crea tooltips flotantes con clase .scene-tooltip. Cuando se
+  // abre el panel cubriendo el cursor, mouseleave del polígono no dispara
+  // y el tooltip queda colgado. Forzar display:none + reset 50ms después
+  // para no romper el siguiente hover real.
+  function hideGlobeTooltip() {
+    document.querySelectorAll('.scene-tooltip').forEach(function (el) {
+      el.style.display = 'none';
+      setTimeout(function () { el.style.display = ''; }, 50);
+    });
+  }
+
   function resetCountry(globe) {
     document.querySelectorAll('.fc-globo-flag-btn.is-active').forEach(function (b) { b.classList.remove('is-active'); });
+    document.querySelectorAll('.fc-globo-sede-chip.is-active').forEach(function (c) { c.classList.remove('is-active'); });
+    _selectedSede = null;
+    if (globe && typeof globe.pointsData === 'function') {
+      globe.pointsData(globe.pointsData());
+    }
     if (!_selectedNE) return;
     _selectedNE = null;
     if (globe && typeof globe.polygonsData === 'function') {
@@ -231,6 +276,7 @@
 
   // ── Panel de detalle (país / sede) ───────────────────────────
   function openDetail(html) {
+    hideGlobeTooltip();
     var panel = document.getElementById('fc-globo-detail');
     var body  = document.getElementById('fc-globo-detail-body');
     if (!panel || !body) return;
@@ -358,7 +404,13 @@
       // Si EQUIPOS no trae lat/lng, derivar centroide aproximado del polígono
       var targetLat = lat;
       var targetLng = lng;
-      if (!lat && !lng) {
+      // Override manual primero — evita centroides erróneos por bounding
+      // box que incluye Alaska (USA), territorios remotos (UK, Francia, etc.)
+      var override = COUNTRY_LATLNG_OVERRIDE[nameEn] || COUNTRY_LATLNG_OVERRIDE[norm(nameEn)];
+      if (override) {
+        targetLat = override.lat;
+        targetLng = override.lng;
+      } else if (!lat && !lng) {
         var feats = (typeof globe.polygonsData === 'function') ? globe.polygonsData() : [];
         var feat = feats.find(function (f) {
           if (!f || !f.properties) return false;
@@ -435,6 +487,8 @@
         if (ctrl) { ctrl.autoRotate = true; ctrl.autoRotateSpeed = 0.4; }
       }, 3000);
 
+      // Resaltar punto blanco → rojo + elevarlo, antes de abrir panel.
+      selectSede(name, globe);
       openDetail(renderPanelSede(wikiData, name));
 
       sedesEl.querySelectorAll('.fc-globo-sede-chip').forEach(function (b) { b.classList.remove('is-active'); });
@@ -614,9 +668,9 @@
               });
 
             globe.pointsData(SEDES.map(function (s) { return { lat: s.lat, lng: s.lng, name: s.name, nameKey: s.nameKey }; }))
-              .pointColor(function () { return '#ffffff'; })
-              .pointAltitude(0.04)
-              .pointRadius(0.5)
+              .pointColor(function (p) { return _selectedSede === p.name ? '#d93025' : '#ffffff'; })
+              .pointAltitude(function (p) { return _selectedSede === p.name ? 0.12 : 0.04; })
+              .pointRadius(function (p) { return _selectedSede === p.name ? 0.9 : 0.5; })
               .pointResolution(20)
               .pointLabel(function (p) {
                 return '<div style="background:rgba(20,28,44,.95);border:1px solid rgba(232,184,48,.4);border-radius:6px;padding:6px 10px;color:#fff;font-size:11px"><b>📍 ' + p.name + '</b><br><span style="color:#aaa;font-size:10px">Sede Mundial 2026</span></div>';
@@ -659,6 +713,7 @@
                 if (!point) return;
                 var key = point.nameKey || point.name;
                 var wikiData = (typeof window.WIKI_SEDES !== 'undefined') ? window.WIKI_SEDES[key] : null;
+                selectSede(point.name, globe);
                 openDetail(renderPanelSede(wikiData, point.name));
 
                 var ctrl = (typeof globe.controls === 'function') ? globe.controls() : null;
