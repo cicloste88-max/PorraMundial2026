@@ -1167,7 +1167,7 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
   box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
   font-size: 12px;
   line-height: 1.45;
-  z-index: 9999;
+  z-index: 10001; /* sobre cluster 9999: #jcard-modal-overlay, #splash-screen, .adm-toast, .fc-globo-overlay */
   pointer-events: auto;
 }
 .ia-exp-title {
