@@ -1572,3 +1572,41 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - ERR: N/A (regresión específica de cluster z-index, no patrón reusable).
 - Backlog item 12: cerrado completamente con este merge (badge `done/N` en PR#56 + tooltip detrás del modal en PR#58). Solo queda `1019ms` aplazado a sprint con profiling DevTools previo.
 
+## 2026-05-06 · Sprint Globo PR2+PR3+Polish+Enrichment · `feature/globo-pr2-pr3` lista para merge
+
+- Branch: `feature/globo-pr2-pr3` desde base `99fb581` → 12 commits, HEAD `6d058b2`. Pushed a origin, **lista para squash-merge a main desde GitHub UI por San**.
+- Sprint: convierte el Globo MVP (PR#54 `8e6681c`) en experiencia interactiva enriquecida — leyenda banderas circulares Supabase + chips sedes + panel detalle dual (sport.es narrativo + ESPN táctico) + highlight rojo país clickado + centroides override + tooltip cleanup + canvas flex layout + leyenda tipos lateral derecho.
+- Files modificados:
+  - `public/js/data/wiki-data-globo.js` (nuevo, 742 LOC) — 45 selecciones + 16 sedes (apodo, grupo, confederación, mundiales, mejor, coach, estrella, frase). Source: sport.es.
+  - `public/js/data/wiki-bio.js` (nuevo, 340 LOC v3) — 48 selecciones (apodo, formación, frase, bio sport.es, bio_espn ESPN). Source: sport.es + ESPN.
+  - `public/js/ui-globo-equipos.js` (~750 LOC, +500 sobre MVP) — overlay flex layout + leg-items lateral + carrusel banderas circular + carrusel chips sedes + selectCountry/selectSede + COUNTRY_LATLNG_OVERRIDE + hideGlobeTooltip + renderPanelPais 3-arg con bios duales + renderPanelSede + onPolygonClick/onPointClick.
+  - `public/css/components/globo-equipos.css` (~590 LOC, +345 sobre MVP) — flex column overlay + flag-btn 36×36 con img circular 28×28 + flag carousel scroll horizontal + sedes scroll horizontal + separadores grupo A-L + leg-items absolute right + detail panel mobile/desktop responsive + bio collapsible details + pill formación + pill-label + frase italic.
+  - `js/main-entry.js` (+2 lines) — chain `wiki-data-globo → wiki-bio → ui-globo-equipos`.
+- Commits del sprint (12 total, orden cronológico):
+  - `3c5801d` PR2 datos — wiki-data-globo (45+16).
+  - `c0f32ed` PR2+PR3 — flag legend + detail panel base.
+  - `a8ccd23` Polish — flag-only legend, venue chips, bio expand, squad stub.
+  - `11a7bde` Fix — canvas flex + flag emoji ISO3.
+  - `b8a2ef2` Iter intermedio — badges Supabase ko.js (descartado por circular).
+  - `6cb8f4b` Iter final — circular flag images Supabase flags bucket.
+  - `e205a84` Highlight — país rojo + reset zoom al cerrar.
+  - `adfff22` One-liner — clear flag is-active on reset.
+  - `2a4bbad` 3-fixes — centroides USA/UK/etc + sede highlight + tooltip cleanup.
+  - `851ca93` Enrichment v2 — formación + frase ESPN + bios duales + grupos en carrusel.
+  - `010b189` Polish v2 — wiki-bio v3 fix textos + chip formación + leyenda lateral.
+  - `6d058b2` Final fix — chip formación con ancho ajustado al contenido.
+- ERR documentados: **ERR-39** (regex non-greedy frases ESPN), **ERR-40** (espacios falsos tildes ESPN), **ERR-41** (pill flex hijo stretch en flex column).
+- Lecciones técnicas:
+  - Cherry-pick de commits inexistentes: brief intermedio pidió `0dea54f` que solo vivía en local de San. Verificado `git rev-parse` y reportado como no-op (5.0/4.2 ya estaban). Patrón: NO ejecutar cherry-pick sin verificar SHA en remoto primero.
+  - Verificación cruzada con `EQUIPOS[]`: la tabla ISO3 emoji del brief omitía TUR/SWE/COD. Validar coverage antes de aplicar.
+  - Patrón badge-with-flag-fallback (CLAUDE.md regla permanente): siempre dual-render. Cuando un brief específico contradice una regla de proyecto, mantener la regla y notarlo como deviation.
+  - HTML entities `&#39;` para escapar single-quotes en JS string → HTML attribute (más robusto que `\'`).
+  - Subagentes Haiku 4.5: ninguno en este sprint (tareas demasiado acopladas a un único `ui-globo-equipos.js` para split por componente).
+- Cierre de sesión (este commit, branch `feature/globo-pr2-pr3`):
+  - CLAUDE.md: Estado actual actualizado, table-índice ERR ampliada con ERR-38..41, mapa docs con `globo-mundial.md`.
+  - CHANGELOG.md: nueva sección 2026-05-06 con tabla de 12 commits + funcionalidad consolidada + ERR + lecciones.
+  - errores_conocidos_porra.md: añadidos ERR-39, ERR-40, ERR-41 con síntoma/causa/fix/patrón preventivo.
+  - docs/globo-mundial.md: nuevo, arquitectura completa del componente (stack, cadena carga, data const, estado, helpers, polygonsData re-render pattern, layout overlay, pill formación, datos WIKI_BIO v3 con scraping, triggers de cambio, pendientes PR4).
+  - docs/architecture.md: nueva sub-sección "Globo de selecciones" en `## Pantallas y patrones de carrusel` con link a `docs/globo-mundial.md`.
+- Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.
+

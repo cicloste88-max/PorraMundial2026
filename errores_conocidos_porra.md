@@ -622,3 +622,32 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** cuando una librería esté **pinneada** a una versión específica, leer la API en `unpkg.com/<lib>@<version>/` (browse del paquete tal cual fue publicado) o el README de esa versión exacta en GitHub releases. **NO fiarse del README del default branch** del repo de la librería: puede corresponder a una versión más reciente con APIs distintas o a un próximo major. Cuando un LLM inventa métodos, contrastar con el ejemplo canónico de la versión pinneada antes de implementar.
 - **Caso conocido:** dos sprints previos rotos (intentos pre-PR#54) por inventar `graticuleLabels()`, encadenar `rendererConfig().chain()`, llamar `globe.autoRotate(true)` (no existe — hay que ir vía `globe.controls()`). El HTML referencia que San subió a `docs/globo-mundial-2026-REFERENCIA.html` (commit `0edd40e`) sirve como fuente de verdad para la API 2.33.0.
 - **Fecha detección:** 06 may 2026 (Sprint Globo MVP — patrón cristalizado tras dos iteraciones rotas previas).
+
+## ERR-39 — ESPN scraping con regex non-greedy corta frases con comillas anidadas
+
+- **Síntoma:** en `wiki-bio.js` v2 generado por scraper ESPN, frases con comillas dobles internas quedaban truncadas en la primera comilla cerrada. Ejemplo Alemania: `frase: "Presionar alto, dejar que los"` (truncada). Bio_espn arrancaba con basura post-truncamiento (`"números 10\" creen". Julian...`).
+- **Causa:** regex `/"(.+?)"/` (non-greedy) en el parser tomaba la primera comilla cerrada disponible, ignorando que la frase completa tenía comillas anidadas tipo `"Presionar alto, dejar que los \"números 10\" creen"`.
+- **Fix:** v3 con regex greedy `/"(.+)"/` desde la primera `"` hasta la última `"` opcionalmente seguida de `[.?!]`. La greediness es segura porque el campo `frase:` está en una línea propia y solo tiene un par de comillas externas.
+- **Patrón preventivo:** para campos JSON con strings que pueden contener delimitadores anidados, preferir regex greedy + ancla (final-de-línea, comilla final + delimitador `,` o `}`). Validación post-scrape: contar pares de `"` en cada frase y reportar entradas impares.
+- **Fix aplicado:** `wiki-bio v3` (commit `010b189` en `feature/globo-pr2-pr3`).
+- **Fecha detección:** 06 may 2026 (Sprint Globo Polish v2 — al revisar Alemania en QA mobile).
+
+## ERR-40 — ESPN HTML inserta espacios falsos tras vocales con tilde
+
+- **Síntoma:** `wiki-bio.js` v2 mostraba `"Bajo la dirección del exdelantero del Barcelona Thomas Christiansen, Panam á ha evolucionado..."` con un espacio espurio entre `m` y `á` que parte la palabra `Panamá`. Mismo patrón potencial en `Núñez`, `Ramón`, `Sánchez`, etc.
+- **Causa:** el HTML de origen de ESPN inyecta un `<span>` o un `&nbsp;` invisible alrededor de ciertos caracteres UTF-8 multibyte (ñ, á, é, í, ó, ú, Ñ, Á…) durante el rendering server-side. Al hacer `.text` o `.get_text()` ingenuo, esos wrappers convierten en espacio normal y la palabra queda partida.
+- **Fix:** `clean_html` que normaliza con regex `re.sub(r'([áéíóúÁÉÍÓÚñÑ])\s+(\w)', r'\1\2', text)` — colapsa "letra-acentuada + espacio + letra" en "letra-acentuada + letra". La regex es defensiva: solo aplica si el espacio sigue inmediatamente a una vocal acentuada y va seguido de otro carácter de palabra.
+- **Patrón preventivo:** post-scrape, validar con `assert "Panam á" not in bio` y similares para entradas conocidas. Otra opción: parsear con `BeautifulSoup` y `.get_text(separator='', strip=False)` para que no inserte separadores artificiales entre nodos.
+- **Fix aplicado:** `wiki-bio v3` (commit `010b189`).
+- **Fecha detección:** 06 may 2026 (Sprint Globo Polish v2 — al revisar Panamá en QA).
+
+## ERR-41 — Pill flex hijo en flex column hereda align-items:stretch → ancho completo
+
+- **Síntoma:** el chip `.fc-globo-detail__pill-formacion` se estiraba al 100% del ancho del header del panel, dejando aire vacío a los lados del texto `Formación: 4-3-3`.
+- **Causa:** el contenedor `.fc-globo-detail__hdr` tenía `display:flex; flex-direction:column`, y `align-items` por defecto es `stretch` en flex containers. Por tanto cualquier hijo (incluyendo `<span>` con `display:inline-flex` o `inline-block`) se estiraba al ancho del cross-axis.
+- **Fix doble:**
+  1. `align-items: flex-start` en `.fc-globo-detail__hdr` → cancela el stretch para todos los hijos.
+  2. `width: auto; max-width: max-content; flex: 0 0 auto; align-self: flex-start` en la propia pill → safeguard si algún ancestro futuro vuelve a forzar stretch.
+- **Patrón preventivo:** cuando un hijo de flex column debe ajustar su ancho al contenido (típico en pills, badges, chips), aplicar `align-self: flex-start` en el hijo o `align-items: flex-start` en el padre. La 2ª opción afecta a TODOS los hijos; la 1ª es scoped al hijo concreto.
+- **Fix aplicado:** commit `6d058b2` en `feature/globo-pr2-pr3`.
+- **Fecha detección:** 06 may 2026 (Sprint Globo Polish v2 — al inspeccionar el panel en localhost).
