@@ -113,10 +113,11 @@
   background: #070b14;
   z-index: 9999;
   display: none;
+  flex-direction: column;
 }
 
 .fc-globo-overlay.is-open {
-  display: block;
+  display: flex;
 }
 
 .fc-globo-overlay__hdr {
@@ -196,11 +197,10 @@
 }
 
 .fc-globo-overlay__canvas {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .fc-globo-overlay__canvas canvas {
@@ -208,20 +208,14 @@
 }
 
 .fc-globo-overlay__leg {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  flex-shrink: 0;
   display: flex;
-  gap: 18px;
   z-index: 5;
   font-size: 11px;
   color: #cfd6e0;
-  background: rgba(10, 16, 28, 0.75);
-  padding: 8px 18px;
-  border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  pointer-events: none;
+  background: rgba(10, 16, 28, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
 }
 
 .fc-globo-overlay__dot {

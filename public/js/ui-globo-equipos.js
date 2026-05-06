@@ -94,6 +94,39 @@
     return ALIAS_WIKI[name_en] || name_en;
   }
 
+  // ── Códigos ISO 3-letras → emoji bandera ─────────────────────
+  // EQUIPOS[].flag contiene 'MEX', 'BRA' etc. (ISO3), no emoji directo.
+  // Cubre los 48 EQUIPOS + algunos extras (KAZ/ANG) por seguridad.
+  var ISO3_TO_FLAG = {
+    'MEX': '🇲🇽', 'RSA': '🇿🇦', 'KOR': '🇰🇷', 'CZE': '🇨🇿',
+    'CAN': '🇨🇦', 'QAT': '🇶🇦', 'SUI': '🇨🇭', 'BIH': '🇧🇦',
+    'BRA': '🇧🇷', 'MAR': '🇲🇦', 'HAI': '🇭🇹', 'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'USA': '🇺🇸', 'AUS': '🇦🇺', 'NZL': '🇳🇿', 'PAR': '🇵🇾',
+    'GER': '🇩🇪', 'ECU': '🇪🇨', 'CIV': '🇨🇮', 'CUW': '🇨🇼',
+    'NED': '🇳🇱', 'JPN': '🇯🇵', 'TUN': '🇹🇳',
+    'BEL': '🇧🇪', 'EGY': '🇪🇬', 'IRN': '🇮🇷',
+    'ESP': '🇪🇸', 'URU': '🇺🇾', 'KSA': '🇸🇦', 'CPV': '🇨🇻',
+    'FRA': '🇫🇷', 'SEN': '🇸🇳', 'NOR': '🇳🇴', 'IRQ': '🇮🇶',
+    'ARG': '🇦🇷', 'ALG': '🇩🇿', 'AUT': '🇦🇹', 'JOR': '🇯🇴',
+    'POR': '🇵🇹', 'COL': '🇨🇴', 'UZB': '🇺🇿',
+    'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'CRO': '🇭🇷', 'GHA': '🇬🇭', 'PAN': '🇵🇦',
+    // Extras de EQUIPOS no incluidos en el brief
+    'TUR': '🇹🇷', 'SWE': '🇸🇪', 'COD': '🇨🇩',
+    // Reservas
+    'KAZ': '🇰🇿', 'ANG': '🇦🇴'
+  };
+
+  function getFlagEmoji(equipo) {
+    if (!equipo) return '⚽';
+    var f = equipo.flag || equipo.flag_emoji || '';
+    // 1. Si ya viene como emoji directo (primer code point > ASCII)
+    if (f && typeof f.codePointAt === 'function' && f.codePointAt(0) > 127) return f;
+    // 2. Lookup ISO3 (case-insensitive)
+    if (f && ISO3_TO_FLAG[f.toUpperCase()]) return ISO3_TO_FLAG[f.toUpperCase()];
+    // 3. Fallback: inicial del nombre
+    return (equipo.name || equipo.name_en || '?').charAt(0).toUpperCase();
+  }
+
   // ── Paleta cartográfica (HEX puros, NO rgba para atmosphere) ─
   var COL = {
     OCEAN:       '#1e4d6b',
@@ -256,7 +289,7 @@
     flagsEl._fcRendered = true;
 
     var html = arr.map(function (e) {
-      var flag   = e.flag || e.flag_emoji || '';
+      var flag   = getFlagEmoji(e);
       var name   = e.name || e.name_en || '';
       var nameEn = e.name_en || name;
       var lat    = (typeof e.lat === 'number') ? e.lat : 0;
@@ -442,7 +475,9 @@
           .atmosphereAltitude(0.10)
           .showGraticules(false);
         globe.width(canvasEl.clientWidth);
-        globe.height(canvasEl.clientHeight);
+        // Fallback (window.innerHeight - 200) cuando clientHeight aún no está
+        // calculado por el flex layout — evita canvas 0px en el primer paint.
+        globe.height(canvasEl.clientHeight || (window.innerHeight - 200));
 
         var ctrl = globe.controls();
         if (ctrl) {
@@ -471,13 +506,16 @@
         // Recalcula altitude responsive en rotación de dispositivo, pero
         // solo si la diferencia con la actual >0.5 (no resetea zoom manual).
         var onResize = function () {
-          globe.width(canvasEl.clientWidth);
-          globe.height(canvasEl.clientHeight);
-          var newAlt = window.innerWidth < 768 ? 5.0 : 4.2;
-          var pov = globe.pointOfView();
-          if (pov && Math.abs(pov.altitude - newAlt) > 0.5) {
-            globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: newAlt }, 400);
-          }
+          // rAF para que el flex layout haya recalculado antes de medir.
+          requestAnimationFrame(function () {
+            globe.width(canvasEl.clientWidth);
+            globe.height(canvasEl.clientHeight || (window.innerHeight - 200));
+            var newAlt = window.innerWidth < 768 ? 5.0 : 4.2;
+            var pov = globe.pointOfView();
+            if (pov && Math.abs(pov.altitude - newAlt) > 0.5) {
+              globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: newAlt }, 400);
+            }
+          });
         };
         window.addEventListener('resize', onResize);
         globe._fcOnResize = onResize;
@@ -652,11 +690,14 @@
     var msg    = overlay.querySelector('#fc-globo-msg');
 
     if (window._globoInstance) {
-      // Instancia cacheada → ajustar tamaño al viewport actual y mostrar
-      try {
-        window._globoInstance.width(canvas.clientWidth);
-        window._globoInstance.height(canvas.clientHeight);
-      } catch (_) { /* defensivo */ }
+      // Instancia cacheada → ajustar tamaño al viewport actual y mostrar.
+      // rAF asegura que el flex layout haya calculado el canvas antes de medir.
+      requestAnimationFrame(function () {
+        try {
+          window._globoInstance.width(canvas.clientWidth);
+          window._globoInstance.height(canvas.clientHeight || (window.innerHeight - 200));
+        } catch (_) { /* defensivo */ }
+      });
       hideMsg(msg);
       renderFlagsLegend(window._globoInstance);
       renderSedesLegend(window._globoInstance);
