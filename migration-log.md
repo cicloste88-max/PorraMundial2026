@@ -1563,3 +1563,12 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - ERR: N/A (regresión específica, no patrón reusable).
 - Backlog item 12: parcialmente cerrado (badge `done/N` resuelto). Click handler `'click' took 1019ms` queda aplazado a sprint con profiling DevTools previo.
 
+## 06may2026 · fix(ia): tooltip explainer z-index sobre cluster 9999 · PR #58
+
+- Branch: `fix/ia-explainer-zindex` → merge `main` SHA `ae8090f` (no-ff).
+- Bug: tooltip `#ia-explainer-popover` detrás del modal `#jcard-modal-overlay` al hacer click en `.ia-pct-trigger` con tarjeta abierta.
+- Causa: ambos `z-index:9999` + hijos directos de `body`; modal recreado en cada apertura → siempre después en DOM → gana por orden de pintado.
+- Files: `public/css/base.css` (`+1/-1`).
+- ERR: N/A (regresión específica de cluster z-index, no patrón reusable).
+- Backlog item 12: cerrado completamente con este merge (badge `done/N` en PR#56 + tooltip detrás del modal en PR#58). Solo queda `1019ms` aplazado a sprint con profiling DevTools previo.
+
