@@ -294,8 +294,8 @@
     var w = wikiData || {};
     var bioEntry = (typeof window.WIKI_BIO !== 'undefined' && nameEn && window.WIKI_BIO[nameEn])
       ? window.WIKI_BIO[nameEn] : null;
-    var bio = bioEntry ? bioEntry.bio : '';
-    var apodoDisplay = bioEntry ? bioEntry.apodo : (w.apodo || '');
+    var b = bioEntry || {};
+    var apodoDisplay = b.apodo || w.apodo || '';
     var coachLine = w.coach
       ? '<div class="fc-globo-detail__row"><span class="fc-globo-detail__lbl">Entrenador</span><span>' + w.coach + '</span></div>'
       : '';
@@ -306,12 +306,22 @@
         (w.estrella_club ? '<span class="fc-globo-detail__estrella-club">' + w.estrella_club + '</span>' : '') +
       '</div>'
     ) : '';
-    var bioSection = bio ? (
-      '<details class="fc-globo-detail__bio">' +
-        '<summary class="fc-globo-detail__bio-toggle">Más sobre este equipo ▸</summary>' +
-        '<p class="fc-globo-detail__bio-text">' + bio + '</p>' +
-      '</details>'
-    ) : '';
+    // WIKI_BIO v2: dos bios separadas (sport.es narrativo + ESPN táctico).
+    // Reuso clases __bio/__bio-toggle/__bio-text que ya tienen CSS estilizado
+    // (border dorado, summary marker custom, etc.). Primer details abierto.
+    var bioHtml = '';
+    if (b.bio) {
+      bioHtml += '<details class="fc-globo-detail__bio" open>' +
+        '<summary class="fc-globo-detail__bio-toggle">📖 Sobre el equipo</summary>' +
+        '<p class="fc-globo-detail__bio-text">' + b.bio + '</p>' +
+      '</details>';
+    }
+    if (b.bio_espn) {
+      bioHtml += '<details class="fc-globo-detail__bio">' +
+        '<summary class="fc-globo-detail__bio-toggle">⚽ Análisis táctico</summary>' +
+        '<p class="fc-globo-detail__bio-text">' + b.bio_espn + '</p>' +
+      '</details>';
+    }
     var btnPlantilla = (
       '<button type="button" class="fc-globo-detail__btn-plantilla" ' +
         'data-name-en="' + (nameEn || '').replace(/"/g, '&quot;') + '">' +
@@ -322,7 +332,9 @@
       '<div class="fc-globo-detail__hdr">' +
         '<span class="fc-globo-detail__title">' + nombrePais + '</span>' +
         (apodoDisplay ? '<span class="fc-globo-detail__sub">' + apodoDisplay + '</span>' : '') +
+        (b.formacion ? '<span class="fc-globo-detail__pill-formacion">' + b.formacion + '</span>' : '') +
       '</div>' +
+      (b.frase ? '<p class="fc-globo-detail__frase">"' + b.frase + '"</p>' : '') +
       '<div class="fc-globo-detail__stats">' +
         (w.grupo  ? '<div class="fc-globo-detail__row"><span class="fc-globo-detail__lbl">Grupo</span><span>' + w.grupo + '</span></div>' : '') +
         (w.confed ? '<div class="fc-globo-detail__row"><span class="fc-globo-detail__lbl">Confederación</span><span>' + w.confed + '</span></div>' : '') +
@@ -331,9 +343,9 @@
         coachLine +
       '</div>' +
       (estrella ? '<div class="fc-globo-detail__section-lbl">Estrella</div>' + estrella : '') +
-      bioSection +
+      bioHtml +
       btnPlantilla +
-      '<div class="fc-globo-detail__attr">Datos: sport.es / Wikipedia CC BY-SA</div>'
+      '<div class="fc-globo-detail__attr">Datos: sport.es + ESPN / Wikipedia CC BY-SA</div>'
     );
   }
 
@@ -370,7 +382,17 @@
     flagsEl._fcRendered = true;
 
     var SUPABASE_FLAGS = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/flags/';
-    var html = arr.map(function (e) {
+    // EQUIPOS viene ordenado por grupos (4 consecutivos = grupo). Insertar
+    // un mini-badge separador A/B/C... antes de cada bloque de 4.
+    var GRUPO_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+    var html = '';
+    arr.forEach(function (e, idx) {
+      if (idx % 4 === 0) {
+        var grupoLetra = GRUPO_LETTERS[Math.floor(idx / 4)] || '';
+        html += '<div class="fc-globo-flags__grupo-sep" aria-hidden="true">' +
+                  '<span class="fc-globo-flags__grupo-label">' + grupoLetra + '</span>' +
+                '</div>';
+      }
       var name   = e.name || e.name_en || '';
       var nameEn = e.name_en || name;
       var lat    = (typeof e.lat === 'number') ? e.lat : 0;
@@ -379,16 +401,14 @@
       var flagContent = flagUrl
         ? '<img src="' + flagUrl + '" alt="' + name.replace(/"/g, '&quot;') + '" class="fc-globo-flag-btn__img" loading="lazy">'
         : (name || '?').substring(0, 3);
-      return (
-        '<button type="button" class="fc-globo-flag-btn" ' +
-          'data-name-en="' + nameEn.replace(/"/g, '&quot;') + '" ' +
-          'data-lat="' + lat + '" data-lng="' + lng + '" ' +
-          'title="' + name + '">' +
-          flagContent +
-          '<span class="fc-globo-flag-btn__name">' + name + '</span>' +
-        '</button>'
-      );
-    }).join('');
+      html += '<button type="button" class="fc-globo-flag-btn" ' +
+                'data-name-en="' + nameEn.replace(/"/g, '&quot;') + '" ' +
+                'data-lat="' + lat + '" data-lng="' + lng + '" ' +
+                'title="' + name + '">' +
+                flagContent +
+                '<span class="fc-globo-flag-btn__name">' + name + '</span>' +
+              '</button>';
+    });
 
     flagsEl.innerHTML = html;
 
