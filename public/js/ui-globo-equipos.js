@@ -174,12 +174,6 @@
         var globe = Globe();
         globe(canvasEl);
 
-        // Limitar pixel ratio retina (mobile 2x/3x = 4-9× más píxels y mata fps).
-        var renderer = globe.renderer && globe.renderer();
-        if (renderer && typeof renderer.setPixelRatio === 'function') {
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-        }
-
         globe
           .globeImageUrl(oceanTex)
           .backgroundImageUrl('')
@@ -197,7 +191,7 @@
         }
         // Altitude responsive: mobile (<768) cámara más lejos para que el
         // globo entre completo en el ancho del viewport vertical estrecho.
-        var initialAlt = window.innerWidth < 768 ? 3.0 : 2.2;
+        var initialAlt = window.innerWidth < 768 ? 7.0 : 6.2;
         globe.pointOfView({ lat: 20, lng: 0, altitude: initialAlt });
 
         // Pause autoRotate durante interacción
@@ -218,7 +212,7 @@
         var onResize = function () {
           globe.width(canvasEl.clientWidth);
           globe.height(canvasEl.clientHeight);
-          var newAlt = window.innerWidth < 768 ? 3.0 : 2.2;
+          var newAlt = window.innerWidth < 768 ? 7.0 : 6.2;
           var pov = globe.pointOfView();
           if (pov && Math.abs(pov.altitude - newAlt) > 0.5) {
             globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: newAlt }, 400);
@@ -260,10 +254,8 @@
             globe.polygonsData(feats)
               .polygonCapColor(function (f) { return f.properties.esMundial ? COL.GOLD : COL.LAND; })
               .polygonStrokeColor(function (f) { return f.properties.esMundial ? COL.GOLD_STROKE : COL.LAND_STROKE; })
-              .polygonAltitude(function (f) { return f.properties.esMundial ? 0.018 : 0.001; })
+              .polygonAltitude(function (f) { return f.properties.esMundial ? 0.022 : 0.006; })
               .polygonSideColor(function (f) { return f.properties.esMundial ? COL.GOLD_SIDE : COL.LAND_SIDE; })
-              .polygonCapCurvatureResolution(8)
-              .polygonsTransitionDuration(0)
               .polygonLabel(function (f) {
                 var n = f.properties.name || '';
                 var b = f.properties.esMundial
@@ -273,7 +265,6 @@
               });
 
             globe.pointsData(SEDES.map(function (s) { return { lat: s.lat, lng: s.lng, name: s.name }; }))
-              .pointsMerge(true)
               .pointColor(function () { return '#ffffff'; })
               .pointAltitude(0.04)
               .pointRadius(0.5)
