@@ -212,6 +212,7 @@
   }
 
   function resetCountry(globe) {
+    document.querySelectorAll('.fc-globo-flag-btn.is-active').forEach(function (b) { b.classList.remove('is-active'); });
     if (!_selectedNE) return;
     _selectedNE = null;
     if (globe && typeof globe.polygonsData === 'function') {
