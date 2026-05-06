@@ -173,6 +173,13 @@
         // Factory pattern (NO `new Globe()`)
         var globe = Globe();
         globe(canvasEl);
+
+        // Limitar pixel ratio retina (mobile 2x/3x = 4-9× más píxels y mata fps).
+        var renderer = globe.renderer && globe.renderer();
+        if (renderer && typeof renderer.setPixelRatio === 'function') {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        }
+
         globe
           .globeImageUrl(oceanTex)
           .backgroundImageUrl('')
@@ -253,8 +260,10 @@
             globe.polygonsData(feats)
               .polygonCapColor(function (f) { return f.properties.esMundial ? COL.GOLD : COL.LAND; })
               .polygonStrokeColor(function (f) { return f.properties.esMundial ? COL.GOLD_STROKE : COL.LAND_STROKE; })
-              .polygonAltitude(function (f) { return f.properties.esMundial ? 0.022 : 0.006; })
+              .polygonAltitude(function (f) { return f.properties.esMundial ? 0.018 : 0.001; })
               .polygonSideColor(function (f) { return f.properties.esMundial ? COL.GOLD_SIDE : COL.LAND_SIDE; })
+              .polygonCapCurvatureResolution(8)
+              .polygonsTransitionDuration(0)
               .polygonLabel(function (f) {
                 var n = f.properties.name || '';
                 var b = f.properties.esMundial
@@ -264,6 +273,7 @@
               });
 
             globe.pointsData(SEDES.map(function (s) { return { lat: s.lat, lng: s.lng, name: s.name }; }))
+              .pointsMerge(true)
               .pointColor(function () { return '#ffffff'; })
               .pointAltitude(0.04)
               .pointRadius(0.5)
