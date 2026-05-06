@@ -1554,3 +1554,12 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
   - PR3: popups enriquecidos por país (entrenador, ranking FIFA, mundiales previos) y por sede (capacidad, año, dato destacado, partidos). Datos desde Wikipedia (CC BY-SA, sin antibot).
   - PR4 (~junio 2026): screen plantilla con campo de fútbol + 11 titular + convocatoria + entrenador, cuando salgan squads reales.
 
+## 06may2026 · fix(grupos): badge done/total stale tras simular · PR #56
+
+- Branch: `fix/grupos-badge-progress-stale` → squash-merge a `main` SHA `fa56a92`.
+- Bug: badges `done/N` de cards colapsables stale tras "Todos los grupos (72)" o dado individual; tarjetas y tablas sí actualizadas, headers y letterbar no.
+- Causa: `diceSimulateMatch` no dispara `jcard:updated` (único punto de refresh del header). `diceSimulateAllGroups` solo refrescaba tablas manualmente.
+- Files: `public/js/ui-groups.js` (extracción helper `_refreshGrupoCardHeader`, expuesto en `window`) + `public/js/admin.js` (batch refresh en `diceSimulateAllGroups` y `diceSimulateGroup`).
+- ERR: N/A (regresión específica, no patrón reusable).
+- Backlog item 12: parcialmente cerrado (badge `done/N` resuelto). Click handler `'click' took 1019ms` queda aplazado a sprint con profiling DevTools previo.
+
