@@ -332,7 +332,7 @@
       '<div class="fc-globo-detail__hdr">' +
         '<span class="fc-globo-detail__title">' + nombrePais + '</span>' +
         (apodoDisplay ? '<span class="fc-globo-detail__sub">' + apodoDisplay + '</span>' : '') +
-        (b.formacion ? '<span class="fc-globo-detail__pill-formacion">' + b.formacion + '</span>' : '') +
+        (b.formacion ? '<span class="fc-globo-detail__pill-formacion"><span class="fc-globo-detail__pill-label">Formación:</span> ' + b.formacion + '</span>' : '') +
       '</div>' +
       (b.frase ? '<p class="fc-globo-detail__frase">"' + b.frase + '"</p>' : '') +
       '<div class="fc-globo-detail__stats">' +
