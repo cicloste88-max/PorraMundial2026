@@ -188,7 +188,10 @@
           ctrl.autoRotateSpeed = 0.4;
           ctrl.enableZoom = true;
         }
-        globe.pointOfView({ lat: 20, lng: 0, altitude: 2.2 });
+        // Altitude responsive: mobile (<768) cámara más lejos para que el
+        // globo entre completo en el ancho del viewport vertical estrecho.
+        var initialAlt = window.innerWidth < 768 ? 3.0 : 2.2;
+        globe.pointOfView({ lat: 20, lng: 0, altitude: initialAlt });
 
         // Pause autoRotate durante interacción
         var rotateTimer;
@@ -202,10 +205,17 @@
           }, 1500);
         });
 
-        // Resize listener (overlay full-screen → ajustar al viewport)
+        // Resize listener (overlay full-screen → ajustar al viewport).
+        // Recalcula altitude responsive en rotación de dispositivo, pero
+        // solo si la diferencia con la actual >0.5 (no resetea zoom manual).
         var onResize = function () {
           globe.width(canvasEl.clientWidth);
           globe.height(canvasEl.clientHeight);
+          var newAlt = window.innerWidth < 768 ? 3.0 : 2.2;
+          var pov = globe.pointOfView();
+          if (pov && Math.abs(pov.altitude - newAlt) > 0.5) {
+            globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: newAlt }, 400);
+          }
         };
         window.addEventListener('resize', onResize);
         globe._fcOnResize = onResize;
