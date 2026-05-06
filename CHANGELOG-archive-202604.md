@@ -1,6 +1,10 @@
 # CHANGELOG archive — Porra Mundial 2026
 
-Entradas anteriores a 2026-04-28 movidas desde CHANGELOG.md para mantener el archivo principal bajo 30KB.
+Entradas anteriores a 2026-05-04 movidas desde CHANGELOG.md para mantener el archivo principal bajo 30KB.
+
+<!-- Movido 2026-05-06 (cierre Sprint Globo PR2+PR3+Enrichment): entradas 2026-04-28 a 2026-04-30 -->
+
+
 
 ## 2026-04-27 — F7.4-D-A eliminar banner+btn legacy de page-grupos (PR pendiente)
 
@@ -167,3 +171,49 @@ Añadido a `.gitignore`: `apify-actors/*/node_modules/`.
 - Grupo F + Suecia
 - Grupo I + Irak
 - Grupo K + RD Congo
+## 2026-04-30 — Turnstile DESACTIVADO (Supabase Auth dashboard)
+
+**Auth / Decisión arquitectónica.** Tras 2 días con Cloudflare Turnstile en login (PR#39+PR#40, 29abr), CAPTCHA desactivado en Supabase Auth dashboard. Razones: app privada (porra entre amigos), fricción innecesaria, **Supabase Cloud expone un único secret slot por proyecto** (no se puede separar dev/prod) y **Cloudflare no acepta hostnames con port** (bloqueando `localhost:5173`). El widget HTML/JS en `index.html` y `auth.js` se mantiene intacto (no estorba; no ejecuta sin secret en Auth). No es bug del código — es limitación arquitectónica del stack. NO añadido a `errores_conocidos_porra.md` (no es ERR).
+
+## 2026-04-30 — F7.X nuevo shell visual #page-elim (PR#44)
+
+**Rediseño Fase final** (8 commits, +872 −66 LOC, merge SHA `5ddb974`).
+
+- **Files nuevos**: `public/js/ui-elim-shell.js` (+545 LOC, controlador shell), `public/css/components/elim-shell.css` (+295), `public/css/components/elim-tokens.css` (+30 design tokens).
+- **Wiring**: `js/main-entry.js` carga `ui-elim-shell.js` en chain; `public/js/ui-nav.js` invoca `mountElimShell()` al entrar a page-elim; `public/js/components/bottom-tab.js` retira el gate modal `_showGruposGateModal` (Fase final ahora accesible siempre, shell muestra estado coherente con `window._gruposComplete`).
+- **Cards CORE preservadas**: las tarjetas de eliminatorias existentes (R32→R16→QF→SF→Final) NO tocadas — el nuevo shell envuelve manteniendo grilla + comportamiento.
+- **Bug UI #3 corregido** (botón simular eliminatorias visible para todos): gate ahora chequea `is_admin` correctamente vía `window._isAdmin`.
+- **Sub-vistas KO/Awards/finalizar-section diferidas**: scope estricto al shell + tokens + wiring. Iteración cosmética posterior.
+- **Patrón multi-agente**: 4 subagentes Haiku 4.5 paralelos vía Task tool en 2 oleadas (oleada 1: PorraHeader + PhaseStepper; oleada 2: ElimRow + ElimExpanded). Split POR COMPONENTE — cada subagente portó un componente completo de JSX a vanilla JS + sus reglas CSS. Padre integró todo en `ui-elim-shell.js` + `elim-shell.css` y resolvió mismatches de selectores y escapes.
+- **Design source v2 persistente**: bundle de referencia push-eado a branch dedicada `docs/quiniela-design-source-v2` (commit `fd95d08`). Patrón a seguir para futuros design source bundles (vs embed inline en briefs).
+
+## 2026-04-30 — F7.4-D-2 cleanup IA Predictor widgets (PR#43)
+
+**Cleanup CSS** (commit `0baaa4a`).
+
+- **`public/css/base.css` −18 LOC**: bloque IA duplicado en líneas 701-713 eliminado; reglas huérfanas `.ia-loading`, `.ia-dot`, `@keyframes iaDot` (sin uso tras eliminar chip `.ia-hint` en post-F.2 y `hydrateIABar` actual no usa spinner) borradas.
+- **`scoring.js` NO tocado**: la lógica de hidratación IA permanece intacta. Solo CSS muerto retirado.
+- Reduce superficie de mantenimiento del Predictor sin tocar comportamiento. Smoke verde post-merge (cards de grupo siguen pintando `.ia-bar` con %, signo, quip).
+
+## 2026-04-29 — Cloudflare Turnstile CAPTCHA (PR#39 + PR#40)
+
+**Auth / Seguridad.**
+
+- **PR#39** (`8b1dc30`): Cloudflare Turnstile CAPTCHA (Managed mode) en formulario de login. Script `api.js` en `<head>`, widget `cf-turnstile` antes del submit, token leído de `[name=cf-turnstile-response]` y pasado vía `options.captchaToken` en `signInWithPassword`. Widget reseteado con `window.turnstile.reset()` tras cada intento. Sitekey + secret en Vault (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`). Secret además configurada en Supabase Auth → Attack Protection.
+- **PR#40** (`7467a4b`): test sitekey `1x00000000000000000000AA` (always-passes) en `localhost` para evitar error 110200; sitekey real `0x4AAAAAADFzAxFI4isPOuJx` en producción. Detección vía `window.location.hostname === 'localhost'`. Banner rojo "Solo para pruebas" en local es esperado.
+
+## 2026-04-28 — Audit Postgres (Claude.ai + Code, ERR-33)
+
+**Database (audit 28abr).**
+
+- Aplicado vía Claude.ai (Supabase MCP) en sesión inicial: RLS en `orchestrator_jobs`; `search_path` + grants tightening en 4 funcs de control (`handle_new_user`, `enforce_max_leagues_per_user`, `schedule_match_crons`, `unschedule_match_crons`); fix `get_vault_secrets`; DROP `idx_award_picks_league` e `idx_ko_predictions_league`.
+- Aplicado vía Claude Code (migrations preparadas + apply Supabase MCP desde Claude.ai, registradas en `schema_migrations` con timestamps `20260428020438`/`20260428020439`): DROP `_fix_encoding_temp`, DROP view `refactor_status`, `search_path` en `is_porra_abierta` (sin tocar grants — ver **ERR-33**), +7 índices en FKs (`award_picks.user_id`, `boost_picks.league_id`, `ia_predictions.snapshot_id`, `ko_predictions.user_id`, `leagues.created_by`, `predictions.user_id`, `whatsapp_subscribers.user_id`).
+- Fix post-PR#36 (28abr 02:33 UTC): RLS+policy `service_only` en `tmp_upload_files` (advisor ERROR `0013_rls_disabled_in_public`). 1 ERROR → 0 en advisor security.
+- Items 3+4 (28abr 03:00 UTC, migration `20260428030000`): DROP 4 dup SELECT policies (`award_picks_select`, `boost_picks_select`, `ko_predictions_select`, `predictions_select` con `USING(true)`) + 17 RLS rewrites `auth.uid()` → `(SELECT auth.uid())` en `award_picks`, `boost_picks`, `ko_predictions`, `predictions`, `league_members`, `leagues`, `profiles`. Diff advisor: `auth_rls_initplan` 19 WARN → 2; `multiple_permissive_policies` ~30 → ~5.
+- Items 2+5 (28abr 04:00 UTC, migration `20260428040000`): DROP 4 storage listing policies (`flags_public_read`, `kits_public_read`, `miniatures_public_read`, `sites_public_read` — buckets `public:true` no necesitan RLS para servir objetos vía URL directa) + DROP `public.tmp_upload_files` (scripts Python backtest WC2022 Fase E ya cumplida; motor en TS en EF `porra-ia-compute v10`). Diff advisor: `public_bucket_allows_listing` 4 WARN → 0.
+- Backlog tras esta sesión: solo queda **Auth dashboard leaked password protection** (HaveIBeenPwned, 1 click San en Supabase → Authentication → Policies). Items 1-5 del backlog post-audit cerrados.
+
+
+---
+
+*Entradas anteriores a 2026-04-28 archivadas en `CHANGELOG-archive-202604.md`.*

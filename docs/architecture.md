@@ -114,6 +114,12 @@ Listener `jcard:updated` registrado una vez (guard `window._jcardUpdatedListener
 3. Standings table via `renderGroupTableCard(match.group)`.
 4. Card colapsable header (bar color + N/6) actualizados in-place sin rebuild.
 
+### Globo de selecciones (cinta + overlay 3D + panel detalle)
+
+Cinta dorada en `#page-grupos` (montada como sibling de `#dice-global-bar` vía `_ensureGloboCintaMount` en `ui-groups.js`) → click abre overlay full-screen `#fc-globo-overlay` con globo 3D `globe.gl@2.33.0` (lazy-loaded). Carrusel de 48 banderas circulares Supabase con separadores A→L, segunda fila con chips de las 16 sedes, leyenda de tipos (clasificados/sedes) en lateral derecho. Click bandera o polígono → highlight rojo del país + panel detalle (apodo + pill formación + frase + bio sport.es + bio_espn ESPN). Click chip o punto → highlight 3D rojo elevado + panel detalle sede.
+
+Detalle completo: `docs/globo-mundial.md`. ERR relacionados: ERR-38 (globe.gl API surface), ERR-39 (regex non-greedy), ERR-40 (espacios falsos tildes), ERR-41 (pill flex stretch).
+
 ## Shims inline en index.html
 
 Dos funciones declaradas en `<script>` inline (líneas 1440-1445):

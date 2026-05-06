@@ -1,11 +1,11 @@
 # Porra Mundial 2026 — Contexto para Claude Code
 
 App de pronósticos del Mundial 2026. Stack: Vite + vanilla JS/CSS, Supabase, Vercel.
-Producción: porramundial2026-seven.vercel.app · Repo: github.com/cicloste88-max/PorraMundial2026
+Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMundial2026
 
 ## Estado actual
 
-Rama activa **main** HEAD `aebbd22` (post Sprint B PR#52, Sprint A PR#51, Sprint A+B UI PR#49, bot IA Zayu PR#48). Sprint B 05-may cerrado: Grupos screen completo replicando patrón Fase Final + modal editable MOVE-original + nav flechas + body TU PRONÓSTICO. Patrón validado: 4 subagentes Haiku paralelos integrados por Opus en oleadas A→B→C. Próximo: squads reales + `update_ia_scorers` para rellenar `predictions.scorer`/`ko_predictions.scorer` (NULL en todas las ligas).
+`main` HEAD `ae8090f`. Rama **`feature/globo-pr2-pr3`** HEAD `6d058b2` (12 commits, lista para squash-merge desde GitHub UI). Sprint Globo MVP+Enrichment cerrado: cinta + overlay 3D + leyenda banderas Supabase + chips sedes + panel detalle dual (sport.es + ESPN) + highlight rojo país/sede + centroides override + tooltip cleanup + canvas flex. Detalle en `docs/globo-mundial.md`. Próximo: PR4 plantilla (campo + 11 titular) post squads reales + `update_ia_scorers` para `predictions.scorer`/`ko_predictions.scorer` (NULL en las 3 ligas).
 
 ## Top-3 pendientes inmediatos
 
@@ -17,44 +17,44 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 ## Pendientes — Bugs UI
 
-1. Cinta superior tabs ronda no se visualiza completa en móvil (eliminatorias).
-2. Añadir hora CEST a píldora `Grupo · Estadio` en tarjeta de partido (conversión ET→CEST = +6h en jun-jul).
-3. Auto-completar Pichichi torneo sumando goleadores seleccionados en pronósticos.
-4. Enganche final frases IA para pronóstico signo partido (lógica incorporada, falta wiring final).
+1. Cinta superior tabs ronda incompleta en móvil (eliminatorias).
+2. Hora CEST en píldora `Grupo · Estadio` (ET→CEST = +6h en jun-jul).
+3. Auto-completar Pichichi torneo sumando goleadores seleccionados.
+4. Wiring final de frases IA para pronóstico signo partido.
 
-**Resueltos recientes**: Sprint A+B 04-may (Premios/Cuadro, Jornada+Directo v2, Ver tarjeta), Sprint B 05-may (Grupos redesign — letterbar+cards+carousel sibling+modal editable). Ver `CHANGELOG.md`.
+**Resueltos recientes**: Sprint A+B 04-may, Sprint B 05-may (Grupos redesign), Sprint Globo MVP+Enrichment 06-may (rama abierta). Ver `CHANGELOG.md`.
 
 ## Pendientes — Antes del 11 junio 2026
 
-1. Migrar WhatsApp sandbox → Meta Business producción (error 63016 — parked).
+1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
 2. Activar pg_cron `update-results` el 11 jun.
-3. Cargar convocatorias reales (`EQUIPOS[].players`) y luego ejecutar action `update_ia_scorers` de `porra-ia-compute` para rellenar `predictions.scorer`/`ko_predictions.scorer` del bot IA Zayu (actualmente NULL en las 3 ligas).
-4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos al usuario.
-5. Verificar estructura JSON `_results.ko_results` con `update-results` real (11 jun).
-6. IDs SofaScore de KO (disponibles ~28 jun 2026, tras finalizar fase de grupos).
+3. Convocatorias reales `EQUIPOS[].players` + action `update_ia_scorers` de `porra-ia-compute` para rellenar `predictions.scorer`/`ko_predictions.scorer` del bot IA Zayu (NULL en 3 ligas).
+4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos.
+5. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
+6. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
-Items 1-5 cerrados (PR#37). Pendiente: activar leaked password protection (HaveIBeenPwned) en Supabase → Authentication → Policies (1 click San). Detalle en `docs/db/audit_28abr_section26_rls_planning.md`.
+Items 1-5 cerrados (PR#37). Pendiente: leaked password protection (HaveIBeenPwned) en Supabase Auth → Policies. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
 
 ## Auth & Secrets
 
-Detalle Vault/EF + Turnstile DESACTIVADO 30abr2026 en `docs/secrets.md`.
+Vault/EF + Turnstile DESACTIVADO 30abr2026: ver `docs/secrets.md`.
 
 ## Reglas CRÍTICAS
 
-- **NUNCA push a main sin validar en localhost:5173 primero**.
-- **Push inmediato tras cada commit** — nunca acumular. Tras pull, San reinicia Vite + hard-reload (ver `.claude/rules/multi-agent-sync.md`).
-- **NO crear ni modificar `vercel.json`** (el wildcard corrompía MIME types de ES modules — ver ERR-06).
+- **NUNCA push a main sin validar en localhost:5173**.
+- **Push inmediato tras cada commit**. Tras pull, San reinicia Vite + hard-reload (`.claude/rules/multi-agent-sync.md`).
+- **NO tocar `vercel.json`** (wildcard corrompía MIME ES modules — ERR-06).
 - **Actualizar `migration-log.md`** tras cada acción importante.
 - **Consultar `errores_conocidos_porra.md`** antes de debuggear.
-- **`schedule_match_crons(match_key, start_ts)`** para crons de partidos — nunca duplicar manualmente.
-- **Verificación CSS/build obligatoria** tras modificar CSS: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ver ERR-22).
-- **E13 — Subagentes Task con Write NO heredan `.claude/rules/`** (GH#23478). Pasar contexto inline o recuperar Write al padre.
+- **`schedule_match_crons(match_key, start_ts)`** para crons de partidos.
+- **Verificación CSS/build obligatoria**: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ERR-22).
+- **E13** — Subagentes Task con Write NO heredan `.claude/rules/` (GH#23478). Pasar contexto inline.
 - **Detectar decisiones autónomas** con `git diff --stat HEAD` antes de commit.
-- **`dice.js` se mantiene dentro de `admin.js`** (no separar).
-- **Badge-with-flag-fallback** es patrón permanente para imágenes de equipo.
-- **NO `addEventListener('DOMContentLoaded')`** directo en classic scripts cargados via `loadScript` (ver ERR-01 + `.claude/rules/frontend-js.md`).
+- **`dice.js` dentro de `admin.js`** (no separar).
+- **Badge-with-flag-fallback** patrón permanente para imágenes de equipo.
+- **NO `addEventListener('DOMContentLoaded')`** en classic scripts cargados via `loadScript` (ERR-01 + `.claude/rules/frontend-js.md`).
 - **Actor Azzouzana `VzKtdb1t0Qnc07X8V`** tiene caché CDN — NO usar para datos live.
 
 ## Comandos útiles
@@ -82,6 +82,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
 | `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
+| `globo-mundial.md` | Globo 3D — factory globe.gl, OVERRIDE/ALIAS, polygonsData re-render, panel detalle, banderas Supabase, WIKI_BIO v3 | Cambios en globo o países |
 
 ### `.claude/rules/` — auto-cargadas por path-scoping
 
@@ -135,13 +136,17 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-34 | `seed_ia_user` race auth.users vs profiles INSERT |
 | ERR-35 | Stale querySelector tras refactor de clase CSS |
 | ERR-36 | `.container` legacy padding rompe paridad de pages |
-| ERR-37 | Scroll-snap carousel anidado → overflow (debe ser sibling) |
+| ERR-37 | Scroll-snap carousel anidado → overflow (sibling) |
+| ERR-38 | globe.gl@2.33.0 API: factory + controls() + atmosphere HEX |
+| ERR-39 | ESPN regex non-greedy trunca frases con comillas anidadas |
+| ERR-40 | ESPN HTML inserta espacios tras vocales con tilde |
+| ERR-41 | Pill flex hijo en flex column hereda align-items:stretch |
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..33 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..41 (síntoma/causa/fix/patrón).
 
 ## End-of-session protocol
 
