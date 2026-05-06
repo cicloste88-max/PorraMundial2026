@@ -459,6 +459,7 @@
 .fc-globo-detail__hdr {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
   margin-bottom: 12px;
   padding-right: 32px;
@@ -559,6 +560,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  width: auto;
+  max-width: max-content;
+  flex: 0 0 auto;
+  align-self: flex-start;
   background: rgba(232, 184, 48, 0.15);
   border: 1px solid #e8b830;
   color: #e8b830;
