@@ -261,62 +261,110 @@
 
 .fc-globo-flags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 6px;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  gap: 4px;
   padding: 8px 12px;
-  max-height: 96px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-top: 1px solid rgba(232, 184, 48, 0.15);
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(232, 184, 48, 0.3) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   pointer-events: auto;
+}
+
+.fc-globo-flags::-webkit-scrollbar {
+  display: none;
 }
 
 .fc-globo-flag-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 4px 6px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 9px;
-  line-height: 1.2;
-  text-align: center;
-  min-width: 36px;
-  max-width: 44px;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  padding: 2px;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .fc-globo-flag-btn__flag {
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1;
   display: block;
 }
 
+/* Texto del país oculto — el title attr sirve de tooltip */
 .fc-globo-flag-btn__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  font-size: 8px;
+  display: none;
 }
 
 .fc-globo-flag-btn:hover,
 .fc-globo-flag-btn:focus-visible {
-  background: rgba(232, 184, 48, 0.12);
-  border-color: rgba(232, 184, 48, 0.35);
-  color: #fff;
+  background: rgba(232, 184, 48, 0.15);
+  border-color: rgba(232, 184, 48, 0.4);
+  transform: scale(1.15);
   outline: none;
 }
 
 .fc-globo-flag-btn.is-active {
-  background: rgba(232, 184, 48, 0.2);
+  background: rgba(232, 184, 48, 0.25);
+  border-color: #e8b830;
+  transform: scale(1.1);
+}
+
+/* ── Chips de sedes (segunda fila scrollable) ─────────────────── */
+.fc-globo-sedes {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px 12px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  pointer-events: auto;
+}
+
+.fc-globo-sedes::-webkit-scrollbar {
+  display: none;
+}
+
+.fc-globo-sede-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.fc-globo-sede-chip:hover,
+.fc-globo-sede-chip:focus-visible {
+  background: rgba(232, 184, 48, 0.12);
+  border-color: rgba(232, 184, 48, 0.4);
+  color: #e8b830;
+  outline: none;
+}
+
+.fc-globo-sede-chip.is-active {
+  background: rgba(232, 184, 48, 0.18);
   border-color: #e8b830;
   color: #e8b830;
 }
@@ -486,4 +534,69 @@
   color: rgba(255, 255, 255, 0.25);
   margin-top: 12px;
   text-align: right;
+}
+
+/* ── Bio colapsable ───────────────────────────────────────────── */
+.fc-globo-detail__bio {
+  margin: 10px 0;
+  border: 1px solid rgba(232, 184, 48, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.fc-globo-detail__bio-toggle {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: rgba(232, 184, 48, 0.8);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(232, 184, 48, 0.05);
+  transition: background 0.15s;
+}
+
+.fc-globo-detail__bio-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.fc-globo-detail__bio[open] .fc-globo-detail__bio-toggle {
+  background: rgba(232, 184, 48, 0.10);
+  color: #e8b830;
+}
+
+.fc-globo-detail__bio-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  padding: 10px 12px 12px;
+  margin: 0;
+  border-top: 1px solid rgba(232, 184, 48, 0.1);
+}
+
+/* ── Botón Ver Plantilla ──────────────────────────────────────── */
+.fc-globo-detail__btn-plantilla {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 10px 16px;
+  background: rgba(232, 184, 48, 0.1);
+  border: 1px solid rgba(232, 184, 48, 0.3);
+  border-radius: 8px;
+  color: #e8b830;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.fc-globo-detail__btn-plantilla:hover {
+  background: rgba(232, 184, 48, 0.2);
+  border-color: rgba(232, 184, 48, 0.6);
 }

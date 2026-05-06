@@ -86,6 +86,14 @@
     return data ? (data[key] || null) : null;
   }
 
+  // Devuelve la key canónica para WIKI_* dado un nombre crudo (NE o EQUIPOS).
+  // Usado para mantener consistencia entre wikiData (WIKI_SELECCIONES) y bio
+  // (WIKI_BIO) — ambos comparten el mismo espacio de keys.
+  function getWikiKey(name_en) {
+    if (!name_en) return '';
+    return ALIAS_WIKI[name_en] || name_en;
+  }
+
   // ── Paleta cartográfica (HEX puros, NO rgba para atmosphere) ─
   var COL = {
     OCEAN:       '#1e4d6b',
@@ -134,6 +142,7 @@
           '<span><span class="fc-globo-overlay__dot fc-globo-overlay__dot--white"></span>sedes</span>' +
         '</div>' +
         '<div class="fc-globo-flags" id="fc-globo-flags"></div>' +
+        '<div class="fc-globo-sedes" id="fc-globo-sedes"></div>' +
       '</div>' +
       '<div class="fc-globo-detail" id="fc-globo-detail" aria-live="polite">' +
         '<button type="button" class="fc-globo-detail__close" id="fc-globo-detail-close" aria-label="Cerrar detalle">✕</button>' +
@@ -167,8 +176,12 @@
     if (panel) panel.classList.remove('is-open');
   }
 
-  function renderPanelPais(wikiData, nombrePais) {
+  function renderPanelPais(wikiData, nombrePais, nameEn) {
     var w = wikiData || {};
+    var bioEntry = (typeof window.WIKI_BIO !== 'undefined' && nameEn && window.WIKI_BIO[nameEn])
+      ? window.WIKI_BIO[nameEn] : null;
+    var bio = bioEntry ? bioEntry.bio : '';
+    var apodoDisplay = bioEntry ? bioEntry.apodo : (w.apodo || '');
     var coachLine = w.coach
       ? '<div class="fc-globo-detail__row"><span class="fc-globo-detail__lbl">Entrenador</span><span>' + w.coach + '</span></div>'
       : '';
@@ -179,10 +192,22 @@
         (w.estrella_club ? '<span class="fc-globo-detail__estrella-club">' + w.estrella_club + '</span>' : '') +
       '</div>'
     ) : '';
+    var bioSection = bio ? (
+      '<details class="fc-globo-detail__bio">' +
+        '<summary class="fc-globo-detail__bio-toggle">Más sobre este equipo ▸</summary>' +
+        '<p class="fc-globo-detail__bio-text">' + bio + '</p>' +
+      '</details>'
+    ) : '';
+    var btnPlantilla = (
+      '<button type="button" class="fc-globo-detail__btn-plantilla" ' +
+        'data-name-en="' + (nameEn || '').replace(/"/g, '&quot;') + '">' +
+        '🏟 Ver plantilla' +
+      '</button>'
+    );
     return (
       '<div class="fc-globo-detail__hdr">' +
         '<span class="fc-globo-detail__title">' + nombrePais + '</span>' +
-        '<span class="fc-globo-detail__sub">' + (w.apodo || '') + '</span>' +
+        (apodoDisplay ? '<span class="fc-globo-detail__sub">' + apodoDisplay + '</span>' : '') +
       '</div>' +
       '<div class="fc-globo-detail__stats">' +
         (w.grupo  ? '<div class="fc-globo-detail__row"><span class="fc-globo-detail__lbl">Grupo</span><span>' + w.grupo + '</span></div>' : '') +
@@ -192,7 +217,8 @@
         coachLine +
       '</div>' +
       (estrella ? '<div class="fc-globo-detail__section-lbl">Estrella</div>' + estrella : '') +
-      (w.frase ? '<p class="fc-globo-detail__frase">"' + w.frase + '"</p>' : '') +
+      bioSection +
+      btnPlantilla +
       '<div class="fc-globo-detail__attr">Datos: sport.es / Wikipedia CC BY-SA</div>'
     );
   }
@@ -292,9 +318,52 @@
       }, 3000);
 
       var wikiData = getWikiSel(nameEn);
-      openDetail(renderPanelPais(wikiData, name));
+      // Usar btn.title como display porque el .fc-globo-flag-btn__name
+      // ahora es display:none (post-polish). nameEn aliado para bio lookup.
+      openDetail(renderPanelPais(wikiData, btn.title || name, getWikiKey(nameEn)));
 
       flagsEl.querySelectorAll('.fc-globo-flag-btn').forEach(function (b) { b.classList.remove('is-active'); });
+      btn.classList.add('is-active');
+    });
+  }
+
+  // ── Chips de sedes (16 ciudades scrollables) ─────────────────
+  function renderSedesLegend(globe) {
+    var sedesEl = document.getElementById('fc-globo-sedes');
+    if (!sedesEl || sedesEl._fcRendered) return;
+    sedesEl._fcRendered = true;
+
+    var html = SEDES.map(function (s) {
+      return (
+        '<button type="button" class="fc-globo-sede-chip" ' +
+          'data-name="' + s.name.replace(/"/g, '&quot;') + '" ' +
+          'data-lat="' + s.lat + '" data-lng="' + s.lng + '" ' +
+          'title="' + s.name + '">' +
+          '📍 ' + s.name +
+        '</button>'
+      );
+    }).join('');
+
+    sedesEl.innerHTML = html;
+
+    sedesEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('.fc-globo-sede-chip');
+      if (!btn || !globe) return;
+      var name = btn.dataset.name;
+      var lat  = parseFloat(btn.dataset.lat);
+      var lng  = parseFloat(btn.dataset.lng);
+      var wikiData = (typeof window.WIKI_SEDES !== 'undefined') ? window.WIKI_SEDES[name] : null;
+
+      var ctrl = (typeof globe.controls === 'function') ? globe.controls() : null;
+      if (ctrl) ctrl.autoRotate = false;
+      globe.pointOfView({ lat: lat, lng: lng, altitude: 1.5 }, 800);
+      setTimeout(function () {
+        if (ctrl) { ctrl.autoRotate = true; ctrl.autoRotateSpeed = 0.4; }
+      }, 3000);
+
+      openDetail(renderPanelSede(wikiData, name));
+
+      sedesEl.querySelectorAll('.fc-globo-sede-chip').forEach(function (b) { b.classList.remove('is-active'); });
       btn.classList.add('is-active');
     });
   }
@@ -473,7 +542,10 @@
                 var wikiData = getWikiSel(name);
                 // Ignorar países no clasificados sin datos wiki
                 if (!wikiData && !feat.properties.esMundial) return;
-                openDetail(renderPanelPais(wikiData, name));
+                // 3er arg = key WIKI canónica (alias resuelto) para que el
+                // bio lookup en WIKI_BIO funcione cuando el polígono NE
+                // (ej. "United Kingdom") difiere de la key WIKI ("England").
+                openDetail(renderPanelPais(wikiData, name, getWikiKey(name)));
 
                 var ctrl = (typeof globe.controls === 'function') ? globe.controls() : null;
                 if (ctrl) ctrl.autoRotate = false;
@@ -539,10 +611,18 @@
     if (closeBtn) closeBtn.addEventListener('click', closeOverlay);
 
     // Click en backdrop (no en hijos) cierra. Botón cerrar del panel
-    // detalle se delega en el mismo listener (id estable en el DOM).
+    // detalle y botón "Ver plantilla" se delegan aquí (id/clase estable
+    // en el DOM, evita inline onclick + escape de apóstrofes en nameEn).
     overlay.addEventListener('click', function (e) {
       if (e.target && e.target.id === 'fc-globo-detail-close') {
         closeDetail();
+        return;
+      }
+      var plantillaBtn = e.target && e.target.closest && e.target.closest('.fc-globo-detail__btn-plantilla');
+      if (plantillaBtn) {
+        if (typeof window._globoNavPlantilla === 'function') {
+          window._globoNavPlantilla(plantillaBtn.dataset.nameEn || '');
+        }
         return;
       }
       if (e.target === overlay) closeOverlay();
@@ -579,6 +659,7 @@
       } catch (_) { /* defensivo */ }
       hideMsg(msg);
       renderFlagsLegend(window._globoInstance);
+      renderSedesLegend(window._globoInstance);
       return;
     }
 
@@ -587,6 +668,7 @@
       .then(function (g) {
         window._globoInstance = g;
         renderFlagsLegend(g);
+        renderSedesLegend(g);
       })
       .catch(function (err) {
         console.error('[globo] init error:', err);
@@ -602,6 +684,12 @@
     var flags = document.getElementById('fc-globo-flags');
     if (flags) {
       flags.querySelectorAll('.fc-globo-flag-btn.is-active').forEach(function (b) {
+        b.classList.remove('is-active');
+      });
+    }
+    var sedes = document.getElementById('fc-globo-sedes');
+    if (sedes) {
+      sedes.querySelectorAll('.fc-globo-sede-chip.is-active').forEach(function (b) {
         b.classList.remove('is-active');
       });
     }
@@ -622,6 +710,16 @@
       }
     });
     container.appendChild(cinta);
+  }
+
+  // Stub de navegación a la pantalla de plantilla (PR4 lo sobreescribirá
+  // con el módulo real). Se registra solo si nadie lo definió antes para
+  // no pisar una implementación futura cargada en otro orden.
+  if (!window._globoNavPlantilla) {
+    window._globoNavPlantilla = function (nameEn) {
+      console.log('[globo] navPlantilla →', nameEn, '(stub — PR4 pendiente)');
+      closeOverlay();
+    };
   }
 
   window._mountGloboCinta = _mountGloboCinta;
