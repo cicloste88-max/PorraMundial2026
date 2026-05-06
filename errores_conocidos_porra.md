@@ -589,3 +589,36 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** scroll-snap carousels con slots ≥80vw NO deben anidarse dentro de containers colapsables con padding interno. Modelo correcto: el carousel/expanded como hermano del header. Si necesitas hidden source elements (e.g. tarjetas editables que el modal extrae), pueden vivir dentro del card via `display: none !important` scoped, pero el carousel como sibling.
 - **Caso conocido:** Sprint B Grupos redesign — primera iteración (commits `26d2658` → `1d35651`) anidaba el carousel dentro de `.collap-body-inner`, refactorizada en `05f5dd4` a sibling pattern.
 - **Fecha detección:** 05 may 2026 (Sprint B Grupos redesign — root cause encontrada por San con DOM inspector tras varias iteraciones de fix superficiales).
+
+---
+
+## ERR-38 — globe.gl@2.33.0 · API surface clave (factory + controls + atmosphere)
+
+- **Síntoma:** `TypeError: X is not a function` o la app falla al inicializar el globo. Métodos alucinados por LLMs (DeepSeek caso documentado en intentos previos al PR#54): `graticuleLabels()`, `rendererConfig().chain()`, `autoRotate()`, `zoom()`, `minZoom()`, `maxZoom()`. Otra variante: `Globe is not a constructor` al invocar con `new Globe()`.
+- **Causa:** la API de `globe.gl@2.33.0` NO incluye esos métodos. La librería usa **factory pattern** (`Globe()` sin `new`) y expone los controles vía `globe.controls()` (devuelve la instancia de Three.js OrbitControls, sobre la que se setean propiedades — no hay setters fluent en el chain del globo). La atmósfera se configura con un color HEX puro; pasar `rgba(...)` con alpha rompe `THREE.Color`.
+- **Patrón correcto:**
+  ```js
+  // Factory + attach a un DOM node:
+  const globe = Globe();
+  globe(domNode);
+
+  // Configuración fluent del globo:
+  globe.atmosphereColor('#7eb6d8')   // HEX puro, NO rgba con alpha
+       .atmosphereAltitude(0.10)
+       .showGraticules(false);
+
+  // Controles via método separado:
+  const ctrl = globe.controls();
+  if (ctrl) {                         // defensivo: en algunas builds devuelve undefined
+    ctrl.autoRotate = true;
+    ctrl.autoRotateSpeed = 0.4;
+    ctrl.enableZoom = true;
+  }
+
+  // Cámara:
+  globe.pointOfView({ lat: 20, lng: 0, altitude: 4.2 });
+  ```
+- **Fix aplicado:** PR #54 (`8e6681c`, sprint Globo MVP) implementa `ui-globo-equipos.js` siguiendo el patrón canónico, validado contra `docs/globo-mundial-2026-REFERENCIA.html` que San curó con la API 2.33.0 ya verificada en su local.
+- **Patrón preventivo:** cuando una librería esté **pinneada** a una versión específica, leer la API en `unpkg.com/<lib>@<version>/` (browse del paquete tal cual fue publicado) o el README de esa versión exacta en GitHub releases. **NO fiarse del README del default branch** del repo de la librería: puede corresponder a una versión más reciente con APIs distintas o a un próximo major. Cuando un LLM inventa métodos, contrastar con el ejemplo canónico de la versión pinneada antes de implementar.
+- **Caso conocido:** dos sprints previos rotos (intentos pre-PR#54) por inventar `graticuleLabels()`, encadenar `rendererConfig().chain()`, llamar `globe.autoRotate(true)` (no existe — hay que ir vía `globe.controls()`). El HTML referencia que San subió a `docs/globo-mundial-2026-REFERENCIA.html` (commit `0edd40e`) sirve como fuente de verdad para la API 2.33.0.
+- **Fecha detección:** 06 may 2026 (Sprint Globo MVP — patrón cristalizado tras dos iteraciones rotas previas).

@@ -1532,3 +1532,25 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - docs/architecture.md: nueva sección "Pantallas y patrones de carrusel" documentando Fase Final + Grupos post-Sprint B + modal editable MOVE-original.
 - .claude/rules/frontend-css.md: añadidas notas sobre .container legacy + stale querySelector + scroll-snap sibling pattern.
 - Pre-commit hook validado: CLAUDE.md 10230 / 10240, CHANGELOG.md ~21KB / 30720.
+
+## 2026-05-06 · Sprint Globo MVP cerrado · PR #54
+
+- Branch: `claude/globo-mvp-setup-QqBiE` → squash-merge a `main` SHA `8e6681c` (`merged_at 2026-05-06T01:01:41Z`).
+- Sprint: cinta dorada en `page-grupos` + overlay full-screen con globo 3D selecciones Mundial 2026 (47 polígonos dorados — UK cubre England+Scotland — + 16 sedes blancas + tooltips on hover + autorotate con pause on interact).
+- Stack: `globe.gl@2.33.0` lazy-loaded desde `cdn.jsdelivr/npm/globe.gl@2.33.0` al primer click. GeoJSON Natural Earth 50m vía `cdn.jsdelivr/gh/nvkelso/natural-earth-vector` (cero ficheros de datos en repo).
+- Files: 2 nuevos (`public/js/ui-globo-equipos.js` 297 LoC + `public/css/components/globo-equipos.css` 220 LoC namespace `fc-globo-*`) + 3 modificados (`public/js/ui-groups.js` `+_ensureGloboCintaMount`, `index.html` `+1 link CSS`, `js/main-entry.js` `+1 loadScript`).
+- Commits del sprint:
+  - `1dfa393` MVP inicial (IIFE + paleta + ALIAS_NE 13 entradas + lazy-load + overlay lifecycle).
+  - `9ed9e25` altitude responsive mobile/desktop con resize handler que preserva zoom manual.
+  - `da6d796` 5 perf opts (revertido — afectaban apariencia).
+  - `f5f97e6` revert + zoom out preliminar 7.0/6.2.
+  - `0dea54f` tune final: zoom 5.0/4.2 + atmósfera 0.10 + pixelRatio cap 1.5 retina.
+- **Lecciones técnicas**:
+  - ERR-38 documentada (globe.gl@2.33.0 factory `Globe()` no `new`, `controls()` para autoRotate/zoom, atmosphere HEX puro). HTML referencia `docs/globo-mundial-2026-REFERENCIA.html` (commit `0edd40e`) como fuente de verdad para la API 2.33.0.
+  - Reverts limpios sin `git revert` (commit nuevo aplicando opuestos) → historial linear y squashable.
+  - Lazy-load on first click + fetch externo CDN para GeoJSON pesado (`~3 MB`) → cero impacto en bundle inicial y cero archivos de datos en repo.
+- **Roadmap próximas fases**:
+  - PR2: doble leyenda banderas + sedes debajo del globo, click navega con `globe.pointOfView()`.
+  - PR3: popups enriquecidos por país (entrenador, ranking FIFA, mundiales previos) y por sede (capacidad, año, dato destacado, partidos). Datos desde Wikipedia (CC BY-SA, sin antibot).
+  - PR4 (~junio 2026): screen plantilla con campo de fútbol + 11 titular + convocatoria + entrenador, cuando salgan squads reales.
+
