@@ -296,10 +296,10 @@
 }
 
 .fc-globo-flag-btn__img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  border-radius: 3px;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 50%;
   display: block;
 }
 
