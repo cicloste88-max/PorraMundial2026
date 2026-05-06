@@ -136,8 +136,14 @@
     GOLD:        '#e8b830',
     GOLD_STROKE: '#ffd866',
     GOLD_SIDE:   '#c89420',
-    ATMOS:       '#7eb6d8'
+    ATMOS:       '#7eb6d8',
+    SEL_CAP:     '#d93025',
+    SEL_STROK:   '#ff6b5b',
+    SEL_SIDE:    '#a01f16'
   };
+
+  // Estado: nombre NE del país actualmente resaltado en rojo (o null).
+  var _selectedNE = null;
 
   // ── HTML templates ──────────────────────────────────────────
   var CINTA_HTML =
@@ -195,6 +201,33 @@
     if (msgEl) msgEl.classList.add('is-hidden');
   }
 
+  // ── Highlight del país seleccionado ──────────────────────────
+  // Usa _selectedNE como nombre NE normalizado (post-ALIAS_NE) para que
+  // los polygon*Color callbacks puedan compararlo contra norm(f.properties.name).
+  function selectCountry(nameEn, globe) {
+    _selectedNE = nameEn ? (ALIAS_NE[nameEn] || nameEn) : null;
+    if (globe && typeof globe.polygonsData === 'function') {
+      globe.polygonsData(globe.polygonsData()); // fuerza re-render con nuevos colores
+    }
+  }
+
+  function resetCountry(globe) {
+    if (!_selectedNE) return;
+    _selectedNE = null;
+    if (globe && typeof globe.polygonsData === 'function') {
+      globe.polygonsData(globe.polygonsData());
+    }
+    var ctrl = (globe && typeof globe.controls === 'function') ? globe.controls() : null;
+    if (ctrl) ctrl.autoRotate = false;
+    var initialAlt = window.innerWidth < 768 ? 5.0 : 4.2;
+    if (globe && typeof globe.pointOfView === 'function') {
+      globe.pointOfView({ lat: 20, lng: 0, altitude: initialAlt }, 600);
+    }
+    setTimeout(function () {
+      if (ctrl) { ctrl.autoRotate = true; ctrl.autoRotateSpeed = 0.4; }
+    }, 1500);
+  }
+
   // ── Panel de detalle (país / sede) ───────────────────────────
   function openDetail(html) {
     var panel = document.getElementById('fc-globo-detail');
@@ -205,6 +238,7 @@
   }
 
   function closeDetail() {
+    resetCountry(window._globoInstance);
     var panel = document.getElementById('fc-globo-detail');
     if (panel) panel.classList.remove('is-open');
   }
@@ -355,6 +389,8 @@
       }, 3000);
 
       var wikiData = getWikiSel(nameEn);
+      // Resaltar polígono del país en rojo antes de abrir el panel.
+      selectCountry(nameEn, globe);
       // Usar btn.title como display porque el .fc-globo-flag-btn__name
       // ahora es display:none (post-polish). nameEn aliado para bio lookup.
       openDetail(renderPanelPais(wikiData, btn.title || name, getWikiKey(nameEn)));
@@ -555,10 +591,19 @@
             if (faltan.length) console.warn('[globo] Países en EQUIPOS sin polígono NE:', faltan);
 
             globe.polygonsData(feats)
-              .polygonCapColor(function (f) { return f.properties.esMundial ? COL.GOLD : COL.LAND; })
-              .polygonStrokeColor(function (f) { return f.properties.esMundial ? COL.GOLD_STROKE : COL.LAND_STROKE; })
+              .polygonCapColor(function (f) {
+                if (_selectedNE && norm(f.properties.name) === _selectedNE) return COL.SEL_CAP;
+                return f.properties.esMundial ? COL.GOLD : COL.LAND;
+              })
+              .polygonStrokeColor(function (f) {
+                if (_selectedNE && norm(f.properties.name) === _selectedNE) return COL.SEL_STROK;
+                return f.properties.esMundial ? COL.GOLD_STROKE : COL.LAND_STROKE;
+              })
               .polygonAltitude(function (f) { return f.properties.esMundial ? 0.022 : 0.006; })
-              .polygonSideColor(function (f) { return f.properties.esMundial ? COL.GOLD_SIDE : COL.LAND_SIDE; })
+              .polygonSideColor(function (f) {
+                if (_selectedNE && norm(f.properties.name) === _selectedNE) return COL.SEL_SIDE;
+                return f.properties.esMundial ? COL.GOLD_SIDE : COL.LAND_SIDE;
+              })
               .polygonLabel(function (f) {
                 var n = f.properties.name || '';
                 var b = f.properties.esMundial
@@ -584,6 +629,9 @@
                 var wikiData = getWikiSel(name);
                 // Ignorar países no clasificados sin datos wiki
                 if (!wikiData && !feat.properties.esMundial) return;
+                // Resaltar polígono en rojo. selectCountry normaliza el name
+                // vía ALIAS_NE igual que el comparator en polygon*Color.
+                selectCountry(name, globe);
                 // 3er arg = key WIKI canónica (alias resuelto) para que el
                 // bio lookup en WIKI_BIO funcione cuando el polígono NE
                 // (ej. "United Kingdom") difiere de la key WIKI ("England").
@@ -722,6 +770,7 @@
   }
 
   function closeOverlay() {
+    resetCountry(window._globoInstance);
     var overlay = document.getElementById('fc-globo-overlay');
     if (overlay) overlay.classList.remove('is-open');
     document.body.style.overflow = '';
