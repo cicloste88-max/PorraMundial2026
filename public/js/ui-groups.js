@@ -1165,6 +1165,38 @@ function _renderGruposCompactCard(match) {
 
 window._renderGruposCompactCard = _renderGruposCompactCard;
 
+// Refresca el header progress N/6 + state class de la card colapsable de un
+// grupo. Helper compartido entre el listener jcard:updated (close del modal
+// editable) y los flujos de simulación masiva en admin.js que NO pasan por
+// el modal (diceSimulateGroup, diceSimulateAllGroups). Disparar el evento
+// jcard:updated por cada partido en una simulación masiva sería 72×
+// re-renders de compact card + letterbar + tabla; este helper permite hacer
+// un refresh batch de O(grupos) en vez de O(partidos).
+function _refreshGrupoCardHeader(letra) {
+  if (!letra) return;
+  var cardSection = document.getElementById('grupo-card-' + letra);
+  if (!cardSection) return;
+  var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === letra; }) : [];
+  var done = partidos.filter(function (m) {
+    var p = (typeof predictions !== 'undefined') ? predictions[(typeof getMatchKey === 'function') ? getMatchKey(m) : null] : null;
+    return p && p.l != null && p.v != null;
+  }).length;
+  var total = partidos.length;
+  var stateClass = (done === total && total > 0) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
+  var bar = cardSection.querySelector('.fc-grupos-card__bar');
+  if (bar) {
+    bar.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+    bar.classList.add(stateClass);
+  }
+  var prog = cardSection.querySelector('.fc-grupos-card__progress');
+  if (prog) {
+    prog.classList.remove('is-completo', 'is-parcial', 'is-vacio');
+    prog.classList.add(stateClass);
+    prog.textContent = done + '/' + total;
+  }
+}
+window._refreshGrupoCardHeader = _refreshGrupoCardHeader;
+
 // Sprint B fix · al cerrar el modal editable, refrescar:
 //   1) compact card preview en el carrusel (estado/marcador del chip),
 //   2) chip count del letterbar (N/6),
@@ -1195,27 +1227,7 @@ if (!window._jcardUpdatedListenerRegistered) {
       renderGroupTableCard(match.group);
     }
     // 4) Header progress N/6 + state class del card colapsable
-    var cardSection = document.getElementById('grupo-card-' + match.group);
-    if (cardSection) {
-      var partidos = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.filter(function (m) { return m.group === match.group; }) : [];
-      var done = partidos.filter(function (m) {
-        var p = (typeof predictions !== 'undefined') ? predictions[(typeof getMatchKey === 'function') ? getMatchKey(m) : null] : null;
-        return p && p.l != null && p.v != null;
-      }).length;
-      var total = partidos.length;
-      var stateClass = (done === total && total > 0) ? 'is-completo' : (done > 0 ? 'is-parcial' : 'is-vacio');
-      var bar = cardSection.querySelector('.fc-grupos-card__bar');
-      if (bar) {
-        bar.classList.remove('is-completo', 'is-parcial', 'is-vacio');
-        bar.classList.add(stateClass);
-      }
-      var prog = cardSection.querySelector('.fc-grupos-card__progress');
-      if (prog) {
-        prog.classList.remove('is-completo', 'is-parcial', 'is-vacio');
-        prog.classList.add(stateClass);
-        prog.textContent = done + '/' + total;
-      }
-    }
+    _refreshGrupoCardHeader(match.group);
   });
 }
 

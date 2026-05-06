@@ -608,6 +608,10 @@ function diceSimulateGroup(letra) {
   const matches = PARTIDOS.filter(m=>m.group===letra);
   matches.forEach(m=>diceSimulateMatch(m));
   if(typeof renderGroupTableCard==='function') renderGroupTableCard(letra);
+  // Refresh batch del header de la card y del letterbar (jcard:updated NO
+  // se dispara aquí; disparar 6× sería re-render innecesario por partido).
+  if(typeof window._refreshGrupoCardHeader==='function') window._refreshGrupoCardHeader(letra);
+  if(typeof window._refreshGruposLetterBar==='function') window._refreshGruposLetterBar();
   savePredictions();
 }
 
@@ -617,6 +621,13 @@ function diceSimulateAllGroups() {
   if(!confirm('¿Simular aleatoriamente los 72 partidos de grupos que aún no están guardados?')) return;
   PARTIDOS.forEach(m=>diceSimulateMatch(m));
   GRUPOS.forEach(g=>{ if(typeof renderGroupTableCard==='function') renderGroupTableCard(g.letra); });
+  // Refresh batch del letterbar (1×) y de los 12 headers de cards. Disparar
+  // jcard:updated por partido sería 72× re-renders de compact card + letterbar
+  // + tabla; este batch es O(grupos) en vez de O(partidos).
+  if(typeof window._refreshGruposLetterBar==='function') window._refreshGruposLetterBar();
+  if(typeof window._refreshGrupoCardHeader==='function') {
+    GRUPOS.forEach(g=>window._refreshGrupoCardHeader(g.letra));
+  }
   // Guardar en Supabase — checkFinalizarReady se llama desde savePredictions tras confirmar
   savePredictions();
 }
