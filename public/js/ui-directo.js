@@ -307,7 +307,7 @@
       '<button class="' + classes + '" type="button" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<span class="dv2-mini-team">' +
-          '<span class="dv2-mini-flag">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</span>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
           '<span class="dv2-mini-code">' + hCode + '</span>' +
         '</span>' +
         '<span class="dv2-mini-score">' +
@@ -317,7 +317,7 @@
         '</span>' +
         '<span class="dv2-mini-team right">' +
           '<span class="dv2-mini-code">' + aCode + '</span>' +
-          '<span class="dv2-mini-flag">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</span>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
         '</span>' +
         '<span class="dv2-mini-right">' + rightHtml + '</span>' +
       '</button>'
@@ -424,7 +424,7 @@
         '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
         '<div class="dv2-exp-mid">' +
           '<div class="dv2-exp-team">' +
-            '<div class="dv2-exp-flag">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</div>' +
+            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (hTeam ? hTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
             '<div class="dv2-exp-team-name">' + m.home + '</div>' +
           '</div>' +
           '<div class="dv2-exp-score">' +
@@ -433,7 +433,7 @@
             '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
           '</div>' +
           '<div class="dv2-exp-team">' +
-            '<div class="dv2-exp-flag">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</div>' +
+            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (aTeam ? aTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
             '<div class="dv2-exp-team-name">' + m.away + '</div>' +
           '</div>' +
         '</div>' +
@@ -761,5 +761,16 @@
     if (newCard) existing.replaceWith(newCard);
   }
   window.updateDirectoCard = updateDirectoCard;
+
+  // ── Click delegado en banderas → abre pizarra táctica
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest && e.target.closest('.dv2-mini-flag-btn, .dv2-exp-flag-btn');
+    if (!btn || !btn.dataset.iso2) return;
+    if (typeof window.openPizarraTactica === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+      window.openPizarraTactica({ iso2: btn.dataset.iso2 });
+    }
+  });
 
 })();
