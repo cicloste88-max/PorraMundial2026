@@ -776,7 +776,12 @@ function _showJcardModal(matchKey, opts) {
     if (!standingsCard) return null;
     const slot = document.createElement('div');
     slot.className = 'jcard-modal-standings-slot';
-    slot.style.cssText = 'padding:16px;margin:0 auto;max-width:560px;box-sizing:border-box;width:100%;';
+    // Replicar el ancho que usan las tarjetas de partido (_placeIntoModal usa
+    // cardEl.offsetWidth - 5). Tomar wrapper.offsetWidth - 5 para mantener
+    // armonía visual entre slides 1-6 (cards) y slide 7 (standings).
+    const targetWidth = Math.max(0, wrapper.offsetWidth - 5);
+    slot.style.cssText =
+      'margin:0 auto;box-sizing:border-box;padding:0;width:' + targetWidth + 'px;';
     slot.appendChild(standingsCard);
     wrapper.appendChild(slot);
     currentTarget = slot;
