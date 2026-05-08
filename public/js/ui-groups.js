@@ -618,7 +618,7 @@ function _showJcardModal(matchKey, opts) {
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'margin:0 auto;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);' +
+    'margin:0 auto;width:min(360px, calc(100vw - 32px));max-height:calc(100vh - 32px);' +
     'overflow-x:hidden;overflow-y:auto;border-radius:16px;padding-bottom:24px;' +
     'position:relative;box-sizing:border-box;left:0;right:0;';
 
@@ -681,12 +681,16 @@ function _showJcardModal(matchKey, opts) {
   });
   if (currentIdx < 0) currentIdx = 0;
 
+  // Slide 7 (1-indexed): tabla de clasificación del grupo. Se monta como
+  // overlay transient sin restitución (currentAnchors=null en _placeStandingsIntoModal).
+  const totalSteps = matchList.length + 1;
+
   // Nav header (counter + arrows). Solo si hay >1 partido en el grupo.
   let navHeader = null;
   let prevBtn = null;
   let nextBtn = null;
   let counterEl = null;
-  if (matchList.length > 1) {
+  if (totalSteps > 1) {
     navHeader = document.createElement('div');
     navHeader.className = 'jcard-nav';
 
@@ -718,9 +722,16 @@ function _showJcardModal(matchKey, opts) {
   // Estado de la tarjeta actualmente en el modal.
   let currentTarget = null;
   let currentAnchors = null; // { parent, nextSibling, styleAttr, matchKey }
+  let lastCardWidth = null; // cacheo del offsetWidth de la última card colocada en el wrapper. Lo consume _placeStandingsIntoModal para mantener armonía visual con la slide standings.
 
   function _restoreCurrent() {
-    if (!currentAnchors || !currentTarget) return;
+    if (!currentTarget) return;
+    // Caso transient (slide standings): no hay restitución, solo remove.
+    if (currentAnchors === null) {
+      if (currentTarget.parentNode) currentTarget.parentNode.removeChild(currentTarget);
+      currentTarget = null;
+      return;
+    }
     const t = currentTarget;
     const a = currentAnchors;
     if (a.styleAttr === null) t.removeAttribute('style');
@@ -750,31 +761,59 @@ function _showJcardModal(matchKey, opts) {
     cardEl.style.left = '0';
     cardEl.style.right = '0';
     wrapper.appendChild(cardEl);
-    cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
+    cardEl.style.width = '100%';
     cardEl.style.margin = '0 auto';
+    lastCardWidth = cardEl.offsetWidth;
     currentTarget = cardEl;
     // Volver al top del wrapper en cada navegaci\u00f3n.
     wrapper.scrollTop = 0;
     return cardEl;
   }
 
+  function _placeStandingsIntoModal() {
+    if (typeof window._renderGruposStandings !== 'function') return null;
+    const letra = startMatch && startMatch.group;
+    if (!letra) return null;
+    const standingsCard = window._renderGruposStandings(letra);
+    if (!standingsCard) return null;
+    standingsCard.style.padding = '0';
+    standingsCard.style.width = '100%';
+    standingsCard.style.boxSizing = 'border-box';
+    const slot = document.createElement('div');
+    slot.className = 'jcard-modal-standings-slot';
+    slot.style.cssText =
+      'margin:0 auto;box-sizing:border-box;padding:0;width:100%;';
+    slot.appendChild(standingsCard);
+    wrapper.appendChild(slot);
+    currentTarget = slot;
+    currentAnchors = null;
+    wrapper.scrollTop = 0;
+    return slot;
+  }
+
   function _updateNavHeader() {
     if (!navHeader) return;
-    counterEl.textContent = (currentIdx + 1) + ' / ' + matchList.length;
+    counterEl.textContent = (currentIdx + 1) + ' / ' + totalSteps;
     if (currentIdx <= 0) prevBtn.setAttribute('aria-disabled', 'true');
     else prevBtn.removeAttribute('aria-disabled');
-    if (currentIdx >= matchList.length - 1) nextBtn.setAttribute('aria-disabled', 'true');
+    if (currentIdx >= totalSteps - 1) nextBtn.setAttribute('aria-disabled', 'true');
     else nextBtn.removeAttribute('aria-disabled');
   }
 
   function _navigateTo(idx) {
-    if (idx < 0 || idx >= matchList.length) return;
+    if (idx < 0 || idx >= totalSteps) return;
     if (idx === currentIdx && currentTarget) return;
     _restoreCurrent();
     currentIdx = idx;
-    const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
-    if (!newKey) return;
-    _placeIntoModal(newKey);
+    if (idx < matchList.length) {
+      // Slide partido (0..matchList.length-1)
+      const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
+      if (!newKey) return;
+      _placeIntoModal(newKey);
+    } else {
+      // Slide standings (idx === matchList.length)
+      _placeStandingsIntoModal();
+    }
     _updateNavHeader();
   }
 

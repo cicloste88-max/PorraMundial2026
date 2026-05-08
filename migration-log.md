@@ -1645,3 +1645,9 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.
 [11:25] PUSH: feat/flag-wrap-pizarra-wiring (createMatchCard flag click → openPizarraTactica). PR #62 abierto.
 [11:56] PUSH: hotfix z-index pizarra-tactica.css 9999→10050 (mismo branch PR #62).
+[12:14] PUSH: feat/standings-slide-jcard-modal (slot 7/7 con _renderGruposStandings en openJcardModal). PR #63 abierto.
+[12:27] PUSH: hotfix ancho slot standings ui-groups.js (alinear con cards partido). Mismo branch feat/standings-slide-jcard-modal.
+[12:35] PUSH: hotfix #2 lastCardWidth cache (revierte estimacion rota wrapper.offsetWidth en standings slot).
+[12:57] PUSH: hotfix #3 reset padding standingsCard ui-groups.js (ancho igual a card).
+[13:05] PUSH: hotfix #4 lastCardWidth sin -5 doble (card y standings idénticos a 338px).
+[13:12] PUSH: hotfix #5 standingsCard width:100 0nline (replica regla CSS .fc-grupos-slot--standings>* del outer carousel).
