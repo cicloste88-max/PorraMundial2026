@@ -681,12 +681,16 @@ function _showJcardModal(matchKey, opts) {
   });
   if (currentIdx < 0) currentIdx = 0;
 
+  // Slide 7 (1-indexed): tabla de clasificación del grupo. Se monta como
+  // overlay transient sin restitución (currentAnchors=null en _placeStandingsIntoModal).
+  const totalSteps = matchList.length + 1;
+
   // Nav header (counter + arrows). Solo si hay >1 partido en el grupo.
   let navHeader = null;
   let prevBtn = null;
   let nextBtn = null;
   let counterEl = null;
-  if (matchList.length > 1) {
+  if (totalSteps > 1) {
     navHeader = document.createElement('div');
     navHeader.className = 'jcard-nav';
 
@@ -720,7 +724,13 @@ function _showJcardModal(matchKey, opts) {
   let currentAnchors = null; // { parent, nextSibling, styleAttr, matchKey }
 
   function _restoreCurrent() {
-    if (!currentAnchors || !currentTarget) return;
+    if (!currentTarget) return;
+    // Caso transient (slide standings): no hay restitución, solo remove.
+    if (currentAnchors === null) {
+      if (currentTarget.parentNode) currentTarget.parentNode.removeChild(currentTarget);
+      currentTarget = null;
+      return;
+    }
     const t = currentTarget;
     const a = currentAnchors;
     if (a.styleAttr === null) t.removeAttribute('style');
@@ -758,23 +768,46 @@ function _showJcardModal(matchKey, opts) {
     return cardEl;
   }
 
+  function _placeStandingsIntoModal() {
+    if (typeof window._renderGruposStandings !== 'function') return null;
+    const letra = startMatch && startMatch.group;
+    if (!letra) return null;
+    const standingsCard = window._renderGruposStandings(letra);
+    if (!standingsCard) return null;
+    const slot = document.createElement('div');
+    slot.className = 'jcard-modal-standings-slot';
+    slot.style.cssText = 'padding:16px;margin:0 auto;max-width:560px;box-sizing:border-box;width:100%;';
+    slot.appendChild(standingsCard);
+    wrapper.appendChild(slot);
+    currentTarget = slot;
+    currentAnchors = null;
+    wrapper.scrollTop = 0;
+    return slot;
+  }
+
   function _updateNavHeader() {
     if (!navHeader) return;
-    counterEl.textContent = (currentIdx + 1) + ' / ' + matchList.length;
+    counterEl.textContent = (currentIdx + 1) + ' / ' + totalSteps;
     if (currentIdx <= 0) prevBtn.setAttribute('aria-disabled', 'true');
     else prevBtn.removeAttribute('aria-disabled');
-    if (currentIdx >= matchList.length - 1) nextBtn.setAttribute('aria-disabled', 'true');
+    if (currentIdx >= totalSteps - 1) nextBtn.setAttribute('aria-disabled', 'true');
     else nextBtn.removeAttribute('aria-disabled');
   }
 
   function _navigateTo(idx) {
-    if (idx < 0 || idx >= matchList.length) return;
+    if (idx < 0 || idx >= totalSteps) return;
     if (idx === currentIdx && currentTarget) return;
     _restoreCurrent();
     currentIdx = idx;
-    const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
-    if (!newKey) return;
-    _placeIntoModal(newKey);
+    if (idx < matchList.length) {
+      // Slide partido (0..matchList.length-1)
+      const newKey = (typeof getMatchKey === 'function') ? getMatchKey(matchList[idx]) : null;
+      if (!newKey) return;
+      _placeIntoModal(newKey);
+    } else {
+      // Slide standings (idx === matchList.length)
+      _placeStandingsIntoModal();
+    }
     _updateNavHeader();
   }
 
