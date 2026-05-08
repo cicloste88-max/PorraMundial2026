@@ -722,6 +722,7 @@ function _showJcardModal(matchKey, opts) {
   // Estado de la tarjeta actualmente en el modal.
   let currentTarget = null;
   let currentAnchors = null; // { parent, nextSibling, styleAttr, matchKey }
+  let lastCardWidth = null; // cacheo del offsetWidth de la última card colocada en el wrapper. Lo consume _placeStandingsIntoModal para mantener armonía visual con la slide standings.
 
   function _restoreCurrent() {
     if (!currentTarget) return;
@@ -762,6 +763,7 @@ function _showJcardModal(matchKey, opts) {
     wrapper.appendChild(cardEl);
     cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
     cardEl.style.margin = '0 auto';
+    lastCardWidth = cardEl.offsetWidth - 5;
     currentTarget = cardEl;
     // Volver al top del wrapper en cada navegaci\u00f3n.
     wrapper.scrollTop = 0;
@@ -776,10 +778,19 @@ function _showJcardModal(matchKey, opts) {
     if (!standingsCard) return null;
     const slot = document.createElement('div');
     slot.className = 'jcard-modal-standings-slot';
-    // Replicar el ancho que usan las tarjetas de partido (_placeIntoModal usa
-    // cardEl.offsetWidth - 5). Tomar wrapper.offsetWidth - 5 para mantener
-    // armonía visual entre slides 1-6 (cards) y slide 7 (standings).
-    const targetWidth = Math.max(0, wrapper.offsetWidth - 5);
+    // Usar el ancho cacheado de la última card mostrada (lastCardWidth set
+    // por _placeIntoModal). Garantiza armonía visual con slides 1-6.
+    // Fallbacks: si ninguna card se mostró aún, intentar con .card del DOM
+    // (grid hidden), luego viewport - margen, luego 320 absoluto.
+    let targetWidth = lastCardWidth;
+    if (!targetWidth || targetWidth < 200) {
+      const refCard = document.querySelector('.card');
+      if (refCard && refCard.offsetWidth > 200) {
+        targetWidth = refCard.offsetWidth - 5;
+      } else {
+        targetWidth = Math.min(window.innerWidth - 40, 540);
+      }
+    }
     slot.style.cssText =
       'margin:0 auto;box-sizing:border-box;padding:0;width:' + targetWidth + 'px;';
     slot.appendChild(standingsCard);
