@@ -771,7 +771,16 @@ function createMatchCard(match, idx) {
     ka.addEventListener('click', () => { /* TODO: shop link */ });
   });
   card.querySelectorAll('.flag-wrap').forEach(fw => {
-    fw.addEventListener('click', e => { e.stopPropagation(); /* TODO: team profile */ });
+    fw.addEventListener('click', e => {
+      e.stopPropagation();
+      if (typeof window.openPizarraTactica !== 'function') return;
+      const iso3 = fw.getAttribute('data-flag');
+      if (!iso3) return;
+      const half = fw.closest('.half');
+      const isHome = half && half.classList.contains('L');
+      const nameEn = isHome ? match.home : match.away;
+      window.openPizarraTactica({ iso3, nameEn });
+    });
   });
 
   // Hidrata la .ia-bar desde iaPredictions (bootstrap de auth.js); si aun no

@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 10050; /* Por encima de jcard-modal-overlay (9999) y de toasts (10000). La pizarra es modal full-screen invocado desde otros modales y debe quedar siempre encima. */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
