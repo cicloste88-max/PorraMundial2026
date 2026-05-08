@@ -662,3 +662,16 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** al migrar arquitectura UI legacy → nueva, hacer auditoría DOM completa con Chrome MCP de todos los paneles del componente origen (no solo el visible). Si un panel queda en `display:none` pero su lógica sigue ejecutándose, los outputs son fantasma. Validar visualmente cada caja del componente legacy antes de marcar la migración como completa.
 - **Fix aplicado:** commits `533ec15` en `claude/pizarra-tactica-modal-kmTEw`.
 - **Fecha detección:** 08 may 2026 (Sprint Cuadro Honor Restore — diagnóstico Chrome MCP).
+
+## ERR-43 — Leer GitHub Contents API desde rama incorrecta provoca patches inservibles
+
+- **Síntoma:** un patch de fix se aplica con éxito (commit + push) pero queda en una rama paralela (`claude/fix-empty-text-blocks-df3Nv`) que diverge de la rama de trabajo real (`feat/standings-slide-jcard-modal` con 12 commits + 6 hotfixes previos sobre el mismo bug). La rama paralela es inservible: nadie la consume, los hotfixes acumulados no están en ella, y al pullear desde la branch real aparece merge conflict + necesidad de rediagnóstico desde cero.
+- **Causa:** Claude.ai (o Code) leyó el fichero objetivo vía `mcp__github__get_file_contents` sin `?ref=<rama>`, lo que GitHub interpreta como `ref=main` por defecto. El diagnóstico se hizo sobre el snapshot de main (sin los 12 commits del feature branch), de modo que la "causa raíz" identificada y el patch propuesto no encajan con el código real que San tiene en localhost. Tampoco se preguntó a San qué rama tenía checkeada antes de empezar.
+- **Fix aplicado:**
+  1. SIEMPRE preguntar la rama actual a San al recibir un brief de patch antes de leer ficheros del repo. Si el brief no la menciona, usar `AskUserQuestion` con header "Rama actual" y opciones derivadas de `git ls-remote --heads origin claude/* feat/* feature/*`.
+  2. Pasar `?ref=<rama>` en TODA llamada `mcp__github__get_file_contents` cuando la rama de trabajo no es main. Sin el ref, los hashes y los snapshots leídos divergen del local de San y los Edit/Write se hacen sobre código stale.
+  3. Cuando se descubre la divergencia tarde (caso `claude/fix-empty-text-blocks-df3Nv`): borrar la rama remota (San lo hace por ERR-17) + borrar local (`git branch -D`) + `git checkout <rama-real>` + repetir diagnóstico con el código correcto.
+- **Patrón preventivo:** ANTES de cualquier `Read`/`Write`/`Edit` sobre ficheros del repo cuando la sesión empieza con un brief de fix, confirmar la rama de trabajo y verificar coincidencia entre `git rev-parse --abbrev-ref HEAD` y la rama mencionada en el brief. Si discrepan, hacer `git checkout <brief-branch>` antes de tocar nada. Documentado también en `.claude/rules/multi-agent-sync.md` §4 (detección de desincronía).
+- **Coste real:** merge conflict resolución + rediagnóstico Chrome MCP + 1 commit fantasma en main (`5e82e62`+`43593f5`) borrado del remoto + nueva rama de trabajo desde cero. ~30 min perdidos en una sesión donde el bug era fácil (3 ediciones mecánicas).
+- **Fix aplicado:** patch real en commit `754e00e` (rama `feat/standings-slide-jcard-modal`).
+- **Fecha detección:** 08 may 2026 (Sprint hotfix #7 modal Jcard Grupos width).

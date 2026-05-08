@@ -137,12 +137,13 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-40 | ESPN HTML inserta espacios tras vocales con tilde |
 | ERR-41 | Pill flex hijo en flex column hereda align-items:stretch |
 | ERR-42 | Cuadro Honor invisible tras F7.4-F (cajas 2+3 en `#view-cinematic` legacy) |
+| ERR-43 | GitHub Contents sin `?ref` → patches inservibles |
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..42 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..43 (síntoma/causa/fix/patrón).
 
 ## End-of-session protocol
 

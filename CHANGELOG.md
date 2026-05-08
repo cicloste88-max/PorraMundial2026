@@ -2,6 +2,20 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-08 — Hotfix #7 modal Jcard Grupos width (rama `feat/standings-slide-jcard-modal`)
+
+Commit `754e00e` cierra la cadena de 6 hotfixes previos sobre el bug visual del modal Jcard de clasificación en Grupos (slot 7/7 con `_renderGruposStandings` desalineado respecto a las 6 slides de partido). 3 cambios mecánicos en `public/js/ui-groups.js`:
+
+1. **wrapper** línea 621: `max-width:calc(100vw - 32px)` → `width:min(360px, calc(100vw - 32px))`. Ancla el modal al ancho del slot del carrusel inline (`.fc-grupos-slot--standings` `max-width:360px`) con fallback en pantallas <392 px.
+2. **`_placeIntoModal`** línea 764: `cardEl.style.width = (cardEl.offsetWidth - 5) + 'px'` → `cardEl.style.width = '100%'`. Elimina la medida arbitraria que congelaba ~574 px en desktop tras `wrapper.appendChild(cardEl)`. Cache `lastCardWidth = cardEl.offsetWidth` mantenido por seguridad.
+3. **`_placeStandingsIntoModal`** slot.style.cssText: `width:${targetWidth}px` → `width:100%`. Limpieza de dead code (8 líneas: cálculo `lastCardWidth` / `refCard` / `Math.min(window.innerWidth - 40, 540)`) sin consumidor tras fijar `width:100%`.
+
+NO TOCADO: línea 660 `clone.style.width` en rama no editable de `_showJcardModal` (read-only Jornada) — flujo distinto.
+
+**Validación visual queda PENDIENTE para próxima sesión** (San valida en localhost:5173 tras pull). Si encaja, PR #63 listo para review/merge.
+
+**Lección operativa**: ERR-43 documentado — el primer intento del fix se aplicó por error sobre main (rama paralela `claude/fix-empty-text-blocks-df3Nv` con commits `5e82e62`+`43593f5`) por leer GitHub Contents API sin `?ref=feat/standings-slide-jcard-modal`. La rama paralela ya borrada del remoto + local. Próximas sesiones: SIEMPRE preguntar rama actual antes de leer ficheros del repo.
+
 ## 2026-05-08 — Sprint Pizarra Táctica + Cuadro de Honor restore (rama `claude/pizarra-tactica-modal-kmTEw`)
 
 4 commits sobre `claude/pizarra-tactica-modal-kmTEw` (base `f6847ab` post-merge globo). HEAD `533ec15`. **Lista para PR a `main`** (squash-merge desde GitHub UI). Sprint dual: (1) modal "Pizarra Táctica" con ficha visual de selección (escudo + 11 tokens en formación + stats) abierto desde el Globo y desde tarjetas de partido en Directo; (2) restauración del Cuadro de Honor (cajas Campeón + Podio) bajo la fila Final del nuevo `fc-elim-list` (huérfano tras la migración F7.4-F al App Shell — ERR-42).

@@ -1651,3 +1651,11 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 [12:57] PUSH: hotfix #3 reset padding standingsCard ui-groups.js (ancho igual a card).
 [13:05] PUSH: hotfix #4 lastCardWidth sin -5 doble (card y standings idénticos a 338px).
 [13:12] PUSH: hotfix #5 standingsCard width:100 0nline (replica regla CSS .fc-grupos-slot--standings>* del outer carousel).
+[14:35] PUSH: feat/standings-slide-jcard-modal commit `754e00e` — fix definitivo modal Jcard Grupos width. 3 cambios mecánicos en `public/js/ui-groups.js` (#7 hotfix, sustituye lógica acumulada de 6 intentos previos):
+  - **A** wrapper línea 621: `max-width:calc(100vw - 32px)` → `width:min(360px, calc(100vw - 32px))`. Ancla el modal a 360 px (= ancho del slot del carrusel inline) con fallback a viewport-32 en pantallas <392 px.
+  - **B** `_placeIntoModal` línea 764: `cardEl.style.width = (cardEl.offsetWidth - 5) + 'px'` → `cardEl.style.width = '100%'`. Elimina la medida arbitraria que congelaba ~574 px en desktop tras el `wrapper.appendChild(cardEl)`. Línea siguiente `lastCardWidth = cardEl.offsetWidth` intacta (cache se mantiene por si futuros hotfixes lo necesitan).
+  - **C** `_placeStandingsIntoModal`: slot.style.cssText fijado a `width:100%` (antes: `width:${targetWidth}px`). Limpieza de dead code: bloque de cálculo `targetWidth` con fallback `lastCardWidth` / `refCard` / `Math.min(window.innerWidth - 40, 540)` eliminado completo (8 líneas) — sin consumidor tras fijar `width:100%`.
+  - NO TOCADO: línea 660 `clone.style.width = (clone.offsetWidth - 5) + 'px'` en rama no editable de `_showJcardModal` (read-only Jornada). Flujo distinto.
+  - **Validación visual queda PENDIENTE para próxima sesión** (San valida en localhost:5173 tras pull). Si el visual no encaja, próximo hotfix #8 sobre el mismo branch.
+[14:35] HOUSEKEEPING: borrada local `claude/fix-empty-text-blocks-df3Nv` (rama paralela inservible aplicada por error sobre main; ya borrada del remoto desde MCP por San). Sesión continúa desde `feat/standings-slide-jcard-modal` HEAD `754e00e`.
+[14:35] DOCS: ERR-43 documentado en `errores_conocidos_porra.md` + tabla-índice CLAUDE.md (lectura GitHub Contents API sin `?ref=<rama>` provoca patches sobre main inservibles cuando branch real es feature). CHANGELOG.md entry breve commit `754e00e` bajo sección 2026-05-08.
