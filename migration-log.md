@@ -1610,3 +1610,36 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
   - docs/architecture.md: nueva sub-sección "Globo de selecciones" en `## Pantallas y patrones de carrusel` con link a `docs/globo-mundial.md`.
 - Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.
 
+
+## 2026-05-08 · Sprint Pizarra Táctica + Cuadro de Honor restore · `claude/pizarra-tactica-modal-kmTEw` lista para PR
+
+- Branch: `claude/pizarra-tactica-modal-kmTEw` desde base `f6847ab` (post-merge globo) → 4 commits, HEAD `533ec15`. Pushed a origin, **lista para PR a `main`** (squash-merge desde GitHub UI por San).
+- Sprint dual: (1) modal "Pizarra Táctica" con ficha visual de selección (escudo + 11 tokens en formación + stats), abierto desde el Globo (botón "🏟 Ver plantilla") y desde tarjetas de partido en Directo (banderas clicables); (2) restauración del Cuadro de Honor (cajas 2 Campeón + 3 Podio) bajo la fila Final del nuevo `fc-elim-list`, huérfano tras la migración F7.4-F (ERR-42).
+- Files modificados:
+  - `public/js/ui-pizarra-tactica.js` (nuevo, 540 LOC) — entry point `window.openPizarraTactica({iso3|iso2|nameEn})`, mapping `NAME_EN_TO_ISO3` 48 selecciones, 12 formaciones en `FORMATION_COORDS`, cache `Map`, fetch a EF `get-squad` con JWT de `window._porraToken`, render mobile-first dark theme, listener tooltip en `buildOverlay()`. Hook `window._globoNavPlantilla = nameEn → openPizarraTactica` para el panel del Globo.
+  - `public/css/components/pizarra-tactica.css` (nuevo, 8.5 KB) — modal 380px dark `#1f2937`, banda bandera 130px con mask gradient 75%, escudo 80px drop-shadow, tokens 11.5% circulares con halo negro sólido en apellido, footer stats con `flex 1 1 0` + `justify-content:center`, `.fc-pizarra-stat-val-wrap` (position:relative + inline-flex), `.fc-pizarra-stat-info` button absoluto, `.fc-pizarra-stat-tooltip` con flecha CSS, `.dv2-mini/exp-flag-btn` reset.
+  - `public/js/ko.js` (+133 LOC) — nueva función `window.buildChampionPodium(matchFinal)` justo antes de `buildFinalSection` (no tocada). Resuelve campeón vía `koPredictions[finalMatchId]`, puestos 2/3/4 vía `BRACKET.third[0]`, helper `teamImg(name, size)` con badge → flag fallback. Devuelve `<div class="fc-champion-podium">` con caja 2 (gradient dorado + escudo + sub-banner FIFA WC 2026 / placeholder) y caja 3 (Podio 🥈/🥉/4️⃣ con escudos + nombres + labels) apiladas column gap 12px.
+  - `public/js/ui-elim-shell.js` (+11 LOC en `_renderList`) — tras `mount.appendChild(rowEl)` y bloque expanded, hook `if (r.key === 'final' && typeof window.buildChampionPodium === 'function')` que invoca con `BRACKET.final[0]` y appendea siempre (no condicional a expanded ni locked).
+  - `public/js/ui-directo.js` (4 cambios) — banderas en `_buildDMini` y `_buildDExpanded` convertidas de `<span>`/`<div>` a `<button>` con `data-iso2`; listener delegado al final del IIFE que invoca `window.openPizarraTactica({iso2: btn.dataset.iso2})` con `e.preventDefault() + stopPropagation()` para no disparar la expansión de la card.
+  - `index.html` (+1 line) — `<link>` a `pizarra-tactica.css` tras `globo-equipos.css`.
+  - `js/main-entry.js` (+1 line) — `loadScript('/js/ui-pizarra-tactica.js')` entre `ui-globo-equipos.js` y `ko.js`.
+- Commits del sprint (4 total, orden cronológico):
+  - `d34db7c` Base — modal completo + 4 patches mecánicos sobre `index.html`/`main-entry.js`/`ui-directo.js`. Files descargados de rama `handoff-pizarra` del propio repo vía MCP GitHub `get_file_contents` (network del sandbox bloquea Supabase Storage; raw GitHub bloqueado en repos privados).
+  - `02aed94` Hot-fix banda — 90→130px + mask 60→75% + título `#fff`+shadow → `#111827` plano + coach `rgba(255,255,255,.95)` → `#4b5563` + header `margin-top` -32→-50px (compensar banda).
+  - `5a3ddde` Dark mode + tooltip tap + stats — modal `#fff` → `#1f2937`, `.fc-pizarra-stat-val-wrap` para centrado correcto, `.stat-info` a button posicionado absoluto, `.fc-pizarra-stat-tooltip` con flecha pseudo, listener delegado tap-toggle 4s.
+  - `533ec15` Cuadro Honor restore — diagnóstico Chrome MCP reveló cajas 2+3 huérfanas en `#view-cinematic` legacy (`display:none`). Fix: nueva fn pública `window.buildChampionPodium` en `ko.js` + hook en `_renderList` ui-elim-shell.js.
+- Backend (sin cambios desde Code en esta sesión, ya en prod al iniciar el sprint):
+  - Tabla `public.squads` con 48 filas (`iso3`, `iso2`, `equipo`, `formacion`, `entrenador`, `stat_edad`, `stat_valor`, `stat_goles`, `color_ficha`, `color_portero`, `plantilla_completa`).
+  - Edge Function `get-squad` v4 ACTIVE — acepta `?iso3=XXX` o `?iso2=XX`, devuelve `TeamData` con jugadores serializados.
+  - Storage `miniatures/pizarra/campo.webp` (38 KB) + `miniatures/badges/{slug}.png` (43, faltan BIH/COD/CZE/IRQ/SWE) + `miniatures/flags/{ISO2}.png` (48) + `miniatures/flags-sm/{ISO2}.webp` (48 small 148×).
+- ERR documentados: **ERR-42** (Cuadro de Honor invisible tras F7.4-F).
+- Lecciones técnicas:
+  - Sandbox network: bloquea Supabase Storage (`Host not in allowlist`); raw GitHub bloqueado para repos privados (404). MCP GitHub `get_file_contents` autenticado es la única vía. Workflow: San sube assets a rama `handoff-pizarra`, Code los lee con MCP, escribe local, aplica patches, commit + push.
+  - Verificación byte-equivalence: comparar `wc -c` con tamaño esperado tras MCP-fetch + Write. Conversión `'—'` ↔ literal `'—'` (UTF-8 em-dash) genera 5 bytes diff por ocurrencia; restaurar con `python3` open('rb')/replace para paridad exacta.
+  - Documentación bugs vivos en main: ERR-42 introducido en F7.4-F (28 abr) detectado y cerrado en este sprint. Patrón: registrar incluso si se cierra en el mismo commit, para trazabilidad.
+- Cierre de sesión (este commit, branch `claude/pizarra-tactica-modal-kmTEw`):
+  - CLAUDE.md: Estado actual actualizado (sustituye refs a `feature/globo-pr2-pr3` por `claude/pizarra-tactica-modal-kmTEw`), table-índice ERR ampliada con ERR-42.
+  - CHANGELOG.md: nueva sección 2026-05-08 con tabla de 4 commits + funcionalidad consolidada (pizarra + cuadro honor) + iteraciones de UI + ERR + lecciones.
+  - errores_conocidos_porra.md: añadido ERR-42 con síntoma/causa/fix/patrón preventivo (Chrome MCP DOM inspection).
+  - migration-log.md: este bloque.
+- Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.

@@ -510,6 +510,17 @@
         });
         mount.appendChild(expEl);
       }
+
+      // ── Cuadro de honor: cajas 2 (campeón) y 3 (podio) bajo la fila Final ──
+      // Siempre visible una vez procesada la fila 'final', con cualquier estado
+      // (locked / expanded / collapsed / sin pronosticar).
+      if (r.key === 'final' && typeof window.buildChampionPodium === 'function') {
+        var finalMatch = (BRACKET.final && BRACKET.final[0]) ? BRACKET.final[0] : null;
+        if (finalMatch) {
+          var champPodium = window.buildChampionPodium(finalMatch);
+          if (champPodium) mount.appendChild(champPodium);
+        }
+      }
     }
   }
 

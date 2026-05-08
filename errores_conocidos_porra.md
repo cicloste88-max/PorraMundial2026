@@ -651,3 +651,14 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** cuando un hijo de flex column debe ajustar su ancho al contenido (típico en pills, badges, chips), aplicar `align-self: flex-start` en el hijo o `align-items: flex-start` en el padre. La 2ª opción afecta a TODOS los hijos; la 1ª es scoped al hijo concreto.
 - **Fix aplicado:** commit `6d058b2` en `feature/globo-pr2-pr3`.
 - **Fecha detección:** 06 may 2026 (Sprint Globo Polish v2 — al inspeccionar el panel en localhost).
+
+## ERR-42 — Cuadro de Honor invisible tras F7.4-F (cajas 2+3 huérfanas en `#view-cinematic` legacy)
+
+- **Síntoma:** en la pestaña Fase Final no aparecían el bloque Campeón ni el Podio (puestos 2/3/4) bajo la fila "F · Final". Caja 4 (Awards) sí estaba accesible vía botón "Premios" del header.
+- **Causa:** la migración F7.4-F al nuevo App Shell `fc-elim-list` solo trasladó la Caja 4 al nuevo `#fc-elim-awards-pane`. Las Cajas 2 (Campeón) y 3 (Podio) seguían siendo emitidas por `buildFinalSection` en `ko.js`, que rendea dentro de `#view-cinematic` (el panel legacy ahora con `display:none`, ancho/altura 0). Diagnosticado vía Chrome MCP DOM inspection: `panels[0]=view-cinematic` activo pero invisible; `row2` con `final-box4 + final-box3` existían pero no llegaban al usuario.
+- **Fix aplicado:**
+  1. Nueva función pública `window.buildChampionPodium(matchFinal)` en `ko.js` (insertada justo antes de `buildFinalSection` sin tocar la original) que devuelve un único bloque DOM con cajas 2+3 apiladas mobile-first.
+  2. Hook en `ui-elim-shell.js#_renderList`: tras procesar la fila `r.key === 'final'` invoca `window.buildChampionPodium(BRACKET.final[0])` y `appendChild` al mount, **siempre visible** (no condicional a expanded ni locked).
+- **Patrón preventivo:** al migrar arquitectura UI legacy → nueva, hacer auditoría DOM completa con Chrome MCP de todos los paneles del componente origen (no solo el visible). Si un panel queda en `display:none` pero su lógica sigue ejecutándose, los outputs son fantasma. Validar visualmente cada caja del componente legacy antes de marcar la migración como completa.
+- **Fix aplicado:** commits `533ec15` en `claude/pizarra-tactica-modal-kmTEw`.
+- **Fecha detección:** 08 may 2026 (Sprint Cuadro Honor Restore — diagnóstico Chrome MCP).

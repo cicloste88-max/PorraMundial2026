@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-`main` HEAD `ae8090f`. Rama **`feature/globo-pr2-pr3`** HEAD `6d058b2` (12 commits, lista para squash-merge desde GitHub UI). Sprint Globo MVP+Enrichment cerrado: cinta + overlay 3D + leyenda banderas Supabase + chips sedes + panel detalle dual (sport.es + ESPN) + highlight rojo país/sede + centroides override + tooltip cleanup + canvas flex. Detalle en `docs/globo-mundial.md`. Próximo: PR4 plantilla (campo + 11 titular) post squads reales + `update_ia_scorers` para `predictions.scorer`/`ko_predictions.scorer` (NULL en las 3 ligas).
+`main` HEAD `ae8090f`. Rama **`claude/pizarra-tactica-modal-kmTEw`** HEAD `533ec15` (4 commits, lista para PR a `main`). Rama paralela `feature/globo-pr2-pr3` HEAD `6d058b2` (12 commits, pendiente squash-merge). Sprints recientes: Globo Enrichment (panel dual sport.es+ESPN, highlight 3D — `docs/globo-mundial.md`) + Pizarra Táctica modal (12 formaciones, dark theme, EF `get-squad` v4 + tabla `squads` 48 filas) + Cuadro de Honor restore (cajas 2+3 bajo fila Final — ERR-42). Próximo: PR pizarra → main + squash-merge globo + `update_ia_scorers` (`predictions.scorer`/`ko_predictions.scorer` NULL).
 
 ## Top-3 pendientes inmediatos
 
@@ -17,12 +17,7 @@ Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr20
 
 ## Pendientes — Bugs UI
 
-1. Cinta superior tabs ronda incompleta en móvil (eliminatorias).
-2. Hora CEST en píldora `Grupo · Estadio` (ET→CEST = +6h en jun-jul).
-3. Auto-completar Pichichi torneo sumando goleadores seleccionados.
-4. Wiring final de frases IA para pronóstico signo partido.
-
-**Resueltos recientes**: Sprint A+B 04-may, Sprint B 05-may (Grupos redesign), Sprint Globo MVP+Enrichment 06-may (rama abierta). Ver `CHANGELOG.md`.
+1. Cinta tabs ronda incompleta móvil. 2. Hora CEST en píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA para pronóstico signo. Detalle: Top-3 #3 + `CHANGELOG.md`.
 
 ## Pendientes — Antes del 11 junio 2026
 
@@ -141,12 +136,13 @@ Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
 | ERR-39 | ESPN regex non-greedy trunca frases con comillas anidadas |
 | ERR-40 | ESPN HTML inserta espacios tras vocales con tilde |
 | ERR-41 | Pill flex hijo en flex column hereda align-items:stretch |
+| ERR-42 | Cuadro Honor invisible tras F7.4-F (cajas 2+3 en `#view-cinematic` legacy) |
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..41 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..42 (síntoma/causa/fix/patrón).
 
 ## End-of-session protocol
 

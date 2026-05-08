@@ -1,0 +1,375 @@
+/* public/css/components/pizarra-tactica.css
+ *
+ * Estilos del modal "Pizarra Táctica".
+ * Mobile-first 375×840. Modal centrado con backdrop semi-transparente.
+ * El campo es 1:1.5 (vertical) con tokens absolutos en %.
+ * ───────────────────────────────────────────────────────────────────── */
+
+.fc-pizarra-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.fc-pizarra-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fc-pizarra-modal {
+  position: relative;
+  width: min(380px, 92vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #1f2937;
+  border-radius: 18px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  /* iOS safe-area */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.fc-pizarra-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1f2937;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.fc-pizarra-close:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+
+.fc-pizarra-content {
+  min-height: 200px;
+}
+
+.fc-pizarra-loading,
+.fc-pizarra-error {
+  padding: 60px 20px;
+  text-align: center;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.fc-pizarra-error-detail {
+  margin-top: 8px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: #9ca3af;
+}
+
+/* ─── Card layout ─────────────────────────────────────────────────────── */
+.fc-pizarra-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Banda superior con bandera + degradado destination-out */
+.fc-pizarra-flag-band {
+  position: relative;
+  height: 130px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  /* Degradado fade hacia abajo */
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+}
+
+/* HEADER (escudo + nombre + entrenador + formación) */
+.fc-pizarra-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  margin-top: -50px;        /* solapado sobre zona aún coloreada de la banda */
+  position: relative;
+  z-index: 2;
+}
+
+.fc-pizarra-badge {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
+  flex-shrink: 0;
+}
+
+.fc-pizarra-badge--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 24px;
+  color: #4b5563;
+  border: 2px solid #e5e7eb;
+}
+
+.fc-pizarra-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.fc-pizarra-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin: 0;
+  color: #fff;
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-pizarra-coach {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: #cbd5e1;
+}
+
+.fc-pizarra-form-pill {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* ─── Campo de fútbol ────────────────────────────────────────────────── */
+.fc-pizarra-field {
+  position: relative;
+  margin: 10px 12px 0;
+  aspect-ratio: 2 / 3;       /* 0.666… vertical */
+  background-size: cover;
+  background-position: center;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Token: ficha circular del jugador con número y apellido */
+.fc-pizarra-token {
+  position: absolute;
+  width: 11.5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  cursor: default;            /* sprint posterior: cursor:pointer + onclick */
+}
+
+.fc-pizarra-token-num {
+  pointer-events: none;
+}
+
+.fc-pizarra-token-name {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  font-size: 10px;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0 -2px 0 #000,
+     0  2px 0 #000,
+    -2px 0 0 #000,
+     2px 0 0 #000;
+  pointer-events: none;
+}
+
+/* ─── Footer stats ───────────────────────────────────────────────────── */
+.fc-pizarra-stats {
+  display: flex;
+  align-items: stretch;
+  margin: 12px 12px 0;
+  padding: 10px 0;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.fc-pizarra-stat {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 8px;
+  min-width: 0;
+  text-align: center;
+}
+
+.fc-pizarra-stat-lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 500;
+  text-align: center;
+}
+
+.fc-pizarra-stat-val-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fc-pizarra-stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fc-pizarra-stat-info {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+  font-style: italic;
+  font-weight: 700;
+  font-family: serif;
+  color: #1f2937;
+  background: #94a3b8;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.fc-pizarra-stat-info:hover,
+.fc-pizarra-stat-info:focus-visible {
+  background: #cbd5e1;
+  outline: none;
+}
+
+.fc-pizarra-stat-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 5;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+}
+
+.fc-pizarra-stat-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #0f172a;
+}
+
+.fc-pizarra-stat-sep {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  align-self: stretch;
+  margin: 0 2px;
+}
+
+/* ─── Footnote ───────────────────────────────────────────────────────── */
+.fc-pizarra-footnote {
+  margin: 10px 16px 14px;
+  font-size: 10px;
+  color: #64748b;
+  text-align: center;
+  font-style: italic;
+}
+
+/* ─── Botón bandera clickable en tarjeta de partido (nuevo) ─────────── */
+.dv2-mini-flag-btn,
+.dv2-exp-flag-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dv2-mini-flag-btn:active,
+.dv2-exp-flag-btn:active {
+  transform: scale(0.92);
+  transition: transform 0.1s ease;
+}
+
+.dv2-mini-flag-btn:focus-visible,
+.dv2-exp-flag-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
