@@ -618,7 +618,7 @@ function _showJcardModal(matchKey, opts) {
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText =
-    'margin:0 auto;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);' +
+    'margin:0 auto;width:min(360px, calc(100vw - 32px));max-height:calc(100vh - 32px);' +
     'overflow-x:hidden;overflow-y:auto;border-radius:16px;padding-bottom:24px;' +
     'position:relative;box-sizing:border-box;left:0;right:0;';
 
@@ -761,7 +761,7 @@ function _showJcardModal(matchKey, opts) {
     cardEl.style.left = '0';
     cardEl.style.right = '0';
     wrapper.appendChild(cardEl);
-    cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
+    cardEl.style.width = '100%';
     cardEl.style.margin = '0 auto';
     lastCardWidth = cardEl.offsetWidth;
     currentTarget = cardEl;
@@ -781,21 +781,8 @@ function _showJcardModal(matchKey, opts) {
     standingsCard.style.boxSizing = 'border-box';
     const slot = document.createElement('div');
     slot.className = 'jcard-modal-standings-slot';
-    // Usar el ancho cacheado de la última card mostrada (lastCardWidth set
-    // por _placeIntoModal). Garantiza armonía visual con slides 1-6.
-    // Fallbacks: si ninguna card se mostró aún, intentar con .card del DOM
-    // (grid hidden), luego viewport - margen, luego 320 absoluto.
-    let targetWidth = lastCardWidth;
-    if (!targetWidth || targetWidth < 200) {
-      const refCard = document.querySelector('.card');
-      if (refCard && refCard.offsetWidth > 200) {
-        targetWidth = refCard.offsetWidth - 5;
-      } else {
-        targetWidth = Math.min(window.innerWidth - 40, 540);
-      }
-    }
     slot.style.cssText =
-      'margin:0 auto;box-sizing:border-box;padding:0;width:' + targetWidth + 'px;';
+      'margin:0 auto;box-sizing:border-box;padding:0;width:100%;';
     slot.appendChild(standingsCard);
     wrapper.appendChild(slot);
     currentTarget = slot;
