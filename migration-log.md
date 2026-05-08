@@ -1643,3 +1643,4 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
   - errores_conocidos_porra.md: añadido ERR-42 con síntoma/causa/fix/patrón preventivo (Chrome MCP DOM inspection).
   - migration-log.md: este bloque.
 - Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.
+[11:25] PUSH: feat/flag-wrap-pizarra-wiring (createMatchCard flag click → openPizarraTactica). PR #62 abierto.
