@@ -1645,3 +1645,4 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - Pre-commit hook validado: tamaños CLAUDE.md / CHANGELOG.md dentro de límites.
 [11:25] PUSH: feat/flag-wrap-pizarra-wiring (createMatchCard flag click → openPizarraTactica). PR #62 abierto.
 [11:56] PUSH: hotfix z-index pizarra-tactica.css 9999→10050 (mismo branch PR #62).
+[12:14] PUSH: feat/standings-slide-jcard-modal (slot 7/7 con _renderGruposStandings en openJcardModal). PR #63 abierto.
