@@ -28,9 +28,9 @@
   width: min(380px, 92vw);
   max-height: 92vh;
   overflow-y: auto;
-  background: #fff;
+  background: #1f2937;
   border-radius: 18px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
   /* iOS safe-area */
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -68,7 +68,7 @@
 .fc-pizarra-error {
   padding: 60px 20px;
   text-align: center;
-  color: #6b7280;
+  color: #cbd5e1;
   font-size: 14px;
 }
 
@@ -139,7 +139,7 @@
   font-size: 26px;
   font-weight: 900;
   margin: 0;
-  color: #111827;
+  color: #fff;
   line-height: 1.05;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -149,8 +149,7 @@
   margin: 4px 0 0;
   font-size: 13px;
   font-style: italic;
-  color: #4b5563;
-  /* Sin text-shadow: el entrenador cae sobre fondo blanco tras el fade */
+  color: #cbd5e1;
 }
 
 .fc-pizarra-form-pill {
@@ -229,58 +228,113 @@
   align-items: stretch;
   margin: 12px 12px 0;
   padding: 10px 0;
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 10px;
 }
 
 .fc-pizarra-stat {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   padding: 0 8px;
   min-width: 0;
+  text-align: center;
 }
 
 .fc-pizarra-stat-lbl {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #6b7280;
+  color: #94a3b8;
   font-weight: 500;
+  text-align: center;
+}
+
+.fc-pizarra-stat-val-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .fc-pizarra-stat-val {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: #fff;
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
 }
 
 .fc-pizarra-stat-info {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 14px;
   height: 14px;
-  margin-left: 4px;
   font-size: 9px;
   font-style: italic;
   font-weight: 700;
   font-family: serif;
-  color: #fff;
-  background: #9ca3af;
+  color: #1f2937;
+  background: #94a3b8;
+  border: 0;
   border-radius: 50%;
-  vertical-align: middle;
-  cursor: help;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.fc-pizarra-stat-info:hover,
+.fc-pizarra-stat-info:focus-visible {
+  background: #cbd5e1;
+  outline: none;
+}
+
+.fc-pizarra-stat-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 5;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+}
+
+.fc-pizarra-stat-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #0f172a;
 }
 
 .fc-pizarra-stat-sep {
   width: 1px;
-  background: #e5e7eb;
+  background: rgba(255, 255, 255, 0.1);
   align-self: stretch;
   margin: 0 2px;
 }
@@ -289,7 +343,7 @@
 .fc-pizarra-footnote {
   margin: 10px 16px 14px;
   font-size: 10px;
-  color: #9ca3af;
+  color: #64748b;
   text-align: center;
   font-style: italic;
 }

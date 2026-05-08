@@ -212,6 +212,31 @@
         closePizarra();
       }
     });
+
+    // Tooltip toggle al tap en .fc-pizarra-stat-info
+    overlay.addEventListener('click', function (e) {
+      const btn = e.target.closest && e.target.closest('.fc-pizarra-stat-info');
+      // Si hay un tooltip abierto y se clickó en otro sitio → cerrarlo
+      const existing = overlay.querySelector('.fc-pizarra-stat-tooltip');
+      if (existing) existing.remove();
+
+      if (!btn) return;
+      e.stopPropagation();
+      const txt = btn.getAttribute('data-tooltip');
+      if (!txt) return;
+
+      const tip = document.createElement('div');
+      tip.className = 'fc-pizarra-stat-tooltip';
+      tip.textContent = txt;
+      // Insertar como hermano del icono dentro del wrap
+      btn.parentElement.appendChild(tip);
+
+      // Auto-cerrar tras 4 segundos
+      setTimeout(function () {
+        if (tip.parentElement) tip.remove();
+      }, 4000);
+    });
+
     return overlay;
   }
 
@@ -234,7 +259,7 @@
       const isGK = j.posicion === 'PO';
       const bg = isGK ? fichaPo : ficha;
       const textColor = (isLight && !isGK) ? '#111827' : '#ffffff';
-      const isPlaceholder = j.nombre === '—' || j.nombre === '—';
+      const isPlaceholder = j.nombre === '—' || j.nombre === '\u2014';
       const apellido = isPlaceholder
         ? j.posicion
         : j.nombre.split(' ').slice(-1)[0];
@@ -254,9 +279,14 @@
       : '<div class="fc-pizarra-badge fc-pizarra-badge--placeholder">' + team.iso3 + '</div>';
 
     const stats = team.stats || {};
+    const golesPeriodo = (stats.goles_periodo || '').replace(/"/g, '&quot;');
     const golesLine = stats.goles != null
-      ? '<span class="fc-pizarra-stat-val">' + fmtNumberEs(stats.goles) + '</span>' +
-        '<span class="fc-pizarra-stat-info" title="' + (stats.goles_periodo || '') + '">i</span>'
+      ? '<span class="fc-pizarra-stat-val-wrap">' +
+          '<span class="fc-pizarra-stat-val">' + fmtNumberEs(stats.goles) + '</span>' +
+          '<button type="button" class="fc-pizarra-stat-info" ' +
+                  'data-tooltip="Media de goles por partido ' + golesPeriodo + '. Una vez se anuncien los partidos disputados a posteriori, este dato se actualizará."' +
+                  ' aria-label="Información sobre el cálculo">i</button>' +
+        '</span>'
       : '<span class="fc-pizarra-stat-val">—</span>';
 
     return (
@@ -283,12 +313,16 @@
         '<div class="fc-pizarra-stats">' +
           '<div class="fc-pizarra-stat">' +
             '<span class="fc-pizarra-stat-lbl">Edad media</span>' +
-            '<span class="fc-pizarra-stat-val">' + fmtNumberEs(stats.edad) + '</span>' +
+            '<span class="fc-pizarra-stat-val-wrap">' +
+              '<span class="fc-pizarra-stat-val">' + fmtNumberEs(stats.edad) + '</span>' +
+            '</span>' +
           '</div>' +
           '<div class="fc-pizarra-stat-sep"></div>' +
           '<div class="fc-pizarra-stat">' +
             '<span class="fc-pizarra-stat-lbl">Valor plantilla</span>' +
-            '<span class="fc-pizarra-stat-val">' + (stats.valor || '—') + '</span>' +
+            '<span class="fc-pizarra-stat-val-wrap">' +
+              '<span class="fc-pizarra-stat-val">' + (stats.valor || '—') + '</span>' +
+            '</span>' +
           '</div>' +
           '<div class="fc-pizarra-stat-sep"></div>' +
           '<div class="fc-pizarra-stat">' +
