@@ -763,7 +763,7 @@ function _showJcardModal(matchKey, opts) {
     wrapper.appendChild(cardEl);
     cardEl.style.width = (cardEl.offsetWidth - 5) + 'px';
     cardEl.style.margin = '0 auto';
-    lastCardWidth = cardEl.offsetWidth - 5;
+    lastCardWidth = cardEl.offsetWidth;
     currentTarget = cardEl;
     // Volver al top del wrapper en cada navegaci\u00f3n.
     wrapper.scrollTop = 0;
