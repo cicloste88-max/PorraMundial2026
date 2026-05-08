@@ -1649,3 +1649,4 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 [12:27] PUSH: hotfix ancho slot standings ui-groups.js (alinear con cards partido). Mismo branch feat/standings-slide-jcard-modal.
 [12:35] PUSH: hotfix #2 lastCardWidth cache (revierte estimacion rota wrapper.offsetWidth en standings slot).
 [12:57] PUSH: hotfix #3 reset padding standingsCard ui-groups.js (ancho igual a card).
+[13:05] PUSH: hotfix #4 lastCardWidth sin -5 doble (card y standings idénticos a 338px).
