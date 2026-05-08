@@ -658,6 +658,139 @@ function buildChampionCard(winnerTeam) {
   `;
 }
 
+// ─────────────────────────────────────────────────────────────
+// buildChampionPodium(matchFinal) — Cajas 2 (Campeón) + 3 (Podio)
+// Versión mobile-first apilada para usar bajo la fila Final del nuevo
+// fc-elim-list (F7.4-F restore). Reemplaza visualmente lo que antes
+// rendía buildFinalSection completa en #view-cinematic (legacy).
+// ─────────────────────────────────────────────────────────────
+function buildChampionPodium(matchFinal) {
+  if (!matchFinal) return null;
+  if (typeof EQUIPOS !== 'object' || typeof BRACKET !== 'object') return null;
+
+  // Resolver nombres reales de equipos
+  const hName = (typeof resolvedSlots === 'object') ? resolvedSlots[matchFinal.home] : null;
+  const aName = (typeof resolvedSlots === 'object') ? resolvedSlots[matchFinal.away] : null;
+  const finalPred = (typeof koPredictions === 'object')
+    ? (koPredictions[matchFinal.id] || koPredictions[String(matchFinal.id)] || {})
+    : {};
+
+  // Campeón
+  let champName = null;
+  if (finalPred.saved && finalPred.l !== null && finalPred.l !== undefined) {
+    if (finalPred.l > finalPred.v)        champName = hName;
+    else if (finalPred.v > finalPred.l)   champName = aName;
+    else if (finalPred.classifier)        champName = finalPred.classifier;
+  }
+  const champTeam = champName ? EQUIPOS.find(e => e.name === champName) : null;
+
+  // Puestos 2/3/4
+  const thirdMatch = BRACKET.third && BRACKET.third[0];
+  const thirdPred = thirdMatch && (typeof koPredictions === 'object')
+    ? (koPredictions[thirdMatch.id] || koPredictions[String(thirdMatch.id)] || {})
+    : {};
+  let pos2 = null, pos3 = null, pos4 = null;
+  if (champName) pos2 = (champName === hName) ? aName : hName;
+  if (thirdMatch && thirdPred.saved && thirdPred.l !== null && thirdPred.l !== undefined) {
+    const t3h = resolvedSlots[thirdMatch.home];
+    const t3a = resolvedSlots[thirdMatch.away];
+    if (thirdPred.l > thirdPred.v)        { pos3 = t3h; pos4 = t3a; }
+    else if (thirdPred.v > thirdPred.l)   { pos3 = t3a; pos4 = t3h; }
+    else if (thirdPred.classifier)        { pos3 = thirdPred.classifier; pos4 = (thirdPred.classifier === t3h) ? t3a : t3h; }
+  }
+
+  // Helper escudo con fallback a bandera
+  function teamImg(name, size = 36) {
+    if (!name) return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#27272a;border:1px solid #3a3a3e"></div>`;
+    const team = EQUIPOS.find(e => e.name === name);
+    if (!team) return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#27272a;border:1px solid #3a3a3e"></div>`;
+    const badge = (typeof getBadgeUrl === 'function') ? getBadgeUrl(team.slug) : null;
+    const flag = `${SB}/flags/${team.flag}.png`;
+    const src = badge || flag;
+    const style = badge
+      ? `width:${size}px;height:${size}px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))`
+      : `width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0`;
+    return `<img src="${src}" style="${style}" onerror="this.src='${flag}'">`;
+  }
+
+  // Wrapper outer mobile-first apilado
+  const outer = document.createElement('div');
+  outer.className = 'fc-champion-podium';
+  outer.style.cssText = 'display:flex;flex-direction:column;gap:12px;margin:14px 16px 6px';
+
+  // ─ Caja 2: Campeón ─
+  const box2 = document.createElement('div');
+  box2.className = 'fc-champion-box';
+  box2.style.cssText = `
+    border-radius:16px;
+    background:linear-gradient(135deg,#0a1628 0%,#111d38 40%,#1c1200 100%);
+    border:1.5px solid rgba(250,204,21,.35);
+    padding:18px 20px;display:flex;align-items:center;gap:16px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    position:relative;overflow:hidden;
+  `.replace(/\s+/g, ' ');
+
+  if (champTeam || champName) {
+    const badge = champTeam ? (typeof getBadgeUrl === 'function' ? getBadgeUrl(champTeam.slug) : null) : null;
+    const flag = champTeam ? `${SB}/flags/${champTeam.flag}.png` : '';
+    const imgSrc = badge || flag;
+    box2.innerHTML = `
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 25% 50%,rgba(250,204,21,.06),transparent 65%);pointer-events:none"></div>
+      <img src="${WORLD_CUP_LOGO}" style="width:48px;height:auto;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))" onerror="this.style.display='none'">
+      <div style="width:1px;height:60px;background:linear-gradient(180deg,transparent,rgba(250,204,21,.3) 50%,transparent);flex-shrink:0"></div>
+      ${imgSrc ? `<div style="position:relative;flex-shrink:0">
+        <div style="position:absolute;inset:-8px;border-radius:50%;background:radial-gradient(circle,rgba(250,204,21,.1),transparent 70%);animation:goldPulse 2.5s ease-in-out infinite"></div>
+        <img src="${imgSrc}" style="width:64px;height:64px;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,.6))" onerror="this.src='${flag}'">
+      </div>` : ''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:8px;font-weight:800;color:rgba(250,204,21,.6);text-transform:uppercase;letter-spacing:.16em;margin-bottom:5px">🏆 Campeón del Mundo</div>
+        <div style="font-family:'Inter Tight',sans-serif;font-size:22px;font-weight:900;color:#fef9c3;letter-spacing:-.02em;line-height:1;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${champName}</div>
+        <div style="font-size:10px;color:rgba(250,204,21,.4);font-style:italic">FIFA World Cup 2026</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:2px">19 jul · MetLife Stadium, Nueva York</div>
+      </div>
+    `;
+  } else {
+    box2.innerHTML = `
+      <div style="text-align:center;width:100%;padding:6px 0">
+        <img src="${WORLD_CUP_LOGO}" style="width:48px;height:auto;opacity:.35;margin-bottom:8px" onerror="this.style.display='none'">
+        <div style="font-size:11px;color:#4b5563">Pronostica la final para ver el campeón</div>
+      </div>`;
+  }
+  outer.appendChild(box2);
+
+  // ─ Caja 3: Clasificación Final — Podio ─
+  const box3 = document.createElement('div');
+  box3.className = 'fc-podium-box';
+  box3.style.cssText = 'border-radius:16px;border:1px solid #27272a;padding:14px 18px;background:var(--card)';
+
+  const podioItems = [
+    { medal: '🥈', label: '2.º Clasificado', name: pos2, size: 40 },
+    { medal: '🥉', label: '3.er Clasificado', name: pos3, size: 36 },
+    { medal: '4️⃣', label: '4.º Clasificado', name: pos4, size: 32 },
+  ];
+
+  box3.innerHTML = `
+    <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">Clasificación Final</div>
+    ${podioItems.map((item, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:${i === 0 ? '10px 0' : '8px 0'};${i < 2 ? 'border-bottom:1px solid #27272a;' : ''}">
+        <div style="font-size:${[36, 30, 26][i]}px;line-height:1;flex-shrink:0;width:38px;text-align:center">${item.medal}</div>
+        <div style="flex-shrink:0">${teamImg(item.name, item.size)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Inter Tight',sans-serif;font-size:${[16, 14, 12][i]}px;font-weight:${[900, 700, 600][i]};color:${['#fff', '#d1d5db', '#9ca3af'][i]};line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name || '—'}</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:2px">${item.label}</div>
+        </div>
+      </div>`).join('')}
+  `;
+  outer.appendChild(box3);
+
+  return outer;
+}
+
+// Exponer en window para uso desde ui-elim-shell
+if (typeof window !== 'undefined') {
+  window.buildChampionPodium = buildChampionPodium;
+}
+
 function buildFinalSection(match) {
   // Resolver equipos
   const hTeam  = getTeamForSlot(match.home);
