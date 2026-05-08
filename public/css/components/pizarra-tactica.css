@@ -88,15 +88,15 @@
 /* Banda superior con bandera + degradado destination-out */
 .fc-pizarra-flag-band {
   position: relative;
-  height: 90px;
+  height: 130px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
   /* Degradado fade hacia abajo */
-  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
-          mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 75%, transparent 100%);
 }
 
 /* HEADER (escudo + nombre + entrenador + formación) */
@@ -105,7 +105,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  margin-top: -32px;        /* solapado con la banda */
+  margin-top: -50px;        /* solapado sobre zona aún coloreada de la banda */
   position: relative;
   z-index: 2;
 }
@@ -139,8 +139,7 @@
   font-size: 26px;
   font-weight: 900;
   margin: 0;
-  color: #fff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+  color: #111827;
   line-height: 1.05;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -150,8 +149,8 @@
   margin: 4px 0 0;
   font-size: 13px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  color: #4b5563;
+  /* Sin text-shadow: el entrenador cae sobre fondo blanco tras el fade */
 }
 
 .fc-pizarra-form-pill {
