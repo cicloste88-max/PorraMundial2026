@@ -777,6 +777,8 @@ function _showJcardModal(matchKey, opts) {
     const standingsCard = window._renderGruposStandings(letra);
     if (!standingsCard) return null;
     standingsCard.style.padding = '0';
+    standingsCard.style.width = '100%';
+    standingsCard.style.boxSizing = 'border-box';
     const slot = document.createElement('div');
     slot.className = 'jcard-modal-standings-slot';
     // Usar el ancho cacheado de la última card mostrada (lastCardWidth set
