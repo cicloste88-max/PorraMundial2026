@@ -126,6 +126,40 @@ CREATE TABLE ia_predictions (
 
 Tabla complementaria (Fase E). Garantiza que la snapshot congelada el 11 jun 00:00 UTC es inmutable durante el torneo. Schema canónico en la migración de Fase E. Invariante crítico: **exactamente 1 fila con `is_active=true`** y FK desde `ia_predictions` apuntando al `snapshot_id` activo.
 
+## Tablas Pizarra Táctica
+
+### `squads`
+
+Una fila por selección clasificada al Mundial 2026 (48 filas). Consumida por la EF `get-squad` que sirve a la Pizarra Táctica modal (`public/js/ui-pizarra-tactica.js`).
+
+```sql
+CREATE TABLE squads (
+  iso3 TEXT PRIMARY KEY,                       -- ISO-3 (ARG, ESP, MEX...)
+  iso2 TEXT NOT NULL,                          -- ISO-2 para bandera
+  equipo TEXT,                                 -- nombre largo en castellano
+  formacion TEXT,                              -- '4-3-3' | '4-4-2' | ... (12 valores en POS_BY_FORMATION)
+  entrenador TEXT,
+  stat_edad NUMERIC,                           -- edad media de la plantilla
+  stat_valor TEXT,                             -- valor de mercado (texto, ej. '€420M')
+  stat_goles NUMERIC,                          -- goles/partido desde Qatar 2022
+  color_ficha TEXT,                            -- color de los tokens del XI (hex o 'white')
+  color_portero TEXT,                          -- color de la ficha del portero (hex)
+  plantilla_completa BOOLEAN DEFAULT false,    -- legacy v5: true cuando los 11 titulares tienen nombre real
+  jugadores JSONB,                             -- v5: array de 11 titulares (XI directo).
+                                               -- v6: array completo 23-55 jugadores con flag `es_titular` (true para los 11 del XI).
+  fuente TEXT,                                 -- 'ff' | 'as' | '365' | 'infobae' | 'fifa-official'
+  updated_at TIMESTAMPTZ,
+  -- ── Columnas nuevas v6 (aplicadas 13 may 2026 vía MCP, sin migration file) ──
+  jugadores_is_final BOOLEAN NOT NULL DEFAULT false,  -- true cuando la plantilla es la prelista/lista FINAL FIFA (no provisional)
+  jugadores_fuente TEXT,                              -- fuente concreta del array jugadores: 'ff' | 'as' | '365' | 'infobae' | 'fifa-official'
+  jugadores_synced_at TIMESTAMPTZ                     -- timestamp del último sync del array jugadores (distinto de updated_at general)
+);
+```
+
+**Estrategia de carga ratificada (13 may 2026)**: prioridad `FutbolFantasy` (primaria, info más fresca en castellano) → `AS` (backup) → `Transfermarkt` (enriquecimiento edad/valor) → `FIFA.com` snapshot final 2 jun (dorsales + fotos vía Chrome MCP).
+
+**Estado actual (13 may 2026)**: 7 de 48 selecciones con plantilla cargada (ARG 55 prov ff con clubs, BIH 26 FINAL as, BRA 51 prov 365, ESP 53 prov ff sin clubs, MEX 55 prov 365, QAT 33 prov infobae sin clubs, SWE 26 FINAL ff). UZB descartado este ciclo (ninguna fuente accesible publica los 40 nombres parseables).
+
 ## Row-Level Security
 
 Las cuatro tablas `ia_*` tienen RLS habilitado.
