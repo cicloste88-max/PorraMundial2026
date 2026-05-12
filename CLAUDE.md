@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-`main` HEAD `ae8090f`. Rama **`claude/pizarra-tactica-modal-kmTEw`** HEAD `533ec15` (4 commits, lista para PR a `main`). Rama paralela `feature/globo-pr2-pr3` HEAD `6d058b2` (12 commits, pendiente squash-merge). Sprints recientes: Globo Enrichment (panel dual sport.es+ESPN, highlight 3D — `docs/globo-mundial.md`) + Pizarra Táctica modal (12 formaciones, dark theme, EF `get-squad` v4 + tabla `squads` 48 filas) + Cuadro de Honor restore (cajas 2+3 bajo fila Final — ERR-42). Próximo: PR pizarra → main + squash-merge globo + `update_ia_scorers` (`predictions.scorer`/`ko_predictions.scorer` NULL).
+`main` HEAD `1fae544`. Rama **`sync/ef-get-squad-v6`** sincroniza el runtime tras deploy directo Claude.ai (EF `get-squad` v6 + 3 cols nuevas en `squads`: `jugadores_is_final` / `jugadores_fuente` / `jugadores_synced_at`, 13 may). Carga plantillas in flight: 7/48 cargadas (ARG, BIH FINAL, BRA, ESP, MEX, QAT, SWE FINAL; UZB descartado). Sprints recientes: Pizarra Táctica modal (EF `get-squad` v4→v6) + Cuadro de Honor (ERR-42) + slide 7 standings modal Jcard Grupos (PR #63). Próximo: PR sync → main + continuar carga 41 plantillas via FF/AS/Transfermarkt + FIFA snapshot 2 jun.
 
 ## Top-3 pendientes inmediatos
 

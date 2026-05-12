@@ -1651,3 +1651,11 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 [12:57] PUSH: hotfix #3 reset padding standingsCard ui-groups.js (ancho igual a card).
 [13:05] PUSH: hotfix #4 lastCardWidth sin -5 doble (card y standings idénticos a 338px).
 [13:12] PUSH: hotfix #5 standingsCard width:100 0nline (replica regla CSS .fc-grupos-slot--standings>* del outer carousel).
+
+## 2026-05-13
+
+[23:09] SQL: ALTER TABLE squads ADD jugadores_is_final boolean NOT NULL DEFAULT false, ADD jugadores_fuente text, ADD jugadores_synced_at timestamptz — aplicado direct via Supabase MCP por Claude.ai esta sesion. NO migration file (cambio aplicado al runtime, no replicable via `supabase db push`). Documentado en `docs/db-schema.md` § Pizarra Táctica.
+[23:10] DEPLOY: EF get-squad v6 ACTIVE (ID aaf02673-e301-46e3-8ed1-c836ea2cb575, version=6, verify_jwt=true) — desplegado directo via Supabase MCP por Claude.ai esta sesion. Retrocompatible con v5: extractXI filtra `es_titular` si flag presente, fallback a `length===11` sin flag (formato v5). Anade `plantilla` (array completo) + `plantilla_meta` ({n, fuente, is_final, synced_at}) a la respuesta sin romper consumers v5 (Pizarra Táctica frontend).
+[23:11] SYNC: rama `sync/ef-get-squad-v6` desde main HEAD `1fae544`. Descargado codigo runtime via MCP `get_edge_function` (220 LOC). `supabase functions download` CLI fallo por falta de SUPABASE_ACCESS_TOKEN — MCP usado como alternativa. Primera linea verificada `// supabase/functions/get-squad/index.ts — v6`.
+[23:11] BBDD: estado squads tras esta sesion (Claude.ai): 7 de 48 cargadas — ARG 55 prov ff (con clubs), BIH 26 FINAL as, BRA 51 prov 365, ESP 53 prov ff (sin clubs, FF no los trae), MEX 55 prov 365, QAT 33 prov infobae (sin clubs), SWE 26 FINAL ff (sustituye AS provisional). UZB descartado este ciclo (ninguna fuente parseable publica los 40 nombres).
+[23:11] PENDIENTE BBDD: Claude.ai en paralelo trabajando en Transfermarkt enriquecimiento (edad/valor) — avisara cuando toque BBDD. Proximo: continuar carga 41 restantes via FutbolFantasy primaria + AS backup, snapshot FIFA.com final 2 jun para dorsales/fotos.
