@@ -525,6 +525,39 @@ window.v3GruposMount = function() {
     if (existing) existing.remove();
     container.appendChild(mount);
 
+    // F2.2 instrumentation temporal — log de dimensiones runtime tras layout.
+    // Si fixes CSS no resuelven, San pega el output en DevTools console para
+    // diagnóstico fino. Removable post-validación en F2.3 o F4 cleanup.
+    setTimeout(function () {
+      try {
+        var diag = {};
+        var pageEl = document.querySelector('#page-grupos');
+        var mountEl = document.querySelector('#v3-grupos-mount');
+        var boardEl = mountEl ? mountEl.querySelector('.v3-board') : null;
+        var leftEl  = boardEl ? boardEl.querySelector('.v3-column-left') : null;
+        var trophyEl = boardEl ? boardEl.querySelector('.v3-trophy-col') : null;
+        var rightEl = boardEl ? boardEl.querySelector('.v3-column-right') : null;
+        function rect(el, label) {
+          if (!el) return { _: label + ' MISSING' };
+          var r = el.getBoundingClientRect();
+          var cs = getComputedStyle(el);
+          return {
+            label: label,
+            w: Math.round(r.width), h: Math.round(r.height),
+            display: cs.display, visibility: cs.visibility, opacity: cs.opacity,
+            gridCols: cs.gridTemplateColumns || '—'
+          };
+        }
+        diag.page = rect(pageEl, '#page-grupos');
+        diag.mount = rect(mountEl, '#v3-grupos-mount');
+        diag.board = rect(boardEl, '.v3-board');
+        diag.left  = rect(leftEl, '.v3-column-left');
+        diag.trophy = rect(trophyEl, '.v3-trophy-col');
+        diag.right = rect(rightEl, '.v3-column-right');
+        console.log('[v3-grupos F2.2 diag]', diag);
+      } catch (e) { /* swallow */ }
+    }, 100);
+
     v3BindDiceBtn();
     v3BindResetBtn();
     v3BindEscapeAndBackdrop();

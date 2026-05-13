@@ -15,12 +15,24 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* F2.2 fix #A: CSS Grid default `min-width: auto` (= min-content) en grid items
+     puede expandir tracks `1fr` si el contenido es más ancho, rompiendo simetría
+     entre column-left y column-right. Force `min-width: 0` para honrar 1fr estricto
+     incluso si el contenido tiene texto largo (e.g. "República de Corea"). */
+  min-width: 0;
 }
 
 /* Trophy column — central, absolute positioning */
 .phone .v3-trophy-col {
   position: relative;
   pointer-events: none;
+  /* F2.2 fix #B: min-width: 0 (mismo razonamiento que .v3-column) +
+     min-height defensivo para que el trophy-col tenga altura aunque
+     `align-items: stretch` falle. Children son absolute (zero intrinsic),
+     sin min-height el column colapsaría a 0 tall si el grid no estirase. */
+  min-width: 0;
+  min-height: 200px;
+  align-self: stretch;
 }
 
 .phone .v3-trophy {
@@ -100,6 +112,11 @@
 /* Card with 4 teams */
 .phone .v3-group__card {
   flex: 1 1 auto;
+  /* F2.2 fix #A: complemento del fix .v3-column — el card debe poder
+     encogerse a ancho de columna sin negarse por min-content del texto.
+     Con line-clamp:2 el texto wrapea internamente; el card respeta la
+     columna padre. */
+  min-width: 0;
   background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
   border: 1px solid var(--g-color);
   box-shadow:
