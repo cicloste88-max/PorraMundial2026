@@ -148,7 +148,7 @@ function renderGroup(grupo) {
 
       var code = document.createElement('div');
       code.className = 'v3-team-row__code';
-      code.textContent = equipo.flag;
+      code.textContent = equipo.name;
       r.appendChild(code);
 
       var flag = document.createElement('div');
@@ -179,7 +179,7 @@ function renderGroup(grupo) {
 
       var code = document.createElement('div');
       code.className = 'v3-team-row__code';
-      code.textContent = equipo.flag;
+      code.textContent = equipo.name;
       r.appendChild(code);
 
       var flag = document.createElement('div');
@@ -377,7 +377,7 @@ function v3RenderStandingsTable(grupo) {
       + '<div class="v3-st-pos">' + (idx+1) + '</div>'
       + '<div class="v3-st-team">'
       + '<div class="v3-st-flag"><img src="' + flagURL(equipo) + '" alt="' + equipo.flag + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
-      + '<div class="v3-st-name">' + equipo.flag + '</div>'
+      + '<div class="v3-st-name">' + equipo.name + '</div>'
       + '</div>'
       + '<div class="v3-st-num">' + row.pj + '</div>'
       + '<div class="v3-st-num">' + row.gf + '</div>'
@@ -475,6 +475,11 @@ window.v3GruposMount = function() {
     trophyCol.className = 'v3-trophy-col';
     var trophyImg = document.createElement('img');
     trophyImg.className = 'v3-trophy';
+    // F2.1 fix #4: bind onerror ANTES de set src para evitar race condition
+    // (si el fetch falla antes de que se ate el listener, el evento se pierde).
+    // Combinado con CSS donde `.v3-trophy-fallback { display: block }` por default
+    // (emoji siempre visible debajo; image lo cubre si carga OK).
+    trophyImg.onerror = function () { trophyCol.classList.add('is-fallback'); };
     trophyImg.src = WORLD_CUP_LOGO || 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/2026_FIFA_World_Cup.png';
     trophyImg.alt = 'Trophy';
     var trophyFallback = document.createElement('div');
@@ -509,23 +514,19 @@ window.v3GruposMount = function() {
     hint.textContent = 'Toca un grupo para pronosticar sus 6 partidos · ESC para cerrar';
     mount.appendChild(hint);
 
-    var overlay = document.createElement('div');
-    overlay.className = 'v3-zoom-overlay';
-    mount.appendChild(overlay);
+    // F2.1 fix #5: NO crear .v3-zoom-overlay / .v3-zoom-panel propios. El shell
+    // mundial-shell-v3.js ya monta un singleton en body via ensureZoomOverlay().
+    // v3OpenZoomGrupos/v3RenderZoom encuentran ese singleton y operan sobre él.
 
-    var panel = document.createElement('div');
-    panel.className = 'v3-zoom-panel';
-    var inner = document.createElement('div');
-    inner.className = 'v3-zoom-panel__inner';
-    panel.appendChild(inner);
-    mount.appendChild(panel);
-
-    container.innerHTML = '';
+    // F2.1 fix #3: NO wipe container.innerHTML (borraría el shell-mount con
+    // fifa-bar/qualified-cta/stage-pill que ensurePageShellV3 inyectó).
+    // En su lugar, remover sólo el mount viejo del grupos (si existe en re-mount).
+    var existing = container.querySelector('#v3-grupos-mount');
+    if (existing) existing.remove();
     container.appendChild(mount);
 
     v3BindDiceBtn();
     v3BindResetBtn();
-    v3BindTrophyFallback();
     v3BindEscapeAndBackdrop();
 
     _v3GruposInited = true;

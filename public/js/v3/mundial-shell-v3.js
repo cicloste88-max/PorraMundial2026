@@ -18,7 +18,7 @@
   // SHELL_PAGES donde la fifa-bar es visible (OQ#1 — welcome excluido).
   var SHELL_PAGES = ['grupos', 'jornada', 'directo', 'elim', 'predictor'];
 
-  var FLAGS_BASE = '/flags/redesign v3/'; // D3 — bucket Supabase URL-encoded en build de URL real.
+  var FLAGS_BASE = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/flags/redesign%20v3/'; // F2.1: Supabase Storage bucket `flags/redesign v3/` con espacio URL-encoded (%20). Antes era path local que no existía.
   var FIFA_LOGO  = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/fifa-logo_brandlogos.net_flczz-512x512.png';
 
   // 4 banderas fijas del CTA D2 + chip +44.

@@ -52,12 +52,15 @@
   transform: translate(-50%, -50%);
   font-size: 96px;
   filter: drop-shadow(0 0 32px rgba(201,169,97,.6));
-  display: none;
-  z-index: 2;
+  /* F2.1 fix #4: emoji siempre visible por default (z-index:1, debajo del trophy
+     img que tiene z-index:2). Si img carga OK, la cubre; si falla, queda visible. */
+  display: block;
+  z-index: 1;
 }
 
+/* Si img falla, .is-fallback se añade vía onerror (evita race de listener);
+   ocultamos la image rota explícitamente. */
 .phone .v3-trophy-col.is-fallback .v3-trophy { display: none; }
-.phone .v3-trophy-col.is-fallback .v3-trophy-fallback { display: block; }
 
 /* Group card (compacta) */
 .phone .v3-group {
