@@ -39,9 +39,8 @@ var V3_MATCH_DAY = ['J1','J1','J2','J2','J3','J3'];
 var _v3GruposInited = false;
 var _v3CurrentLetter = null;
 var _v3CurrentTab = 'predictions';
-// F2.8: sub-overlay squad picker state
+// F2.8.1: sub-overlay squad picker — 1 pick por partido (sin side parameter).
 var _v3SquadPickerMatchIdx = null;
-var _v3SquadPickerSide = null;
 
 function v3FlagURLByEquipo(equipo) {
   var slug = V3_FLAG_SLUG[equipo.flag] || equipo.flag;
@@ -332,11 +331,11 @@ function v3RenderZoomGrupos() {
     };
   });
 
-  // F2.8: bind picks de goleadores en tab Goleadores
+  // F2.8.1: bind picks de goleadores en tab Goleadores (1 por partido, sin side).
   inner.querySelectorAll('[data-v3-goleador-pick]').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
-      v3OpenGoleadorPickerGrupos(+btn.dataset.v3Match, btn.dataset.v3Side);
+      v3OpenGoleadorPickerGrupos(+btn.dataset.v3Match);
     };
   });
 }
@@ -508,7 +507,7 @@ function v3RenderChipsGrupos(match, prediction) {
   return '<div class="v3-chip-stack">' + chips + '</div>';
 }
 
-// Tab Goleadores: lista de 6 partidos con picks home/away.
+// F2.8.1: Tab Goleadores — 1 pick UNIFICADO por partido (lista combinada home+away en el picker).
 function v3RenderGoleadoresTabGrupos(grupo, matchesInGroup) {
   var html = '<div class="v3-goleadores-list">';
   var lastDay = null;
@@ -527,8 +526,7 @@ function v3RenderGoleadoresTabGrupos(grupo, matchesInGroup) {
 
     html += '<div class="v3-goleador-row">'
       + '<div class="v3-goleador-row__match">' + homeEquipo.flag + ' vs ' + awayEquipo.flag + '</div>'
-      + v3RenderGoleadorPick(idx, 'home', homeEquipo, p)
-      + v3RenderGoleadorPick(idx, 'away', awayEquipo, p)
+      + v3RenderGoleadorPickUnified(idx, match, homeEquipo, awayEquipo, p)
       + '</div>';
   });
 
@@ -536,39 +534,56 @@ function v3RenderGoleadoresTabGrupos(grupo, matchesInGroup) {
   return html;
 }
 
-// Render una pick area (home o away).
-function v3RenderGoleadorPick(idx, side, equipo, prediction) {
-  var hasSquad = equipo && equipo.players && equipo.players.length > 0;
-  var pickIsThisSide = prediction.gol && prediction.goleadorSide === side;
-  var player = null;
-  if (pickIsThisSide && hasSquad) {
-    player = equipo.players.find(function(pl) { return pl.key === prediction.gol; });
-  }
+// F2.8.1: render del pick unificado (1 por partido).
+// Estados: unavailable (ambos squads vacíos) / empty (sin elegir) / filled (con jugador + chip equipo).
+function v3RenderGoleadorPickUnified(idx, match, homeEquipo, awayEquipo, prediction) {
+  var homeHasSquad = homeEquipo && homeEquipo.players && homeEquipo.players.length > 0;
+  var awayHasSquad = awayEquipo && awayEquipo.players && awayEquipo.players.length > 0;
+  var bothEmpty = !homeHasSquad && !awayHasSquad;
 
-  if (!hasSquad) {
+  if (bothEmpty) {
     return '<div class="v3-goleador-pick v3-goleador-pick--empty v3-goleador-pick--unavailable" aria-disabled="true">'
-      + '<span class="v3-goleador-pick__hint">Squad pendiente</span>'
+      + '<span class="v3-goleador-pick__hint">Squad pendiente — disponible al cargar plantilla</span>'
       + '</div>';
   }
 
-  if (!player) {
-    return '<button class="v3-goleador-pick v3-goleador-pick--empty" data-v3-goleador-pick data-v3-match="' + idx + '" data-v3-side="' + side + '">'
-      + '<span class="v3-goleador-pick__hint">— Sin elegir (' + equipo.flag + ')</span>'
+  // Buscar el jugador elegido (si lo hay) entre ambos squads.
+  var pickedPlayer = null;
+  var pickedTeam = null;
+  if (prediction.gol) {
+    if (homeHasSquad) {
+      var foundHome = homeEquipo.players.find(function(pl) { return pl.key === prediction.gol; });
+      if (foundHome) { pickedPlayer = foundHome; pickedTeam = homeEquipo; }
+    }
+    if (!pickedPlayer && awayHasSquad) {
+      var foundAway = awayEquipo.players.find(function(pl) { return pl.key === prediction.gol; });
+      if (foundAway) { pickedPlayer = foundAway; pickedTeam = awayEquipo; }
+    }
+  }
+
+  if (!pickedPlayer) {
+    return '<button class="v3-goleador-pick v3-goleador-pick--empty" data-v3-goleador-pick data-v3-match="' + idx + '">'
+      + '<span class="v3-goleador-pick__hint">— Elegir goleador</span>'
+      + '<span class="v3-goleador-pick__chev">▾</span>'
       + '</button>';
   }
 
-  return '<button class="v3-goleador-pick" data-v3-goleador-pick data-v3-match="' + idx + '" data-v3-side="' + side + '">'
-    + '<span class="v3-goleador-pick__player">'
-    + '<span class="v3-goleador-pick__name">' + player.name + '</span>'
-    + '</span>'
-    + '<span class="v3-goleador-pick__chev">›</span>'
+  // Filled: avatar (número extraído del prefijo "9 · Nombre") + nombre + chip equipo.
+  var numberMatch = pickedPlayer.name.match(/^(\d+)\s*·\s*/);
+  var avatarNum = numberMatch ? numberMatch[1] : '·';
+  var playerName = numberMatch ? pickedPlayer.name.replace(/^\d+\s*·\s*/, '') : pickedPlayer.name;
+
+  return '<button class="v3-goleador-pick is-filled" data-v3-goleador-pick data-v3-match="' + idx + '">'
+    + '<span class="v3-goleador-pick__avatar">' + avatarNum + '</span>'
+    + '<span class="v3-goleador-pick__name">' + playerName + '</span>'
+    + '<span class="v3-goleador-pick__team">' + pickedTeam.flag + '</span>'
+    + '<span class="v3-goleador-pick__chev">▾</span>'
     + '</button>';
 }
 
-// Open squad picker sub-overlay (z-index 120 sobre el modal z-index 100).
-function v3OpenGoleadorPickerGrupos(matchIdx, side) {
+// F2.8.1: Open squad picker sub-overlay (z-index 120 sobre el modal z-index 100). Sin side.
+function v3OpenGoleadorPickerGrupos(matchIdx) {
   _v3SquadPickerMatchIdx = matchIdx;
-  _v3SquadPickerSide = side;
   v3EnsureSquadPickerOverlay();
   v3RenderSquadPickerGrupos();
   var overlay = document.querySelector('.v3-squad-picker-overlay');
@@ -579,7 +594,6 @@ function v3CloseGoleadorPickerGrupos() {
   var overlay = document.querySelector('.v3-squad-picker-overlay');
   if (overlay) overlay.classList.remove('is-open');
   _v3SquadPickerMatchIdx = null;
-  _v3SquadPickerSide = null;
 }
 
 // Crea overlay+panel del squad picker si no existe (singleton body level).
@@ -597,7 +611,7 @@ function v3EnsureSquadPickerOverlay() {
   document.body.appendChild(panel);
 }
 
-// Render contenido del squad picker.
+// F2.8.1: Render contenido del squad picker con 2 secciones (home + away combinadas).
 function v3RenderSquadPickerGrupos() {
   var inner = document.querySelector('.v3-squad-picker-panel__inner');
   if (!inner) return;
@@ -606,8 +620,8 @@ function v3RenderSquadPickerGrupos() {
   var match = matchesInGroup[_v3SquadPickerMatchIdx];
   if (!match) return;
 
-  var teamName = _v3SquadPickerSide === 'home' ? match.home : match.away;
-  var equipo = v3FindEquipoByName(teamName);
+  var homeEquipo = v3FindEquipoByName(match.home);
+  var awayEquipo = v3FindEquipoByName(match.away);
   var key = getMatchKey(match);
   var p = predictions[key] || {};
 
@@ -623,21 +637,18 @@ function v3RenderSquadPickerGrupos() {
     + '<button class="v3-zoom-close" data-v3-squad-close aria-label="Cerrar (ESC)">✕</button>'
     + '</div>'
     + '<div class="v3-squad-picker-body">'
-    + '<h3 class="v3-squad-picker-body__title">Elige goleador · ' + equipo.name + '</h3>';
+    + '<h3 class="v3-squad-picker-body__title">Elige goleador</h3>';
 
-  if (!equipo.players || !equipo.players.length) {
-    html += '<div class="v3-squad-picker-empty">Plantilla no cargada todavía. Disponible al cargar la convocatoria oficial.</div>';
+  var bothEmpty = (!homeEquipo.players || !homeEquipo.players.length) && (!awayEquipo.players || !awayEquipo.players.length);
+  if (bothEmpty) {
+    html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
   } else {
-    html += '<div class="v3-squad-picker-list">';
-    equipo.players.forEach(function(pl) {
-      var isPicked = p.gol === pl.key && p.goleadorSide === _v3SquadPickerSide;
-      html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '">'
-        + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
-        + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
-        + '</button>';
-    });
-    html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="" ' + (p.gol && p.goleadorSide===_v3SquadPickerSide ? '' : 'disabled') + '>Quitar selección</button>';
-    html += '</div>';
+    // Sección equipo home + away (cada una si tiene squad).
+    html += v3RenderSquadPickerTeamSection(homeEquipo, p.gol);
+    html += v3RenderSquadPickerTeamSection(awayEquipo, p.gol);
+    if (p.gol) {
+      html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+    }
   }
   html += '</div>';
 
@@ -649,12 +660,35 @@ function v3RenderSquadPickerGrupos() {
   inner.querySelectorAll('[data-v3-squad-player]').forEach(function(btn) {
     btn.onclick = function() {
       if (btn.disabled) return;
-      v3SaveGoleadorGrupos(_v3SquadPickerMatchIdx, _v3SquadPickerSide, btn.dataset.v3SquadPlayer);
+      v3SaveGoleadorGrupos(_v3SquadPickerMatchIdx, btn.dataset.v3SquadPlayer);
     };
   });
 }
 
-function v3SaveGoleadorGrupos(matchIdx, side, playerKey) {
+// F2.8.1: render sección por equipo (header + lista jugadores). Skipped si squad vacío.
+function v3RenderSquadPickerTeamSection(equipo, currentPickKey) {
+  if (!equipo.players || !equipo.players.length) {
+    return '<div class="v3-squad-picker-team-section v3-squad-picker-team-section--empty">'
+      + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>'
+      + '<div class="v3-squad-picker-team-section__hint">Plantilla pendiente</div>'
+      + '</div>';
+  }
+  var html = '<div class="v3-squad-picker-team-section">'
+    + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>'
+    + '<div class="v3-squad-picker-list">';
+  equipo.players.forEach(function(pl) {
+    var isPicked = currentPickKey === pl.key;
+    html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '">'
+      + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
+      + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
+      + '</button>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+// F2.8.1: save infiere side por lookup playerKey en EQUIPOS de ambos equipos del partido.
+function v3SaveGoleadorGrupos(matchIdx, playerKey) {
   var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
   var match = matchesInGroup[matchIdx];
   if (!match) return;
@@ -665,10 +699,18 @@ function v3SaveGoleadorGrupos(matchIdx, side, playerKey) {
   }
 
   if (playerKey) {
+    // Infer side por lookup en home/away.
+    var homeEquipo = v3FindEquipoByName(match.home);
+    var awayEquipo = v3FindEquipoByName(match.away);
+    var side = null;
+    if (homeEquipo.players && homeEquipo.players.find(function(p) { return p.key === playerKey; })) {
+      side = 'home';
+    } else if (awayEquipo.players && awayEquipo.players.find(function(p) { return p.key === playerKey; })) {
+      side = 'away';
+    }
     predictions[key].gol = playerKey;
-    predictions[key].goleadorSide = side;
+    predictions[key].goleadorSide = side; // backward compat; scoring.js lee gol, no side.
   } else {
-    // Clear selection
     predictions[key].gol = null;
     predictions[key].goleadorSide = null;
   }
@@ -676,8 +718,11 @@ function v3SaveGoleadorGrupos(matchIdx, side, playerKey) {
   predictions[key].away = match.away;
   predictions[key].saved = true;
 
-  savePredictions();
+  // Persistir + cerrar sub-overlay + forzar re-render del tab Goleadores.
+  if (typeof savePredictions === 'function') savePredictions();
   v3CloseGoleadorPickerGrupos();
+  // Asegurar que la tab activa es 'goleadores' (no reset accidental tras render).
+  _v3CurrentTab = 'goleadores';
   v3RenderZoomGrupos();
 }
 

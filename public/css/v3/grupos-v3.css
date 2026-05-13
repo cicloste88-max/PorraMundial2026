@@ -660,13 +660,15 @@
 }
 
 .v3-goleador-row {
+  /* F2.8.1: refactor a 1 pick unificado por partido (eliminada la 3ra columna).
+     grid 1fr (match-label) | 2fr (pick area full-width del espacio restante). */
   background: var(--ink-800);
   border: 1px solid var(--ink-700);
   border-radius: 10px;
   padding: 8px 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px;
   align-items: center;
   font-size: 11px;
 }
@@ -755,6 +757,73 @@
   color: var(--ink-500);
   font-size: 14px;
   font-weight: 800;
+}
+
+/* F2.8.1: pick filled — avatar (número) + nombre + chip equipo */
+.v3-goleador-pick.is-filled {
+  background: rgba(94,234,212,.1);
+  border-color: rgba(94,234,212,.35);
+}
+
+.v3-goleador-pick__avatar {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--zoom-color, var(--fifa-gold));
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+}
+
+.v3-goleador-pick__team {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ink-900);
+  background: var(--lime);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* F2.8.1: sub-overlay squad picker — sección por equipo (home/away dividers) */
+.v3-squad-picker-team-section {
+  margin-bottom: 14px;
+}
+
+.v3-squad-picker-team-section:last-of-type {
+  margin-bottom: 8px;
+}
+
+.v3-squad-picker-team-section__title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--zoom-color, var(--fifa-gold));
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--ink-700);
+  margin-bottom: 8px;
+}
+
+.v3-squad-picker-team-section--empty {
+  opacity: .55;
+}
+
+.v3-squad-picker-team-section__hint {
+  font-size: 10px;
+  color: var(--ink-500);
+  font-style: italic;
+  padding: 6px 4px;
 }
 
 /* ─── Squad picker sub-overlay (z-index sobre el modal zoom) ─── */
