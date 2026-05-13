@@ -869,12 +869,18 @@
   opacity: 0;
   transform: scale(.94) translateY(12px);
   transition: opacity .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);
-  pointer-events: auto;
+  /* F2.8.2 fix: pointer-events:none por default. Antes era `auto` sin scoping,
+     lo que hacía que el inner (fullscreen via flex centering del .v3-squad-picker-panel)
+     capturara TODOS los clicks aunque opacity=0 → bloqueaba toda la página tras 1ª
+     selección. Pattern idéntico al zoom-overlay del modal principal. */
+  pointer-events: none;
   overflow: hidden;
 }
 
 .v3-squad-picker-overlay.is-open ~ .v3-squad-picker-panel .v3-squad-picker-panel__inner {
   opacity: 1;
+  /* F2.8.2 fix: pointer-events:auto SOLO cuando .is-open (lift al overlay sibling). */
+  pointer-events: auto;
   transform: scale(1) translateY(0);
 }
 

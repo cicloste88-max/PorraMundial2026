@@ -593,6 +593,11 @@ function v3OpenGoleadorPickerGrupos(matchIdx) {
 function v3CloseGoleadorPickerGrupos() {
   var overlay = document.querySelector('.v3-squad-picker-overlay');
   if (overlay) overlay.classList.remove('is-open');
+  // F2.8.2 defensive: limpiar innerHTML del inner para garantizar que descendientes
+  // (botones de jugadores) no quedan en DOM capturando clicks aunque el CSS
+  // ya gateé pointer-events. Belt + suspenders.
+  var inner = document.querySelector('.v3-squad-picker-panel__inner');
+  if (inner) inner.innerHTML = '';
   _v3SquadPickerMatchIdx = null;
 }
 
