@@ -56,10 +56,13 @@
       +     '</div>'
       +   '</div>'
       +   '<div class="v3-fifa-bar__countdown" data-v3-bar-countdown aria-live="off">'
-      +     '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="days">--</span><span class="v3-cd-lbl">días</span></div>'
-      +     '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="hours">--</span><span class="v3-cd-lbl">horas</span></div>'
-      +     '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="minutes">--</span><span class="v3-cd-lbl">min</span></div>'
-      +     '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="seconds">--</span><span class="v3-cd-lbl">seg.</span></div>'
+      +     '<span class="v3-fifa-bar__eyebrow" data-v3-bar-eyebrow>FALTA</span>'
+      +     '<div class="v3-fifa-bar__cd-row">'
+      +       '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="days">--</span><span class="v3-cd-lbl">días</span></div>'
+      +       '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="hours">--</span><span class="v3-cd-lbl">horas</span></div>'
+      +       '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="minutes">--</span><span class="v3-cd-lbl">min</span></div>'
+      +       '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="seconds">--</span><span class="v3-cd-lbl">seg.</span></div>'
+      +     '</div>'
       +   '</div>'
       +   '<div class="v3-fifa-bar__user" data-user-mount></div>'
       + '</header>';
@@ -125,9 +128,11 @@
   }
 
   function applyPostKickoffMode() {
-    // Reemplaza los 4 bloques countdown por un slot único de texto next-match.
+    // F1.1h: 2 líneas verticales — eyebrow (estado) + nextmatch (equipos).
     document.querySelectorAll('[data-v3-bar-countdown]').forEach(function (el) {
-      el.innerHTML = '<div class="v3-fifa-bar__nextmatch" data-v3-next-match>—</div>';
+      el.innerHTML = ''
+        + '<span class="v3-fifa-bar__eyebrow" data-v3-bar-eyebrow>PRÓXIMO</span>'
+        + '<div class="v3-fifa-bar__nextmatch" data-v3-next-match>—</div>';
     });
   }
 
@@ -137,13 +142,17 @@
       var info = window.resolveNextMatchV3(Date.now());
       if (!info || !info.match) return;
       var match = info.match;
-      var label;
-      if (info.state === 'live') {
-        label = 'EN VIVO · ' + (match.home_es || match.home_en) + ' vs ' + (match.away_es || match.away_en);
-      } else {
-        label = 'Próx · ' + (match.home_es || match.home_en) + ' vs ' + (match.away_es || match.away_en);
-      }
-      document.querySelectorAll('[data-v3-next-match]').forEach(function (el) { el.textContent = label; });
+      var isLive = info.state === 'live';
+      var eyebrowText = isLive ? 'EN VIVO' : 'PRÓXIMO';
+      var label = (match.home_es || match.home_en) + ' vs ' + (match.away_es || match.away_en);
+
+      document.querySelectorAll('[data-v3-bar-eyebrow]').forEach(function (el) {
+        el.textContent = eyebrowText;
+        el.classList.toggle('is-live', isLive);
+      });
+      document.querySelectorAll('[data-v3-next-match]').forEach(function (el) {
+        el.textContent = label;
+      });
       // Event para que otras vistas (Vista Directo, Pichichi banner) puedan reaccionar.
       window.dispatchEvent(new CustomEvent('mundial:next-match-changed', { detail: info }));
     } catch (e) { /* swallow — resolver puede fallar pre-fetch */ }

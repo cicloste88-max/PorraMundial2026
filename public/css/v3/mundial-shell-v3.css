@@ -84,9 +84,43 @@
 }
 .phone .v3-fifa-bar__countdown {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 60%;
+}
+.phone .v3-fifa-bar__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: .8;
+  line-height: 1;
+  color: #fff;
+}
+.phone .v3-fifa-bar__eyebrow.is-live {
+  color: var(--lime);
+  opacity: 1;
+}
+.phone .v3-fifa-bar__cd-row {
+  display: flex;
   gap: 6px;
   align-items: stretch;
-  flex-shrink: 0;
+}
+.phone .v3-fifa-bar__nextmatch {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.1;
 }
 .phone .v3-cd-block {
   display: flex;
@@ -128,7 +162,10 @@
   .phone .v3-cd-num { font-size: 13px; }
   .phone .v3-cd-lbl { font-size: 7px; margin-top: 2px; }
   .phone .v3-cd-block { min-width: 22px; }
-  .phone .v3-fifa-bar__countdown { gap: 4px; }
+  .phone .v3-fifa-bar__cd-row { gap: 4px; }
+  .phone .v3-fifa-bar__eyebrow { font-size: 8px; letter-spacing: 0.14em; }
+  .phone .v3-fifa-bar__nextmatch { font-size: 11px; }
+  .phone .v3-fifa-bar__countdown { max-width: 58%; }
 }
 
 /* ─── Qualified CTA (acceso al globo 3D — solo en grupos) ── */

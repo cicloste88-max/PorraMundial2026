@@ -98,21 +98,28 @@
     setInterval(tick, 1000);
   })();
 
-  // Botón: forzar post-kickoff sustituyendo countdown blocks por slot next-match.
+  // Botón: forzar post-kickoff (2-líneas: eyebrow + nextmatch — F1.1h).
   document.getElementById('btn-fake-kickoff').addEventListener('click', function () {
     document.querySelectorAll('[data-v3-bar-countdown]').forEach(function (el) {
-      el.innerHTML = '<div class="v3-fifa-bar__nextmatch" data-v3-next-match style="font-size:11px;font-weight:600;letter-spacing:.02em">Cargando próximo partido…</div>';
+      el.innerHTML = ''
+        + '<span class="v3-fifa-bar__eyebrow is-live" data-v3-bar-eyebrow>EN VIVO</span>'
+        + '<div class="v3-fifa-bar__nextmatch" data-v3-next-match>Cargando…</div>';
     });
-    // Pre-warm fixtures y pinta el primero.
+    // Pre-warm fixtures y pinta el primero forzando now = kickoff + 1ms.
     if (typeof window._loadNextMatchFixtures === 'function') {
       window._loadNextMatchFixtures().then(function () {
-        // Forzar "ahora = kickoff + 1ms" para que el resolver devuelva 'live' del primer partido.
         var info = window.resolveNextMatchV3(new Date('2026-06-11T19:00:01Z').getTime());
         if (info && info.match) {
           var m = info.match;
-          var label = (info.state === 'live' ? 'EN VIVO · ' : 'Próx · ')
-                    + (m.home_es || m.home_en) + ' vs ' + (m.away_es || m.away_en);
-          document.querySelectorAll('[data-v3-next-match]').forEach(function (el) { el.textContent = label; });
+          var isLive = info.state === 'live';
+          var label = (m.home_es || m.home_en) + ' vs ' + (m.away_es || m.away_en);
+          document.querySelectorAll('[data-v3-bar-eyebrow]').forEach(function (el) {
+            el.textContent = isLive ? 'EN VIVO' : 'PRÓXIMO';
+            el.classList.toggle('is-live', isLive);
+          });
+          document.querySelectorAll('[data-v3-next-match]').forEach(function (el) {
+            el.textContent = label;
+          });
         }
       });
     }
