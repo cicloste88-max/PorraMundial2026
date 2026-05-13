@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0E1A"/>
+<title>Mundial 2026 · Eliminatorias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="mundial-2026.css"/>
+<link rel="stylesheet" href="eliminatorias-2026.css"/>
+</head>
+<body>
+
+<div class="phone" data-screen-label="Eliminatorias">
+
+  <header class="fifa-bar">
+    <div class="fifa-bar__left">
+      <img class="fifa-bar__icon"
+           src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/fifa-logo_brandlogos.net_flczz-512x512.png"
+           alt="FIFA"/>
+      <div class="fifa-bar__txt">
+        <div class="fifa-bar__title">Copa Mundial de la FIFA 2026<sup>™</sup></div>
+        <div class="fifa-bar__subtitle">11 de junio – 19 de julio de 2026</div>
+      </div>
+    </div>
+    <div class="fifa-bar__countdown" aria-live="off">
+      <div class="cd-block"><span class="cd-num" data-countdown="days">--</span><span class="cd-lbl">días</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="hours">--</span><span class="cd-lbl">horas</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="minutes">--</span><span class="cd-lbl">min</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="seconds">--</span><span class="cd-lbl">seg.</span></div>
+    </div>
+  </header>
+
+  <div class="round-switcher"></div>
+
+  <main class="board">
+    <div class="column column-left"></div>
+
+    <div class="trophy-col">
+      <div class="final-stack final-stack--above"></div>
+      <img class="trophy"
+           src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png"
+           alt=""
+           loading="eager"/>
+      <div class="trophy-fallback">🏆</div>
+      <div class="final-stack final-stack--below"></div>
+    </div>
+
+    <div class="column column-right"></div>
+  </main>
+
+  <nav class="screen-nav" aria-label="Navegación entre pantallas">
+    <a href="mundial-2026.html">Fase de grupos</a>
+    <a href="eliminatorias-2026.html" class="is-current">Eliminatorias</a>
+  </nav>
+
+  <div class="actions">
+    <button class="btn" data-demo>Demo · precargar</button>
+    <button class="btn btn--danger" data-reset>Borrar pronósticos</button>
+  </div>
+  <p class="hint">Toca un cruce para pronosticar · cambia de fase arriba</p>
+
+</div>
+
+<!-- Zoom overlay (reusa estilos de mundial-2026.css) -->
+<div class="zoom-overlay" aria-hidden="true"></div>
+<div class="zoom-panel">
+  <div class="zoom-panel__inner"></div>
+</div>
+
+<script src="eliminatorias-data.js"></script>
+<script src="eliminatorias-app.js"></script>
+</body>
+</html>

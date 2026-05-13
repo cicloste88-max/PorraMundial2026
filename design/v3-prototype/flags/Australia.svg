@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1000" width="1500" height="1000">
+<title>Australia</title><defs>
+<clipPath id="flagClip"><path d="M30,80 C 250,40 500,140 750,90 C 1000,40 1250,150 1470,100 L 1480,920 C 1250,870 1000,960 750,910 C 500,860 250,960 30,920 Z"></path></clipPath>
+<linearGradient id="folds" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#000" stop-opacity=".35"></stop><stop offset="6%" stop-color="#000" stop-opacity=".05"></stop><stop offset="14%" stop-color="#000" stop-opacity=".30"></stop><stop offset="22%" stop-color="#000" stop-opacity="0"></stop><stop offset="34%" stop-color="#000" stop-opacity=".18"></stop><stop offset="46%" stop-color="#000" stop-opacity="0"></stop><stop offset="58%" stop-color="#000" stop-opacity=".22"></stop><stop offset="70%" stop-color="#000" stop-opacity="0"></stop><stop offset="82%" stop-color="#000" stop-opacity=".20"></stop><stop offset="92%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".30"></stop>
+</linearGradient>
+<linearGradient id="foldsV" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#000" stop-opacity=".25"></stop><stop offset="15%" stop-color="#000" stop-opacity="0"></stop><stop offset="50%" stop-color="#000" stop-opacity=".08"></stop><stop offset="85%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".28"></stop>
+</linearGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="0.2">
+<stop offset="0%" stop-color="#fff" stop-opacity="0"></stop><stop offset="20%" stop-color="#fff" stop-opacity=".18"></stop><stop offset="35%" stop-color="#fff" stop-opacity="0"></stop><stop offset="55%" stop-color="#fff" stop-opacity=".22"></stop><stop offset="70%" stop-color="#fff" stop-opacity="0"></stop><stop offset="88%" stop-color="#fff" stop-opacity=".15"></stop><stop offset="100%" stop-color="#fff" stop-opacity="0"></stop>
+</linearGradient>
+<pattern id="silk" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(20)">
+<rect width="14" height="14" fill="transparent"></rect>
+<line x1="0" y1="0" x2="0" y2="14" stroke="#fff" stroke-opacity=".04" stroke-width="1"></line>
+<line x1="7" y1="0" x2="7" y2="14" stroke="#000" stroke-opacity=".04" stroke-width="1"></line>
+</pattern>
+<filter id="dropshadow" x="-5%" y="-5%" width="110%" height="115%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="6"></feGaussianBlur><feOffset dx="3" dy="6"></feOffset>
+<feComponentTransfer><feFuncA type="linear" slope=".35"></feFuncA></feComponentTransfer>
+<feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+</filter>
+</defs>
+<g filter="url(#dropshadow)"><g clip-path="url(#flagClip)">
+<rect width="1500" height="1000" fill="#012169"></rect>
+
+<g>
+  <rect width="750" height="500" fill="#012169"></rect>
+  <path d="M0,0 L750,500 M750,0 L0,500" stroke="#FFF" stroke-width="60"></path>
+  <path d="M0,0 L750,500" stroke="#C8102E" stroke-width="40"></path>
+  <path d="M750,0 L0,500" stroke="#C8102E" stroke-width="40"></path>
+  <path d="M375,0 L375,500" stroke="#FFF" stroke-width="100"></path>
+  <path d="M0,250 L750,250" stroke="#FFF" stroke-width="100"></path>
+  <path d="M375,0 L375,500" stroke="#C8102E" stroke-width="60"></path>
+  <path d="M0,250 L750,250" stroke="#C8102E" stroke-width="60"></path>
+</g>
+
+<g transform="translate(375,750)" fill="#FFF"><polygon points="0.0,-110.0 19.1,-39.6 86.0,-68.6 42.9,-9.8 107.2,24.5 34.4,27.4 47.7,99.1 0.0,44.0 -47.7,99.1 -34.4,27.4 -107.2,24.5 -42.9,-9.8 -86.0,-68.6 -19.1,-39.6"></polygon></g>
+
+<g fill="#FFF">
+  <polygon points="1100.0,160.0 1106.9,185.6 1131.3,175.1 1115.6,196.4 1139.0,208.9 1112.5,210.0 1117.4,236.0 1100.0,216.0 1082.6,236.0 1087.5,210.0 1061.0,208.9 1084.4,196.4 1068.7,175.1 1093.1,185.6"></polygon>
+  <polygon points="1280.0,350.0 1288.7,382.0 1319.1,368.8 1299.5,395.5 1328.7,411.1 1295.6,412.5 1301.7,445.0 1280.0,420.0 1258.3,445.0 1264.4,412.5 1231.3,411.1 1260.5,395.5 1240.9,368.8 1271.3,382.0"></polygon>
+  <polygon points="1130.0,538.0 1137.4,564.7 1162.8,553.8 1146.6,576.2 1170.9,589.3 1143.3,590.6 1148.2,617.8 1130.0,597.0 1111.8,617.8 1116.7,590.6 1089.1,589.3 1113.4,576.2 1097.2,553.8 1122.6,564.7"></polygon>
+  <polygon points="1280.0,682.0 1286.5,706.5 1309.7,696.3 1294.6,716.7 1317.0,728.5 1291.7,729.4 1296.5,754.2 1280.0,735.0 1263.5,754.2 1268.3,729.4 1243.0,728.5 1265.4,716.7 1250.3,696.3 1273.5,706.5"></polygon>
+  <polygon points="1180.0,448.0 1185.3,462.7 1200.9,463.2 1188.6,472.8 1192.9,487.8 1180.0,479.0 1167.1,487.8 1171.4,472.8 1159.1,463.2 1174.7,462.7"></polygon>
+</g><rect width="1500" height="1000" fill="url(#silk)"></rect><rect width="1500" height="1000" fill="url(#shine)" style="mix-blend-mode:screen"></rect><rect width="1500" height="1000" fill="url(#folds)" style="mix-blend-mode:multiply"></rect><rect width="1500" height="1000" fill="url(#foldsV)" style="mix-blend-mode:multiply"></rect></g></g></svg>

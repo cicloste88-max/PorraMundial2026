@@ -1,0 +1,637 @@
+/* ============================================================
+   ELIMINATORIAS — estilos adicionales sobre mundial-2026.css
+   (Reusa tokens, hero, trophy, zoom overlay).
+   ============================================================ */
+
+/* ─── FIFA bar (header sobrio con cuenta atrás) ───────── */
+.fifa-bar {
+  background: #2851E1;            /* FIFA royal blue */
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-display);
+  margin-bottom: 12px;
+  box-shadow: 0 4px 18px rgba(40,81,225,.25);
+}
+.fifa-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.fifa-bar__icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+  object-fit: contain;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.fifa-bar__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.fifa-bar__title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fifa-bar__title sup {
+  font-size: 0.55em;
+  vertical-align: super;
+  opacity: .8;
+  margin-left: 1px;
+}
+.fifa-bar__subtitle {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: .85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fifa-bar__countdown {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.cd-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 0 1px;
+}
+.cd-num {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.cd-lbl {
+  font-size: 8px;
+  font-weight: 500;
+  opacity: .85;
+  margin-top: 3px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+/* Móvil más estrecho: encoge tipografías para mantener el bar en 1 fila */
+@media (max-width: 400px) {
+  .fifa-bar { padding: 8px 10px; gap: 8px; border-radius: 6px; }
+  .fifa-bar__icon { width: 32px; height: 32px; padding: 3px; }
+  .fifa-bar__title { font-size: 11px; }
+  .fifa-bar__subtitle { font-size: 9px; }
+  .cd-num { font-size: 13px; }
+  .cd-lbl { font-size: 7px; margin-top: 2px; }
+  .cd-block { min-width: 22px; }
+  .fifa-bar__countdown { gap: 4px; }
+}
+
+/* Round switcher (segmented control bajo el título) */
+.round-switcher {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--ink-700);
+  border-radius: 999px;
+  margin: 14px auto 0;
+  max-width: 360px;
+}
+.round-pill {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--ink-400);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  padding: 7px 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all .15s;
+  text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+}
+.round-pill:hover { color: var(--ink-200); }
+.round-pill.is-active {
+  background: var(--r-color, var(--fifa-gold));
+  color: var(--ink-900);
+  box-shadow: 0 2px 12px var(--r-glow, rgba(201,169,97,.4));
+}
+
+/* Bracket cards — versión compacta para R32 (16 matches), respira más
+   conforme avanza la fase. El JS añade clase .ko-board--<round> al .board. */
+
+.ko-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease;
+  user-select: none;
+}
+.ko-card:active { transform: scale(.97); }
+
+.column-left  .ko-card { flex-direction: row; }
+.column-right .ko-card { flex-direction: row-reverse; }
+
+/* Pestaña con el id del match (M1, M17...) */
+.ko-card__tag {
+  flex: 0 0 22px;
+  background: var(--k-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  color: var(--ink-900);
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 12px var(--k-glow);
+}
+.column-left  .ko-card__tag { border-radius: 9px 0 0 9px; }
+.column-right .ko-card__tag { border-radius: 0 9px 9px 0; }
+
+.ko-card__body {
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--k-color);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.03),
+    0 0 14px var(--k-glow),
+    0 3px 10px rgba(0,0,0,.5);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-height: 50px;
+}
+.column-left  .ko-card__body { border-radius: 0 9px 9px 0; border-left: 0; }
+.column-right .ko-card__body { border-radius: 9px 0 0 9px; border-right: 0; }
+
+.ko-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+  min-height: 14px;
+}
+.column-left .ko-row { flex-direction: row-reverse; justify-content: flex-end; }
+
+.ko-row__code {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-100);
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.column-left  .ko-row__code { text-align: right; }
+.column-right .ko-row__code { text-align: left; }
+
+.ko-row__flag {
+  flex: 0 0 16px;
+  width: 16px; height: 11px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ink-700);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.ko-row__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.ko-row__score {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-200);
+  width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ko-row__score.is-empty { color: var(--ink-600); }
+
+/* Indicador ganador (chip pequeño "G" + brillo en la row) */
+.ko-card.is-decided .ko-row.is-winner { 
+  background: linear-gradient(90deg, transparent 0%, var(--k-glow) 50%, transparent 100%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.ko-card.is-decided .ko-row.is-winner .ko-row__code { color: var(--ink-100); font-weight: 800; }
+.ko-card.is-decided .ko-row:not(.is-winner) .ko-row__code,
+.ko-card.is-decided .ko-row:not(.is-winner) .ko-row__score {
+  color: var(--ink-500);
+}
+.ko-card.is-decided .ko-row.is-winner .ko-row__score { color: var(--ink-100); }
+
+/* Tag indicador "completo" */
+.ko-card__tag::after {
+  content: '';
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.4);
+  opacity: 0;
+}
+.ko-card.is-decided .ko-card__tag::after { opacity: 1; }
+
+/* ─── Cards más grandes para rondas avanzadas ─────────── */
+.ko-board--R16 .ko-card__body { min-height: 60px; padding: 6px 8px; }
+.ko-board--R16 .ko-row__code { font-size: 11px; }
+.ko-board--R16 .ko-row__flag { flex-basis: 18px; width: 18px; height: 12px; }
+.ko-board--R16 .ko-row__score { font-size: 12px; width: 16px; }
+
+.ko-board--QF .ko-card__body { min-height: 78px; padding: 8px 10px; gap: 4px; }
+.ko-board--QF .ko-card__tag { flex-basis: 26px; font-size: 11px; }
+.ko-board--QF .ko-row__code { font-size: 12px; }
+.ko-board--QF .ko-row__flag { flex-basis: 22px; width: 22px; height: 14px; }
+.ko-board--QF .ko-row__score { font-size: 14px; width: 18px; }
+.ko-board--QF .ko-row { min-height: 22px; padding: 2px 0; }
+
+.ko-board--SF .ko-card__body { min-height: 110px; padding: 10px 12px; gap: 6px; }
+.ko-board--SF .ko-card__tag { flex-basis: 30px; font-size: 12px; }
+.ko-board--SF .ko-row__code { font-size: 13px; }
+.ko-board--SF .ko-row__flag { flex-basis: 26px; width: 26px; height: 17px; }
+.ko-board--SF .ko-row__score { font-size: 18px; width: 24px; }
+.ko-board--SF .ko-row { min-height: 32px; padding: 4px 0; }
+
+/* QF y SF tienen pocas cards → si dejamos altura natural el bracket
+   "se desinfla" y el trofeo queda alto. Forzamos min-height equivalente
+   a un bracket de R16 (≈260px) y distribuimos las cards con space-evenly
+   para que el trofeo siempre flote en el centro vertical entre los cruces. */
+.ko-board--QF .column,
+.ko-board--SF .column {
+  min-height: 260px;
+  justify-content: space-evenly;
+}
+
+/* ─── Final view (round = F): FINAL encima del trofeo, 3º debajo ─── */
+.ko-board--F { display: block; padding: 4px 4px 16px; }
+.ko-board--F .column { display: none; }
+
+/* trophy-col pasa a ser una columna flex que apila: FINAL → TROFEO → 3º */
+.ko-board--F .trophy-col {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  pointer-events: auto;
+}
+
+/* El trofeo deja de ser absolute y fluye en el stack como elemento medio */
+.ko-board--F .trophy {
+  position: static;
+  transform: none;
+  width: 200px;
+  max-width: 200px;
+  max-height: 230px;
+  margin: 0;
+  filter:
+    drop-shadow(0 0 22px rgba(201,169,97,.55))
+    drop-shadow(0 14px 32px rgba(0,0,0,.55))
+    drop-shadow(0 0 100px rgba(201,169,97,.25));
+  animation: trophy-float 5s ease-in-out infinite;
+}
+@keyframes trophy-float-static {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.ko-board--F .trophy { animation-name: trophy-float-static; }
+
+/* En rondas no-F los .final-stack están vacíos y no se ven */
+.final-stack { display: none; }
+.ko-board--F .final-stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 380px;
+}
+
+/* FINAL card — protagonista absoluto: oro, glow, grande */
+.final-card {
+  background: linear-gradient(180deg, rgba(201,169,97,.18) 0%, var(--ink-800) 55%, var(--ink-900) 100%);
+  border: 2px solid var(--fifa-gold);
+  border-radius: 18px;
+  padding: 18px 16px 16px;
+  box-shadow:
+    0 0 40px rgba(201,169,97,.45),
+    0 16px 40px rgba(0,0,0,.6);
+  position: relative;
+  cursor: pointer;
+  transition: transform .15s ease;
+}
+.final-card:active { transform: scale(.98); }
+.final-card__eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  color: var(--fifa-gold);
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.final-card__match {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.final-card__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.final-card__flag {
+  width: 60px; height: 40px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--ink-700);
+  box-shadow: 0 4px 14px rgba(0,0,0,.55);
+  border: 1px solid rgba(201,169,97,.3);
+}
+.final-card__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.final-card__code {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.final-card__score {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--ink-100);
+  font-variant-numeric: tabular-nums;
+  background: rgba(0,0,0,.45);
+  border: 1.5px solid var(--fifa-gold);
+  border-radius: 12px;
+  padding: 8px 12px;
+  min-width: 96px;
+  text-align: center;
+  line-height: 1;
+  box-shadow: inset 0 0 16px rgba(201,169,97,.15);
+}
+.final-card__score.is-empty {
+  color: var(--ink-500);
+  font-size: 20px;
+  font-weight: 700;
+  border-color: var(--ink-700);
+  box-shadow: none;
+}
+.final-card.is-decided .final-card__winner {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  padding: 5px 14px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  box-shadow: 0 6px 16px rgba(201,169,97,.5);
+  white-space: nowrap;
+}
+
+/* 3er puesto — secundario: bronce mate, sin glow, tipografía más pequeña.
+   Queda DEBAJO del trofeo, ocupa menos espacio, color/peso reducidos. */
+.final-card--third {
+  background: rgba(20, 24, 38, .65);
+  border: 1px dashed rgba(160, 110, 60, .35);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: none;
+  opacity: .75;
+}
+.final-card--third:hover { opacity: .92; }
+.final-card--third .final-card__eyebrow {
+  color: rgba(205, 127, 50, .7);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  margin-bottom: 8px;
+}
+.final-card--third .final-card__flag {
+  width: 28px; height: 19px;
+  border-radius: 3px;
+  border: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.final-card--third .final-card__code {
+  font-size: 10px;
+  color: var(--ink-300);
+  font-weight: 700;
+}
+.final-card--third .final-card__score {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink-300);
+  background: rgba(0,0,0,.3);
+  border: 1px solid rgba(160,110,60,.3);
+  border-radius: 6px;
+  padding: 3px 8px;
+  min-width: 50px;
+  box-shadow: none;
+}
+.final-card--third .final-card__score.is-empty { font-size: 11px; }
+.final-card--third .final-card__match { gap: 8px; }
+.final-card--third .final-card__side { gap: 4px; }
+.final-card--third.is-decided .final-card__winner {
+  position: static;
+  display: inline-block;
+  transform: none;
+  background: transparent;
+  color: rgba(205,127,50,.85);
+  border: 1px solid rgba(205,127,50,.4);
+  box-shadow: none;
+  font-size: 8px;
+  padding: 2px 8px;
+  margin: 0 auto 6px;
+  letter-spacing: 0.12em;
+}
+
+/* Nav inferior entre pantallas */
+.screen-nav {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.screen-nav a {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--ink-400);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--ink-700);
+  border-radius: 999px;
+  text-transform: uppercase;
+  transition: all .15s;
+}
+.screen-nav a:hover { color: var(--ink-100); border-color: var(--fifa-gold); }
+.screen-nav a.is-current {
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  border-color: var(--fifa-gold);
+}
+
+/* Zoom panel ajustes para KO (un solo partido) */
+.zoom-ko-match {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.zoom-ko-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.zoom-ko-side__flag {
+  width: 56px; height: 38px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--ink-700);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+.zoom-ko-side__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.zoom-ko-side__code {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.1;
+}
+.zoom-ko-side__label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-400);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.zoom-ko-score {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--ink-700);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+/* Penalty winner picker (cuando empate en KO) */
+.zoom-ko-penalty {
+  background: rgba(201,169,97,.08);
+  border: 1px solid rgba(201,169,97,.4);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.zoom-ko-penalty__label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fifa-gold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.zoom-ko-penalty__btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.zoom-ko-penalty__btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--ink-700);
+  color: var(--ink-200);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.zoom-ko-penalty__btn:hover { background: rgba(255,255,255,.06); }
+.zoom-ko-penalty__btn.is-active {
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  border-color: var(--fifa-gold);
+  box-shadow: 0 2px 12px rgba(201,169,97,.4);
+}
+
+.zoom-ko-summary {
+  background: rgba(0,0,0,.3);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-200);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.zoom-ko-summary strong { color: var(--fifa-gold); }

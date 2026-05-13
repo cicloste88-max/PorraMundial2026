@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1000" width="1500" height="1000">
+<title>Paraguay</title><defs>
+<clipPath id="flagClip"><path d="M30,80 C 250,40 500,140 750,90 C 1000,40 1250,150 1470,100 L 1480,920 C 1250,870 1000,960 750,910 C 500,860 250,960 30,920 Z"></path></clipPath>
+<linearGradient id="folds" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#000" stop-opacity=".35"></stop><stop offset="6%" stop-color="#000" stop-opacity=".05"></stop><stop offset="14%" stop-color="#000" stop-opacity=".30"></stop><stop offset="22%" stop-color="#000" stop-opacity="0"></stop><stop offset="34%" stop-color="#000" stop-opacity=".18"></stop><stop offset="46%" stop-color="#000" stop-opacity="0"></stop><stop offset="58%" stop-color="#000" stop-opacity=".22"></stop><stop offset="70%" stop-color="#000" stop-opacity="0"></stop><stop offset="82%" stop-color="#000" stop-opacity=".20"></stop><stop offset="92%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".30"></stop>
+</linearGradient>
+<linearGradient id="foldsV" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#000" stop-opacity=".25"></stop><stop offset="15%" stop-color="#000" stop-opacity="0"></stop><stop offset="50%" stop-color="#000" stop-opacity=".08"></stop><stop offset="85%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".28"></stop>
+</linearGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="0.2">
+<stop offset="0%" stop-color="#fff" stop-opacity="0"></stop><stop offset="20%" stop-color="#fff" stop-opacity=".18"></stop><stop offset="35%" stop-color="#fff" stop-opacity="0"></stop><stop offset="55%" stop-color="#fff" stop-opacity=".22"></stop><stop offset="70%" stop-color="#fff" stop-opacity="0"></stop><stop offset="88%" stop-color="#fff" stop-opacity=".15"></stop><stop offset="100%" stop-color="#fff" stop-opacity="0"></stop>
+</linearGradient>
+<pattern id="silk" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(20)">
+<rect width="14" height="14" fill="transparent"></rect>
+<line x1="0" y1="0" x2="0" y2="14" stroke="#fff" stroke-opacity=".04" stroke-width="1"></line>
+<line x1="7" y1="0" x2="7" y2="14" stroke="#000" stroke-opacity=".04" stroke-width="1"></line>
+</pattern>
+<filter id="dropshadow" x="-5%" y="-5%" width="110%" height="115%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="6"></feGaussianBlur><feOffset dx="3" dy="6"></feOffset>
+<feComponentTransfer><feFuncA type="linear" slope=".35"></feFuncA></feComponentTransfer>
+<feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+</filter>
+</defs>
+<g filter="url(#dropshadow)"><g clip-path="url(#flagClip)"><rect width="1500" height="333" fill="#D52B1E"></rect><rect y="333" width="1500" height="334" fill="#FFF"></rect><rect y="667" width="1500" height="333" fill="#0038A8"></rect>
+<g transform="translate(750,500)">
+  <circle r="100" fill="#FFF" stroke="#D52B1E" stroke-width="3"></circle>
+  <polygon points="0.0,-40.0 7.1,-19.7 28.5,-19.3 11.4,-6.3 17.6,14.3 0.0,2.0 -17.6,14.3 -11.4,-6.3 -28.5,-19.3 -7.1,-19.7"></polygon>
+  <g fill="#FFD100"><circle r="38" opacity="0"></circle></g>
+  
+  <g fill="#FFD100" transform="translate(0,-10)"><polygon points="0.0,-35.0 8.2,-11.3 33.3,-10.8 13.3,4.3 20.6,28.3 0.0,14.0 -20.6,28.3 -13.3,4.3 -33.3,-10.8 -8.2,-11.3"></polygon></g>
+  <g stroke="#FFD100" stroke-width="2" fill="none">
+    <line x1="42" y1="-10" x2="75" y2="-10"></line><line x1="36.373066958946424" y1="10.999999999999996" x2="64.9519052838329" y2="27.499999999999993"></line><line x1="21.000000000000004" y1="26.373066958946424" x2="37.50000000000001" y2="54.9519052838329"></line><line x1="2.5717582782094417e-15" y1="32" x2="4.592425496802574e-15" y2="65"></line><line x1="-20.99999999999999" y1="26.373066958946424" x2="-37.499999999999986" y2="54.9519052838329"></line><line x1="-36.373066958946424" y1="10.999999999999996" x2="-64.9519052838329" y2="27.499999999999993"></line><line x1="-42" y1="-9.999999999999995" x2="-75" y2="-9.999999999999991"></line><line x1="-36.373066958946424" y1="-31.000000000000004" x2="-64.9519052838329" y2="-47.50000000000001"></line><line x1="-21.000000000000018" y1="-46.37306695894641" x2="-37.500000000000036" y2="-74.95190528383287"></line><line x1="-7.715274834628325e-15" y1="-52" x2="-1.3777276490407723e-14" y2="-85"></line><line x1="21.000000000000004" y1="-46.373066958946424" x2="37.50000000000001" y2="-74.9519052838329"></line><line x1="36.37306695894641" y1="-31.000000000000018" x2="64.95190528383287" y2="-47.500000000000036"></line>
+  </g>
+  
+  <g stroke="#3F8B43" stroke-width="2" fill="#3F8B43">
+    <path d="M-70,40 Q-80,60 -50,75" fill="none" stroke-width="3"></path>
+    <path d="M70,40 Q80,60 50,75" fill="none" stroke-width="3"></path>
+    <ellipse cx="-75" cy="50" rx="3" ry="8" transform="rotate(-30 -75 50)"></ellipse>
+    <ellipse cx="-70" cy="65" rx="3" ry="8" transform="rotate(-15 -70 65)"></ellipse>
+    <ellipse cx="-58" cy="73" rx="3" ry="8" transform="rotate(10 -58 73)"></ellipse>
+    <ellipse cx="75" cy="50" rx="3" ry="8" transform="rotate(30 75 50)"></ellipse>
+    <ellipse cx="70" cy="65" rx="3" ry="8" transform="rotate(15 70 65)"></ellipse>
+    <ellipse cx="58" cy="73" rx="3" ry="8" transform="rotate(-10 58 73)"></ellipse>
+  </g>
+</g><rect width="1500" height="1000" fill="url(#silk)"></rect><rect width="1500" height="1000" fill="url(#shine)" style="mix-blend-mode:screen"></rect><rect width="1500" height="1000" fill="url(#folds)" style="mix-blend-mode:multiply"></rect><rect width="1500" height="1000" fill="url(#foldsV)" style="mix-blend-mode:multiply"></rect></g></g></svg>

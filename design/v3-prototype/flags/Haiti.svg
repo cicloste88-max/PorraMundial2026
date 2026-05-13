@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1000" width="1500" height="1000">
+<title>Haiti</title><defs>
+<clipPath id="flagClip"><path d="M30,80 C 250,40 500,140 750,90 C 1000,40 1250,150 1470,100 L 1480,920 C 1250,870 1000,960 750,910 C 500,860 250,960 30,920 Z"></path></clipPath>
+<linearGradient id="folds" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#000" stop-opacity=".35"></stop><stop offset="6%" stop-color="#000" stop-opacity=".05"></stop><stop offset="14%" stop-color="#000" stop-opacity=".30"></stop><stop offset="22%" stop-color="#000" stop-opacity="0"></stop><stop offset="34%" stop-color="#000" stop-opacity=".18"></stop><stop offset="46%" stop-color="#000" stop-opacity="0"></stop><stop offset="58%" stop-color="#000" stop-opacity=".22"></stop><stop offset="70%" stop-color="#000" stop-opacity="0"></stop><stop offset="82%" stop-color="#000" stop-opacity=".20"></stop><stop offset="92%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".30"></stop>
+</linearGradient>
+<linearGradient id="foldsV" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#000" stop-opacity=".25"></stop><stop offset="15%" stop-color="#000" stop-opacity="0"></stop><stop offset="50%" stop-color="#000" stop-opacity=".08"></stop><stop offset="85%" stop-color="#000" stop-opacity="0"></stop><stop offset="100%" stop-color="#000" stop-opacity=".28"></stop>
+</linearGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="0.2">
+<stop offset="0%" stop-color="#fff" stop-opacity="0"></stop><stop offset="20%" stop-color="#fff" stop-opacity=".18"></stop><stop offset="35%" stop-color="#fff" stop-opacity="0"></stop><stop offset="55%" stop-color="#fff" stop-opacity=".22"></stop><stop offset="70%" stop-color="#fff" stop-opacity="0"></stop><stop offset="88%" stop-color="#fff" stop-opacity=".15"></stop><stop offset="100%" stop-color="#fff" stop-opacity="0"></stop>
+</linearGradient>
+<pattern id="silk" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(20)">
+<rect width="14" height="14" fill="transparent"></rect>
+<line x1="0" y1="0" x2="0" y2="14" stroke="#fff" stroke-opacity=".04" stroke-width="1"></line>
+<line x1="7" y1="0" x2="7" y2="14" stroke="#000" stroke-opacity=".04" stroke-width="1"></line>
+</pattern>
+<filter id="dropshadow" x="-5%" y="-5%" width="110%" height="115%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="6"></feGaussianBlur><feOffset dx="3" dy="6"></feOffset>
+<feComponentTransfer><feFuncA type="linear" slope=".35"></feFuncA></feComponentTransfer>
+<feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+</filter>
+</defs>
+<g filter="url(#dropshadow)"><g clip-path="url(#flagClip)"><rect width="1500" height="500" fill="#00209F"></rect><rect y="500" width="1500" height="500" fill="#D21034"></rect>
+<rect x="600" y="380" width="300" height="240" fill="#FFF"></rect>
+<g transform="translate(750,500)">
+  
+  <ellipse cx="0" cy="60" rx="100" ry="10" fill="#3a7d2e"></ellipse>
+  <path d="M0,60 L0,-50" stroke="#5C3A1E" stroke-width="6"></path>
+  
+  <g fill="#3F8B43">
+    <path d="M0,-50 Q-50,-70 -80,-55 Q-40,-55 0,-45 Z"></path>
+    <path d="M0,-50 Q50,-70 80,-55 Q40,-55 0,-45 Z"></path>
+    <path d="M0,-50 Q-40,-90 -55,-90 Q-25,-70 0,-50 Z"></path>
+    <path d="M0,-50 Q40,-90 55,-90 Q25,-70 0,-50 Z"></path>
+    <path d="M0,-55 Q-15,-95 -10,-100 Q5,-80 5,-55 Z"></path>
+  </g>
+  
+  <path d="M-12,-100 Q-12,-115 0,-115 Q12,-115 12,-100 Q6,-105 0,-100 Q-6,-105 -12,-100 Z" fill="#D21034"></path>
+  
+  <rect x="-70" y="40" width="50" height="10" fill="#2a2a2a"></rect>
+  <rect x="20" y="40" width="50" height="10" fill="#2a2a2a"></rect>
+  
+  <g fill="#1a1a1a"><circle cx="-50" cy="65" r="4"></circle><circle cx="-35" cy="65" r="4"></circle><circle cx="40" cy="65" r="4"></circle><circle cx="55" cy="65" r="4"></circle></g>
+</g><rect width="1500" height="1000" fill="url(#silk)"></rect><rect width="1500" height="1000" fill="url(#shine)" style="mix-blend-mode:screen"></rect><rect width="1500" height="1000" fill="url(#folds)" style="mix-blend-mode:multiply"></rect><rect width="1500" height="1000" fill="url(#foldsV)" style="mix-blend-mode:multiply"></rect></g></g></svg>

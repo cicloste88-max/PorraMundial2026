@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0E1A"/>
+<title>Mundial 2026 · Fase de Grupos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="mundial-2026.css"/>
+</head>
+<body>
+
+<div class="phone" data-screen-label="Group Stage">
+
+  <header class="fifa-bar">
+    <div class="fifa-bar__left">
+      <img class="fifa-bar__icon"
+           src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/fifa-logo_brandlogos.net_flczz-512x512.png"
+           alt="FIFA"/>
+      <div class="fifa-bar__txt">
+        <div class="fifa-bar__title">Copa Mundial de la FIFA 2026<sup>™</sup></div>
+        <div class="fifa-bar__subtitle">11 de junio – 19 de julio de 2026</div>
+      </div>
+    </div>
+    <div class="fifa-bar__countdown" aria-live="off">
+      <div class="cd-block"><span class="cd-num" data-countdown="days">--</span><span class="cd-lbl">días</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="hours">--</span><span class="cd-lbl">horas</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="minutes">--</span><span class="cd-lbl">min</span></div>
+      <div class="cd-block"><span class="cd-num" data-countdown="seconds">--</span><span class="cd-lbl">seg.</span></div>
+    </div>
+  </header>
+
+  <a class="qualified-cta" href="#" data-qualified-cta aria-label="Conoce a las 48 selecciones clasificadas">
+    <div class="qualified-cta__flags" aria-hidden="true">
+      <span class="qualified-cta__flag" style="--bg:#AA151B"><img src="flags/Spain.svg" alt=""/></span>
+      <span class="qualified-cta__flag" style="--bg:#75AADB"><img src="flags/Argentina.svg" alt=""/></span>
+      <span class="qualified-cta__flag" style="--bg:#009C3B"><img src="flags/Brazil.svg" alt=""/></span>
+      <span class="qualified-cta__flag" style="--bg:#012169"><img src="flags/France.svg" alt=""/></span>
+      <span class="qualified-cta__flag qualified-cta__flag--more">+44</span>
+    </div>
+    <div class="qualified-cta__body">
+      <div class="qualified-cta__eyebrow">QUALIFIED</div>
+      <div class="qualified-cta__title">Conoce a las 48 selecciones</div>
+    </div>
+    <div class="qualified-cta__arrow" aria-hidden="true">›</div>
+  </a>
+
+  <div class="stage-pill-wrap">
+    <div class="stage-pill">● GROUP STAGE</div>
+  </div>
+
+  <main class="board">
+
+    <!-- Columna izquierda: A-F -->
+    <div class="column column-left"></div>
+
+    <!-- Logo central (epicentro) -->
+    <div class="trophy-col" aria-hidden="true">
+      <img class="trophy"
+           src="https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/2026_FIFA_World_Cup.png"
+           alt=""
+           loading="eager"/>
+      <div class="trophy-fallback">🏆</div>
+    </div>
+
+    <!-- Columna derecha: G-L -->
+    <div class="column column-right"></div>
+
+  </main>
+
+  <div class="actions">
+    <button class="btn" data-demo>Demo · precargar</button>
+    <button class="btn btn--danger" data-reset>Borrar pronósticos</button>
+  </div>
+  <p class="hint">Toca un grupo para pronosticar sus 6 partidos · ESC o ✕ para cerrar</p>
+
+</div>
+
+<!-- Zoom overlay -->
+<div class="zoom-overlay" aria-hidden="true"></div>
+<div class="zoom-panel">
+  <div class="zoom-panel__inner"><!-- JS-rendered --></div>
+</div>
+
+<script src="groups-data.js"></script>
+<script src="groups-app.js"></script>
+</body>
+</html>

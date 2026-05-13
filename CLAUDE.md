@@ -89,54 +89,9 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `apify-actor.md` | `apify-actors/**` | Contrato I/O, push, eventId discovery, Cloudflare 403 |
 | `multi-agent-sync.md` | `index.html`, `public/**`, `js/**`, `docs/**`, `supabase/**`, `apify-actors/**`, `.claude/rules/**`, `CLAUDE.md`, `migration-log.md` | Sync Code↔San: push inmediato, reinicio Vite tras pull, detección desincronía, switch branch limpio, post-squash cleanup |
 
-### Errores conocidos — tabla-índice
+### Errores conocidos
 
-Detalle completo en `errores_conocidos_porra.md`. Consultar antes de debuggear.
-
-| ID | Título |
-|----|--------|
-| ERR-01 | DOMContentLoaded en classic scripts cargados async |
-| ERR-02 | `const` top-level no se expone en `window` |
-| ERR-03 | Vite public collision (dev vs prod sirven ficheros distintos) |
-| ERR-04 | Whitespace invisible en secrets del Vault |
-| ERR-05 | Cadena de fallos SofaScore live scoring (solución arquitectónica) |
-| ERR-06 | `vercel.json` wildcard corrompe MIME types de ES modules |
-| ERR-07 | `updateCardUI` race condition tras login |
-| ERR-08 | 404 masivos en consola por `extractUrl(linear-gradient(...))` |
-| ERR-09 | CSS grid-areas roto en Vista Jornada |
-| ERR-10 | Header eliminatorias no responsive en móvil |
-| ERR-11 | GitHub raw bloqueado por proxy de Claude.ai |
-| ERR-12 | Ficheros de persistencia referenciados pero no existentes |
-| ERR-13 | `porra-fix-encoding action:inspect` devuelve 404 erróneamente |
-| ERR-14 | `checkIsAdmin` async no completa, sección admin-only no renderiza |
-| ERR-15 | Sobrescritura de `encrypted_password` en QA es destructiva |
-| ERR-16 | Plataforma Supabase rechaza JWT ES256 cuando `verify_jwt=true` |
-| ERR-17 | Claude Code no puede borrar ramas remotas (HTTP 403 proxy git) |
-| ERR-18 | Vite build no incluye `css/*.css` en `dist/` |
-| ERR-19 | `openMobileFocus` dejaba `body.overflow=hidden` colgado en iPhone |
-| ERR-20 | `body.style.overflow='hidden'` bloquea scroll persistente en iPhone Safari |
-| ERR-21 | `.mobile-focus-layer` dentro de `@media` dejaba layer fantasma |
-| ERR-22 | `index.html` `<style>` inline nunca migrados a CSS (causa raíz 18-21) |
-| ERR-23 | Flash de welcome al F5 con sesión válida + restore de página |
-| ERR-24 | Wikipedia inadecuada como fuente de H2H masivo entre selecciones |
-| ERR-25 | 11v11.com devuelve 403 sin los 3 headers obligatorios |
-| ERR-26 | `pg_net` no soporta HTTP PUT (bloquea merge PR vía GitHub API) |
-| ERR-27 | `supabase-js` no enruta `from("vault.x")` ni `.schema("vault")` |
-| ERR-28 | RLS `ia_snapshots` requiere policy `ia_snapshots_public_read_active` |
-| ERR-29 | MCP `deploy_edge_function` rompe con payloads >70 KB |
-| ERR-30 | `mobile-locked` persiste tras Deshacer (✅ PR#32) |
-| ERR-31 | `btnRow` residual tras Deshacer (cosmético, pendiente) |
-| ERR-32 | Boost check desincronizado con `boostPicks` en focus mobile (✅ PR#33) |
-| ERR-33 | `REVOKE FROM PUBLIC` en función usada por RLS rompe `authenticated` |
-| ERR-34 | `seed_ia_user` race auth.users vs profiles INSERT |
-| ERR-35 | Stale querySelector tras refactor de clase CSS |
-| ERR-36 | `.container` legacy padding rompe paridad de pages |
-| ERR-37 | Scroll-snap carousel anidado → overflow (sibling) |
-| ERR-38 | globe.gl@2.33.0 API: factory + controls() + atmosphere HEX |
-| ERR-39 | ESPN regex non-greedy trunca frases con comillas anidadas |
-| ERR-40 | ESPN HTML inserta espacios tras vocales con tilde |
-| ERR-41 | Pill flex hijo en flex column hereda align-items:stretch |
-| ERR-42 | Cuadro Honor invisible tras F7.4-F (cajas 2+3 en `#view-cinematic` legacy) |
+ERR-01..42: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42).
 
 ### Otros ficheros de contexto
 
