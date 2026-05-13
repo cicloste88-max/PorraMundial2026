@@ -39,6 +39,9 @@ var V3_MATCH_DAY = ['J1','J1','J2','J2','J3','J3'];
 var _v3GruposInited = false;
 var _v3CurrentLetter = null;
 var _v3CurrentTab = 'predictions';
+// F2.8: sub-overlay squad picker state
+var _v3SquadPickerMatchIdx = null;
+var _v3SquadPickerSide = null;
 
 function v3FlagURLByEquipo(equipo) {
   var slug = V3_FLAG_SLUG[equipo.flag] || equipo.flag;
@@ -260,8 +263,10 @@ function v3RenderZoomGrupos() {
     + '<button class="v3-zoom-close" aria-label="Cerrar (ESC)" data-v3-close>✕</button>'
     + '</div>';
 
+  // F2.8: 3 tabs — Marcadores (rename de Pronósticos) + Goleadores (nuevo) + Clasificación (gated 6/6).
   var tabs = '<div class="v3-zoom-tabs">'
-    + '<button class="v3-zoom-tab ' + (_v3CurrentTab==='predictions'?'is-active':'') + '" data-v3-tab="predictions">Pronósticos</button>'
+    + '<button class="v3-zoom-tab ' + (_v3CurrentTab==='predictions'?'is-active':'') + '" data-v3-tab="predictions">Marcadores</button>'
+    + '<button class="v3-zoom-tab ' + (_v3CurrentTab==='goleadores'?'is-active':'') + '" data-v3-tab="goleadores">Goleadores</button>'
     + '<button class="v3-zoom-tab ' + (_v3CurrentTab==='standings'?'is-active':'') + '" data-v3-tab="standings" ' + (isDone?'':'disabled') + '>'
     + 'Clasificación ' + (isDone ? '' : '(' + filled + '/' + total + ')')
     + '</button>'
@@ -281,6 +286,10 @@ function v3RenderZoomGrupos() {
       + (isDone ? 'Clasificación →' : ('Falta' + (total-filled===1?'':'n') + ' ' + (total-filled)))
       + '</button>'
       + '</div>'
+      + '</div>';
+  } else if (_v3CurrentTab === 'goleadores') {
+    body += '<div data-v3-view="goleadores">'
+      + v3RenderGoleadoresTabGrupos(grupo, matchesInGroup)
       + '</div>';
   } else {
     body += '<div data-v3-view="standings">'
@@ -320,6 +329,14 @@ function v3RenderZoomGrupos() {
     btn.onclick = (e) => {
       e.stopPropagation();
       v3AdjustScoreGrupos(_v3CurrentLetter, +btn.dataset.v3Match, btn.dataset.v3Side, +btn.dataset.v3Delta);
+    };
+  });
+
+  // F2.8: bind picks de goleadores en tab Goleadores
+  inner.querySelectorAll('[data-v3-goleador-pick]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      v3OpenGoleadorPickerGrupos(+btn.dataset.v3Match, btn.dataset.v3Side);
     };
   });
 }
@@ -367,6 +384,9 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
       + '<div class="v3-match-side__name">' + awayEquipo.flag + '</div>'
       + '</div>'
       + '</div>';
+
+    // F2.8: chips de puntuación post-partido (3 estados: pre-kickoff nada, 0 pts gris, N pts stack).
+    html += v3RenderChipsGrupos(match, p);
   });
 
   html += '</div>';
@@ -406,13 +426,268 @@ function v3RenderStandingsTable(grupo) {
   return html;
 }
 
+// ─── F2.8 — Goleadores + chips puntuación ─────────────────────
+
+// Wrapper sobre calcMatchPoints (scoring.js). Devuelve breakdown por tipo + total.
+// shape return: { total, types: ['signo'|'exacto'|'gole'|'bonus'] }
+function v3CalcMatchPointsGrupos(prediction, match) {
+  if (!prediction || !prediction.saved) return { total: 0, types: [] };
+  if (!match || match.realHome == null || match.realAway == null) return { total: 0, types: [] };
+  // Sentinel: si realHome=0 AND realAway=0, asumimos no jugado (placeholder).
+  if (match.realHome === 0 && match.realAway === 0) return { total: 0, types: [] };
+
+  var realL = match.realHome;
+  var realR = match.realAway;
+  var types = [];
+
+  // Replicamos la lógica de scoring.js calcMatchPoints SIN llamarla directamente
+  // (queremos breakdown por tipo, no solo total). El total final debe coincidir
+  // (verificar parity post-F2.8 si scoring.js cambia).
+  var isExact = prediction.l === realL && prediction.v === realR;
+  if (isExact) {
+    types.push('exact');
+  } else if (Math.sign(prediction.l - prediction.v) === Math.sign(realL - realR) && realL !== realR) {
+    types.push('win');
+  } else if (Math.sign(prediction.l - prediction.v) === Math.sign(realL - realR) && realL === realR) {
+    // empate predicho + empate real
+    types.push('win');
+  }
+
+  // Goleador (+2): coincide con el goleador real del equipo ganador.
+  if (prediction.gol && realL !== realR && typeof EQUIPOS !== 'undefined') {
+    var winnerTeam = realL > realR ? prediction.home : prediction.away;
+    var team = EQUIPOS.find(function(e) { return e.name === winnerTeam; });
+    var realScorer = team && team.players && team.players[0] ? team.players[0].key : null;
+    if (realScorer && prediction.gol === realScorer) types.push('gole');
+  }
+
+  // Bonus IA contrario (+1). Sólo si iaBonusWillApply existe globalmente.
+  var matchKey = (typeof getMatchKey === 'function') ? getMatchKey(match) : null;
+  if (typeof iaBonusWillApply === 'function' && matchKey && iaBonusWillApply(matchKey, prediction, realL, realR)) {
+    types.push('bonus');
+  }
+
+  // Llamamos a calcMatchPoints si disponible para el total canónico (incluye cap 7 + boost).
+  var total;
+  if (typeof calcMatchPoints === 'function') {
+    total = calcMatchPoints(prediction, realL, realR, matchKey);
+  } else {
+    // Fallback computacional si scoring.js no cargado (sandbox sin scoring).
+    total = 0;
+    if (types.indexOf('exact') !== -1) total += 3;
+    else if (types.indexOf('win') !== -1) total += 1;
+    if (types.indexOf('gole') !== -1) total += 2;
+    if (types.indexOf('bonus') !== -1) total += 1;
+    total = Math.min(total, 7);
+  }
+
+  return { total: total, types: types };
+}
+
+// Render chips de puntuación bajo cada match-card.
+// 3 estados: pre-kickoff (nada) / 0 pts gris / N pts stack con tipos + total.
+function v3RenderChipsGrupos(match, prediction) {
+  // Estado 1: pre-kickoff o placeholder 0-0 → no chip.
+  if (!match || match.realHome == null || match.realAway == null) return '';
+  if (match.realHome === 0 && match.realAway === 0) return '';
+
+  var pts = v3CalcMatchPointsGrupos(prediction, match);
+
+  // Estado 2: 0 pts → chip único gris.
+  if (pts.total === 0) {
+    return '<div class="v3-chip-stack"><span class="v3-chip v3-chip--zero">+0 pts</span></div>';
+  }
+
+  // Estado 3: N pts → stack por tipo + chip total destacado.
+  var chips = '';
+  if (pts.types.indexOf('win') !== -1) chips += '<span class="v3-chip v3-chip--win">✓ Signo</span>';
+  if (pts.types.indexOf('exact') !== -1) chips += '<span class="v3-chip v3-chip--exact">★ Exacto</span>';
+  if (pts.types.indexOf('gole') !== -1) chips += '<span class="v3-chip v3-chip--gole">⚽ Gol</span>';
+  if (pts.types.indexOf('bonus') !== -1) chips += '<span class="v3-chip v3-chip--bonus">IA</span>';
+  chips += '<span class="v3-chip v3-chip--total">+' + pts.total + ' pts</span>';
+  return '<div class="v3-chip-stack">' + chips + '</div>';
+}
+
+// Tab Goleadores: lista de 6 partidos con picks home/away.
+function v3RenderGoleadoresTabGrupos(grupo, matchesInGroup) {
+  var html = '<div class="v3-goleadores-list">';
+  var lastDay = null;
+
+  matchesInGroup.forEach(function(match, idx) {
+    var day = V3_MATCH_DAY[idx % 6];
+    if (day !== lastDay) {
+      html += '<div class="v3-match-day-label">Jornada ' + day.slice(1) + '</div>';
+      lastDay = day;
+    }
+
+    var homeEquipo = v3FindEquipoByName(match.home);
+    var awayEquipo = v3FindEquipoByName(match.away);
+    var key = getMatchKey(match);
+    var p = predictions[key] || {};
+
+    html += '<div class="v3-goleador-row">'
+      + '<div class="v3-goleador-row__match">' + homeEquipo.flag + ' vs ' + awayEquipo.flag + '</div>'
+      + v3RenderGoleadorPick(idx, 'home', homeEquipo, p)
+      + v3RenderGoleadorPick(idx, 'away', awayEquipo, p)
+      + '</div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
+// Render una pick area (home o away).
+function v3RenderGoleadorPick(idx, side, equipo, prediction) {
+  var hasSquad = equipo && equipo.players && equipo.players.length > 0;
+  var pickIsThisSide = prediction.gol && prediction.goleadorSide === side;
+  var player = null;
+  if (pickIsThisSide && hasSquad) {
+    player = equipo.players.find(function(pl) { return pl.key === prediction.gol; });
+  }
+
+  if (!hasSquad) {
+    return '<div class="v3-goleador-pick v3-goleador-pick--empty v3-goleador-pick--unavailable" aria-disabled="true">'
+      + '<span class="v3-goleador-pick__hint">Squad pendiente</span>'
+      + '</div>';
+  }
+
+  if (!player) {
+    return '<button class="v3-goleador-pick v3-goleador-pick--empty" data-v3-goleador-pick data-v3-match="' + idx + '" data-v3-side="' + side + '">'
+      + '<span class="v3-goleador-pick__hint">— Sin elegir (' + equipo.flag + ')</span>'
+      + '</button>';
+  }
+
+  return '<button class="v3-goleador-pick" data-v3-goleador-pick data-v3-match="' + idx + '" data-v3-side="' + side + '">'
+    + '<span class="v3-goleador-pick__player">'
+    + '<span class="v3-goleador-pick__name">' + player.name + '</span>'
+    + '</span>'
+    + '<span class="v3-goleador-pick__chev">›</span>'
+    + '</button>';
+}
+
+// Open squad picker sub-overlay (z-index 120 sobre el modal z-index 100).
+function v3OpenGoleadorPickerGrupos(matchIdx, side) {
+  _v3SquadPickerMatchIdx = matchIdx;
+  _v3SquadPickerSide = side;
+  v3EnsureSquadPickerOverlay();
+  v3RenderSquadPickerGrupos();
+  var overlay = document.querySelector('.v3-squad-picker-overlay');
+  if (overlay) overlay.classList.add('is-open');
+}
+
+function v3CloseGoleadorPickerGrupos() {
+  var overlay = document.querySelector('.v3-squad-picker-overlay');
+  if (overlay) overlay.classList.remove('is-open');
+  _v3SquadPickerMatchIdx = null;
+  _v3SquadPickerSide = null;
+}
+
+// Crea overlay+panel del squad picker si no existe (singleton body level).
+function v3EnsureSquadPickerOverlay() {
+  if (document.querySelector('.v3-squad-picker-overlay')) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'v3-squad-picker-overlay';
+  overlay.setAttribute('aria-hidden', 'true');
+  var panel = document.createElement('div');
+  panel.className = 'v3-squad-picker-panel';
+  var inner = document.createElement('div');
+  inner.className = 'v3-squad-picker-panel__inner';
+  panel.appendChild(inner);
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+}
+
+// Render contenido del squad picker.
+function v3RenderSquadPickerGrupos() {
+  var inner = document.querySelector('.v3-squad-picker-panel__inner');
+  if (!inner) return;
+
+  var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
+  var match = matchesInGroup[_v3SquadPickerMatchIdx];
+  if (!match) return;
+
+  var teamName = _v3SquadPickerSide === 'home' ? match.home : match.away;
+  var equipo = v3FindEquipoByName(teamName);
+  var key = getMatchKey(match);
+  var p = predictions[key] || {};
+
+  var scoreLine = (Number.isInteger(p.l) && Number.isInteger(p.v))
+    ? (p.l + ' – ' + p.v)
+    : '— – —';
+
+  var html = '<div class="v3-squad-picker-header">'
+    + '<div class="v3-squad-picker-header__title">'
+    + '<div class="v3-squad-picker-header__eyebrow">Partido ' + (_v3SquadPickerMatchIdx+1) + ' · Jornada ' + V3_MATCH_DAY[_v3SquadPickerMatchIdx].slice(1) + '</div>'
+    + '<div class="v3-squad-picker-header__scoreline">' + match.home + ' ' + scoreLine + ' ' + match.away + '</div>'
+    + '</div>'
+    + '<button class="v3-zoom-close" data-v3-squad-close aria-label="Cerrar (ESC)">✕</button>'
+    + '</div>'
+    + '<div class="v3-squad-picker-body">'
+    + '<h3 class="v3-squad-picker-body__title">Elige goleador · ' + equipo.name + '</h3>';
+
+  if (!equipo.players || !equipo.players.length) {
+    html += '<div class="v3-squad-picker-empty">Plantilla no cargada todavía. Disponible al cargar la convocatoria oficial.</div>';
+  } else {
+    html += '<div class="v3-squad-picker-list">';
+    equipo.players.forEach(function(pl) {
+      var isPicked = p.gol === pl.key && p.goleadorSide === _v3SquadPickerSide;
+      html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '">'
+        + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
+        + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
+        + '</button>';
+    });
+    html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="" ' + (p.gol && p.goleadorSide===_v3SquadPickerSide ? '' : 'disabled') + '>Quitar selección</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  inner.innerHTML = html;
+
+  var closeBtn = inner.querySelector('[data-v3-squad-close]');
+  if (closeBtn) closeBtn.onclick = v3CloseGoleadorPickerGrupos;
+
+  inner.querySelectorAll('[data-v3-squad-player]').forEach(function(btn) {
+    btn.onclick = function() {
+      if (btn.disabled) return;
+      v3SaveGoleadorGrupos(_v3SquadPickerMatchIdx, _v3SquadPickerSide, btn.dataset.v3SquadPlayer);
+    };
+  });
+}
+
+function v3SaveGoleadorGrupos(matchIdx, side, playerKey) {
+  var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
+  var match = matchesInGroup[matchIdx];
+  if (!match) return;
+  var key = getMatchKey(match);
+
+  if (!predictions[key]) {
+    predictions[key] = { l: 0, v: 0, saved: true, home: match.home, away: match.away };
+  }
+
+  if (playerKey) {
+    predictions[key].gol = playerKey;
+    predictions[key].goleadorSide = side;
+  } else {
+    // Clear selection
+    predictions[key].gol = null;
+    predictions[key].goleadorSide = null;
+  }
+  predictions[key].home = match.home;
+  predictions[key].away = match.away;
+  predictions[key].saved = true;
+
+  savePredictions();
+  v3CloseGoleadorPickerGrupos();
+  v3RenderZoomGrupos();
+}
+
 function v3AdjustScoreGrupos(letter, matchIdx, side, delta) {
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
   var match = matchesInGroup[matchIdx];
   if (!match) return;
 
   var key = getMatchKey(match);
-  if (!predictions[key]) predictions[key] = { l: 0, v: 0, saved: false };
+  if (!predictions[key]) predictions[key] = { l: 0, v: 0, saved: false, home: match.home, away: match.away };
 
   var fieldKey = side === 'home' ? 'l' : 'v';
   var cur = Number.isInteger(predictions[key][fieldKey]) ? predictions[key][fieldKey] : 0;
@@ -423,7 +698,10 @@ function v3AdjustScoreGrupos(letter, matchIdx, side, delta) {
     predictions[key][otherKey] = 0;
   }
 
-  predictions[key].saved = false;
+  // F2.8: home/away team names + saved=true (requeridos por scoring.js calcMatchPoints).
+  predictions[key].home = match.home;
+  predictions[key].away = match.away;
+  predictions[key].saved = true;
   savePredictions();
   v3RenderZoomGrupos();
 }
@@ -453,9 +731,17 @@ function v3BindDiceBtn() {
 
 function v3BindEscapeAndBackdrop() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && _v3CurrentLetter) v3CloseZoomGrupos();
+    if (e.key !== 'Escape') return;
+    // F2.8: jerarquía de cierre — si sub-overlay del squad picker abierto, cierra ese primero.
+    if (_v3SquadPickerMatchIdx !== null) { v3CloseGoleadorPickerGrupos(); return; }
+    if (_v3CurrentLetter) v3CloseZoomGrupos();
   });
   document.addEventListener('click', (e) => {
+    // F2.8: backdrop del squad picker tiene prioridad sobre el de zoom-overlay.
+    if (e.target && e.target.classList && e.target.classList.contains('v3-squad-picker-overlay')) {
+      v3CloseGoleadorPickerGrupos();
+      return;
+    }
     if (e.target && e.target.classList && e.target.classList.contains('v3-zoom-overlay')) {
       v3CloseZoomGrupos();
     }

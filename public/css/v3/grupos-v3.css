@@ -583,3 +583,351 @@
   .phone .v3-team-row__flag { width: 16px; height: 11px; }
   .phone .v3-trophy { max-width: 84px; max-height: 130px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   F2.8 — Goleadores tab + chips puntuación + squad picker
+   Audit pre-cambio (lección F2.3-F2.7): los selectores `.v3-goleador*`,
+   `.v3-chip*`, `.v3-squad-picker*` son exclusivos de Grupos. No existen
+   en eliminatoria-v3.css. Sin riesgo de colisión cross-file.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Chips de puntuación bajo cada match-card (tab Marcadores post-partido) */
+.v3-chip-stack {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 4px 0;
+  border-top: 1px dashed var(--ink-700);
+  margin-top: 6px;
+}
+
+.v3-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.v3-chip--zero {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-400);
+}
+
+.v3-chip--win {
+  background: rgba(0,131,74,.18);
+  border: 1px solid rgba(52,211,153,.4);
+  color: #34d399;
+}
+
+.v3-chip--exact {
+  background: rgba(196,240,70,.18);
+  border: 1px solid rgba(196,240,70,.45);
+  color: var(--lime);
+}
+
+.v3-chip--gole {
+  background: rgba(201,169,97,.18);
+  border: 1px solid rgba(201,169,97,.5);
+  color: var(--fifa-gold);
+}
+
+.v3-chip--bonus {
+  background: rgba(167,139,250,.18);
+  border: 1px solid rgba(167,139,250,.4);
+  color: #a78bfa;
+}
+
+.v3-chip--total {
+  background: linear-gradient(135deg, var(--zoom-color, #5eead4), var(--lime));
+  color: var(--ink-900);
+  border: 0;
+  font-weight: 900;
+  box-shadow: 0 0 12px rgba(94,234,212,.4);
+  margin-left: auto;
+}
+
+/* ─── Tab Goleadores — lista de partidos con picks ───────────── */
+.v3-goleadores-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v3-goleador-row {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr);
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.v3-goleador-row__match {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-300);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-goleador-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(94,234,212,.06);
+  border: 1px solid rgba(94,234,212,.2);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: var(--font-text);
+  color: var(--ink-100);
+  font-size: 10.5px;
+  text-align: left;
+  min-width: 0;
+  transition: background .15s, border-color .15s;
+}
+
+.v3-goleador-pick:hover {
+  background: rgba(94,234,212,.12);
+  border-color: rgba(94,234,212,.4);
+}
+
+.v3-goleador-pick--empty {
+  background: rgba(255,255,255,.03);
+  border: 1px dashed rgba(255,255,255,.1);
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+.v3-goleador-pick--empty:hover {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.2);
+  font-style: normal;
+}
+
+.v3-goleador-pick--unavailable {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.v3-goleador-pick--unavailable:hover {
+  background: rgba(255,255,255,.03);
+  border-color: rgba(255,255,255,.1);
+}
+
+.v3-goleador-pick__hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.v3-goleador-pick__player {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-goleador-pick__name {
+  font-weight: 600;
+  color: var(--ink-100);
+}
+
+.v3-goleador-pick__chev {
+  flex-shrink: 0;
+  color: var(--ink-500);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* ─── Squad picker sub-overlay (z-index sobre el modal zoom) ─── */
+.v3-squad-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,14,26,.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 120;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+
+.v3-squad-picker-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.v3-squad-picker-panel {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  z-index: 130;
+  pointer-events: none;
+  overflow-y: auto;
+}
+
+.v3-squad-picker-panel__inner {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border-radius: 18px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto;
+  border: 1.5px solid var(--zoom-color, var(--fifa-gold));
+  box-shadow:
+    0 0 28px var(--zoom-glow, rgba(201,169,97,.4)),
+    0 20px 48px rgba(0,0,0,.7);
+  opacity: 0;
+  transform: scale(.94) translateY(12px);
+  transition: opacity .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.v3-squad-picker-overlay.is-open ~ .v3-squad-picker-panel .v3-squad-picker-panel__inner {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.v3-squad-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--ink-700);
+}
+
+.v3-squad-picker-header__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-squad-picker-header__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--zoom-color, var(--fifa-gold));
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.v3-squad-picker-header__scoreline {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-squad-picker-body {
+  padding: 14px 16px 18px;
+}
+
+.v3-squad-picker-body__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+  margin: 0 0 10px;
+}
+
+.v3-squad-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v3-squad-picker-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ink-700);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-text);
+  font-size: 12px;
+  color: var(--ink-100);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s, border-color .15s;
+}
+
+.v3-squad-picker-player:hover {
+  background: rgba(94,234,212,.08);
+  border-color: rgba(94,234,212,.3);
+}
+
+.v3-squad-picker-player.is-picked {
+  background: rgba(196,240,70,.14);
+  border-color: rgba(196,240,70,.45);
+}
+
+.v3-squad-picker-player__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.v3-squad-picker-player__check {
+  flex-shrink: 0;
+  color: var(--lime);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.v3-squad-picker-player--clear {
+  background: rgba(227,6,19,.06);
+  border: 1px dashed rgba(227,6,19,.3);
+  color: var(--fifa-red);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.v3-squad-picker-player--clear:hover {
+  background: rgba(227,6,19,.12);
+  border-color: rgba(227,6,19,.5);
+}
+
+.v3-squad-picker-player--clear:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.v3-squad-picker-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-400);
+  background: rgba(255,255,255,.02);
+  border: 1px dashed var(--ink-700);
+  border-radius: 8px;
+}
