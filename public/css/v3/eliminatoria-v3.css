@@ -74,7 +74,9 @@
   grid-template-columns: 1fr 1fr;
 }
 
-.v3-column {
+/* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
+   leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L. */
+.v3-bracket-board .v3-column {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -559,21 +561,28 @@
   letter-spacing: 0.12em;
 }
 
-/* Trophy container en Final */
-.v3-trophy-col {
-  position: relative;
+/* Trophy container en Final
+   F2.3 fix: scoped a contexto KO. ANTES `.v3-trophy-col { display: none }` global
+   se aplicaba a TODOS los .v3-trophy-col incluido el de Grupos (clase compartida),
+   ocultando el trofeo en página Grupos. */
+.v3-bracket-board:not(.v3-ko-board--F) .v3-trophy-col {
   display: none;
+}
+
+.v3-ko-board--F .v3-trophy-col {
+  position: relative;
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   width: 100%;
+  max-width: 380px;
 }
 
-.v3-ko-board--F .v3-trophy-col {
-  display: flex;
-}
-
-.v3-trophy {
+/* F2.3 fix: scope a Final-view. ANTES `.v3-trophy { position: static; width: 200px }`
+   global leakeaba `width: 200px` al .v3-trophy de Grupos (donde queremos `width: 110%`
+   absolute-centered). */
+.v3-ko-board--F .v3-trophy {
   position: static;
   transform: none;
   width: 200px;
