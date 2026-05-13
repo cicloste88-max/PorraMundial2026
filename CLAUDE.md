@@ -5,15 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-`main` HEAD `1fae544`. Rama **`sync/ef-get-squad-v6`** sincroniza el runtime tras deploy directo Claude.ai (EF `get-squad` v6 + 3 cols nuevas en `squads`: `jugadores_is_final` / `jugadores_fuente` / `jugadores_synced_at`, 13 may). Carga plantillas in flight: 7/48 cargadas (ARG, BIH FINAL, BRA, ESP, MEX, QAT, SWE FINAL; UZB descartado). Sprints recientes: Pizarra Táctica modal (EF `get-squad` v4→v6) + Cuadro de Honor (ERR-42) + slide 7 standings modal Jcard Grupos (PR #63). Próximo: PR sync → main + continuar carga 41 plantillas via FF/AS/Transfermarkt + FIFA snapshot 2 jun.
+Rama **`claude/port-world-cup-design-FvZpD`** HEAD `5b87645` — **redesign v3 base estable** Grupos cerrado visualmente por San (14 may). Modal 3 tabs (Marcadores / Goleadores / Clasificación), chips puntuación 3 estados, goleador picker unificado (1 pick por partido, sub-overlay con secciones home+away). 4 colisiones namespace resueltas en serie (trophy-col display, @keyframes trophy-float, .v3-zoom-panel skeleton, function declarations grupos↔elim). **ERR-43** nuevo (pointer-events gating en sub-overlays). **NO mergeado a main** — F3 wiring SPA pendiente. Rama paralela `sync/ef-get-squad-v6` (squads 7/48, runtime EF `get-squad` v6) sigue abierta. Próximo: F2.9 smoke Eliminatoria + F3 wiring SPA + audit cards legacy → v3 (`docs/AUDIT_CARDS_LEGACY_VS_V3.md`).
 
 ## Top-3 pendientes inmediatos
 
-Detalle completo de las 13 inversiones priorizadas en `docs/sanity-check-20abr2026.md`. Top-3 críticos:
-
-1. **Backend pre-11jun core**: WhatsApp Meta migration (ticket 63016) + activar pg_cron `update-results` el 11 jun + cargar squads reales en `EQUIPOS[].players`. Sin esto la app no funciona el día del Mundial.
-2. **Tests motor de puntuación** (Vitest, 30 tests de `calc*Points` en `scoring.js`). Sin esto, disputas reales por puntos mal calculados el día de la final.
-3. **Pulido UI residual**: bugs Pendientes — Bugs UI ítems 1-4 (cinta tabs ronda mobile, hora CEST, Pichichi auto, frases IA wiring final).
+1. **Boost UX en v3**: defaults ×2 / FIFA-calendar / lock-1er-partido. Legacy `ui-groups.js` lo tenía via `boostPicks` + `boost-ticker`. Sin esto el día-boost no funciona en redesign.
+2. **Integración IA Predictor + Bot Zayu en v3**: tooltip IA contraria + frase IA + `iaBonusWillApply` wiring en cards modal. Legacy lo tenía, redesign aún no.
+3. **Audit cards-de-partido legacy vs v3**: deliverable `docs/AUDIT_CARDS_LEGACY_VS_V3.md` lista features no portadas (tooltip IA, CEST pill, Pizarra long-press, EN VIVO indicator, stadium info, award badges, etc.). NO implementar — solo documentar antes de F3.
 
 ## Pendientes — Bugs UI
 
@@ -46,6 +44,7 @@ Vault/EF + Turnstile DESACTIVADO 30abr2026: ver `docs/secrets.md`.
 - **`schedule_match_crons(match_key, start_ts)`** para crons de partidos.
 - **Verificación CSS/build obligatoria**: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ERR-22).
 - **E13** — Subagentes Task con Write NO heredan `.claude/rules/` (GH#23478). Pasar contexto inline.
+- **E14** — Verificación post-fix de overlays/sub-overlays: tras `classList.remove('is-open')`, hacer click programático en OTRO elemento de la página (modal padre, tab adyacente, botón close, backdrop) Y verificar que el handler responde. Single-event tests no capturan el bug de `pointer-events` no gateado (ERR-43). Alternativa: `document.elementFromPoint(window.innerWidth/2, window.innerHeight/2)` post-cierre — debe devolver elemento background, no descendiente del overlay.
 - **Detectar decisiones autónomas** con `git diff --stat HEAD` antes de commit.
 - **`dice.js` dentro de `admin.js`** (no separar).
 - **Badge-with-flag-fallback** patrón permanente para imágenes de equipo.
@@ -91,13 +90,14 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..42: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42).
+ERR-01..43: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42), Overlay v3 (43).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..42 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..43 (síntoma/causa/fix/patrón).
+- `docs/AUDIT_CARDS_LEGACY_VS_V3.md` — audit features match-card legacy vs redesign v3 (tooltip IA, CEST, Pizarra long-press, EN VIVO, stadium, boost, award badges, etc.). Generado F2.8.2 cierre. NO implementado — referencia para F3 wiring.
 
 ## End-of-session protocol
 

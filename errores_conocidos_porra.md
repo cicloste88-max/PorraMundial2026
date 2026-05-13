@@ -662,3 +662,17 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** al migrar arquitectura UI legacy → nueva, hacer auditoría DOM completa con Chrome MCP de todos los paneles del componente origen (no solo el visible). Si un panel queda en `display:none` pero su lógica sigue ejecutándose, los outputs son fantasma. Validar visualmente cada caja del componente legacy antes de marcar la migración como completa.
 - **Fix aplicado:** commits `533ec15` en `claude/pizarra-tactica-modal-kmTEw`.
 - **Fecha detección:** 08 may 2026 (Sprint Cuadro Honor Restore — diagnóstico Chrome MCP).
+
+## ERR-43 — Overlay / sub-overlay con `pointer-events` no gateado por `.is-open`
+
+- **Síntoma:** tras la 1ª apertura+cierre de un overlay v3 (modal zoom o sub-overlay tipo squad picker), la página queda bloqueada — clicks en cualquier zona del viewport no responden. Los handlers de otros pickers, botones close del modal padre, tabs, e incluso el backdrop oscuro dejan de funcionar.
+- **Causa raíz:** la regla CSS base de `.X-overlay-panel__inner` tenía `pointer-events: auto` sin scope a `.X-overlay.is-open ~`. Aunque `opacity: 0` y la animación oculta visualmente el panel, **el inner sigue ocupando fullscreen** (via `position: fixed; inset: 0` heredado del wrapper panel) **y captura todos los clicks** porque pointer-events lo permite. Solo se manifiesta tras la 1ª apertura porque `inner.innerHTML` está vacío antes y no hay descendientes que interceptar; tras renderizar la lista (e.g. squad players), los hijos quedan en DOM y consumen los pointer events.
+- **Confirmación runtime:** `document.elementFromPoint(window.innerWidth/2, window.innerHeight/2)` post-cierre devuelve un descendiente del overlay invisible (e.g. `.v3-squad-picker-player__name`), no el `body` o page activo.
+- **Fix:**
+  1. `.X-overlay-panel__inner { pointer-events: none; }` por default.
+  2. `.X-overlay.is-open ~ .X-overlay-panel .X-overlay-panel__inner { pointer-events: auto; }` — solo cuando `.is-open` activo (mismo selector sibling que ya gateaba `opacity`).
+  3. JS defensivo: tras `overlay.classList.remove('is-open')`, hacer `inner.innerHTML = ''` para garantizar que no quedan hijos clicables en DOM (belt + suspenders).
+- **Patrón preventivo:** cualquier overlay/sub-overlay con pattern `fixed inset:0 + opacity-gated visibility` debe gatear **también** `pointer-events` por la misma clase `.is-open`. Verificar el zoom-overlay del modal principal (mundial-shell-v3.css L355) como referencia canónica de gating correcto.
+- **Test post-fix obligatorio:** tras cerrar el overlay programáticamente, click en OTRO elemento de la página (modal padre, tab adyacente, botón close, backdrop) — verificar que el handler responde. Single-event tests NO capturan este bug. Ver patrón E14 en `CLAUDE.md`.
+- **Fix aplicado:** commit `5b87645` en `claude/port-world-cup-design-FvZpD` (F2.8.2). Afectado: `.v3-squad-picker-panel__inner` del sub-overlay del goleador picker.
+- **Fecha detección:** 14 may 2026 (sandbox v3-pages-smoke, F2.8.1 → F2.8.2 — diagnóstico Chrome MCP runtime de San).
