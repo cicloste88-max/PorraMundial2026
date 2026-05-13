@@ -435,14 +435,6 @@ function v3BindDiceBtn() {
   };
 }
 
-function v3BindTrophyFallback() {
-  var img = document.querySelector('.phone .v3-trophy');
-  if (!img) return;
-  img.addEventListener('error', () => {
-    var col = img.closest('.v3-trophy-col');
-    if (col) col.classList.add('is-fallback');
-  }, { once: true });
-}
 
 function v3BindEscapeAndBackdrop() {
   document.addEventListener('keydown', (e) => {
@@ -475,18 +467,13 @@ window.v3GruposMount = function() {
     trophyCol.className = 'v3-trophy-col';
     var trophyImg = document.createElement('img');
     trophyImg.className = 'v3-trophy';
-    // F2.1 fix #4: bind onerror ANTES de set src para evitar race condition
-    // (si el fetch falla antes de que se ate el listener, el evento se pierde).
-    // Combinado con CSS donde `.v3-trophy-fallback { display: block }` por default
-    // (emoji siempre visible debajo; image lo cubre si carga OK).
-    trophyImg.onerror = function () { trophyCol.classList.add('is-fallback'); };
+    // F2.4: emoji fallback removido (San lo pidió eliminar — la imagen del logo
+    // es el único elemento esperado en esta posición). Si la image falla,
+    // queda vacío en lugar de emoji. onerror lo oculta para no mostrar broken-img icon.
+    trophyImg.onerror = function () { trophyImg.style.display = 'none'; };
     trophyImg.src = WORLD_CUP_LOGO || 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/2026_FIFA_World_Cup.png';
-    trophyImg.alt = 'Trophy';
-    var trophyFallback = document.createElement('div');
-    trophyFallback.className = 'v3-trophy-fallback';
-    trophyFallback.textContent = '🏆';
+    trophyImg.alt = 'FIFA World Cup 2026';
     trophyCol.appendChild(trophyImg);
-    trophyCol.appendChild(trophyFallback);
     board.appendChild(trophyCol);
 
     var colRight = document.createElement('div');

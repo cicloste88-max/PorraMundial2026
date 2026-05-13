@@ -593,10 +593,15 @@
     drop-shadow(0 0 22px rgba(201, 169, 97, 0.55))
     drop-shadow(0 14px 32px rgba(0, 0, 0, 0.55))
     drop-shadow(0 0 100px rgba(201, 169, 97, 0.25));
-  animation: v3-trophy-float 5s ease-in-out infinite;
+  /* F2.4: keyframes renombradas a v3-trophy-float-final. Antes colisionaban con
+     las de grupos-v3.css (mismo nombre, distintos transforms): elim usa
+     translateY puro porque el trofeo Final es position:static; grupos lo necesita
+     con translate(-50%,-50%) para mantener el centrado absolute. Cascade hacía
+     que elim's keyframes ganaran y desplazaran el trofeo de Grupos. */
+  animation: v3-trophy-float-final 5s ease-in-out infinite;
 }
 
-@keyframes v3-trophy-float {
+@keyframes v3-trophy-float-final {
   0%, 100% {
     transform: translateY(0);
   }
