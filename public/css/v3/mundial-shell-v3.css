@@ -359,3 +359,95 @@
   opacity: 1;
   transform: scale(1) translateY(0);
 }
+
+/* F2.5 unificación: header + close + body + tabs movidos desde grupos-v3.css
+   y eliminatoria-v3.css (colisionaban entre sí). Skeleton compartido del modal
+   v3 vive aquí; cada page renderiza SU contenido específico dentro del inner. */
+.v3-zoom-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--ink-700);
+}
+.v3-zoom-header__letter {
+  background: var(--zoom-color);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 18px var(--zoom-glow);
+}
+.v3-zoom-header__title { flex: 1; min-width: 0; }
+.v3-zoom-header__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--zoom-color);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.v3-zoom-header__name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink-100);
+}
+
+.v3-zoom-close {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-100);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.v3-zoom-close:hover { background: rgba(255,255,255,.12); }
+
+.v3-zoom-body { padding: 14px 16px 18px; }
+
+/* Tabs (usado por Grupos: Pronósticos / Clasificación) */
+.v3-zoom-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(0,0,0,.4);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+.v3-zoom-tab {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--ink-400);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.v3-zoom-tab.is-active {
+  background: var(--zoom-color);
+  color: var(--ink-900);
+  box-shadow: 0 2px 8px var(--zoom-glow);
+}
+.v3-zoom-tab:disabled { opacity: .35; cursor: not-allowed; }
