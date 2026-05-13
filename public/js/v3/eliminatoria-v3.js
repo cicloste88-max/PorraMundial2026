@@ -358,7 +358,7 @@ function v3FlagFor(slot) {
 function v3OpenZoom(match, meta) {
   v3CurrentMatch = match;
   v3CurrentRoundObj = meta;
-  v3RenderZoom();
+  v3RenderZoomKO();
 
   // Use shell's zoom overlay if available
   var overlay = document.querySelector('.v3-zoom-overlay') || document.querySelector('.zoom-overlay');
@@ -378,7 +378,7 @@ function v3OpenZoom(match, meta) {
   document.body.style.overflow = 'hidden';
 }
 
-function v3CloseZoom() {
+function v3CloseZoomKO() {
   var overlay = document.querySelector('.v3-zoom-overlay') || document.querySelector('.zoom-overlay');
   if (overlay) overlay.classList.remove('is-open');
   document.body.style.overflow = '';
@@ -386,7 +386,7 @@ function v3CloseZoom() {
   v3RenderAll();
 }
 
-function v3RenderZoom() {
+function v3RenderZoomKO() {
   var match = v3CurrentMatch;
   var meta = v3CurrentRoundObj;
   if (!match) return;
@@ -472,12 +472,12 @@ function v3RenderZoom() {
   `;
 
   // Bind events
-  inner.querySelector('[data-close]').onclick = v3CloseZoom;
+  inner.querySelector('[data-close]').onclick = v3CloseZoomKO;
 
   inner.querySelectorAll('[data-stepper]').forEach(function(btn) {
     btn.onclick = function(e) {
       e.stopPropagation();
-      v3AdjustScore(match.id, btn.dataset.side, +btn.dataset.delta);
+      v3AdjustScoreKO(match.id, btn.dataset.side, +btn.dataset.delta);
     };
   });
 
@@ -489,7 +489,7 @@ function v3RenderZoom() {
   });
 }
 
-function v3AdjustScore(matchId, side, delta) {
+function v3AdjustScoreKO(matchId, side, delta) {
   if (typeof koPredictions === 'undefined') return;
 
   if (!koPredictions[matchId]) koPredictions[matchId] = {};
@@ -514,7 +514,7 @@ function v3AdjustScore(matchId, side, delta) {
   p.saved = true;
   if (typeof saveKO === 'function') saveKO();
 
-  v3RenderZoom();
+  v3RenderZoomKO();
 }
 
 function v3SetPenaltyWinner(matchId, side) {
@@ -526,7 +526,7 @@ function v3SetPenaltyWinner(matchId, side) {
   p.saved = true;
   if (typeof saveKO === 'function') saveKO();
 
-  v3RenderZoom();
+  v3RenderZoomKO();
 }
 
 // ─── Buttons ────────────────────────────────────────────────
@@ -555,14 +555,14 @@ function v3BindButtonsAndSwitcher() {
 
   // ESC key
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoom();
+    if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
   });
 
   // Overlay click
   var overlay = document.querySelector('.v3-zoom-overlay');
   if (overlay) {
     overlay.onclick = function(e) {
-      if (e.target === overlay) v3CloseZoom();
+      if (e.target === overlay) v3CloseZoomKO();
     };
   }
 }

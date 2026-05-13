@@ -40,20 +40,20 @@ var _v3GruposInited = false;
 var _v3CurrentLetter = null;
 var _v3CurrentTab = 'predictions';
 
-function flagURL(equipo) {
+function v3FlagURLByEquipo(equipo) {
   var slug = V3_FLAG_SLUG[equipo.flag] || equipo.flag;
   return window.flagPath ? window.flagPath(slug) : '/flags/redesign v3/' + encodeURIComponent(slug + '.svg');
 }
 
-function findEquipoByName(name) {
+function v3FindEquipoByName(name) {
   return EQUIPOS.find(e => e.name === name);
 }
 
-function getGrupoLetterIndex(letter) {
+function v3GetGrupoLetterIndex(letter) {
   return GRUPOS.findIndex(g => g.letra === letter);
 }
 
-function isGroupComplete(letter) {
+function v3IsGroupComplete(letter) {
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
   return matchesInGroup.every(m => {
     var key = getMatchKey(m);
@@ -62,7 +62,7 @@ function isGroupComplete(letter) {
   });
 }
 
-function countFilled(letter) {
+function v3CountFilled(letter) {
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
   return matchesInGroup.filter(m => {
     var key = getMatchKey(m);
@@ -71,8 +71,8 @@ function countFilled(letter) {
   }).length;
 }
 
-function computeStandings(letter) {
-  var grupoIdx = getGrupoLetterIndex(letter);
+function v3ComputeStandings(letter) {
+  var grupoIdx = v3GetGrupoLetterIndex(letter);
   var grupo = GRUPOS[grupoIdx];
   var stats = grupo.equipos.map((name, idx) => ({
     teamIdx: idx, name: name, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, gd: 0, pts: 0
@@ -102,7 +102,7 @@ function computeStandings(letter) {
   return stats;
 }
 
-function renderBoard() {
+function v3RenderBoardGrupos() {
   var left = document.querySelector('.phone .v3-column-left');
   var right = document.querySelector('.phone .v3-column-right');
   if (!left || !right) return;
@@ -110,19 +110,19 @@ function renderBoard() {
   right.innerHTML = '';
 
   GRUPOS.forEach((grupo, i) => {
-    var el = renderGroup(grupo);
+    var el = v3RenderGroup(grupo);
     (i < 6 ? left : right).appendChild(el);
   });
 }
 
-function renderGroup(grupo) {
+function v3RenderGroup(grupo) {
   var div = document.createElement('div');
   div.className = 'v3-group';
   div.dataset.letter = grupo.letra;
   div.style.setProperty('--g-color', V3_GRUPO_COLORS[grupo.letra].color);
   div.style.setProperty('--g-glow', V3_GRUPO_COLORS[grupo.letra].glow);
 
-  var isComplete = isGroupComplete(grupo.letra);
+  var isComplete = v3IsGroupComplete(grupo.letra);
   if (isComplete) div.classList.add('is-complete', 'has-standings');
 
   var tab = document.createElement('div');
@@ -134,9 +134,9 @@ function renderGroup(grupo) {
   card.className = 'v3-group__card';
 
   if (isComplete) {
-    var standings = computeStandings(grupo.letra);
+    var standings = v3ComputeStandings(grupo.letra);
     standings.forEach((row, idx) => {
-      var equipo = findEquipoByName(row.name);
+      var equipo = v3FindEquipoByName(row.name);
       var r = document.createElement('div');
       r.className = 'v3-team-row';
       if (idx < 2) r.classList.add('is-qualified');
@@ -154,7 +154,7 @@ function renderGroup(grupo) {
       var flag = document.createElement('div');
       flag.className = 'v3-team-row__flag';
       var img = document.createElement('img');
-      img.src = flagURL(equipo);
+      img.src = v3FlagURLByEquipo(equipo);
       img.alt = equipo.flag;
       img.loading = 'lazy';
       img.onerror = function() {
@@ -173,7 +173,7 @@ function renderGroup(grupo) {
     });
   } else {
     grupo.equipos.forEach(name => {
-      var equipo = findEquipoByName(name);
+      var equipo = v3FindEquipoByName(name);
       var r = document.createElement('div');
       r.className = 'v3-team-row';
 
@@ -185,7 +185,7 @@ function renderGroup(grupo) {
       var flag = document.createElement('div');
       flag.className = 'v3-team-row__flag';
       var img = document.createElement('img');
-      img.src = flagURL(equipo);
+      img.src = v3FlagURLByEquipo(equipo);
       img.alt = equipo.flag;
       img.loading = 'lazy';
       img.onerror = function() {
@@ -206,14 +206,14 @@ function renderGroup(grupo) {
 
 function v3OpenZoomGrupos(letter) {
   _v3CurrentLetter = letter;
-  _v3CurrentTab = isGroupComplete(letter) ? 'standings' : 'predictions';
+  _v3CurrentTab = v3IsGroupComplete(letter) ? 'standings' : 'predictions';
 
   // F2.6 defensive: si shell no se inicializó (race), asegurar overlay antes.
   if (!document.querySelector('.v3-zoom-overlay') && typeof window.mundialShellV3Init === 'function') {
     window.mundialShellV3Init();
   }
 
-  v3RenderZoom();
+  v3RenderZoomGrupos();
   var overlay = document.querySelector('.v3-zoom-overlay');
   var inner = document.querySelector('.v3-zoom-panel__inner');
   console.log('[v3-grupos openZoom]', {
@@ -228,15 +228,15 @@ function v3OpenZoomGrupos(letter) {
   document.body.style.overflow = 'hidden';
 }
 
-function v3CloseZoom() {
+function v3CloseZoomGrupos() {
   var overlay = document.querySelector('.v3-zoom-overlay');
   if (overlay) overlay.classList.remove('is-open');
   document.body.style.overflow = '';
   _v3CurrentLetter = null;
-  renderBoard();
+  v3RenderBoardGrupos();
 }
 
-function v3RenderZoom() {
+function v3RenderZoomGrupos() {
   var grupo = GRUPOS.find(g => g.letra === _v3CurrentLetter);
   if (!grupo) return;
 
@@ -247,7 +247,7 @@ function v3RenderZoom() {
   inner.style.setProperty('--zoom-glow', V3_GRUPO_COLORS[_v3CurrentLetter].glow);
 
   var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
-  var filled = countFilled(_v3CurrentLetter);
+  var filled = v3CountFilled(_v3CurrentLetter);
   var total = matchesInGroup.length;
   var isDone = filled === total;
 
@@ -300,26 +300,26 @@ function v3RenderZoom() {
   inner.innerHTML = header + body;
 
   var closeBtn = inner.querySelector('[data-v3-close]');
-  if (closeBtn) closeBtn.onclick = v3CloseZoom;
+  if (closeBtn) closeBtn.onclick = v3CloseZoomGrupos;
 
   inner.querySelectorAll('[data-v3-tab]').forEach(btn => {
     btn.onclick = () => {
       if (btn.disabled) return;
       _v3CurrentTab = btn.dataset.v3Tab;
-      v3RenderZoom();
+      v3RenderZoomGrupos();
     };
   });
 
   var showSt = inner.querySelector('[data-v3-show-standings]');
-  if (showSt) showSt.onclick = () => { _v3CurrentTab = 'standings'; v3RenderZoom(); };
+  if (showSt) showSt.onclick = () => { _v3CurrentTab = 'standings'; v3RenderZoomGrupos(); };
 
   var showPr = inner.querySelector('[data-v3-show-predictions]');
-  if (showPr) showPr.onclick = () => { _v3CurrentTab = 'predictions'; v3RenderZoom(); };
+  if (showPr) showPr.onclick = () => { _v3CurrentTab = 'predictions'; v3RenderZoomGrupos(); };
 
   inner.querySelectorAll('[data-v3-stepper]').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
-      v3AdjustScore(_v3CurrentLetter, +btn.dataset.v3Match, btn.dataset.v3Side, +btn.dataset.v3Delta);
+      v3AdjustScoreGrupos(_v3CurrentLetter, +btn.dataset.v3Match, btn.dataset.v3Side, +btn.dataset.v3Delta);
     };
   });
 }
@@ -335,8 +335,8 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
       lastDay = day;
     }
 
-    var homeEquipo = findEquipoByName(match.home);
-    var awayEquipo = findEquipoByName(match.away);
+    var homeEquipo = v3FindEquipoByName(match.home);
+    var awayEquipo = v3FindEquipoByName(match.away);
     var key = getMatchKey(match);
     var p = predictions[key] || {};
 
@@ -346,7 +346,7 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
 
     html += '<div class="v3-match-card ' + (filled?'is-filled':'') + '">'
       + '<div class="v3-match-side v3-match-side--home">'
-      + '<div class="v3-match-side__flag"><img src="' + flagURL(homeEquipo) + '" alt="' + homeEquipo.flag + '" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
+      + '<div class="v3-match-side__flag"><img src="' + v3FlagURLByEquipo(homeEquipo) + '" alt="' + homeEquipo.flag + '" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
       + '<div class="v3-match-side__name">' + homeEquipo.flag + '</div>'
       + '</div>'
       + '<div class="v3-match-score">'
@@ -363,7 +363,7 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
       + '</div>'
       + '</div>'
       + '<div class="v3-match-side v3-match-side--away">'
-      + '<div class="v3-match-side__flag"><img src="' + flagURL(awayEquipo) + '" alt="' + awayEquipo.flag + '" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
+      + '<div class="v3-match-side__flag"><img src="' + v3FlagURLByEquipo(awayEquipo) + '" alt="' + awayEquipo.flag + '" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
       + '<div class="v3-match-side__name">' + awayEquipo.flag + '</div>'
       + '</div>'
       + '</div>';
@@ -374,7 +374,7 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
 }
 
 function v3RenderStandingsTable(grupo) {
-  var standings = computeStandings(grupo.letra);
+  var standings = v3ComputeStandings(grupo.letra);
   var html = '<div class="v3-standings-table">'
     + '<div class="v3-standings-head">'
     + '<div class="v3-st-pos">#</div>'
@@ -387,11 +387,11 @@ function v3RenderStandingsTable(grupo) {
     + '</div>';
 
   standings.forEach((row, idx) => {
-    var equipo = findEquipoByName(row.name);
+    var equipo = v3FindEquipoByName(row.name);
     html += '<div class="v3-standings-row ' + (idx < 2 ? 'is-qualified' : '') + '">'
       + '<div class="v3-st-pos">' + (idx+1) + '</div>'
       + '<div class="v3-st-team">'
-      + '<div class="v3-st-flag"><img src="' + flagURL(equipo) + '" alt="' + equipo.flag + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
+      + '<div class="v3-st-flag"><img src="' + v3FlagURLByEquipo(equipo) + '" alt="' + equipo.flag + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
       + '<div class="v3-st-name">' + equipo.name + '</div>'
       + '</div>'
       + '<div class="v3-st-num">' + row.pj + '</div>'
@@ -406,7 +406,7 @@ function v3RenderStandingsTable(grupo) {
   return html;
 }
 
-function v3AdjustScore(letter, matchIdx, side, delta) {
+function v3AdjustScoreGrupos(letter, matchIdx, side, delta) {
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
   var match = matchesInGroup[matchIdx];
   if (!match) return;
@@ -425,7 +425,7 @@ function v3AdjustScore(letter, matchIdx, side, delta) {
 
   predictions[key].saved = false;
   savePredictions();
-  v3RenderZoom();
+  v3RenderZoomGrupos();
 }
 
 function v3BindResetBtn() {
@@ -435,7 +435,7 @@ function v3BindResetBtn() {
     if (!confirm('¿Borrar todos los pronósticos guardados?')) return;
     predictions = {};
     savePredictions();
-    renderBoard();
+    v3RenderBoardGrupos();
   };
 }
 
@@ -453,11 +453,11 @@ function v3BindDiceBtn() {
 
 function v3BindEscapeAndBackdrop() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && _v3CurrentLetter) v3CloseZoom();
+    if (e.key === 'Escape' && _v3CurrentLetter) v3CloseZoomGrupos();
   });
   document.addEventListener('click', (e) => {
     if (e.target && e.target.classList && e.target.classList.contains('v3-zoom-overlay')) {
-      v3CloseZoom();
+      v3CloseZoomGrupos();
     }
   });
 }
@@ -518,7 +518,7 @@ window.v3GruposMount = function() {
 
     // F2.1 fix #5: NO crear .v3-zoom-overlay / .v3-zoom-panel propios. El shell
     // mundial-shell-v3.js ya monta un singleton en body via ensureZoomOverlay().
-    // v3OpenZoomGrupos/v3RenderZoom encuentran ese singleton y operan sobre él.
+    // v3OpenZoomGrupos/v3RenderZoomGrupos encuentran ese singleton y operan sobre él.
 
     // F2.1 fix #3: NO wipe container.innerHTML (borraría el shell-mount con
     // fifa-bar/qualified-cta/stage-pill que ensurePageShellV3 inyectó).
@@ -534,7 +534,7 @@ window.v3GruposMount = function() {
     _v3GruposInited = true;
   }
 
-  renderBoard();
+  v3RenderBoardGrupos();
 };
 
 // F2 integración (padre Opus): NO auto-mount. El padre (showPage('grupos') en F3
