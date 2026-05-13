@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 // ui-globo-equipos.js — Sprint Globo MVP
-// Cinta dorada en #page-grupos + overlay full-screen con globo 3D
-// (globe.gl@2.33.0 lazy-loaded). Expone window._mountGloboCinta(container).
+// Overlay full-screen con globo 3D (globe.gl@2.33.0 lazy-loaded).
+// Expone window._openGloboOverlay() — invocado desde el CTA "Conoce a las 48"
+// del shell v3 (D8 ELIMINA la cinta dorada antigua; F1.1e refactor).
 // Referencia API: docs/globo-mundial-2026-REFERENCIA.html
 // ═══════════════════════════════════════════════════════════════
 (function () {
@@ -166,26 +167,9 @@
   var _selectedSede = null;
 
   // ── HTML templates ──────────────────────────────────────────
-  var CINTA_HTML =
-    '<div class="fc-globo-cinta" role="button" tabindex="0" aria-label="Conoce las selecciones del Mundial 2026">' +
-      '<svg class="fc-globo-cinta__svg" viewBox="0 0 24 24" aria-hidden="true">' +
-        '<defs><clipPath id="fc-globo-clip"><circle cx="12" cy="12" r="9.6"/></clipPath></defs>' +
-        '<circle cx="12" cy="12" r="9.6" fill="rgba(232,184,48,0.08)" stroke="#e8b830" stroke-width="1.3"/>' +
-        '<ellipse cx="12" cy="12" rx="9.6" ry="3.5" fill="none" stroke="#e8b830" stroke-width="0.8" opacity="0.55"/>' +
-        '<line x1="2.4" y1="12" x2="21.6" y2="12" stroke="#e8b830" stroke-width="0.8" opacity="0.55"/>' +
-        '<g class="continents" clip-path="url(#fc-globo-clip)">' +
-          '<path d="M5 9 Q7 7 9 9 T12 10 Q11 12 9 12 Q7 11 5 9 Z" fill="#e8b830" opacity="0.85"/>' +
-          '<path d="M14 7 Q17 6 18 9 Q17 11 15 10 Q14 9 14 7 Z" fill="#ffd866" opacity="0.9"/>' +
-          '<ellipse cx="10" cy="16" rx="3" ry="1.4" fill="#e8b830" opacity="0.8"/>' +
-          '<circle cx="17" cy="15" r="1.3" fill="#ffd866" opacity="0.85"/>' +
-        '</g>' +
-      '</svg>' +
-      '<div class="fc-globo-cinta__txt">' +
-        '<div class="fc-globo-cinta__main">Conoce las selecciones</div>' +
-        '<div class="fc-globo-cinta__sub">Recorre los 48 mundialistas y sus 16 sedes</div>' +
-      '</div>' +
-      '<span class="fc-globo-cinta__chev" aria-hidden="true">›</span>' +
-    '</div>';
+  // F1.1e: CINTA_HTML eliminado — el trigger del overlay vive ahora en
+  // .v3-qualified-cta del shell mundial-shell-v3.js (data-qualified-cta),
+  // que invoca window._openGloboOverlay() expuesto al final de este IIFE.
 
   var OVERLAY_HTML =
     '<div class="fc-globo-overlay" id="fc-globo-overlay" role="dialog" aria-modal="true" aria-label="Globo Mundial 2026">' +
@@ -865,23 +849,6 @@
     }
   }
 
-  // ── API pública: monta la cinta dentro de container ─────────
-  // Idempotente: si ya hay .fc-globo-cinta dentro, no duplica.
-  function _mountGloboCinta(container) {
-    if (!container || container.querySelector('.fc-globo-cinta')) return;
-    var wrap = document.createElement('div');
-    wrap.innerHTML = CINTA_HTML;
-    var cinta = wrap.firstElementChild;
-    cinta.addEventListener('click', openOverlay);
-    cinta.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        openOverlay();
-      }
-    });
-    container.appendChild(cinta);
-  }
-
   // Stub de navegación a la pantalla de plantilla (PR4 lo sobreescribirá
   // con el módulo real). Se registra solo si nadie lo definió antes para
   // no pisar una implementación futura cargada en otro orden.
@@ -892,5 +859,6 @@
     };
   }
 
-  window._mountGloboCinta = _mountGloboCinta;
+  // F1.1e — API pública para el CTA v3 (shell mundial-shell-v3.js).
+  window._openGloboOverlay = openOverlay;
 })();
