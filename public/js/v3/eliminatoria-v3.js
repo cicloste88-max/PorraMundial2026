@@ -3,6 +3,30 @@
 // Expone: window.v3ElimMount()
 // NO auto-init — padre (página KO real) llama window.v3ElimMount()
 
+// F2 integración (padre Opus): mapping 3-letras FIFA → slug v3 para flag URL.
+// El brief lo proveía pero el agente Haiku no lo aplicó (construyó URL incorrecta
+// "/flags/MEX.svg"). Reusa el mismo mapping que grupos-v3.js. F3 cleanup puede
+// extraerlo a shell común.
+var V3_FLAG_SLUG_ELIM = {
+  MEX:'Mexico', RSA:'SouthAfrica', KOR:'KoreaRepublic', CZE:'Czechia',
+  CAN:'Canada', BIH:'Bosnia', QAT:'Qatar', SUI:'Switzerland',
+  BRA:'Brazil', MAR:'Morocco', HAI:'Haiti', SCO:'Scotland',
+  USA:'USA', PAR:'Paraguay', AUS:'Australia', TUR:'Turkiye',
+  GER:'Germany', CUW:'Curacao', CIV:'CoteIvoire', ECU:'Ecuador',
+  NED:'Netherlands', JPN:'Japan', SWE:'Sweden', TUN:'Tunisia',
+  BEL:'Belgium', EGY:'Egypt', IRN:'Iran', NZL:'NewZealand',
+  ESP:'Spain', CPV:'CaboVerde', KSA:'SaudiArabia', URU:'Uruguay',
+  FRA:'France', SEN:'Senegal', IRQ:'Iraq', NOR:'Norway',
+  ARG:'Argentina', ALG:'Algeria', AUT:'Austria', JOR:'Jordan',
+  POR:'Portugal', COD:'CongoDR', UZB:'Uzbekistan', COL:'Colombia',
+  ENG:'England', CRO:'Croatia', GHA:'Ghana', PAN:'Panama'
+};
+function v3FlagURLByCode(code) {
+  if (!code) return null;
+  var slug = V3_FLAG_SLUG_ELIM[code] || code;
+  return window.flagPath ? window.flagPath(slug) : '/flags/redesign v3/' + encodeURIComponent(slug + '.svg');
+}
+
 var _v3ElimInited = false;
 
 window.v3ElimMount = function() {
@@ -325,7 +349,8 @@ function v3FlagFor(slot) {
   var team = EQUIPOS.find(function(e) { return e.name === teamName; });
   if (!team || !team.flag) return '';
 
-  var flagUrl = '/flags/' + team.flag.toUpperCase() + '.svg';
+  var flagUrl = v3FlagURLByCode(team.flag);
+  if (!flagUrl) return '';
   return `<img src="${flagUrl}" alt="" onerror="this.remove()"/>`;
 }
 
