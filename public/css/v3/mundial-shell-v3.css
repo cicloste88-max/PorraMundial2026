@@ -1,0 +1,323 @@
+/* F1.1b · v3 shell compartido (Grupos + Eliminatoria + SHELL_PAGES).
+   Procedencia: design/v3-prototype/mundial-2026.css HEAD `7a6eff4`.
+   Scope: TODO bajo `.phone .v3-*` para evitar colisión con CSS legacy.
+   Tokens consumidos: var(--ink-*), var(--lime), var(--fifa-*), var(--font-*)
+   (declarados en public/css/components/elim-tokens.css).
+   Coexistencia F1-F3: solo se aplica cuando body.v3-active y la page incluye
+   un wrapper `<div class="phone">` montado por mundial-shell-v3.js. */
+
+/* ─── Phone-frame container (mobile-first 420px) ────────── */
+.phone {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 18px 12px 80px;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 32%, rgba(201,169,97,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 70%, rgba(10,69,149,.15) 0%, transparent 65%),
+    linear-gradient(180deg, rgba(10,14,26,.78) 0%, rgba(10,14,26,.88) 100%),
+    var(--ink-900);
+  background-attachment: local, local, local, local;
+}
+
+/* ─── FIFA bar (header sobrio con countdown / next-match) ── */
+.phone .v3-fifa-bar {
+  background: #2851E1;
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-display);
+  margin-bottom: 12px;
+  box-shadow: 0 4px 18px rgba(40,81,225,.25);
+}
+.phone .v3-fifa-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.phone .v3-fifa-bar__icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+  object-fit: contain;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.phone .v3-fifa-bar__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.phone .v3-fifa-bar__title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phone .v3-fifa-bar__title sup {
+  font-size: 0.55em;
+  vertical-align: super;
+  opacity: .8;
+  margin-left: 1px;
+}
+.phone .v3-fifa-bar__subtitle {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: .85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.phone .v3-fifa-bar__countdown {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.phone .v3-cd-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 0 1px;
+}
+.phone .v3-cd-num {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.phone .v3-cd-lbl {
+  font-size: 8px;
+  font-weight: 500;
+  opacity: .85;
+  margin-top: 3px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+/* Slot user-mount (badge avatar+nombre+admin+logout — D13 corregida) */
+.phone .v3-fifa-bar__user {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.phone .v3-fifa-bar__user:empty { display: none; }
+
+@media (max-width: 400px) {
+  .phone .v3-fifa-bar { padding: 8px 10px; gap: 8px; border-radius: 6px; }
+  .phone .v3-fifa-bar__icon { width: 32px; height: 32px; padding: 3px; }
+  .phone .v3-fifa-bar__title { font-size: 11px; }
+  .phone .v3-fifa-bar__subtitle { font-size: 9px; }
+  .phone .v3-cd-num { font-size: 13px; }
+  .phone .v3-cd-lbl { font-size: 7px; margin-top: 2px; }
+  .phone .v3-cd-block { min-width: 22px; }
+  .phone .v3-fifa-bar__countdown { gap: 4px; }
+}
+
+/* ─── Qualified CTA (acceso al globo 3D — solo en grupos) ── */
+.phone .v3-qualified-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 10px;
+  background-color: #5B4FA8;
+  background-image:
+    radial-gradient(circle at 30% -20%, #F5C518 0 22%, transparent 23%),
+    radial-gradient(circle at 100% 10%, #E8632A 0 28%, transparent 29%),
+    radial-gradient(circle at 65% 110%, #D8362E 0 36%, transparent 37%),
+    radial-gradient(circle at 45% 50%, #6DB6B5 0 22%, transparent 23%),
+    radial-gradient(circle at 10% 130%, #9B8AC9 0 38%, transparent 39%),
+    linear-gradient(135deg, #5B4FA8 0%, #4A3E94 100%);
+  background-size: 100% 100%;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  color: #fff;
+  text-decoration: none;
+  font-family: var(--font-display);
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 18px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.2) inset;
+  cursor: pointer;
+}
+.phone .v3-qualified-cta:hover {
+  border-color: rgba(255,255,255,.4);
+  box-shadow: 0 6px 22px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.15) inset;
+}
+.phone .v3-qualified-cta:active { transform: scale(.99); }
+.phone .v3-qualified-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.10) 0%, rgba(0,0,0,.30) 60%, rgba(0,0,0,.50) 100%);
+  pointer-events: none;
+}
+.phone .v3-qualified-cta__flags {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.phone .v3-qualified-cta__flag {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg, var(--ink-700));
+  border: 1.5px solid #fff;
+  margin-left: -10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  position: relative;
+}
+.phone .v3-qualified-cta__flag:first-child { margin-left: 0; }
+.phone .v3-qualified-cta__flag img {
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  display: block;
+}
+.phone .v3-qualified-cta__flag--more {
+  background: #fff;
+  color: #1e1a4a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+}
+.phone .v3-qualified-cta__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.phone .v3-qualified-cta__eyebrow {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: #FFE082;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 3px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.phone .v3-qualified-cta__title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.phone .v3-qualified-cta__arrow {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(4px);
+}
+@media (max-width: 360px) {
+  .phone .v3-qualified-cta { padding: 8px 12px 8px 8px; gap: 8px; }
+  .phone .v3-qualified-cta__flag { width: 24px; height: 24px; margin-left: -8px; }
+  .phone .v3-qualified-cta__flag--more { font-size: 9px; }
+  .phone .v3-qualified-cta__title { font-size: 11px; }
+}
+
+/* ─── Stage pill (etiqueta de fase activa por page) ─────── */
+.phone .v3-stage-pill-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.phone .v3-stage-pill {
+  background: var(--lime);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  padding: 6px 16px;
+  border-radius: 999px;
+  box-shadow: 0 0 24px rgba(196,240,70,.35), 0 0 48px rgba(196,240,70,.15);
+}
+
+/* ─── Zoom overlay shared (predicciones / clasificación / KO) ── */
+.v3-zoom-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,14,26,.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.v3-zoom-overlay.is-open { opacity: 1; pointer-events: auto; }
+
+.v3-zoom-panel {
+  position: fixed; inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  z-index: 110;
+  pointer-events: none;
+  overflow-y: auto;
+}
+.v3-zoom-panel__inner {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto;
+  border: 1.5px solid var(--zoom-color, var(--fifa-gold));
+  box-shadow:
+    0 0 32px var(--zoom-glow, rgba(201,169,97,.4)),
+    0 24px 64px rgba(0,0,0,.7);
+  opacity: 0;
+  transform: scale(.94) translateY(16px);
+  transition: opacity .3s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: auto;
+  overflow: hidden;
+}
+.v3-zoom-overlay.is-open ~ .v3-zoom-panel .v3-zoom-panel__inner {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
