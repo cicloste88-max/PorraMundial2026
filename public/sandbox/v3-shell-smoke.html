@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0E1A"/>
+<title>F1.1g · Smoke Shell v3 — Porra Mundial 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/css/components/tokens.css"/>
+<link rel="stylesheet" href="/css/components/elim-tokens.css"/>
+<link rel="stylesheet" href="/css/v3/mundial-shell-v3.css"/>
+<style>
+  body { margin:0; background:var(--ink-900); color:var(--ink-100); font-family:'Inter',sans-serif; }
+  .smoke-controls {
+    position: fixed; bottom: 12px; left: 12px; right: 12px;
+    background: rgba(20,24,38,.95);
+    border: 1px solid #2A3142;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--ink-300);
+    z-index: 9999;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    backdrop-filter: blur(8px);
+  }
+  .smoke-controls button {
+    background: var(--fifa-blue); color: #fff; border: 0;
+    padding: 6px 10px; border-radius: 6px; font-size: 11px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .smoke-controls button.danger { background: var(--fifa-red); }
+  .smoke-controls button.lime { background: var(--lime); color: var(--ink-900); }
+  .smoke-controls .label { font-weight: 700; color: var(--lime); margin-right: 4px; }
+  .smoke-controls .badge {
+    background: rgba(196,240,70,.12); color: var(--lime);
+    padding: 2px 6px; border-radius: 4px; font-size: 10px;
+  }
+  .placeholder-content {
+    text-align: center;
+    color: var(--ink-400);
+    font-size: 12px;
+    padding: 40px 16px;
+    border: 1px dashed var(--ink-700);
+    border-radius: 12px;
+    margin: 20px 0;
+  }
+  .fake-badge {
+    background: rgba(17,19,24,.9); border:1px solid #27272a; border-radius:24px;
+    padding:5px 12px 5px 7px; display:inline-flex; align-items:center; gap:8px;
+    color: var(--ink-100); font-size: 11px;
+  }
+  .fake-badge .wc-user-avatar {
+    width:24px;height:24px;border-radius:50%;background:var(--fifa-gold);color:var(--ink-900);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;
+  }
+</style>
+</head>
+<body data-active-page="grupos">
+
+<!-- Mount target — el shell v3 inyecta .phone[data-v3-shell-mount] al inicio -->
+<div id="page-grupos">
+  <div class="placeholder-content">
+    [F1.1g sandbox · placeholder content de #page-grupos]<br/>
+    El shell v3 inyecta arriba: <code>.phone</code> con fifa-bar + qualified-cta + stage-pill.<br/>
+    Board de grupos llegará en F2 (grupos-v3.js).
+  </div>
+</div>
+
+<div class="smoke-controls">
+  <span class="label">F1.1g smoke</span>
+  <span class="badge" id="smoke-now">--</span>
+  <button id="btn-fake-kickoff">⏭ Simular post-kickoff</button>
+  <button id="btn-reset-kickoff" class="danger">↺ Reset countdown</button>
+  <button id="btn-fake-login" class="lime">👤 Simular login</button>
+  <button id="btn-logout">⎋ Logout</button>
+  <a href="/" style="color:var(--ink-300);text-decoration:none;font-size:11px;margin-left:auto">← volver</a>
+</div>
+
+<!-- v3 scripts (orden: resolver → shell) -->
+<script src="/js/v3/next-match-resolver-v3.js"></script>
+<script src="/js/v3/mundial-shell-v3.js"></script>
+
+<script>
+  // Reloj sandbox para San (verifica que el tick existe).
+  (function () {
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function tick() {
+      var d = new Date();
+      var el = document.getElementById('smoke-now');
+      if (el) el.textContent = 'Now UTC ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+
+  // Botón: forzar post-kickoff sustituyendo countdown blocks por slot next-match.
+  document.getElementById('btn-fake-kickoff').addEventListener('click', function () {
+    document.querySelectorAll('[data-v3-bar-countdown]').forEach(function (el) {
+      el.innerHTML = '<div class="v3-fifa-bar__nextmatch" data-v3-next-match style="font-size:11px;font-weight:600;letter-spacing:.02em">Cargando próximo partido…</div>';
+    });
+    // Pre-warm fixtures y pinta el primero.
+    if (typeof window._loadNextMatchFixtures === 'function') {
+      window._loadNextMatchFixtures().then(function () {
+        // Forzar "ahora = kickoff + 1ms" para que el resolver devuelva 'live' del primer partido.
+        var info = window.resolveNextMatchV3(new Date('2026-06-11T19:00:01Z').getTime());
+        if (info && info.match) {
+          var m = info.match;
+          var label = (info.state === 'live' ? 'EN VIVO · ' : 'Próx · ')
+                    + (m.home_es || m.home_en) + ' vs ' + (m.away_es || m.away_en);
+          document.querySelectorAll('[data-v3-next-match]').forEach(function (el) { el.textContent = label; });
+        }
+      });
+    }
+  });
+
+  // Botón: reset (recarga la página — la forma más limpia de volver al countdown).
+  document.getElementById('btn-reset-kickoff').addEventListener('click', function () {
+    location.reload();
+  });
+
+  // Botón: simular usuario logueado rellenando [data-user-mount] manualmente.
+  // (Smoke standalone — sin Supabase auth real. Valida D13 visual.)
+  document.getElementById('btn-fake-login').addEventListener('click', function () {
+    var badgeHtml = '<div class="fake-badge">'
+      + '<div class="wc-user-avatar">S</div>'
+      + '<span>San</span>'
+      + '</div>';
+    document.querySelectorAll('[data-user-mount]').forEach(function (el) {
+      el.innerHTML = badgeHtml;
+    });
+  });
+  document.getElementById('btn-logout').addEventListener('click', function () {
+    document.querySelectorAll('[data-user-mount]').forEach(function (el) {
+      el.innerHTML = '';
+    });
+  });
+</script>
+</body>
+</html>
