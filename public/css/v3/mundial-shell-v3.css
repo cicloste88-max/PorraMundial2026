@@ -172,7 +172,7 @@
 .phone .v3-qualified-cta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 10px 14px 10px 10px;
   background-color: #5B4FA8;
   background-image:
@@ -216,12 +216,12 @@
   z-index: 1;
 }
 .phone .v3-qualified-cta__flag {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--bg, var(--ink-700));
   border: 1.5px solid #fff;
-  margin-left: -10px;
+  margin-left: -9px;
   overflow: hidden;
   flex-shrink: 0;
   display: inline-flex;
@@ -262,7 +262,7 @@
   text-shadow: 0 1px 4px rgba(0,0,0,.6);
 }
 .phone .v3-qualified-cta__title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.15;
@@ -292,9 +292,10 @@
 }
 @media (max-width: 360px) {
   .phone .v3-qualified-cta { padding: 8px 12px 8px 8px; gap: 8px; }
-  .phone .v3-qualified-cta__flag { width: 24px; height: 24px; margin-left: -8px; }
+  .phone .v3-qualified-cta__flag { width: 22px; height: 22px; margin-left: -8px; }
   .phone .v3-qualified-cta__flag--more { font-size: 9px; }
   .phone .v3-qualified-cta__title { font-size: 11px; }
+  .phone .v3-qualified-cta__arrow { width: 22px; height: 22px; font-size: 16px; }
 }
 
 /* ─── Stage pill (etiqueta de fase activa por page) ─────── */
