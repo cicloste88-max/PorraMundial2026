@@ -191,11 +191,17 @@
   }
 
   function ensureZoomOverlay() {
+    // F2.6: alinear con design source — 2 nodos siblings direct body children
+    // (spec: "Hay 2 nodos fijos en el HTML... fuera del .phone"). Antes envolvía
+    // ambos en [data-v3-zoom-host] (sibling combinator funcionaba pero la
+    // abstracción extra desviaba de spec; remover para parity exacta).
     if (document.querySelector('[data-v3-zoom-overlay]')) return;
-    var host = document.createElement('div');
-    host.setAttribute('data-v3-zoom-host', '');
-    host.innerHTML = zoomOverlayHTML();
-    document.body.appendChild(host);
+    var temp = document.createElement('div');
+    temp.innerHTML = zoomOverlayHTML();
+    while (temp.firstChild) {
+      document.body.appendChild(temp.firstChild);
+    }
+    console.log('[v3-shell] ensureZoomOverlay → overlay+panel appended to body');
   }
 
   // ── Wiring ─────────────────────────────────────────────

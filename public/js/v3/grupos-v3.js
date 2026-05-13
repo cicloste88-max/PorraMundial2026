@@ -207,8 +207,23 @@ function renderGroup(grupo) {
 function v3OpenZoomGrupos(letter) {
   _v3CurrentLetter = letter;
   _v3CurrentTab = isGroupComplete(letter) ? 'standings' : 'predictions';
+
+  // F2.6 defensive: si shell no se inicializó (race), asegurar overlay antes.
+  if (!document.querySelector('.v3-zoom-overlay') && typeof window.mundialShellV3Init === 'function') {
+    window.mundialShellV3Init();
+  }
+
   v3RenderZoom();
   var overlay = document.querySelector('.v3-zoom-overlay');
+  var inner = document.querySelector('.v3-zoom-panel__inner');
+  console.log('[v3-grupos openZoom]', {
+    letter: letter,
+    overlayFound: !!overlay,
+    innerFound: !!inner,
+    innerHTMLLen: inner ? inner.innerHTML.length : 0,
+    overlayParent: overlay ? overlay.parentNode.tagName + (overlay.parentNode.id ? '#' + overlay.parentNode.id : '') : 'NONE',
+    panelSibling: overlay && overlay.nextElementSibling ? overlay.nextElementSibling.className : 'NONE'
+  });
   if (overlay) overlay.classList.add('is-open');
   document.body.style.overflow = 'hidden';
 }
