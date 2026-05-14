@@ -362,11 +362,16 @@
   opacity: 0;
   transform: scale(.94) translateY(16px);
   transition: opacity .3s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
-  pointer-events: auto;
+  /* F2.9 HOTFIX-03 (ERR-43 redux): pointer-events:none default; gating por
+     .is-open via sibling combinator abajo. Sin esto, tras cerrar el modal el
+     inner (fullscreen via flex centering del panel) capturaba clicks invisibles
+     hasta reload page. Mismo patrón que .v3-squad-picker-panel__inner (F2.8.2). */
+  pointer-events: none;
   overflow: hidden;
 }
 .v3-zoom-overlay.is-open ~ .v3-zoom-panel .v3-zoom-panel__inner {
   opacity: 1;
+  pointer-events: auto;
   transform: scale(1) translateY(0);
 }
 

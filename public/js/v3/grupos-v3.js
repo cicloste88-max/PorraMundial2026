@@ -233,6 +233,11 @@ function v3OpenZoomGrupos(letter) {
 function v3CloseZoomGrupos() {
   var overlay = document.querySelector('.v3-zoom-overlay');
   if (overlay) overlay.classList.remove('is-open');
+  // F2.9 HOTFIX-03 (ERR-43 redux): limpiar inner para garantizar que descendientes
+  // (match-cards, tabs, etc.) no quedan en DOM capturando clicks aunque el CSS
+  // ya gatee pointer-events. Belt + suspenders consistente con F2.8.2.
+  var inner = document.querySelector('.v3-zoom-panel__inner');
+  if (inner) inner.innerHTML = '';
   document.body.style.overflow = '';
   _v3CurrentLetter = null;
   v3RenderBoardGrupos();

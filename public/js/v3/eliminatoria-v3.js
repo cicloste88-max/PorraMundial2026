@@ -381,6 +381,11 @@ function v3OpenZoom(match, meta) {
 function v3CloseZoomKO() {
   var overlay = document.querySelector('.v3-zoom-overlay') || document.querySelector('.zoom-overlay');
   if (overlay) overlay.classList.remove('is-open');
+  // F2.9 HOTFIX-03 (ERR-43 redux): limpiar inner para garantizar que descendientes
+  // no quedan en DOM capturando clicks aunque el CSS ya gatee pointer-events.
+  // Belt + suspenders consistente con F2.8.2 (v3CloseGoleadorPickerGrupos).
+  var inner = document.querySelector('.v3-zoom-panel__inner') || document.querySelector('.zoom-panel__inner');
+  if (inner) inner.innerHTML = '';
   document.body.style.overflow = '';
   v3CurrentMatch = null;
   v3RenderAll();
