@@ -22,6 +22,16 @@
   background-attachment: local, local, local, local;
 }
 
+/* F2.9 HOTFIX-01: shell-host es un componente compacto (header + stage-pill +
+   qualified-cta opcional). Heredar min-height: 100vh del .phone genérico crea
+   ~890px de aire entre el shell y el contenido principal de la pantalla, porque
+   shell y contenido viven en .phone separados (sibling, no descendiente) en
+   grupos-v3.js y eliminatoria-v3.js. Detectado durante F2.9 smoke; aplica también
+   a Grupos (F2.8 cerró sin detectar). */
+.phone.v3-shell-host {
+  min-height: 0;
+}
+
 /* ─── FIFA bar (header sobrio con countdown / next-match) ── */
 .phone .v3-fifa-bar {
   background: #2851E1;
