@@ -394,7 +394,7 @@ function v3RenderZoomKO() {
   var overlay = document.querySelector('.v3-zoom-overlay') || document.querySelector('.zoom-overlay');
   if (!overlay) return;
 
-  var inner = overlay.querySelector('.v3-zoom-panel__inner') || overlay.querySelector('.zoom-panel__inner');
+  var inner = document.querySelector('.v3-zoom-panel__inner') || document.querySelector('.zoom-panel__inner');
   if (!inner) return;
 
   inner.style.setProperty('--zoom-color', meta.color);
