@@ -66,12 +66,18 @@
   position: relative;
 }
 
-/* Rondas R32, R16, QF, SF — layout de 2 columnas */
+/* Rondas R32, R16, QF, SF — layout grid 3 cols (1fr <trofeo central> 1fr).
+   F2.9 HF-06-bis: cambiado de "1fr 1fr" a "1fr 40px 1fr" para reservar carril
+   central donde flota el trofeo intermedio (HF-06 #8 inyecta .v3-trophy-col).
+   Patrón prototipo (design/v3-prototype/mundial-2026.css L379+): 3 cols grid
+   con trofeo absolute centrado. Aplicamos misma estructura con track 40px
+   (vs 86px del prototipo) para minimizar reducción de ancho de cards en elim
+   (cards más anchas que grupos). */
 .v3-bracket-board.v3-ko-board--R32,
 .v3-bracket-board.v3-ko-board--R16,
 .v3-bracket-board.v3-ko-board--QF,
 .v3-bracket-board.v3-ko-board--SF {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 40px 1fr;
 }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
@@ -575,12 +581,36 @@
   letter-spacing: 0.12em;
 }
 
-/* Trophy container en Final
-   F2.3 fix: scoped a contexto KO. ANTES `.v3-trophy-col { display: none }` global
-   se aplicaba a TODOS los .v3-trophy-col incluido el de Grupos (clase compartida),
-   ocultando el trofeo en página Grupos. */
+/* Trophy container — Final view rules.
+   F2.9 HF-06-bis: ELIMINADA la regla `.v3-bracket-board:not(.v3-ko-board--F)
+   .v3-trophy-col { display: none }` (era F2.3 fix para clase compartida con
+   Grupos antes de F2.5 unificación). Ahora el trofeo intermedio en R32/R16/QF/SF
+   SÍ debe ser visible (HF-06 #8). Las reglas para trofeo intermedio están en
+   el bloque dedicado más abajo. */
+
+/* Trophy col + img intermedio en R32/R16/QF/SF (carril central del grid 3 cols).
+   F2.9 HF-06-bis: position relative reserva carril, trofeo absolute centrado
+   con tamaño decorativo (opacity reducido + max-width pequeño para NO competir
+   visualmente con cards). Patrón mirror del prototipo mundial-2026.css L398+. */
 .v3-bracket-board:not(.v3-ko-board--F) .v3-trophy-col {
-  display: none;
+  position: relative;
+  pointer-events: none;
+  min-width: 0;
+}
+
+.v3-bracket-board:not(.v3-ko-board--F) .v3-trophy {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 110%;
+  max-width: 56px;
+  height: auto;
+  object-fit: contain;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 10px rgba(201,169,97,.35));
+  pointer-events: none;
+  z-index: 1;
 }
 
 .v3-ko-board--F .v3-trophy-col {
