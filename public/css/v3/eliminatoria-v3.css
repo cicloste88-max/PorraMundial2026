@@ -535,6 +535,15 @@
   white-space: nowrap;
 }
 
+/* F2.9 HF-10: cuando aparece el winner badge (chip "🏆 CAMPEÓN · ..." flotante
+   sobre el card por position:absolute top:-12px), ocultar el eyebrow ("🏆 GRAN
+   FINAL") para evitar solape visual — el badge winner ya cumple la función de
+   anunciar que es la final. Aplica también a la card 3er puesto donde el winner
+   "🥉 Bronce · ..." sustituye al eyebrow "🥉 3.er PUESTO". */
+.v3-final-card:has(.v3-final-card__winner) .v3-final-card__eyebrow {
+  display: none;
+}
+
 /* 3er Puesto — secundario, bronce mate */
 .v3-final-card--third {
   background: rgba(20, 24, 38, 0.65);
