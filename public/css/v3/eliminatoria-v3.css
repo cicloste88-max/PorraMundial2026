@@ -67,17 +67,16 @@
 }
 
 /* Rondas R32, R16, QF, SF — layout grid 3 cols (1fr <trofeo central> 1fr).
-   F2.9 HF-06-bis: cambiado de "1fr 1fr" a "1fr 40px 1fr" para reservar carril
-   central donde flota el trofeo intermedio (HF-06 #8 inyecta .v3-trophy-col).
-   Patrón prototipo (design/v3-prototype/mundial-2026.css L379+): 3 cols grid
-   con trofeo absolute centrado. Aplicamos misma estructura con track 40px
-   (vs 86px del prototipo) para minimizar reducción de ancho de cards en elim
-   (cards más anchas que grupos). */
+   F2.9 HF-06-ter: track central 40px → 86px (alineado con prototipo
+   design/v3-prototype/mundial-2026.css L379+ que usa exactamente 1fr 86px 1fr).
+   HF-06-bis había usado 40px conservador, pero el trofeo decorativo del prototipo
+   es 110px max-width — necesita 86px de carril para flotar centrado sin solapar
+   las cards laterales. Cards laterales: 155.5px (HF-06-bis) → 138.5px (HF-06-ter). */
 .v3-bracket-board.v3-ko-board--R32,
 .v3-bracket-board.v3-ko-board--R16,
 .v3-bracket-board.v3-ko-board--QF,
 .v3-bracket-board.v3-ko-board--SF {
-  grid-template-columns: 1fr 40px 1fr;
+  grid-template-columns: 1fr 86px 1fr;
 }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
@@ -603,14 +602,29 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  /* F2.9 HF-06-ter: alineado al prototipo design/v3-prototype/mundial-2026.css
+     (.trophy rule L398+). max-width 56→110, max-height añadido 160, opacity
+     0.6→1 (default), filter triple drop-shadow + animation float idéntica
+     al prototipo. Nombre keyframe v3-trophy-float-bracket (sufijo único para
+     evitar colisión con v3-trophy-float de grupos y v3-trophy-float-final
+     de la vista F — patrón post-F2.4 namespace rename). */
   width: 110%;
-  max-width: 56px;
+  max-width: 110px;
+  max-height: 160px;
   height: auto;
   object-fit: contain;
-  opacity: 0.6;
-  filter: drop-shadow(0 0 10px rgba(201,169,97,.35));
+  filter:
+    drop-shadow(0 0 18px rgba(201,169,97,.5))
+    drop-shadow(0 12px 28px rgba(0,0,0,.55))
+    drop-shadow(0 0 80px rgba(201,169,97,.2));
+  animation: v3-trophy-float-bracket 5s ease-in-out infinite;
   pointer-events: none;
   z-index: 1;
+}
+
+@keyframes v3-trophy-float-bracket {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50%      { transform: translate(-50%, calc(-50% - 4px)); }
 }
 
 .v3-ko-board--F .v3-trophy-col {
