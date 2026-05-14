@@ -383,6 +383,11 @@
   transition: transform 0.15s ease;
   width: 100%;
   max-width: 100%;
+  /* F2.9 HF-06 #9: clip overflow lateral en vista Final. Antes la grid interna
+     (1fr 96px 1fr) con min-content de los sides causaba overflow horizontal
+     visible (scrollbar) en viewport mobile ~360px. */
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .v3-final-card:active {
@@ -405,6 +410,10 @@
   grid-template-columns: 1fr auto 1fr;
   gap: 12px;
   align-items: center;
+  /* F2.9 HF-06 #9: min-width 0 para permitir que el grid honre 1fr estricto
+     cuando min-content de los sides excedería su track allocation (mismo
+     gotcha que F2.2 .v3-column). */
+  min-width: 0;
 }
 
 .v3-final-card__side {
@@ -413,6 +422,8 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* F2.9 HF-06 #9: clip code/text largos (e.g. "SAUDI ARABIA") en grid 1fr. */
+  overflow: hidden;
 }
 
 .v3-final-card__flag {
@@ -456,7 +467,10 @@
   border: 1.5px solid var(--fifa-gold);
   border-radius: 12px;
   padding: 8px 12px;
-  min-width: 96px;
+  /* F2.9 HF-06 #9: min-width 96px → 78px da headroom al grid (auto track)
+     para que los 2 fr columnas tengan más espacio en viewports estrechos
+     (360px). El score sigue legible (78px = 2 dígitos + dash). */
+  min-width: 78px;
   text-align: center;
   line-height: 1;
   box-shadow: inset 0 0 16px rgba(201, 169, 97, 0.15);

@@ -151,6 +151,19 @@ function v3RenderBoard() {
   });
   board.appendChild(leftCol);
 
+  // F2.9 HF-06 #8: trofeo central SIEMPRE entre las 2 columnas (R32/R16/QF/SF).
+  // En F lo gestiona v3RenderFinalBlock (early-return arriba). Sin .final-stack
+  // aquí porque no aplican fuera de F.
+  var trophyCol = document.createElement('div');
+  trophyCol.className = 'v3-trophy-col';
+  var trophy = document.createElement('img');
+  trophy.className = 'v3-trophy';
+  trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
+  trophy.alt = 'Trophy';
+  trophy.onerror = function() { this.style.display = 'none'; };
+  trophyCol.appendChild(trophy);
+  board.appendChild(trophyCol);
+
   // Right column
   var rightCol = document.createElement('div');
   rightCol.className = 'v3-column v3-column-right';
@@ -236,7 +249,8 @@ function v3RenderFinalBlock() {
   // Trophy
   var trophy = document.createElement('img');
   trophy.className = 'v3-trophy';
-  trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy-2026.png';
+  // F2.9 HF-06: URL alineada con prototipo (miniatures/trophy/trophy.png) — antes apuntaba a trophy-2026.png.
+  trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
   trophy.alt = 'Trophy';
   trophy.onerror = function() { this.style.display = 'none'; };
   trophyCol.appendChild(trophy);
