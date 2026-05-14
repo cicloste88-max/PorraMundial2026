@@ -144,8 +144,8 @@
 <script>
   // ── Toggle entre pages ─────────────────────────────────
   function showPage(pageId) {
-    document.getElementById('page-grupos').style.display = pageId === 'grupos' ? '' : 'none';
-    document.getElementById('page-elim').style.display   = pageId === 'elim'   ? '' : 'none';
+    document.getElementById('page-grupos').style.display = pageId === 'grupos' ? 'block' : 'none';
+    document.getElementById('page-elim').style.display   = pageId === 'elim'   ? 'block' : 'none';
     document.body.setAttribute('data-active-page', pageId);
     // Re-mount shell para que actualice qualified-cta + stage-pill según page.
     if (typeof window.ensurePageShellV3 === 'function') {
