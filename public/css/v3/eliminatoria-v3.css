@@ -67,6 +67,13 @@
      borde del viewport mobile 375). Aplica a todas las rondas — en R32/R16/QF
      reduce ligeramente el ancho de cards pero mantiene legibilidad. */
   padding: 4px 12px 12px;
+  /* F2.9 HF-06-sexto: box-sizing border-box para que el padding 12+12 quede
+     DENTRO del width:100% (default content-box hacía que el padding-right se
+     sumara fuera del 100%, causando overflow horizontal asimétrico — izquierda
+     OK por padL "empujando hacia dentro" / derecha desbordando 12-24px).
+     Con border-box el grid 1fr 86px 1fr recalcula a 120.5px/86px/120.5px
+     simétricos dentro del ancho 100% del padre. */
+  box-sizing: border-box;
   position: relative;
 }
 
