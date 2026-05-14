@@ -518,31 +518,34 @@
 }
 
 .v3-final-card.is-decided .v3-final-card__winner {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--fifa-gold);
-  color: var(--ink-900);
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
+  /* F2.9 HF-10-bis: header static dentro del card (no chip flotante).
+     Antes position:absolute + top:-12px hacía que el badge flotara fuera
+     del card (top fuera del fondo dorado, visualmente cortado). San
+     aclaró via montaje: AMBOS winner + eyebrow GRAN FINAL deben
+     coexistir apilados verticalmente dentro del card. Margin negativo
+     -12/-14 compensa el padding 12px 14px del card (HF-06-quater) para
+     que el header ocupe full-width edge-to-edge. */
+  position: static;
+  transform: none;
+  margin: -12px -14px 8px;
   padding: 5px 14px;
-  border-radius: 999px;
+  text-align: center;
+  background: rgba(201, 169, 97, 0.12);
+  border-bottom: 1px solid rgba(201, 169, 97, 0.25);
+  border-radius: 8px 8px 0 0;
+  color: var(--fifa-gold);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  box-shadow: 0 6px 16px rgba(201, 169, 97, 0.5);
+  line-height: 1.2;
   white-space: nowrap;
 }
 
-/* F2.9 HF-10: cuando aparece el winner badge (chip "🏆 CAMPEÓN · ..." flotante
-   sobre el card por position:absolute top:-12px), ocultar el eyebrow ("🏆 GRAN
-   FINAL") para evitar solape visual — el badge winner ya cumple la función de
-   anunciar que es la final. Aplica también a la card 3er puesto donde el winner
-   "🥉 Bronce · ..." sustituye al eyebrow "🥉 3.er PUESTO". */
-.v3-final-card:has(.v3-final-card__winner) .v3-final-card__eyebrow {
-  display: none;
-}
+/* F2.9 HF-10-bis: revertida la regla HF-10 que ocultaba el eyebrow cuando
+   había winner. San aclaró que AMBOS deben ser visibles apilados verticalmente
+   dentro del card (no exclusivos). Eyebrow ahora siempre visible. */
 
 /* 3er Puesto — secundario, bronce mate */
 .v3-final-card--third {
