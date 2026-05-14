@@ -62,7 +62,11 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   width: 100%;
-  padding: 4px 0 12px;
+  /* F2.9 HF-06-quinto: padding lateral 0→12px para dar respiración a cards
+     en SF/F (badges lime 101/102 y GRAN FINAL card quedaban pegados al
+     borde del viewport mobile 375). Aplica a todas las rondas — en R32/R16/QF
+     reduce ligeramente el ancho de cards pero mantiene legibilidad. */
+  padding: 4px 12px 12px;
   position: relative;
 }
 
