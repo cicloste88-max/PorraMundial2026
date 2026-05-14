@@ -107,7 +107,9 @@
     alert('[stub] openPizarraTactica · ' + (opts && (opts.nameEn || opts.iso2 || opts.iso3) || 'sin opts'));
   };
   window.diceSimulateAllGroups = function () {
-    if (!confirm('[stub] ¿Simular grupos?')) return;
+    // F2.9 HF-05 #6: stub confirm doble eliminado. El modal Grupos ya muestra su
+    // propio confirm real antes de invocar este stub. Solo persiste el grupo A
+    // in-memory (no escribe Supabase — currentUser=null).
     // Mini-stub — rellena 6 partidos del grupo A con scores aleatorios.
     if (typeof PARTIDOS === 'undefined' || typeof predictions === 'undefined') return;
     PARTIDOS.forEach(function (m) {

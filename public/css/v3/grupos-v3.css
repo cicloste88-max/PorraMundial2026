@@ -521,14 +521,22 @@
 
 .v3-st-name {
   font-family: var(--font-display);
-  font-size: 11px;
+  /* F2.9 HF-05 #4: reducir font-size una unidad (11→10) + permitir wrap a 2 líneas
+     para nombres largos ("República de Corea", "Bosnia y Herzegovina"). Antes hacía
+     ellipsis con nowrap + overflow hidden → truncamiento agresivo en standings table. */
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-100);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .v3-st-num {

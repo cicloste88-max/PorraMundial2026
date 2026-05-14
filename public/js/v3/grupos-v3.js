@@ -304,7 +304,6 @@ function v3RenderZoomGrupos() {
       + '<div class="v3-zoom-progress__label">Pronósticos guardados</div>'
       + '<div class="v3-zoom-progress__bar"><div class="v3-zoom-progress__fill" style="width:100%"></div></div>'
       + '</div>'
-      + '<button class="v3-zoom-cta" data-v3-show-predictions>Editar</button>'
       + '</div>'
       + '</div>';
   }
@@ -326,8 +325,7 @@ function v3RenderZoomGrupos() {
   var showSt = inner.querySelector('[data-v3-show-standings]');
   if (showSt) showSt.onclick = () => { _v3CurrentTab = 'standings'; v3RenderZoomGrupos(); };
 
-  var showPr = inner.querySelector('[data-v3-show-predictions]');
-  if (showPr) showPr.onclick = () => { _v3CurrentTab = 'predictions'; v3RenderZoomGrupos(); };
+  // F2.9 HF-05 #3: removido botón Editar del footer Clasificación (autosave coherente, sin modo edit explícito).
 
   inner.querySelectorAll('[data-v3-stepper]').forEach(btn => {
     btn.onclick = (e) => {

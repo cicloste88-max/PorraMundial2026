@@ -422,9 +422,11 @@ function v3RenderZoomKO() {
   var homeScore = hasHome ? pred.l : '–';
   var awayScore = hasAway ? pred.v : '–';
 
+  // F2.9 HF-05 #10-texto: el marcador del modal KO YA INCLUYE prórroga; el usuario
+  // sólo indica quién clasifica (independiente del mecanismo prórroga gol o tanda final).
   var penaltyHtml = isDraw ? `
     <div class="v3-zoom-ko-penalty">
-      <div class="v3-zoom-ko-penalty__label">⚽ Empate · ¿Quién gana en penaltis?</div>
+      <div class="v3-zoom-ko-penalty__label">⚽ Empate · Indica equipo que clasifica</div>
       <div class="v3-zoom-ko-penalty__btns">
         <button class="v3-zoom-ko-penalty__btn ${pred.classifier === homeLabel ? 'is-active' : ''}" data-pen="home">${homeLabel}</button>
         <button class="v3-zoom-ko-penalty__btn ${pred.classifier === awayLabel ? 'is-active' : ''}" data-pen="away">${awayLabel}</button>
@@ -433,8 +435,8 @@ function v3RenderZoomKO() {
   ` : '';
 
   var summaryHtml = decided
-    ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong>${isDraw ? ' (en penaltis)' : ''}</div>`
-    : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Marca quién gana en penaltis' : 'Introduce el marcador final'}</div>`;
+    ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong></div>`
+    : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
 
   inner.innerHTML = `
     <div class="v3-zoom-header">
