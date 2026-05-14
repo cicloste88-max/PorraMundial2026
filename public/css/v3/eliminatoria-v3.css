@@ -80,12 +80,17 @@
 }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
-   leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L. */
+   leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L.
+   F2.9 HF-06-quater #1: añadido min-width:0 para grid 1fr estricto. Sin esto,
+   el min-content de las cards descendientes (.v3-ko-card) puede expandir el
+   track 1fr más allá de su allocation calculada, causando overflow horizontal
+   en SF (verificado runtime: tracks asimétricos 155 vs 164 → bodyScrollW 429 > viewport 375). */
 .v3-bracket-board .v3-column {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 150px;
+  min-width: 0;
 }
 
 /* QF y SF: altura mínima para que el trofeo flote centrado */
@@ -127,6 +132,12 @@
   user-select: none;
   border-radius: 12px;
   overflow: hidden;
+  /* F2.9 HF-06-quater #1: min-width:0 para que las cards respeten el 1fr
+     estricto del grid 1fr 86px 1fr. Sin esto, el min-content del flex interno
+     (badge __tag fijo 22px + __body con códigos+flags+scores) fuerza la card
+     a expandir más allá del track 1fr → en SF (2 cards, 1 por columna) genera
+     overflow horizontal de 54px visible como scrollbar en viewport 375px. */
+  min-width: 0;
 }
 
 .v3-ko-card:active {
@@ -379,7 +390,11 @@
   background: linear-gradient(180deg, rgba(201, 169, 97, 0.18) 0%, var(--ink-800) 55%, var(--ink-900) 100%);
   border: 2px solid var(--fifa-gold);
   border-radius: 18px;
-  padding: 18px 16px 16px;
+  /* F2.9 HF-06-quater #3: padding 18px 16px 16px → 12px 14px (vertical -22px)
+     para reducir altura de la card GRAN FINAL (medido 133px → objetivo ~100px).
+     La card 3er puesto (.v3-final-card--third L552+) tiene padding propio
+     que la mantiene compacta sin tocar aquí. */
+  padding: 12px 14px;
   box-shadow:
     0 0 40px rgba(201, 169, 97, 0.45),
     0 16px 40px rgba(0, 0, 0, 0.6);
@@ -407,7 +422,9 @@
   color: var(--fifa-gold);
   text-transform: uppercase;
   text-align: center;
-  margin-bottom: 14px;
+  /* F2.9 HF-06-quater #3: margin-bottom 14px → 8px (reduce gap eyebrow→match
+     en GRAN FINAL card). */
+  margin-bottom: 8px;
 }
 
 .v3-final-card__match {
@@ -647,6 +664,11 @@
   max-width: 200px;
   max-height: 230px;
   margin: 0;
+  /* F2.9 HF-06-quater #2: object-fit:contain explícito (default CSS es 'fill'
+     que DEFORMA la imagen al box width:200×max-height:230 ignorando aspect ratio
+     nativo 0.667 → render aplastado 200×230 visualmente achaparrado). Con contain
+     preserva aspect: dentro del box, image renders ~153.5×230. */
+  object-fit: contain;
   filter:
     drop-shadow(0 0 22px rgba(201, 169, 97, 0.55))
     drop-shadow(0 14px 32px rgba(0, 0, 0, 0.55))
