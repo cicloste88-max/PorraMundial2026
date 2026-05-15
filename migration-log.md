@@ -1769,3 +1769,22 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - I4: close-porra read-only en cards v3.
 
 **HEAD anterior:** f509a82 (audit doc nomenclatura).
+
+## 2026-05-15 — fix(spa): F3-I1.5 cargar assets v3 (CSS + JS) en index/main-entry
+
+**Origen:** smoke F3-I1 falló porque las funciones v3GruposMount, v3ElimMount, ensurePageShellV3 no estaban en window. Causa: F2.x desarrolló v3 en sandboxes aislados (/sandbox/v3-pages-smoke.html y /sandbox/v3-shell-smoke.html) pero nunca migró los 4 scripts ni los 3 stylesheets al SPA principal (index.html + main-entry.js).
+
+**Cambios:**
+- index.html: 3 <link rel="stylesheet"> tras el último CSS legacy (/css/components/pizarra-tactica.css): /css/v3/mundial-shell-v3.css, grupos-v3.css, eliminatoria-v3.css.
+- js/main-entry.js: 4 .then(loadScript) entre ui-pred-shell.js y safety net, orden replicado del sandbox v3-pages-smoke.html: /js/v3/next-match-resolver-v3.js → mundial-shell-v3.js → grupos-v3.js → eliminatoria-v3.js.
+
+**Orden CSS:** v3 carga DESPUÉS del legacy para que pueda override si hace falta (cascade order natural).
+**Orden JS:** next-match-resolver primero (helper consumido por shell + pages); mundial-shell antes que pages (registra zoom singleton reusado, F2.1 fix #5).
+
+**F3-I1 wiring (d6bae7c) ahora es funcional.** Pages Grupos / Fase final muestran v3 al cambiar tab desde tabbar inferior.
+
+**Desviación menor del brief:** brief indicaba ruta `public/js/main-entry.js`; ruta real es `js/main-entry.js` (root, no bajo public/). index.html:994 importa `/js/main-entry.js`, Vite resuelve desde root.
+
+**Verificación:** node --check OK. 7/7 grep gates = 1 (3 CSS + 4 JS). Smoke localhost no ejecutado en sandbox (sin browser/vite).
+
+**HEAD anterior:** d6bae7c (F3-I1).

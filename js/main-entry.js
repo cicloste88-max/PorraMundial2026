@@ -83,6 +83,19 @@ loadScript('/js/leagues.js')
   // (predictor-ranks.js), totalPoints/awardPicks/currentLeague.
   .then(() => loadScript('/js/predictor-ranks.js'))
   .then(() => loadScript('/js/ui-pred-shell.js'))
+  // F3-I1.5: scripts del redesign v3 (4 ficheros).
+  // Orden replicado de /sandbox/v3-pages-smoke.html:
+  // 1) next-match-resolver-v3: helper (export window helpers para shell + pages).
+  // 2) mundial-shell-v3: registra zoom overlay singleton (ensureZoomOverlay)
+  //    + escucha 'mundial:page-changed' (consumido por F3-I1 routing).
+  // 3) grupos-v3: reusa zoom singleton (F2.1 fix #5).
+  // 4) eliminatoria-v3: idem reusa singleton.
+  // No auto-mount: padre showPage() invoca v3GruposMount/v3ElimMount
+  // bajo demanda (F3-I1).
+  .then(() => loadScript('/js/v3/next-match-resolver-v3.js'))
+  .then(() => loadScript('/js/v3/mundial-shell-v3.js'))
+  .then(() => loadScript('/js/v3/grupos-v3.js'))
+  .then(() => loadScript('/js/v3/eliminatoria-v3.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
