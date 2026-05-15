@@ -113,10 +113,13 @@ Las match-cards v3 viven en el modal zoom (`v3RenderMatchesList` + `v3RenderZoom
 
 **Notas implementación:**
 - ✅ **Fundamentos integración cerrados** (I1+I1.5+I1.6+I2). Cards v3 ya no son "isla" — el SPA ruteea, monta y limpia legacy en grupos.
-- **Orden ejecutado:** I2 (3 LOC) → I1 (wiring) → I1.5 (assets retroactivos) → I1.6 (cleanup grupos + chips) → [próximo] I3 (event bus) → I4 (close-porra) → bugs UX 1-3 + I1.7 elim cleanup → I5+I6+I7 (UX cards) → I8+I9 (refinamiento).
+- ✅ **Sprint 16-may cerrado** — F3-I1.6.x sub-iter (I1.6.2/3/4/5: chip logout funcional + currentUser file-scope + layout grid stage-row + códigos 3 letras grupos + 8 mejores 3eros marcados + cleanup CSS rápido `#page-elim`) + 8 hotfixes KO bracket (HF-08 wiring `resolveAllSlots` → R32 nombres reales · HF-09 home/away literal + códigos 3 letras KO · HF-11 replantar CSS cards KO con prototipo literal del autor, -119 LOC · HF-13 mount fantasma `data-user-mount` eliminado, ERR-45 · HF-14+15 separación SEMIS↔trofeo). Bracket KO v3 visualmente completo. Branch HEAD `ffb360a` lista para merge a main.
+- **Orden ejecutado:** I2 (3 LOC) → I1 (wiring) → I1.5 (assets retroactivos) → I1.6 (cleanup grupos + chips) → I1.6.x sub-iter (smoke fixes) → HF-08..HF-15 (KO bracket) → [próximo] I3 (event bus) → I4 (close-porra) → I5+I6+I7 (UX cards) → I8+I9 (refinamiento) → I1.7 elim HTML cleanup (legacy F7.X.4 ya oculto vía CSS en I1.6.5, eliminación HTML diferida).
 - **Lección F3-I1.5 retroactivo:** F2.x cerrado en sandbox aislado ≠ integrado al SPA. Verificar SIEMPRE que scripts/CSS estén incluidos en `index.html` y `main-entry.js` antes de asumir wiring funcional. Causa de commit retroactivo `e1de51f`.
+- **Lección HF-13 (ERR-45):** cuando un bug visual persiste pese a defensas, buscar TODOS los mount points relacionados (no solo el sospechoso obvio). El `#wc-auth-bar` legacy estaba bien oculto, pero `mundial-shell-v3.js:67` tenía un mount nuevo `[data-user-mount]` que `renderAuthBar` interceptaba. F1.1f-v3 había añadido el mount como bridge transitorio que debía limpiarse cuando los chips F3-I1.6 estuviesen.
+- **Lección HF-11:** estampar CSS literal del prototipo del autor es a veces el camino más limpio (-119 LOC vs iterar overrides; respeta la decisión "estampa código tal cual").
 - **Solapamiento con audit match-cards (15 features tabla anterior):** I5↔item 4, I6↔items 1+7+15, I7↔item 9, I8↔item 3. La tabla transversales referencia el wiring; la tabla match-cards detalla las features específicas.
-- **HF-08 (propagación grupos→KO + render nombres reales) NO está en transversales** — es trabajo de scoring/state interno de los 2 screens v3. Va en Backlog F3 abajo.
+- **HF-08 (propagación grupos→KO + render nombres reales) ✅ DONE en este sprint** — wiring `resolveAllSlots()` desde `v3RenderBoard` (1 LOC + try/catch defensivo). La función legacy ya existía en `ko.js` desde F7.X.4; sólo faltaba invocarla.
 
 ---
 
