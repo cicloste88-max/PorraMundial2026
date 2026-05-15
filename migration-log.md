@@ -1928,3 +1928,26 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** Grep gates OK (HF-10 3 menciones; QF `1fr 50px 1fr`; SF `1fr 40px 1fr`). Smoke localhost no ejecutado en sandbox.
 
 **HEAD anterior:** 66db0fe.
+
+## 2026-05-16 — fix(elim): HF-11 replantar cards KO con prototipo + revertir HF-10
+
+**Contexto:** smoke HF-10 reveló que reducir el track del trofeo (50/40px) cambiaba el tamaño visual del trofeo entre rondas. San reclamó: "trofeo mantiene tamaño en todas las fases; cards más anchas via min-height/padding, no reduciendo trofeo". Solicitó estampar el CSS literal del prototipo del autor.
+
+**Cambios (eliminatoria-v3.css):**
+- REVERTIR HF-10: regla unificada `1fr 86px 1fr` para R32+R16+QF+SF (4 selectores agrupados).
+- ELIMINADAS reglas previas conflictivas (todas las A4+A5 del brief existían en el fichero):
+  - A1 ✓ HF-10 separadas QF (1fr 50px 1fr) + SF (1fr 40px 1fr) — eliminadas y fusionadas en C.
+  - A2 ✓ Vieja regla R32+R16 con `1fr 86px 1fr` (sola tras HF-10) — reemplazada con C unificada 4 rondas.
+  - A3 ✗ HF-09 `.phone .v3-ko-row__code`: NO existía con prefijo `.phone`. HF-09 había modificado base `.v3-ko-row__code` directamente — eliminada vía A4.
+  - A4 ✓ Las 19 reglas base: `.v3-ko-card`, `:active`, `.v3-column-left/right .v3-ko-card`, `.v3-ko-card__tag` (+ left/right), `.v3-ko-card__body` (+ left/right), `.v3-ko-row`, `.v3-column-left .v3-ko-row`, `.v3-ko-row__code` (+ left/right), `.v3-ko-row__flag` (+ img), `.v3-ko-row__score`, `.is-empty`. CONSERVADA `.v3-column-right .v3-ko-row` (NO en A4 del brief).
+  - A5 ✓ Las 17 reglas overrides por-ronda (4 R16 + 6 QF + 6 SF + reparto vertical QF/SF .v3-column).
+- APPEND bloque literal del prototipo del autor al final del fichero. Única adaptación: prefijo `v3-` 1-a-1 en cada selector. Sin cambios de valores, sin !important, sin .phone prefix. Crecimiento progresivo de cards: R32 50px → R16 60px → QF 78px → SF 110px (min-height del body).
+- NO TOCADO: `.v3-bracket-board` (padding/box-sizing), `.v3-bracket-board .v3-column` (min-height 150 + min-width 0), `.v3-trophy*`, `.v3-ko-board--F`, `.v3-final-*` (San: "Final OK, no tocar"), `.is-decided` (.v3-ko-row.is-winner highlight), `.v3-column-right .v3-ko-row` (no listado en A4), F3-I1.6.5 cleanup legacy.
+
+**Riesgo identificado (a observar en smoke):**
+- Prototipo NO incluye `min-width: 0` en `.v3-ko-card` (lo tenía la versión F2.9 HF-06-quater #1 para evitar overflow horizontal en SF). Si SF muestra scrollbar horizontal o tracks asimétricos, follow-up trivial: re-añadir `min-width: 0` (no contradice prototipo, era ajuste defensivo).
+- Prototipo NO usa `border-radius: 12px; overflow: hidden` en `.v3-ko-card` (lo tenía F2). El radio se aplica ahora en `__tag` y `__body` separados (9px). Si bordes redondeados se ven distintos a R32 antes, esto explica.
+
+**Tamaño**: 1016 → 897 líneas (-119) · 25810 bytes.
+
+**HEAD anterior:** 8992f8a.

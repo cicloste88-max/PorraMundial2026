@@ -77,30 +77,16 @@
   position: relative;
 }
 
-/* R32/R16 — layout grid 3 cols (1fr <trofeo 86px> 1fr). Alineado con
-   prototipo. Cards ~105px en mobile 375 con códigos 3 letras a font
-   9-11px cabe holgado. */
+/* HF-11: revertir HF-10. Todas las rondas no-F mantienen el mismo
+   carril del trofeo (86px) → trofeo se ve igual de grande en
+   R32/R16/QF/SF. Las cards ganan ancho gracias a los overrides
+   de min-height/padding del prototipo (bloque HF-11 al final del
+   fichero), no reduciendo el carril. */
 .v3-bracket-board.v3-ko-board--R32,
-.v3-bracket-board.v3-ko-board--R16 {
-  grid-template-columns: 1fr 86px 1fr;
-}
-
-/* HF-10: QF y SF tienen menos cards (4/2) y fonts más grandes (12-13px).
-   Códigos 3 letras a font 12-13 ocupan 39-50px, rebasando visualmente
-   el card de 105px por el border-radius + overflow:hidden.
-   Solución: reducir el track central del trofeo para que las cards
-   ganen ancho. Trofeo decorativo (max-width:110px) se comprime al
-   carril, visualmente menor pero proporcional a la ronda.
-   Aritmética target mobile 375:
-     QF: 1fr 50px 1fr → cards ~118px (+13px), row ~96, code 39 + flag 22
-                        + score 18 + gaps 8 = 87 + holgura 9px ✓
-     SF: 1fr 40px 1fr → cards ~123px (+18px), row ~101, code 50 + flag 22
-                        + score 18 + gaps 8 = 98 + holgura 3px (justo) */
-.v3-bracket-board.v3-ko-board--QF {
-  grid-template-columns: 1fr 50px 1fr;
-}
+.v3-bracket-board.v3-ko-board--R16,
+.v3-bracket-board.v3-ko-board--QF,
 .v3-bracket-board.v3-ko-board--SF {
-  grid-template-columns: 1fr 40px 1fr;
+  grid-template-columns: 1fr 86px 1fr;
 }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
@@ -115,13 +101,6 @@
   gap: 8px;
   min-height: 150px;
   min-width: 0;
-}
-
-/* QF y SF: altura mínima para que el trofeo flote centrado */
-.v3-ko-board--QF .v3-column,
-.v3-ko-board--SF .v3-column {
-  min-height: 260px;
-  justify-content: space-evenly;
 }
 
 /* Final: ocultar columnas, mostrar trofeo vertical */
@@ -145,167 +124,12 @@
   gap: 14px;
 }
 
-/* ─── KO Card (matches R32-SF) ──────────────────────────── */
-.v3-ko-card {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.15s ease;
-  user-select: none;
-  border-radius: 12px;
-  overflow: hidden;
-  /* F2.9 HF-06-quater #1: min-width:0 para que las cards respeten el 1fr
-     estricto del grid 1fr 86px 1fr. Sin esto, el min-content del flex interno
-     (badge __tag fijo 22px + __body con códigos+flags+scores) fuerza la card
-     a expandir más allá del track 1fr → en SF (2 cards, 1 por columna) genera
-     overflow horizontal de 54px visible como scrollbar en viewport 375px. */
-  min-width: 0;
-}
-
-.v3-ko-card:active {
-  transform: scale(0.97);
-}
-
-.v3-column-left .v3-ko-card {
-  flex-direction: row;
-}
-
-.v3-column-right .v3-ko-card {
-  flex-direction: row-reverse;
-}
-
-/* Tag lateral con ID (M73, M89, ...) */
-.v3-ko-card__tag {
-  flex: 0 0 22px;
-  background: var(--k-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 10px;
-  color: var(--ink-900);
-  letter-spacing: 0.04em;
-  box-shadow: 0 0 12px var(--k-glow);
-  flex-shrink: 0;
-}
-
-.v3-column-left .v3-ko-card__tag {
-  border-radius: 9px 0 0 9px;
-}
-
-.v3-column-right .v3-ko-card__tag {
-  border-radius: 0 9px 9px 0;
-}
-
-/* Body del match (home + away rows) */
-.v3-ko-card__body {
-  flex: 1 1 auto;
-  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
-  border: 1px solid var(--k-color);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 0 14px var(--k-glow),
-    0 3px 10px rgba(0, 0, 0, 0.5);
-  padding: 4px 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
-  min-height: 50px;
-}
-
-.v3-column-left .v3-ko-card__body {
-  border-radius: 0 9px 9px 0;
-  border-left: 0;
-}
-
-.v3-column-right .v3-ko-card__body {
-  border-radius: 9px 0 0 9px;
-  border-right: 0;
-}
-
-/* Fila de equipo (home o away) */
-/* HF-09: padding 1px 2px para coherencia con .v3-team-row de grupos
-   (códigos 3 letras post-resoluciónSlots, mismo formato visual). */
-.v3-ko-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 2px;
-  min-height: 14px;
-}
-
-.v3-column-left .v3-ko-row {
-  flex-direction: row-reverse;
-  justify-content: flex-end;
-}
-
+/* HF-11: reglas base de cards KO movidas al final del fichero
+   (CSS literal del prototipo del autor, prefijo v3- adaptado).
+   Conservada aquí únicamente `.v3-column-right .v3-ko-row`. */
 .v3-column-right .v3-ko-row {
   flex-direction: row;
   justify-content: flex-start;
-}
-
-/* Código del equipo (1A, 2B, G.M73, etc.) */
-/* HF-09: font-size 9px (era 10px) para coherencia con
-   .v3-team-row__code de grupos. R16/QF/SF mantienen sus overrides
-   progresivos (11/12/13px) — tienen más espacio horizontal. */
-.v3-ko-row__code {
-  font-family: var(--font-display);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--ink-100);
-  letter-spacing: 0.03em;
-  line-height: 1.1;
-  flex: 1;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.v3-column-left .v3-ko-row__code {
-  text-align: right;
-}
-
-.v3-column-right .v3-ko-row__code {
-  text-align: left;
-}
-
-/* Bandera */
-.v3-ko-row__flag {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 11px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--ink-700);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.v3-ko-row__flag img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* Score */
-.v3-ko-row__score {
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--ink-200);
-  width: 14px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
-.v3-ko-row__score.is-empty {
-  color: var(--ink-600);
 }
 
 /* Indicador ganador (fila ganadora resaltada) */
@@ -331,88 +155,8 @@
   color: var(--ink-500);
 }
 
-/* Escalas por ronda */
-.v3-ko-board--R16 .v3-ko-card__body {
-  min-height: 60px;
-  padding: 6px 8px;
-}
-
-.v3-ko-board--R16 .v3-ko-row__code {
-  font-size: 11px;
-}
-
-.v3-ko-board--R16 .v3-ko-row__flag {
-  flex-basis: 18px;
-  width: 18px;
-  height: 12px;
-}
-
-.v3-ko-board--R16 .v3-ko-row__score {
-  font-size: 12px;
-  width: 16px;
-}
-
-.v3-ko-board--QF .v3-ko-card__body {
-  min-height: 78px;
-  padding: 8px 10px;
-  gap: 4px;
-}
-
-.v3-ko-board--QF .v3-ko-card__tag {
-  flex-basis: 26px;
-  font-size: 11px;
-}
-
-.v3-ko-board--QF .v3-ko-row__code {
-  font-size: 12px;
-}
-
-.v3-ko-board--QF .v3-ko-row__flag {
-  flex-basis: 22px;
-  width: 22px;
-  height: 14px;
-}
-
-.v3-ko-board--QF .v3-ko-row__score {
-  font-size: 14px;
-  width: 18px;
-}
-
-.v3-ko-board--QF .v3-ko-row {
-  min-height: 22px;
-  padding: 2px 0;
-}
-
-.v3-ko-board--SF .v3-ko-card__body {
-  min-height: 110px;
-  padding: 10px 12px;
-  gap: 6px;
-}
-
-.v3-ko-board--SF .v3-ko-card__tag {
-  flex-basis: 30px;
-  font-size: 12px;
-}
-
-.v3-ko-board--SF .v3-ko-row__code {
-  font-size: 13px;
-}
-
-.v3-ko-board--SF .v3-ko-row__flag {
-  flex-basis: 26px;
-  width: 26px;
-  height: 17px;
-}
-
-.v3-ko-board--SF .v3-ko-row__score {
-  font-size: 18px;
-  width: 24px;
-}
-
-.v3-ko-board--SF .v3-ko-row {
-  min-height: 32px;
-  padding: 4px 0;
-}
+/* HF-11: overrides por ronda (R16/QF/SF) movidos al bloque
+   del prototipo al final del fichero. */
 
 /* ─── Final Card (FINAL + 3er Puesto) ────────────────────── */
 .v3-final-card {
@@ -1013,4 +757,141 @@ body.fc-shell-active #page-elim > #fc-elim-bracket-pane,
 body.fc-shell-active #page-elim > .container,
 body.fc-shell-active #page-elim > #modal {
   display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HF-11 (16-may) — CSS literal del prototipo del autor para
+   cards KO. Pegado tal cual del sistema de diseño con única
+   adaptación: prefijo v3- en cada clase.
+   Decisión San: estampa código sin cambios. Final (F) no
+   incluida — gestionada por sus propias reglas legacy.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Base de tarjeta — estructura común a todas las rondas */
+.v3-ko-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease;
+  user-select: none;
+}
+.v3-ko-card:active { transform: scale(.97); }
+
+/* Columna izquierda: pestaña a la izquierda. Derecha: invertida */
+.v3-column-left  .v3-ko-card { flex-direction: row; }
+.v3-column-right .v3-ko-card { flex-direction: row-reverse; }
+
+/* Pestaña vertical con el ID del partido (M73, M89…) */
+.v3-ko-card__tag {
+  flex: 0 0 22px;
+  background: var(--k-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  color: var(--ink-900);
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 12px var(--k-glow);
+}
+.v3-column-left  .v3-ko-card__tag { border-radius: 9px 0 0 9px; }
+.v3-column-right .v3-ko-card__tag { border-radius: 0 9px 9px 0; }
+
+/* Body con los 2 equipos */
+.v3-ko-card__body {
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--k-color);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.03),
+    0 0 14px var(--k-glow),
+    0 3px 10px rgba(0,0,0,.5);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-height: 50px;
+}
+.v3-column-left  .v3-ko-card__body { border-radius: 0 9px 9px 0; border-left: 0; }
+.v3-column-right .v3-ko-card__body { border-radius: 9px 0 0 9px; border-right: 0; }
+
+/* Filas de equipo dentro del cuerpo */
+.v3-ko-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+  min-height: 14px;
+}
+.v3-column-left .v3-ko-row { flex-direction: row-reverse; justify-content: flex-end; }
+
+.v3-ko-row__code {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-100);
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v3-column-left  .v3-ko-row__code { text-align: right; }
+.v3-column-right .v3-ko-row__code { text-align: left; }
+
+.v3-ko-row__flag {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 11px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ink-700);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.v3-ko-row__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.v3-ko-row__score {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-200);
+  width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.v3-ko-row__score.is-empty { color: var(--ink-600); }
+
+/* 🟣 8vos (R16) overrides */
+.v3-ko-board--R16 .v3-ko-card__body { min-height: 60px; padding: 6px 8px; }
+.v3-ko-board--R16 .v3-ko-row__code  { font-size: 11px; }
+.v3-ko-board--R16 .v3-ko-row__flag  { flex-basis: 18px; width: 18px; height: 12px; }
+.v3-ko-board--R16 .v3-ko-row__score { font-size: 12px; width: 16px; }
+
+/* 🟠 4tos (QF) overrides */
+.v3-ko-board--QF .v3-ko-card__body { min-height: 78px; padding: 8px 10px; gap: 4px; }
+.v3-ko-board--QF .v3-ko-card__tag  { flex-basis: 26px; font-size: 11px; }
+.v3-ko-board--QF .v3-ko-row        { min-height: 22px; padding: 2px 0; }
+.v3-ko-board--QF .v3-ko-row__code  { font-size: 12px; }
+.v3-ko-board--QF .v3-ko-row__flag  { flex-basis: 22px; width: 22px; height: 14px; }
+.v3-ko-board--QF .v3-ko-row__score { font-size: 14px; width: 18px; }
+
+/* 🟢 Semis (SF) overrides */
+.v3-ko-board--SF .v3-ko-card__body { min-height: 110px; padding: 10px 12px; gap: 6px; }
+.v3-ko-board--SF .v3-ko-card__tag  { flex-basis: 30px; font-size: 12px; }
+.v3-ko-board--SF .v3-ko-row        { min-height: 32px; padding: 4px 0; }
+.v3-ko-board--SF .v3-ko-row__code  { font-size: 13px; }
+.v3-ko-board--SF .v3-ko-row__flag  { flex-basis: 26px; width: 26px; height: 17px; }
+.v3-ko-board--SF .v3-ko-row__score { font-size: 18px; width: 24px; }
+
+/* Reparto vertical QF y SF (trofeo flotando centrado) */
+.v3-ko-board--QF .v3-column,
+.v3-ko-board--SF .v3-column {
+  min-height: 260px;
+  justify-content: space-evenly;
 }
