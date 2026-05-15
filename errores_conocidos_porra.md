@@ -662,3 +662,39 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** al migrar arquitectura UI legacy → nueva, hacer auditoría DOM completa con Chrome MCP de todos los paneles del componente origen (no solo el visible). Si un panel queda en `display:none` pero su lógica sigue ejecutándose, los outputs son fantasma. Validar visualmente cada caja del componente legacy antes de marcar la migración como completa.
 - **Fix aplicado:** commits `533ec15` en `claude/pizarra-tactica-modal-kmTEw`.
 - **Fecha detección:** 08 may 2026 (Sprint Cuadro Honor Restore — diagnóstico Chrome MCP).
+
+## ERR-43 — Overlay / sub-overlay con `pointer-events` no gateado por `.is-open`
+
+- **Síntoma:** tras la 1ª apertura+cierre de un overlay v3 (modal zoom o sub-overlay tipo squad picker), la página queda bloqueada — clicks en cualquier zona del viewport no responden. Los handlers de otros pickers, botones close del modal padre, tabs, e incluso el backdrop oscuro dejan de funcionar.
+- **Causa raíz:** la regla CSS base de `.X-overlay-panel__inner` tenía `pointer-events: auto` sin scope a `.X-overlay.is-open ~`. Aunque `opacity: 0` y la animación oculta visualmente el panel, **el inner sigue ocupando fullscreen** (via `position: fixed; inset: 0` heredado del wrapper panel) **y captura todos los clicks** porque pointer-events lo permite. Solo se manifiesta tras la 1ª apertura porque `inner.innerHTML` está vacío antes y no hay descendientes que interceptar; tras renderizar la lista (e.g. squad players), los hijos quedan en DOM y consumen los pointer events.
+- **Confirmación runtime:** `document.elementFromPoint(window.innerWidth/2, window.innerHeight/2)` post-cierre devuelve un descendiente del overlay invisible (e.g. `.v3-squad-picker-player__name`), no el `body` o page activo.
+- **Fix:**
+  1. `.X-overlay-panel__inner { pointer-events: none; }` por default.
+  2. `.X-overlay.is-open ~ .X-overlay-panel .X-overlay-panel__inner { pointer-events: auto; }` — solo cuando `.is-open` activo (mismo selector sibling que ya gateaba `opacity`).
+  3. JS defensivo: tras `overlay.classList.remove('is-open')`, hacer `inner.innerHTML = ''` para garantizar que no quedan hijos clicables en DOM (belt + suspenders).
+- **Patrón preventivo:** cualquier overlay/sub-overlay con pattern `fixed inset:0 + opacity-gated visibility` debe gatear **también** `pointer-events` por la misma clase `.is-open`. Verificar el zoom-overlay del modal principal (mundial-shell-v3.css L355) como referencia canónica de gating correcto.
+- **Test post-fix obligatorio:** tras cerrar el overlay programáticamente, click en OTRO elemento de la página (modal padre, tab adyacente, botón close, backdrop) — verificar que el handler responde. Single-event tests NO capturan este bug. Ver patrón E14 en `CLAUDE.md`.
+- **Fix aplicado:** commit `5b87645` en `claude/port-world-cup-design-FvZpD` (F2.8.2). Afectado: `.v3-squad-picker-panel__inner` del sub-overlay del goleador picker.
+- **Fecha detección:** 14 may 2026 (sandbox v3-pages-smoke, F2.8.1 → F2.8.2 — diagnóstico Chrome MCP runtime de San).
+
+## ERR-44 — Simuladores legacy KO escriben classifier="home"|"away" literal
+
+- **Síntoma:** En el bracket v3 aparece texto `home` o `away` literal en lugar del nombre del equipo ganador en cards KO con empate (visible en QF/SF cuando hay penaltis simulados).
+- **Causa:** `diceSimulateKOMatch()` en `admin.js` y `v3SimulateDice()` en `eliminatoria-v3.js`, en lugar de resolver el equipo ganador en penaltis, escriben directamente `pred.classifier = "home"` o `"away"` (la cadena literal, no el nombre del equipo). `resolveKO()` en `ko.js` entonces hace `resolvedSlots['W'+id] = pred.classifier` → bracket v3 renderiza el texto literal `"away"` como label del slot.
+- **Fix aplicado:** HF-09 (commit `66db0fe`, 16-may) — blindaje defensivo en `resolveKO()` bloque empate: si `classifier === 'home'` → `hTeam`; `'away'` → `aTeam`; otros valores (nombres reales) → tal cual. Cubre predicciones pasadas y futuras sin tocar simuladores legacy.
+- **Patrón preventivo:** validar OUTPUT semántico en consumer cuando datos vienen de fuentes heterogéneas (simuladores legacy + prediccions UI). Resolver en el punto de consumo, no asumir que todos los productores siguen el mismo contrato.
+- **Pendiente:** corregir los simuladores en origen (escribir nombre de equipo, no `"home"`/`"away"`) en sprint futuro.
+- **Fecha detección:** 16 may 2026 (smoke HF-08, sesión sprint F3-I1.6.x + KO bracket).
+
+## ERR-45 — `data-user-mount` fantasma en fifa-bar v3 interceptado por `renderAuthBar`
+
+- **Síntoma:** Avatar "C" + nombre + botón "Cerrar sesión" reaparecen tras unos segundos en la fifa-bar del shell v3, pese a defensas activas (`F3-I1.6.2` CSS `body.fc-shell-active #wc-auth-bar { display: none !important }` y `F3-I1.6.4` JS toggle defensivo en `refreshShellUserChips`). Vuelve a aparecer tras login state change, refresh de leagues, o cualquier re-render del shell.
+- **Causa:** Las defensas apuntaban al elemento equivocado. `#wc-auth-bar` legacy del welcome estaba bien oculto en SHELL_PAGES, pero `mundial-shell-v3.js:67` tenía un mount NUEVO dentro de la fifa-bar:
+  ```html
+  <div class="v3-fifa-bar__user" data-user-mount></div>
+  ```
+  Y `renderAuthBar()` en `auth.js:225-235` busca **todos** los `[data-user-mount]` del DOM con `document.querySelectorAll` y les inyecta `adminBtn + wc-user-badge` (avatar + nombre + "Cerrar sesión"). El mount fantasma se recreaba en cada re-render del shell y se llenaba en cada llamada a `renderAuthBar()`.
+- **Fix aplicado:** HF-13 (commit `5d07913`, 16-may) — eliminar la línea 67 del shell-v3 entera. Los chips ⚙ ADMIN + ↩ del stage-row F3-I1.6 ya cubren ADMIN + logout en el shell. Avatar + nombre San decidió quitarlos (duplicaban funcionalidad sin valor añadido).
+- **Patrón preventivo:** cuando un bug visual persiste pese a defensas, **buscar TODOS los mount points relacionados** en el repo, no solo el sospechoso obvio. Greps útiles: `data-user-mount`, `wc-user-badge`, `do-logout`, etc. Usar Chrome MCP DOM inspection en runtime para verificar qué elemento realmente vive en pantalla. F1.1f-v3 había añadido el mount como bridge transitorio mientras los chips no existían en el shell — debe limpiarse cuando el bridge ya no es necesario.
+- **Lección sister:** los comentarios de la función relevante (`renderAuthBar` en `auth.js:217-220`) ya advertían explícitamente "F4 cleanup elimina los 3 viejos" — leer comentarios de código antes de bordear el síntoma con defensas paralelas.
+- **Fecha detección:** 16 may 2026 (smoke HF-12, root cause encontrado tras 2 intentos fallidos en F3-I1.6.2 y F3-I1.6.4).

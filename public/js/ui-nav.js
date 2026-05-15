@@ -495,7 +495,6 @@ function koInit() {
   // NAVEGACIÓN SPA — showPage, updateKOPts, initWelcome
   // ─────────────────────────────────────────────────────────────
 /* ══ NAVEGACIÓN SPA ══ */
-let _gruposInitPromise = null;
 function showPage(page) {
   // F7.4-D-1: exponer página actual ANTES de cualquier toggle/render.
   // Consumido por tickerBoostToggle y _buildJornadaRanking (ui-groups.js)
@@ -532,23 +531,32 @@ function showPage(page) {
   if (authBar) authBar.style.display = page==='welcome' ? 'flex' : 'none';
   // Score user bar — eliminado en F7.4-C; identidad de usuario llegará en F7.4-E
   // vía header global persistente (D5: avatar + pts + #posición).
-  if(page === 'elim')   {
+  if(page === 'elim') {
     window.scrollTo(0,0);
-    koInit(); // resuelve slots para que buildKOCard tenga equipos.
-    // F7.X.4: shell visual nuevo. Si ui-elim-shell.js cargado, render.
-    // Reset activeAction → 'mis-pronosticos' antes del render: cada
-    // re-entrada al tab 'Fase final' arranca en estado base (no hereda
-    // un subtab Cuadro/Premios de la sesión anterior).
-    if (typeof window.elimShellResetAction === 'function') window.elimShellResetAction();
-    if (typeof window.renderElimShell === 'function') window.renderElimShell();
+    // F3-I1: v3 reemplaza elim legacy. v3ElimMount idempotente
+    // (guard _v3ElimInited; remount = v3RenderAll). NO invocamos
+    // koInit() ni renderElimShell() ni elimShellResetAction() (F7.X.4).
+    // TODO F3-Ix: verificar que v3ElimMount cubre internamente:
+    //   - resolveAllSlots() para que cards muestren nombres reales
+    //   - locked-screen cuando getGroupsProgress() < 72 partidos
+    //   - #ko-dice-btn show/hide según _porraCerrada
+    // Si no los cubre, mover esos calls aquí ANTES de v3ElimMount().
+    if (typeof window.v3ElimMount === 'function') {
+      window.v3ElimMount();
+    } else {
+      console.warn('[ui-nav F3-I1] window.v3ElimMount no disponible');
+    }
   }
   if(page === 'grupos') {
     window.scrollTo(0,0);
-    if (!_gruposInitPromise) {
-      _gruposInitPromise = Promise.resolve().then(function() { return initGrupos(); });
+    // F3-I1: v3 reemplaza grupos legacy. v3GruposMount es idempotente
+    // (guard interno _v3GruposInited). NO invocamos initGrupos() ni
+    // _gruposInitPromise (eliminado en Edición 4).
+    if (typeof window.v3GruposMount === 'function') {
+      window.v3GruposMount();
+    } else {
+      console.warn('[ui-nav F3-I1] window.v3GruposMount no disponible');
     }
-    // F7.X.7: bug #3 — #dice-global-bar visible para TODOS los usuarios con
-    // porra abierta. Antes solo se mostraba al admin via admReopenDirect.
     var diceBar = document.getElementById('dice-global-bar');
     if (diceBar) diceBar.style.display = window._porraCerrada ? 'none' : 'flex';
   }
@@ -567,6 +575,14 @@ function showPage(page) {
   if(page === 'welcome') window.scrollTo(0,0);
   if(page === 'score')  { window.scrollTo(0,0); sbLoad(); }
   if(page === 'admin')  { window.scrollTo(0,0); admInit(); }
+
+  // F3-I1: notificar al shell v3 (mundial-shell-v3.js) del cambio de page.
+  // CustomEvent para extensibilidad; ensurePageShellV3 síncrono como
+  // fallback (event no garantiza orden con renders inmediatos).
+  window.dispatchEvent(new CustomEvent('mundial:page-changed', { detail: { page: page } }));
+  if (typeof window.ensurePageShellV3 === 'function') {
+    window.ensurePageShellV3(page);
+  }
 
   // F7.4-B: aplicar shell según page
   if (typeof window.fcShellApply === 'function') window.fcShellApply(page);

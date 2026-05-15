@@ -213,11 +213,16 @@ function saveAwPicks() {
 // onAuthStateChange se registra dentro de runAuthInit() para garantizar
 // que todos los scripts de la cadena ya están cargados
 
-/* ── Renderiza la barra de sesión (top-right) ── */
+/* ── Renderiza la barra de sesión (top-right) ──
+   F1.1f v3 (D13 corregida): añade soporte para slots `[data-user-mount]` que
+   inyecta el shell mundial-shell-v3.js dentro de .v3-fifa-bar__user en cada
+   SHELL_PAGE. Coexiste con los 3 mounts viejos (#wc-auth-bar, #grupos-user-bar,
+   #elim-user-bar) durante transición F1-F3; F4 cleanup elimina los 3 viejos. */
 function renderAuthBar() {
   const bar      = document.getElementById('wc-auth-bar');
   const gruposBar = document.getElementById('grupos-user-bar');
   const elimBar  = document.getElementById('elim-user-bar');
+  const v3Mounts = document.querySelectorAll('[data-user-mount]');
   if (currentUser) {
     const inicial = currentUser.nombre.charAt(0).toUpperCase();
     const adminBtn = currentUser.is_admin
@@ -227,11 +232,13 @@ function renderAuthBar() {
     if (bar)      bar.innerHTML      = badgeHtml;
     if (gruposBar) gruposBar.innerHTML = badgeHtml;
     if (elimBar)  elimBar.innerHTML  = badgeHtml;
+    v3Mounts.forEach(el => { el.innerHTML = badgeHtml; });
   } else {
     const loginHtml = `<button class="wc-login-btn-bar do-login">Iniciar sesión</button>`;
     if (bar)      bar.innerHTML      = loginHtml;
     if (gruposBar) gruposBar.innerHTML = '';
     if (elimBar)  elimBar.innerHTML  = '';
+    v3Mounts.forEach(el => { el.innerHTML = ''; });
   }
 }
 // Event delegation unificado — logout, login y cierre de popover

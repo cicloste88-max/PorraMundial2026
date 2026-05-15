@@ -1,0 +1,1028 @@
+/* ============================================================
+   MUNDIAL 2026 — Grupos v3 (mobile porter desde prototipo)
+   ============================================================ */
+
+.phone .v3-board {
+  display: grid;
+  grid-template-columns: 1fr 86px 1fr;
+  gap: 6px;
+  margin-top: 12px;
+  align-items: stretch;
+  position: relative;
+}
+
+.phone .v3-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* F2.2 fix #A: CSS Grid default `min-width: auto` (= min-content) en grid items
+     puede expandir tracks `1fr` si el contenido es más ancho, rompiendo simetría
+     entre column-left y column-right. Force `min-width: 0` para honrar 1fr estricto
+     incluso si el contenido tiene texto largo (e.g. "República de Corea"). */
+  min-width: 0;
+}
+
+/* Trophy column — central, absolute positioning */
+.phone .v3-trophy-col {
+  position: relative;
+  pointer-events: none;
+  /* F2.2 fix #B: min-width: 0 (mismo razonamiento que .v3-column) +
+     min-height defensivo para que el trophy-col tenga altura aunque
+     `align-items: stretch` falle. Children son absolute (zero intrinsic),
+     sin min-height el column colapsaría a 0 tall si el grid no estirase. */
+  min-width: 0;
+  min-height: 200px;
+  align-self: stretch;
+}
+
+.phone .v3-trophy {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 110%;
+  max-width: 110px;
+  max-height: 160px;
+  object-fit: contain;
+  z-index: 2;
+  filter:
+    drop-shadow(0 0 18px rgba(201,169,97,.5))
+    drop-shadow(0 12px 28px rgba(0,0,0,.55))
+    drop-shadow(0 0 80px rgba(201,169,97,.2));
+  animation: v3-trophy-float 5s ease-in-out infinite;
+}
+
+@keyframes v3-trophy-float {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50%      { transform: translate(-50%, calc(-50% - 4px)); }
+}
+
+/* F2.4: emoji fallback removido (San lo pidió eliminar). Si la image del logo
+   FIFA falla, queda vacío — no más emoji 🏆. Las reglas .v3-trophy-fallback
+   y .is-fallback se eliminan junto con el div del JS. */
+
+/* Group card (compacta) */
+.phone .v3-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease;
+  user-select: none;
+}
+
+.phone .v3-group:active { transform: scale(.97); }
+
+.phone .v3-column-left .v3-group { flex-direction: row; }
+.phone .v3-column-right .v3-group { flex-direction: row-reverse; }
+
+/* Vertical tab with letter */
+.phone .v3-group__tab {
+  flex: 0 0 22px;
+  background: var(--g-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink-900);
+  letter-spacing: -0.02em;
+  position: relative;
+  box-shadow: 0 0 14px var(--g-glow);
+}
+
+.phone .v3-column-left .v3-group__tab { border-radius: 10px 0 0 10px; }
+.phone .v3-column-right .v3-group__tab { border-radius: 0 10px 10px 0; }
+
+/* Card with 4 teams */
+.phone .v3-group__card {
+  flex: 1 1 auto;
+  /* F2.2 fix #A: complemento del fix .v3-column — el card debe poder
+     encogerse a ancho de columna sin negarse por min-content del texto.
+     Con line-clamp:2 el texto wrapea internamente; el card respeta la
+     columna padre. */
+  min-width: 0;
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--g-color);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.03),
+    0 0 16px var(--g-glow),
+    0 4px 12px rgba(0,0,0,.5);
+  padding: 6px 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 108px;
+}
+
+.phone .v3-column-left .v3-group__card { border-radius: 0 10px 10px 0; border-left: 0; }
+.phone .v3-column-right .v3-group__card { border-radius: 10px 0 0 10px; border-right: 0; }
+
+/* Team row */
+.phone .v3-team-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 2px;
+  min-height: 22px;
+}
+
+.phone .v3-column-left .v3-team-row { flex-direction: row-reverse; justify-content: flex-end; }
+
+.phone .v3-team-row__code {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-100);
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.phone .v3-column-left .v3-team-row__code { text-align: right; }
+.phone .v3-column-right .v3-team-row__code { text-align: left; }
+
+.phone .v3-team-row__flag {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 12px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ink-700);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+  position: relative;
+}
+
+.phone .v3-team-row__flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.phone .v3-team-row__flag.is-broken {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  font-size: 6px;
+  color: var(--ink-400);
+}
+
+.phone .v3-team-row__flag img.is-broken { display: none; }
+
+/* Standings display */
+.phone .v3-group.has-standings .v3-team-row__pos {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-400);
+  width: 8px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.phone .v3-column-right .v3-group.has-standings .v3-team-row__pos,
+.phone .v3-group.has-standings .v3-team-row.is-qualified .v3-team-row__pos {
+  color: var(--win);
+}
+
+.phone .v3-group.has-standings .v3-team-row.is-qualified .v3-team-row__code {
+  color: var(--win);
+}
+
+.phone .v3-group.has-standings .v3-team-row__pts {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-100);
+  width: 12px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* F3-I1.6.4: post-simulación render con códigos 3 letras (MEX/BRA/ESP)
+   en lugar de nombres completos. Sin riesgo de overflow → simplificar
+   override a solo desactivar wrap vertical de la regla base. */
+.phone .v3-group.has-standings .v3-team-row__code {
+  display: block;
+  -webkit-line-clamp: initial;
+  -webkit-box-orient: initial;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+/* Complete indicator */
+.phone .v3-group__tab::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.4);
+  opacity: 0;
+}
+
+.phone .v3-group.is-complete .v3-group__tab::after { opacity: 1; }
+
+/* Footer actions */
+.phone .v3-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.phone .v3-btn {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-700);
+  background: rgba(255,255,255,.04);
+  color: var(--ink-300);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.phone .v3-btn:hover { background: rgba(255,255,255,.08); color: var(--ink-100); }
+
+.phone .v3-btn--danger { color: var(--fifa-red); border-color: rgba(227,6,19,.3); }
+.phone .v3-btn--danger:hover { background: rgba(227,6,19,.08); }
+
+.phone .v3-hint {
+  text-align: center;
+  font-family: var(--font-text);
+  font-size: 10px;
+  color: var(--ink-400);
+  margin-top: 16px;
+  letter-spacing: 0.04em;
+}
+
+/* F2.5: Zoom Overlay / Panel / Header / Close / Body / Tabs movidos a
+   mundial-shell-v3.css (shared skeleton compartido entre Grupos + Elim).
+   Las reglas page-specific del CONTENIDO (footer, progress, cta, match-card,
+   standings, match-side, score-stepper) viven debajo, no han colisionado. */
+
+/* Match cards */
+.v3-matches-list { display: flex; flex-direction: column; gap: 8px; }
+
+.v3-match-day-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  margin: 6px 0 -2px;
+  padding-left: 4px;
+}
+
+.v3-match-day-label:first-child { margin-top: 0; }
+
+.v3-match-card {
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  transition: border-color .15s;
+}
+
+.v3-match-card.is-filled { border-color: rgba(0,131,74,.4); }
+
+.v3-match-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.v3-match-side--home { flex-direction: row; }
+.v3-match-side--away { flex-direction: row-reverse; }
+
+.v3-match-side__flag {
+  width: 28px;
+  height: 18px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--ink-700);
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+
+.v3-match-side__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.v3-match-side__flag.is-broken {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.08);
+  font-size: 8px;
+  color: var(--ink-400);
+}
+
+.v3-match-side__name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-100);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-match-side--away .v3-match-side__name { text-align: right; }
+
+.v3-match-score {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--ink-700);
+  border-radius: 9px;
+  padding: 2px;
+}
+
+.v3-score-stepper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+}
+
+.v3-score-btn {
+  background: transparent;
+  border: 0;
+  color: var(--ink-400);
+  font-size: 10px;
+  cursor: pointer;
+  width: 100%;
+  height: 14px;
+  padding: 0;
+  line-height: 1;
+  transition: color .12s;
+}
+
+.v3-score-btn:hover,
+.v3-score-btn:active { color: var(--zoom-color); }
+
+.v3-score-val {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink-100);
+  width: 100%;
+  text-align: center;
+  line-height: 1;
+  padding: 1px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-score-val.is-empty { color: var(--ink-600); }
+
+.v3-score-sep {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink-500);
+  padding: 0 2px;
+}
+
+/* Footer del zoom */
+.v3-zoom-footer {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(0,0,0,.3);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.v3-zoom-progress { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.v3-zoom-progress__label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-300);
+  text-transform: uppercase;
+}
+
+.v3-zoom-progress__bar {
+  height: 4px;
+  background: rgba(255,255,255,.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.v3-zoom-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--zoom-color), var(--fifa-gold));
+  border-radius: 2px;
+  width: 0%;
+  transition: width .25s ease;
+}
+
+.v3-zoom-cta {
+  background: var(--zoom-color);
+  color: var(--ink-900);
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px var(--zoom-glow);
+  transition: transform .15s, filter .15s;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.v3-zoom-cta:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.v3-zoom-cta:disabled { opacity: .35; cursor: not-allowed; filter: grayscale(.5); }
+
+/* Standings table */
+.v3-standings-table {
+  background: var(--ink-800);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ink-700);
+}
+
+.v3-standings-head,
+.v3-standings-row {
+  display: grid;
+  grid-template-columns: 22px 1fr 22px 22px 22px 24px 26px;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-standings-head {
+  background: rgba(0,0,0,.3);
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.v3-standings-row {
+  font-size: 12px;
+  border-top: 1px solid var(--ink-700);
+}
+
+.v3-standings-row.is-qualified { background: rgba(0,131,74,.08); }
+.v3-standings-row.is-qualified .v3-st-name { color: var(--win); }
+.v3-standings-row.is-qualified .v3-st-pos { color: var(--win); }
+
+.v3-st-pos {
+  font-family: var(--font-display);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--ink-400);
+}
+
+.v3-st-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v3-st-flag {
+  width: 20px;
+  height: 14px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ink-700);
+  flex-shrink: 0;
+}
+
+.v3-st-flag img { width: 100%; height: 100%; object-fit: cover; }
+
+.v3-st-name {
+  font-family: var(--font-display);
+  /* F2.9 HF-05 #4: reducir font-size una unidad (11→10) + permitir wrap a 2 líneas
+     para nombres largos ("República de Corea", "Bosnia y Herzegovina"). Antes hacía
+     ellipsis con nowrap + overflow hidden → truncamiento agresivo en standings table. */
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-100);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.v3-st-num {
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink-300);
+  font-size: 11px;
+}
+
+.v3-st-pts {
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--ink-100);
+  font-size: 13px;
+}
+
+.v3-qualif-legend {
+  margin-top: 10px;
+  font-family: var(--font-text);
+  font-size: 10px;
+  color: var(--ink-400);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.v3-qualif-legend::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: rgba(0,131,74,.25);
+  border: 1px solid rgba(0,131,74,.5);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Responsive */
+@media (min-width: 600px) {
+  .phone .v3-board { grid-template-columns: 1fr 96px 1fr; gap: 8px; }
+  .phone .v3-trophy { max-width: 130px; max-height: 180px; }
+}
+
+@media (max-width: 360px) {
+  .phone .v3-board { grid-template-columns: 1fr 72px 1fr; gap: 4px; }
+  .phone .v3-group__card { min-height: 96px; padding: 4px 5px; }
+  .phone .v3-team-row { min-height: 20px; }
+  .phone .v3-team-row__code { font-size: 8px; }
+  .phone .v3-team-row__flag { width: 16px; height: 11px; }
+  .phone .v3-trophy { max-width: 84px; max-height: 130px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   F2.8 — Goleadores tab + chips puntuación + squad picker
+   Audit pre-cambio (lección F2.3-F2.7): los selectores `.v3-goleador*`,
+   `.v3-chip*`, `.v3-squad-picker*` son exclusivos de Grupos. No existen
+   en eliminatoria-v3.css. Sin riesgo de colisión cross-file.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Chips de puntuación bajo cada match-card (tab Marcadores post-partido) */
+.v3-chip-stack {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 4px 0;
+  border-top: 1px dashed var(--ink-700);
+  margin-top: 6px;
+}
+
+.v3-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.v3-chip--zero {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-400);
+}
+
+.v3-chip--win {
+  background: rgba(0,131,74,.18);
+  border: 1px solid rgba(52,211,153,.4);
+  color: #34d399;
+}
+
+.v3-chip--exact {
+  background: rgba(196,240,70,.18);
+  border: 1px solid rgba(196,240,70,.45);
+  color: var(--lime);
+}
+
+.v3-chip--gole {
+  background: rgba(201,169,97,.18);
+  border: 1px solid rgba(201,169,97,.5);
+  color: var(--fifa-gold);
+}
+
+.v3-chip--bonus {
+  background: rgba(167,139,250,.18);
+  border: 1px solid rgba(167,139,250,.4);
+  color: #a78bfa;
+}
+
+.v3-chip--total {
+  background: linear-gradient(135deg, var(--zoom-color, #5eead4), var(--lime));
+  color: var(--ink-900);
+  border: 0;
+  font-weight: 900;
+  box-shadow: 0 0 12px rgba(94,234,212,.4);
+  margin-left: auto;
+}
+
+/* ─── Tab Goleadores — lista de partidos con picks ───────────── */
+.v3-goleadores-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v3-goleador-row {
+  /* F2.8.1: refactor a 1 pick unificado por partido (eliminada la 3ra columna).
+     grid 1fr (match-label) | 2fr (pick area full-width del espacio restante). */
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.v3-goleador-row__match {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-300);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-goleador-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(94,234,212,.06);
+  border: 1px solid rgba(94,234,212,.2);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: var(--font-text);
+  color: var(--ink-100);
+  font-size: 10.5px;
+  text-align: left;
+  min-width: 0;
+  transition: background .15s, border-color .15s;
+}
+
+.v3-goleador-pick:hover {
+  background: rgba(94,234,212,.12);
+  border-color: rgba(94,234,212,.4);
+}
+
+.v3-goleador-pick--empty {
+  background: rgba(255,255,255,.03);
+  border: 1px dashed rgba(255,255,255,.1);
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+.v3-goleador-pick--empty:hover {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.2);
+  font-style: normal;
+}
+
+.v3-goleador-pick--unavailable {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.v3-goleador-pick--unavailable:hover {
+  background: rgba(255,255,255,.03);
+  border-color: rgba(255,255,255,.1);
+}
+
+.v3-goleador-pick__hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.v3-goleador-pick__player {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-goleador-pick__name {
+  font-weight: 600;
+  color: var(--ink-100);
+}
+
+.v3-goleador-pick__chev {
+  flex-shrink: 0;
+  color: var(--ink-500);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* F2.8.1: pick filled — avatar (número) + nombre + chip equipo */
+.v3-goleador-pick.is-filled {
+  background: rgba(94,234,212,.1);
+  border-color: rgba(94,234,212,.35);
+}
+
+.v3-goleador-pick__avatar {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--zoom-color, var(--fifa-gold));
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+}
+
+.v3-goleador-pick__team {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ink-900);
+  background: var(--lime);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* F2.8.1: sub-overlay squad picker — sección por equipo (home/away dividers) */
+.v3-squad-picker-team-section {
+  margin-bottom: 14px;
+}
+
+.v3-squad-picker-team-section:last-of-type {
+  margin-bottom: 8px;
+}
+
+.v3-squad-picker-team-section__title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--zoom-color, var(--fifa-gold));
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--ink-700);
+  margin-bottom: 8px;
+}
+
+.v3-squad-picker-team-section--empty {
+  opacity: .55;
+}
+
+.v3-squad-picker-team-section__hint {
+  font-size: 10px;
+  color: var(--ink-500);
+  font-style: italic;
+  padding: 6px 4px;
+}
+
+/* ─── Squad picker sub-overlay (z-index sobre el modal zoom) ─── */
+.v3-squad-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,14,26,.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 120;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+
+.v3-squad-picker-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.v3-squad-picker-panel {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  z-index: 130;
+  pointer-events: none;
+  overflow-y: auto;
+}
+
+.v3-squad-picker-panel__inner {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border-radius: 18px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto;
+  border: 1.5px solid var(--zoom-color, var(--fifa-gold));
+  box-shadow:
+    0 0 28px var(--zoom-glow, rgba(201,169,97,.4)),
+    0 20px 48px rgba(0,0,0,.7);
+  opacity: 0;
+  transform: scale(.94) translateY(12px);
+  transition: opacity .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1);
+  /* F2.8.2 fix: pointer-events:none por default. Antes era `auto` sin scoping,
+     lo que hacía que el inner (fullscreen via flex centering del .v3-squad-picker-panel)
+     capturara TODOS los clicks aunque opacity=0 → bloqueaba toda la página tras 1ª
+     selección. Pattern idéntico al zoom-overlay del modal principal. */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.v3-squad-picker-overlay.is-open ~ .v3-squad-picker-panel .v3-squad-picker-panel__inner {
+  opacity: 1;
+  /* F2.8.2 fix: pointer-events:auto SOLO cuando .is-open (lift al overlay sibling). */
+  pointer-events: auto;
+  transform: scale(1) translateY(0);
+}
+
+.v3-squad-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--ink-700);
+}
+
+.v3-squad-picker-header__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-squad-picker-header__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--zoom-color, var(--fifa-gold));
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.v3-squad-picker-header__scoreline {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v3-squad-picker-body {
+  padding: 14px 16px 18px;
+}
+
+.v3-squad-picker-body__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+  margin: 0 0 10px;
+}
+
+.v3-squad-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v3-squad-picker-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ink-700);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-text);
+  font-size: 12px;
+  color: var(--ink-100);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s, border-color .15s;
+}
+
+.v3-squad-picker-player:hover {
+  background: rgba(94,234,212,.08);
+  border-color: rgba(94,234,212,.3);
+}
+
+.v3-squad-picker-player.is-picked {
+  background: rgba(196,240,70,.14);
+  border-color: rgba(196,240,70,.45);
+}
+
+.v3-squad-picker-player__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.v3-squad-picker-player__check {
+  flex-shrink: 0;
+  color: var(--lime);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.v3-squad-picker-player--clear {
+  background: rgba(227,6,19,.06);
+  border: 1px dashed rgba(227,6,19,.3);
+  color: var(--fifa-red);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.v3-squad-picker-player--clear:hover {
+  background: rgba(227,6,19,.12);
+  border-color: rgba(227,6,19,.5);
+}
+
+.v3-squad-picker-player--clear:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.v3-squad-picker-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-400);
+  background: rgba(255,255,255,.02);
+  border: 1px dashed var(--ink-700);
+  border-radius: 8px;
+}

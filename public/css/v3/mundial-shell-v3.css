@@ -1,0 +1,539 @@
+/* F1.1b · v3 shell compartido (Grupos + Eliminatoria + SHELL_PAGES).
+   Procedencia: design/v3-prototype/mundial-2026.css HEAD `7a6eff4`.
+   Scope: TODO bajo `.phone .v3-*` para evitar colisión con CSS legacy.
+   Tokens consumidos: var(--ink-*), var(--lime), var(--fifa-*), var(--font-*)
+   (declarados en public/css/components/elim-tokens.css).
+   Coexistencia F1-F3: solo se aplica cuando body.v3-active y la page incluye
+   un wrapper `<div class="phone">` montado por mundial-shell-v3.js. */
+
+/* ─── Phone-frame container (mobile-first 420px) ────────── */
+.phone {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 18px 12px 80px;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 32%, rgba(201,169,97,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 70%, rgba(10,69,149,.15) 0%, transparent 65%),
+    linear-gradient(180deg, rgba(10,14,26,.78) 0%, rgba(10,14,26,.88) 100%),
+    var(--ink-900);
+  background-attachment: local, local, local, local;
+}
+
+/* F2.9 HOTFIX-01: shell-host es un componente compacto (header + stage-pill +
+   qualified-cta opcional). Heredar min-height: 100vh del .phone genérico crea
+   ~890px de aire entre el shell y el contenido principal de la pantalla, porque
+   shell y contenido viven en .phone separados (sibling, no descendiente) en
+   grupos-v3.js y eliminatoria-v3.js. Detectado durante F2.9 smoke; aplica también
+   a Grupos (F2.8 cerró sin detectar). */
+/* F3-I1.6.3: sobreescribir padding-bottom heredado de .phone (80px)
+   que generaba 80 de 118px de hueco entre stage pill y v3-board.
+   padding-top se mantiene (18px) porque respira la FIFA bar.
+   Procedencia padding original: .phone en design/v3-prototype donde
+   era contenedor único; al separar shell + board en SPA, el padding
+   bottom queda en medio sin función. */
+.phone.v3-shell-host {
+  min-height: 0;
+  padding-bottom: 0 !important;
+}
+
+/* ─── FIFA bar (header sobrio con countdown / next-match) ── */
+.phone .v3-fifa-bar {
+  background: #2851E1;
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-display);
+  margin-bottom: 12px;
+  box-shadow: 0 4px 18px rgba(40,81,225,.25);
+}
+.phone .v3-fifa-bar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.phone .v3-fifa-bar__icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 4px;
+  object-fit: contain;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.phone .v3-fifa-bar__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.phone .v3-fifa-bar__title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phone .v3-fifa-bar__title sup {
+  font-size: 0.55em;
+  vertical-align: super;
+  opacity: .8;
+  margin-left: 1px;
+}
+.phone .v3-fifa-bar__subtitle {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: .85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.phone .v3-fifa-bar__countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 60%;
+}
+.phone .v3-fifa-bar__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: .8;
+  line-height: 1;
+  color: #fff;
+}
+.phone .v3-fifa-bar__eyebrow.is-live {
+  color: var(--lime);
+  opacity: 1;
+}
+.phone .v3-fifa-bar__cd-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.phone .v3-fifa-bar__nextmatch {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.1;
+}
+.phone .v3-cd-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 0 1px;
+}
+.phone .v3-cd-num {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.phone .v3-cd-lbl {
+  font-size: 8px;
+  font-weight: 500;
+  opacity: .85;
+  margin-top: 3px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+/* Slot user-mount (badge avatar+nombre+admin+logout — D13 corregida) */
+.phone .v3-fifa-bar__user {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.phone .v3-fifa-bar__user:empty { display: none; }
+
+@media (max-width: 400px) {
+  .phone .v3-fifa-bar { padding: 8px 10px; gap: 8px; border-radius: 6px; }
+  .phone .v3-fifa-bar__icon { width: 32px; height: 32px; padding: 3px; }
+  .phone .v3-fifa-bar__title { font-size: 11px; }
+  .phone .v3-fifa-bar__subtitle { font-size: 9px; }
+  .phone .v3-cd-num { font-size: 13px; }
+  .phone .v3-cd-lbl { font-size: 7px; margin-top: 2px; }
+  .phone .v3-cd-block { min-width: 22px; }
+  .phone .v3-fifa-bar__cd-row { gap: 4px; }
+  .phone .v3-fifa-bar__eyebrow { font-size: 8px; letter-spacing: 0.14em; }
+  .phone .v3-fifa-bar__nextmatch { font-size: 11px; }
+  .phone .v3-fifa-bar__countdown { max-width: 58%; }
+}
+
+/* ─── Qualified CTA (acceso al globo 3D — solo en grupos) ── */
+.phone .v3-qualified-cta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 10px;
+  background-color: #5B4FA8;
+  background-image:
+    radial-gradient(circle at 30% -20%, #F5C518 0 22%, transparent 23%),
+    radial-gradient(circle at 100% 10%, #E8632A 0 28%, transparent 29%),
+    radial-gradient(circle at 65% 110%, #D8362E 0 36%, transparent 37%),
+    radial-gradient(circle at 45% 50%, #6DB6B5 0 22%, transparent 23%),
+    radial-gradient(circle at 10% 130%, #9B8AC9 0 38%, transparent 39%),
+    linear-gradient(135deg, #5B4FA8 0%, #4A3E94 100%);
+  background-size: 100% 100%;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  color: #fff;
+  text-decoration: none;
+  font-family: var(--font-display);
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 18px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.2) inset;
+  cursor: pointer;
+}
+.phone .v3-qualified-cta:hover {
+  border-color: rgba(255,255,255,.4);
+  box-shadow: 0 6px 22px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.15) inset;
+}
+.phone .v3-qualified-cta:active { transform: scale(.99); }
+.phone .v3-qualified-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.10) 0%, rgba(0,0,0,.30) 60%, rgba(0,0,0,.50) 100%);
+  pointer-events: none;
+}
+.phone .v3-qualified-cta__flags {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.phone .v3-qualified-cta__flag {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg, var(--ink-700));
+  border: 1.5px solid #fff;
+  margin-left: -9px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  position: relative;
+}
+.phone .v3-qualified-cta__flag:first-child { margin-left: 0; }
+.phone .v3-qualified-cta__flag img {
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  display: block;
+}
+.phone .v3-qualified-cta__flag--more {
+  background: #fff;
+  color: #1e1a4a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+}
+.phone .v3-qualified-cta__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.phone .v3-qualified-cta__eyebrow {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: #FFE082;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 3px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.phone .v3-qualified-cta__title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.phone .v3-qualified-cta__arrow {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(4px);
+}
+@media (max-width: 360px) {
+  .phone .v3-qualified-cta { padding: 8px 12px 8px 8px; gap: 8px; }
+  .phone .v3-qualified-cta__flag { width: 22px; height: 22px; margin-left: -8px; }
+  .phone .v3-qualified-cta__flag--more { font-size: 9px; }
+  .phone .v3-qualified-cta__title { font-size: 11px; }
+  .phone .v3-qualified-cta__arrow { width: 22px; height: 22px; font-size: 16px; }
+}
+
+/* ─── Stage pill (etiqueta de fase activa por page) ─────── */
+.phone .v3-stage-pill-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.phone .v3-stage-pill {
+  background: var(--lime);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  padding: 6px 16px;
+  border-radius: 999px;
+  box-shadow: 0 0 24px rgba(196,240,70,.35), 0 0 48px rgba(196,240,70,.15);
+}
+
+/* ─── Zoom overlay shared (predicciones / clasificación / KO) ── */
+.v3-zoom-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,14,26,.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.v3-zoom-overlay.is-open { opacity: 1; pointer-events: auto; }
+
+.v3-zoom-panel {
+  position: fixed; inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  z-index: 110;
+  pointer-events: none;
+  overflow-y: auto;
+}
+.v3-zoom-panel__inner {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  margin: 12px auto;
+  border: 1.5px solid var(--zoom-color, var(--fifa-gold));
+  box-shadow:
+    0 0 32px var(--zoom-glow, rgba(201,169,97,.4)),
+    0 24px 64px rgba(0,0,0,.7);
+  opacity: 0;
+  transform: scale(.94) translateY(16px);
+  transition: opacity .3s ease, transform .35s cubic-bezier(.34,1.56,.64,1);
+  /* F2.9 HOTFIX-03 (ERR-43 redux): pointer-events:none default; gating por
+     .is-open via sibling combinator abajo. Sin esto, tras cerrar el modal el
+     inner (fullscreen via flex centering del panel) capturaba clicks invisibles
+     hasta reload page. Mismo patrón que .v3-squad-picker-panel__inner (F2.8.2). */
+  pointer-events: none;
+  overflow: hidden;
+}
+.v3-zoom-overlay.is-open ~ .v3-zoom-panel .v3-zoom-panel__inner {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1) translateY(0);
+}
+
+/* F2.5 unificación: header + close + body + tabs movidos desde grupos-v3.css
+   y eliminatoria-v3.css (colisionaban entre sí). Skeleton compartido del modal
+   v3 vive aquí; cada page renderiza SU contenido específico dentro del inner. */
+.v3-zoom-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--ink-700);
+}
+.v3-zoom-header__letter {
+  background: var(--zoom-color);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 18px var(--zoom-glow);
+}
+.v3-zoom-header__title { flex: 1; min-width: 0; }
+.v3-zoom-header__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--zoom-color);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.v3-zoom-header__name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink-100);
+}
+
+.v3-zoom-close {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-100);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.v3-zoom-close:hover { background: rgba(255,255,255,.12); }
+
+.v3-zoom-body { padding: 14px 16px 18px; }
+
+/* Tabs (usado por Grupos: Pronósticos / Clasificación) */
+.v3-zoom-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(0,0,0,.4);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+.v3-zoom-tab {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--ink-400);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.v3-zoom-tab.is-active {
+  background: var(--zoom-color);
+  color: var(--ink-900);
+  box-shadow: 0 2px 8px var(--zoom-glow);
+}
+.v3-zoom-tab:disabled { opacity: .35; cursor: not-allowed; }
+
+/* F3-I1.6: row contenedor del stage pill + chips de usuario */
+/* F3-I1.6.4: grid 1fr/auto/1fr para que pill quede SIEMPRE centrado
+   en viewport. ADMIN chip en col 1 (start), pill en col 2 (center),
+   SALIR chip en col 3 (end). */
+.v3-stage-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+  margin-top: 12px;
+}
+.v3-stage-row > .v3-stage-pill-wrap { grid-column: 2; justify-self: center; margin-bottom: 0; }
+.v3-stage-row > .v3-shell-chip--admin  { grid-column: 1; justify-self: start; }
+.v3-stage-row > .v3-shell-chip--logout { grid-column: 3; justify-self: end; }
+
+.v3-shell-chip {
+  display: none;
+  font-size: 10px;          /* F3-I1.6.4: más compacto */
+  font-weight: 600;
+  padding: 4px 8px;          /* F3-I1.6.4: lo más pequeño legible */
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid;
+  background: rgba(0, 0, 0, 0.35);
+  transition: all 0.15s ease;
+  font-family: 'Inter', sans-serif;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+
+.v3-shell-chip--admin {
+  color: #fbbf24;
+  border-color: #78350f;
+  background: rgba(28, 16, 8, 0.85);
+}
+.v3-shell-chip--admin:hover {
+  border-color: #f59e0b;
+  background: rgba(41, 32, 16, 0.95);
+}
+
+.v3-shell-chip--logout {
+  color: #f87171;
+  border-color: #7f1d1d;
+  background: rgba(28, 6, 6, 0.85);
+}
+.v3-shell-chip--logout:hover {
+  border-color: #ef4444;
+  background: rgba(41, 12, 12, 0.95);
+}
+
+/* F3-I1.6.2: ocultar wc-auth-bar legacy (avatar + nombre + Cerrar
+   sesión) en pages donde shell v3 ya muestra chips ADMIN + ↩ Salir.
+   body.fc-shell-active es gestionada por F7.4-C fcShellApply
+   EXACTAMENTE en las pages con tabbar inferior (todas menos welcome).
+   Verificado en vivo (sesión 16-may):
+     - welcome: body className=""           → wc-auth-bar visible (login btn)
+     - grupos:  body className="fc-shell-active" → oculto
+     - predictor: idem → oculto
+   #wc-auth-bar es body-child global, no scoped a page-X. */
+body.fc-shell-active #wc-auth-bar {
+  display: none !important;
+}

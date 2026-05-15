@@ -36,6 +36,7 @@
   --win:  #00834A;
   --draw: #B7860B;
   --loss: #6F1E22;
+  --lime: #C4F046; /* F1.1a v3 — acento highlight (qualified-cta, badges activos) */
 
   /* F7.7 — type families (compartidas Predictor + futuras vistas) */
   --font-display: "Saira", "SF Pro Display", -apple-system, system-ui, sans-serif;

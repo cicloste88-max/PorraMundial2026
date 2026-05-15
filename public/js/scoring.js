@@ -48,7 +48,7 @@ const FINAL_CLASSIFICATION_PTS = {
 //   D) user 2-0 (signo 1), ia=null, real 1-0 (1)    → 1 signo + 0 bonus = 1
 // Verificados via Node en F.4 commit. El bonus se aplica DESPUÉS de
 // signo/exacto/goleador y antes del cap de 7 y del boost ×2.
-function calcMatchPoints(pred, realL, realR, matchKey) {
+function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   if(!pred || !pred.saved) return 0;
   let pts = 0;
 
@@ -61,12 +61,14 @@ function calcMatchPoints(pred, realL, realR, matchKey) {
     pts += 1; // solo signo
   }
 
-  // Goleador
-  if(pred.gol && realL !== realR) {
-    const winnerTeam = realL > realR ? pred.home : pred.away;
-    const team = EQUIPOS.find(e => e.name === winnerTeam);
-    const realScorer = team?.players?.[0]?.key || null;
-    if(realScorer && pred.gol === realScorer) pts += 2;
+  // F2.9 HF-09 — Goleador: +2 si pred.gol acierta a CUALQUIER goleador real
+  // del partido. Independiente del marcador (incluido 0-0 si se registra
+  // un goleador) y del equipo (ganador, perdedor, empatado).
+  // Excepción KO: los goles en tanda de penaltis NO cuentan — responsabilidad
+  // del pipeline alimentar realScorers solo con goles de 90' + prórroga.
+  if(pred.gol) {
+    const scorers = realScorers ?? _hf09FallbackScorers(pred, realL, realR);
+    if(scorers.includes(pred.gol)) pts += 2;
   }
 
   // Bonus vs IA (F.4). iaBonusWillApply valida que ia.sign !== null,
@@ -86,12 +88,25 @@ function calcMatchPoints(pred, realL, realR, matchKey) {
   return pts;
 }
 
+// F2.9 HF-09: placeholder mientras el pipeline no hidrate scorers[] reales.
+// En producción definitiva, realScorers vendrá desde realMatchResults[key].scorers
+// o realKoResults[m.id].scorers (excluyendo penaltis en KO). Trabajo pendiente
+// aguas arriba en porra-apify-webhook + update-results EF (fuera de F2.9).
+function _hf09FallbackScorers(pred, realL, realR) {
+  const teams = realL === realR
+    ? [pred.home, pred.away]
+    : [realL > realR ? pred.home : pred.away];
+  return teams
+    .map(name => EQUIPOS.find(e => e.name === name)?.players?.[0]?.key)
+    .filter(Boolean);
+}
+
 // ── Puntos KO por ronda ───────────────────────────────────
 // Calcula los pts de un pronóstico KO dado un resultado real
 // round: 'r32'|'r16'|'qf'|'sf'|'final'
-function calcKOMatchPoints(pred, realL, realR, round) {
+function calcKOMatchPoints(pred, realL, realR, round, realScorers) {
   if(!pred || !pred.saved) return 0;
-  let pts = calcMatchPoints(pred, realL, realR, null);
+  let pts = calcMatchPoints(pred, realL, realR, null, realScorers);
 
   const realWinner = realL > realR ? 'home' : realR > realL ? 'away' : null;
   const predWinner = pred.l > pred.v ? 'home'
@@ -164,7 +179,7 @@ function calcTotalUserPoints(userPredictions, userKoPredictions, userAwPicks,
     const key = getMatchKey(m);
     const pred = userPredictions[key];
     const real = realMatchResults?.[key];
-    if(pred && real) total += calcMatchPoints(pred, real.l, real.v, key);
+    if(pred && real) total += calcMatchPoints(pred, real.l, real.v, key, real.scorers);
   });
 
   // 2. Partidos eliminatorias (con bonus de ronda)
@@ -180,7 +195,7 @@ function calcTotalUserPoints(userPredictions, userKoPredictions, userAwPicks,
     matches.forEach(m => {
       const pred = userKoPredictions[m.id] || userKoPredictions[String(m.id)];
       const real = realKoResults?.[m.id];
-      if(pred && real) total += calcKOMatchPoints(pred, real.l, real.v, round);
+      if(pred && real) total += calcKOMatchPoints(pred, real.l, real.v, round, real.scorers);
     });
   });
 

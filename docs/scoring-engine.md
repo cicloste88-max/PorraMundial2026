@@ -15,6 +15,19 @@ El motor de puntuación calcula automáticamente la puntuación de cada particip
 | **Máximo por partido** | **7** |
 | **Con boost x2 activado** | **14** |
 
+### Regla del +2 goleador (F2.9 HF-09)
+
+El **+2 por goleador correcto** se aplica cuando `pred.gol` acierta a **cualquier goleador real** del partido, independientemente de:
+
+- El **marcador final** (incluido 0-0 si por algún motivo se registra un goleador).
+- El **equipo** del goleador (ganador, perdedor o empatado).
+
+**Justificación**: equipara oportunidades de puntos entre usuarios. Si un usuario pronostica 0-0 sin goleador y otro pronostica 0-0 con goleador, ambos pueden tener acceso al +2.
+
+**Excepción en rondas KO**: los goles en **tanda de penaltis** NO cuentan como goles del partido. El array `realScorers` que alimenta al motor debe contener solo goleadores de 90' + prórroga. Es responsabilidad del pipeline que llena `ko_results` / `live_scores` (porra-apify-webhook + EF `update-results`).
+
+**Estado actual del pipeline**: `realScorers` aún no se hidrata desde producción. El motor usa un **fallback placeholder** (`_hf09FallbackScorers` en `scoring.js`: `players[0]` de los equipos relevantes del partido) hasta que la hidratación real se implemente. Esto mantiene backwards compat: si `realScorers` no se pasa, el motor sigue funcionando con la heurística placeholder pero ya **no bloquea empates** (regresión pre-HF-09 corregida). Trabajo aguas arriba pendiente fuera de F2.9.
+
 ## Puntos por avance KO
 
 Por cada equipo del que el usuario pronostica avance correctamente:

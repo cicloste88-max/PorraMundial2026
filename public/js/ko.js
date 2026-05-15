@@ -166,10 +166,19 @@ function resolveAllSlots() {
     if(pred.l>pred.v){ resolvedSlots['W'+id]=hTeam; resolvedSlots['L'+id]=aTeam; }
     else if(pred.v>pred.l){ resolvedSlots['W'+id]=aTeam; resolvedSlots['L'+id]=hTeam; }
     else {
-      // Empate → usar el equipo seleccionado como ganador en penaltis
+      // Empate → usar el equipo seleccionado como ganador en penaltis.
+      // HF-09: blindaje defensivo. Simuladores legacy
+      // (diceSimulateKOMatch, v3SimulateDice) escriben
+      // classifier="home"|"away" LITERAL en lugar del nombre del
+      // equipo ganador. Resolvemos aquí en lugar de en cada consumer.
+      // Predicciones manuales (nombre real) pasan tal cual.
       if(pred.classifier) {
-        resolvedSlots['W'+id] = pred.classifier;
-        resolvedSlots['L'+id] = pred.classifier === hTeam ? aTeam : hTeam;
+        var winner;
+        if (pred.classifier === 'home') winner = hTeam;
+        else if (pred.classifier === 'away') winner = aTeam;
+        else winner = pred.classifier;
+        resolvedSlots['W'+id] = winner;
+        resolvedSlots['L'+id] = (winner === hTeam) ? aTeam : hTeam;
       }
       // Si no hay clasificado seleccionado → slot queda vacío hasta que se elija
     }

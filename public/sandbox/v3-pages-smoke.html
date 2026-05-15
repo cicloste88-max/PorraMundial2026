@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0E1A"/>
+<title>F2 · Smoke Pages v3 (Grupos + Eliminatoria) — Porra Mundial 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/css/components/tokens.css"/>
+<link rel="stylesheet" href="/css/components/elim-tokens.css"/>
+<link rel="stylesheet" href="/css/v3/mundial-shell-v3.css"/>
+<link rel="stylesheet" href="/css/v3/grupos-v3.css"/>
+<link rel="stylesheet" href="/css/v3/eliminatoria-v3.css"/>
+<style>
+  body { margin:0; background:var(--ink-900); color:var(--ink-100); font-family:'Inter',sans-serif; }
+  .smoke-controls {
+    position: fixed; bottom: 12px; left: 12px; right: 12px;
+    background: rgba(20,24,38,.95);
+    border: 1px solid #2A3142;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--ink-300);
+    z-index: 9999;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    backdrop-filter: blur(8px);
+  }
+  .smoke-controls button {
+    background: var(--fifa-blue); color: #fff; border: 0;
+    padding: 6px 10px; border-radius: 6px; font-size: 11px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .smoke-controls button.lime { background: var(--lime); color: var(--ink-900); }
+  .smoke-controls button.gold { background: var(--fifa-gold); color: var(--ink-900); }
+  .smoke-controls button.danger { background: var(--fifa-red); }
+  .smoke-controls .label { font-weight: 700; color: var(--lime); margin-right: 4px; }
+  .smoke-controls .badge { background: rgba(196,240,70,.12); color: var(--lime); padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+  #page-grupos, #page-elim { min-height: 60vh; }
+  #page-elim { display: none; }
+  .smoke-out {
+    position: fixed; top: 8px; right: 8px;
+    background: rgba(20,24,38,.95);
+    border: 1px solid #2A3142;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 10px;
+    color: var(--ink-300);
+    z-index: 9999;
+    max-width: 280px;
+    line-height: 1.4;
+  }
+  .smoke-out b { color: var(--lime); }
+</style>
+</head>
+<body data-active-page="grupos">
+
+<div class="smoke-out" id="smoke-out">[F2 smoke] cargando…</div>
+
+<!-- Mount targets v3 -->
+<div id="page-grupos">
+  <div style="padding:32px 16px;text-align:center;color:var(--ink-400);font-size:12px;border:1px dashed var(--ink-700);border-radius:12px;margin:16px">
+    Esperando window.v3GruposMount() — pulsa "Mount Grupos" abajo.
+  </div>
+</div>
+<div id="page-elim">
+  <div style="padding:32px 16px;text-align:center;color:var(--ink-400);font-size:12px;border:1px dashed var(--ink-700);border-radius:12px;margin:16px">
+    Esperando window.v3ElimMount() — pulsa "Mount Elim" abajo.
+  </div>
+</div>
+
+<div class="smoke-controls">
+  <span class="label">F2 smoke</span>
+  <button id="btn-show-grupos" class="lime">📋 Show Grupos</button>
+  <button id="btn-mount-grupos">▶ Mount Grupos</button>
+  <button id="btn-show-elim" class="gold">🏆 Show Elim</button>
+  <button id="btn-mount-elim">▶ Mount Elim</button>
+  <button id="btn-clear" class="danger">↺ Reset</button>
+  <a href="/sandbox/v3-shell-smoke.html" style="color:var(--ink-300);text-decoration:none;font-size:11px;margin-left:auto">← F1.1g sandbox</a>
+</div>
+
+<!-- Dependencias reales: data.js (EQUIPOS, GRUPOS, PARTIDOS, predictions, getMatchKey) + ko.js (BRACKET, koPredictions, resolvedSlots, resolveKO, resolveSlot) -->
+<script src="/js/data.js"></script>
+<script src="/js/ko.js"></script>
+
+<script>
+  // Stubs sandbox standalone (sustituyen helpers Supabase-backed por no-ops in-memory).
+  // El F3 SPA wiring reemplazará estos por sus reales.
+  window.currentUser = null;
+  window._porraCerrada = false;
+
+  window.savePredictions = function () {
+    // In-memory only — no Supabase upsert.
+    document.getElementById('smoke-out').innerHTML =
+      '<b>savePredictions</b> stub · predictions tiene ' +
+      Object.keys(window.predictions || {}).length + ' entries';
+  };
+  // saveKO no se sobrescribe — ko.js define `async function saveKO()` y nuestras
+  // llamadas v3 a saveKO() la invocan. Como currentUser=null, NO escribe a Supabase
+  // (early-return en ko.js:89). Idempotente seguro.
+
+  window.openPizarraTactica = function (opts) {
+    alert('[stub] openPizarraTactica · ' + (opts && (opts.nameEn || opts.iso2 || opts.iso3) || 'sin opts'));
+  };
+  window.diceSimulateAllGroups = function () {
+    // F2.9 HF-05 #6: stub confirm doble eliminado. El modal Grupos ya muestra su
+    // propio confirm real antes de invocar este stub. Solo persiste el grupo A
+    // in-memory (no escribe Supabase — currentUser=null).
+    // Mini-stub — rellena 6 partidos del grupo A con scores aleatorios.
+    if (typeof PARTIDOS === 'undefined' || typeof predictions === 'undefined') return;
+    PARTIDOS.forEach(function (m) {
+      if (m.group === 'A') {
+        var key = getMatchKey(m);
+        predictions[key] = {
+          l: Math.floor(Math.random() * 4),
+          v: Math.floor(Math.random() * 4),
+          saved: true
+        };
+      }
+    });
+    if (window.v3GruposMount) window.v3GruposMount();
+  };
+  window.diceSimulateAllKO = function () {
+    if (!confirm('[stub] ¿Simular KO?')) return;
+    if (typeof BRACKET === 'undefined' || typeof koPredictions === 'undefined') return;
+    BRACKET.r32.forEach(function (m) {
+      var h = Math.floor(Math.random() * 4);
+      var a = Math.floor(Math.random() * 4);
+      koPredictions[m.id] = { l: h, v: a, classifier: null, saved: true };
+    });
+    if (window.v3ElimMount) window.v3ElimMount();
+  };
+  // buildChampionPodium ya viene de ko.js (línea 667). NO sobrescribir.
+</script>
+
+<!-- v3 scripts -->
+<script src="/js/v3/next-match-resolver-v3.js"></script>
+<script src="/js/v3/mundial-shell-v3.js"></script>
+<script src="/js/v3/grupos-v3.js"></script>
+<script src="/js/v3/eliminatoria-v3.js"></script>
+
+<script>
+  // ── Toggle entre pages ─────────────────────────────────
+  function showPage(pageId) {
+    document.getElementById('page-grupos').style.display = pageId === 'grupos' ? 'block' : 'none';
+    document.getElementById('page-elim').style.display   = pageId === 'elim'   ? 'block' : 'none';
+    document.body.setAttribute('data-active-page', pageId);
+    // Re-mount shell para que actualice qualified-cta + stage-pill según page.
+    if (typeof window.ensurePageShellV3 === 'function') {
+      window.ensurePageShellV3(pageId);
+    }
+    document.getElementById('smoke-out').innerHTML = 'page activa: <b>' + pageId + '</b>';
+  }
+
+  document.getElementById('btn-show-grupos').addEventListener('click', function () { showPage('grupos'); });
+  document.getElementById('btn-show-elim').addEventListener('click', function () { showPage('elim'); });
+
+  document.getElementById('btn-mount-grupos').addEventListener('click', function () {
+    showPage('grupos');
+    if (typeof window.v3GruposMount === 'function') {
+      window.v3GruposMount();
+      document.getElementById('smoke-out').innerHTML = '<b>v3GruposMount()</b> llamado · idempotente, llamadas N veces re-renderizan';
+    } else {
+      alert('v3GruposMount no disponible');
+    }
+  });
+  document.getElementById('btn-mount-elim').addEventListener('click', function () {
+    showPage('elim');
+    if (typeof window.v3ElimMount === 'function') {
+      window.v3ElimMount();
+      document.getElementById('smoke-out').innerHTML = '<b>v3ElimMount()</b> llamado · idempotente';
+    } else {
+      alert('v3ElimMount no disponible');
+    }
+  });
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    location.reload();
+  });
+
+  // Auto-arranque: mostrar grupos por default y informar de helpers disponibles.
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      var out = document.getElementById('smoke-out');
+      out.innerHTML = ''
+        + 'EQUIPOS=' + (typeof EQUIPOS !== 'undefined' ? EQUIPOS.length : 0)
+        + ' · GRUPOS=' + (typeof GRUPOS !== 'undefined' ? GRUPOS.length : 0)
+        + ' · PARTIDOS=' + (typeof PARTIDOS !== 'undefined' ? PARTIDOS.length : 0)
+        + ' · BRACKET.r32=' + (typeof BRACKET !== 'undefined' && BRACKET.r32 ? BRACKET.r32.length : 0)
+        + '<br/>v3GruposMount=' + (typeof window.v3GruposMount === 'function' ? '<b>ok</b>' : 'MISS')
+        + ' · v3ElimMount=' + (typeof window.v3ElimMount === 'function' ? '<b>ok</b>' : 'MISS')
+        + ' · buildChampionPodium=' + (typeof window.buildChampionPodium === 'function' ? '<b>ok</b>' : 'MISS');
+    }, 200);
+  });
+</script>
+</body>
+</html>
