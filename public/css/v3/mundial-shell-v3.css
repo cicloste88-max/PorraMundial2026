@@ -28,8 +28,15 @@
    shell y contenido viven en .phone separados (sibling, no descendiente) en
    grupos-v3.js y eliminatoria-v3.js. Detectado durante F2.9 smoke; aplica también
    a Grupos (F2.8 cerró sin detectar). */
+/* F3-I1.6.3: sobreescribir padding-bottom heredado de .phone (80px)
+   que generaba 80 de 118px de hueco entre stage pill y v3-board.
+   padding-top se mantiene (18px) porque respira la FIFA bar.
+   Procedencia padding original: .phone en design/v3-prototype donde
+   era contenedor único; al separar shell + board en SPA, el padding
+   bottom queda en medio sin función. */
 .phone.v3-shell-host {
   min-height: 0;
+  padding-bottom: 0 !important;
 }
 
 /* ─── FIFA bar (header sobrio con countdown / next-match) ── */

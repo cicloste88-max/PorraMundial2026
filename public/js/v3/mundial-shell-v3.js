@@ -215,8 +215,14 @@
     if (!mount) return;
     var adminChip  = mount.querySelector('[data-v3-admin-chip]');
     var logoutChip = mount.querySelector('[data-v3-logout-chip]');
-    var isLogged = !!window.currentUser;
-    var isAdmin  = !!(window.currentUser && window.currentUser.is_admin);
+    // F3-I1.6.3: currentUser está declarado como `let` en auth.js (file-scope
+    // global porque auth.js se carga como <script> regular, no module). NO se
+    // expone a window.currentUser — la asignación es plain `currentUser = {...}`.
+    // typeof guard defensivo por si shell-v3 carga antes que auth.js declare
+    // (aunque main-entry garantiza orden).
+    var hasUser = (typeof currentUser !== 'undefined') && !!currentUser;
+    var isLogged = hasUser;
+    var isAdmin  = hasUser && !!currentUser.is_admin;
     if (adminChip)  adminChip.style.display  = isAdmin  ? 'inline-flex' : 'none';
     if (logoutChip) logoutChip.style.display = isLogged ? 'inline-flex' : 'none';
   }

@@ -211,6 +211,24 @@
   flex-shrink: 0;
 }
 
+/* F3-I1.6.3: post-simulación (v3IsGroupComplete=true), cada row
+   añade pos (8px) + pts (12px) + 2 gaps adicionales = 30px más,
+   comprimiendo el espacio del nombre país a ~55px en móvil 375.
+   overflow-wrap:anywhere + line-clamp:2 base provocan wrap vertical
+   letra-por-letra ("Mé.xi.co"). Override: en cards con standings,
+   truncar con elipsis en 1 línea (preserva legibilidad). */
+.phone .v3-group.has-standings .v3-team-row__code {
+  display: block;
+  -webkit-line-clamp: initial;
+  -webkit-box-orient: initial;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
 /* Complete indicator */
 .phone .v3-group__tab::after {
   content: '';

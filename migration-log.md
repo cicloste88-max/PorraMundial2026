@@ -1827,3 +1827,20 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK. 5/5 grep gates. Smoke localhost no ejecutado en sandbox (sin browser/vite).
 
 **HEAD anterior:** 7646e79.
+
+## 2026-05-16 — fix(shell+grupos): F3-I1.6.3 chips visibles + hueco + clasificación
+
+**Contexto:** smoke F3-I1.6.2 (16-may) confirmó 3 bugs activos.
+
+**Cambios:**
+- public/js/v3/mundial-shell-v3.js refreshShellUserChips: usar `typeof currentUser !== 'undefined' && !!currentUser` en lugar de `!!window.currentUser`. auth.js declara `currentUser` como `let` file-scope global (script regular, no module); NUNCA se asigna a window.currentUser. Error original de F3-I1.6 (suposición mía).
+- public/css/v3/mundial-shell-v3.css .phone.v3-shell-host: añadir `padding-bottom: 0 !important` para sobrescribir el padding-bottom:80px heredado de `.phone` (legacy del sandbox donde .phone era contenedor único; al separar shell + board ese padding queda en medio). Hueco esperado: 118px → 38px (padding-top 18 + margin-top 12 + 8).
+- public/css/v3/grupos-v3.css `.phone .v3-group.has-standings .v3-team-row__code`: override con `white-space:nowrap` + `text-overflow:ellipsis` para truncar con … en lugar de wrap vertical letra-por-letra cuando hay pos+pts adicionales en estado post-sim. Pre-sim intacto (regla base sin tocar).
+
+**Smoke esperado:** chips visibles + hueco ≤50px + nombres legibles post-simulación.
+
+**Verificación:** node --check OK. 5/5 grep gates. Smoke localhost no ejecutado en sandbox.
+
+**Desviación menor del brief:** el selector real para el shell host es `.phone.v3-shell-host` (clases encadenadas), no `.v3-shell-host` simple como indicaba el brief. Preservé el selector original más específico para mantener cascade intacto.
+
+**HEAD anterior:** 2bb4523.
