@@ -119,6 +119,18 @@ function v3RenderSwitcher() {
 
 // ─── Render board (main bracket) ────────────────────────────
 function v3RenderBoard() {
+  // HF-08: poblar resolvedSlots desde grupos completados antes de
+  // renderizar bracket. resolveAllSlots() (ko.js legacy) computa:
+  //  - 12×3 = 36 slots de grupos (1A..3L)
+  //  - 8 slots de mejores 3eros (T_ABCDF..T_DEIJL) — orden simple,
+  //    no tabla H FIFA estricta (comentario del autor original)
+  //  - W/L slots propagados en cascada R32→R16→QF→SF→Third
+  // Si los grupos NO están completos, slots quedan undefined y
+  // v3ResolveSlotLabel() cae a fallback ("1º Gr.A", "Mejor 3º"…)
+  // que es el comportamiento esperado en pre-Mundial.
+  if (typeof resolveAllSlots === 'function') {
+    try { resolveAllSlots(); } catch (e) { console.warn('HF-08 resolveAllSlots:', e); }
+  }
   var board = document.getElementById('v3-bracket-board');
   if (!board) return;
   board.innerHTML = '';

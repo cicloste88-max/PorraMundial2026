@@ -1884,3 +1884,16 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK. Grep gates: F3-I1.6.5 elim CSS 1, grupos JS 3, v3ComputeBestThirds 2 (def+invocation), _v3BestThirdsCache 4 lines (decl+write+comment+read). Smoke localhost no ejecutado en sandbox.
 
 **HEAD anterior:** 3c481cd.
+
+## 2026-05-16 — fix(elim): HF-08 wiring resolveAllSlots desde v3RenderBoard
+
+**Contexto:** R32 (y demás rondas KO) mostraban placeholders "1º Gr.X" / "Mejor 3º Gr.X" en lugar de nombres reales, incluso con los 12 grupos completos. Diagnóstico (16-may): resolveAllSlots() YA EXISTE en ko.js (legacy F7.X.4) y funciona correctamente (poblada 106 entradas en test en vivo), pero v3RenderBoard de eliminatoria-v3.js no la invocaba. resolvedSlots={} permanente.
+
+**Cambios:**
+- public/js/v3/eliminatoria-v3.js v3RenderBoard: llamada a resolveAllSlots() al inicio del render (1 línea + try/catch defensivo). Reutiliza función legacy: tablas grupos + 8 mejores 3eros + propagación cascada KO. Si grupos no están completos, slots quedan undefined y v3ResolveSlotLabel cae a fallback (comportamiento esperado pre-Mundial).
+
+**Nota:** asignación de slots T_XYZWV a los 3eros sigue la lógica simplificada del autor original ("each T_XXXX gets the best available third from those groups", NO tabla H FIFA estricta). Aceptable para el formato 48 equipos (FIFA aún no publicó tabla H oficial; este sistema es una aproximación común en otras porras).
+
+**Verificación:** node --check OK. resolveAllSlots: 3 menciones (1 comentario + 1 typeof + 1 línea con invocación+warn label) = funcionalmente 1 typeof + 1 call. HF-08: 2 menciones (header + warn label).
+
+**HEAD anterior:** f896e4a.
