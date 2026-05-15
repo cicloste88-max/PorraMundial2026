@@ -113,6 +113,21 @@
 .v3-bracket-board.v3-ko-board--SF .v3-column-left  .v3-ko-card { margin-left: -10px; }
 .v3-bracket-board.v3-ko-board--SF .v3-column-right .v3-ko-card { margin-right: -10px; }
 
+/* HF-15: reducir el drop-shadow gold del trofeo SOLO en SF para liberar
+   el centro visual. Cup aspect ratio (width:height del <img>) IDÉNTICO
+   a otras rondas — solo se reduce el halo decorativo de 18px → 8px.
+   El halo a opacidad 0.5 ocupaba ~12px visibles invadiendo el gap entre
+   trophy edge y card edge, dando sensación de solape pese a 13.7px de
+   aire geométrico real. Tras este fix: aire visible ~23.7px. Las otras
+   2 drop-shadows (dark 28px y ambient 80px) intactas — apenas
+   contribuyen al solape por su opacidad/posición. */
+.v3-bracket-board.v3-ko-board--SF .v3-trophy {
+  filter:
+    drop-shadow(0 0 8px rgba(201,169,97,.5))
+    drop-shadow(0 12px 28px rgba(0,0,0,.55))
+    drop-shadow(0 0 80px rgba(201,169,97,.2));
+}
+
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
    leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L.
    F2.9 HF-06-quater #1: añadido min-width:0 para grid 1fr estricto. Sin esto,

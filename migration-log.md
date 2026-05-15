@@ -2004,3 +2004,22 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Scope:** solo SF (San: "el resto OK"). R32/R16/QF/F sin cambios.
 
 **HEAD anterior:** 5d07913.
+
+## 2026-05-16 — fix(elim): HF-15 reducir halo gold del trofeo en SF
+
+**Contexto:** smoke HF-14 (margin -10 + column-gap 40) seguía mostrando sensación de solape. Análisis: lime tabs ya a ~2px del borde viewport, imposible empujar más sin overflow off-screen. El "solape" visual residual viene del filter del trofeo `drop-shadow(0 0 18px rgba(201,169,97,.5))` — halo gold de 18px blur a opacidad 0.5 que invade el gap visualmente, pese a 13.7px de aire geométrico real.
+
+**User constraint:** "trofeo mantiene su relación de aspecto en todas las fases". Aspect ratio = width:height del SVG/img → PRESERVADO. El halo de drop-shadow NO es parte del aspect ratio (es decoración del filter chain).
+
+**Cambios:** public/css/v3/eliminatoria-v3.css — override scope SF del filter del trofeo:
+- `drop-shadow(0 0 18px ...)` → `drop-shadow(0 0 8px ...)` — reduce blur del halo gold ~10px
+- `drop-shadow(0 12px 28px ...)` → intacto (sombra inferior, no afecta laterales)
+- `drop-shadow(0 0 80px ...)` → intacto (ambient halo a opacidad 0.2, apenas contribuye al solape)
+
+**Aritmética verificada:**
+- Aire visible antes: 40 (col-gap) - 4.3 (trophy track overflow) - 18 (gold halo) - 14 (card glow) = 3.7px
+- Aire visible después: 40 - 4.3 - 8 (reduced halo) - 14 = 13.7px efectivo + 10px liberados del halo = ~23.7px sensación visual
+- Cup, aspect ratio, max-width 110, max-height 160, animation: TODO intacto
+- Otras rondas (R32/R16/QF/F): sin cambios (regla scope SF únicamente)
+
+**HEAD anterior:** 8b17ee2.
