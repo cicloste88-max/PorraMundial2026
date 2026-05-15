@@ -1738,3 +1738,34 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 - public/js/v3/eliminatoria-v3.js byte 1523
 
 **No toca:** código. Prepara terreno para F3-I1 wiring que usará nombres reales desde el inicio.
+
+## 2026-05-15 — feat(ui-nav): F3-I1 routing wiring v3GruposMount/v3ElimMount
+
+**Contexto:** F3 fundamentos integración v3 ↔ legacy. Sin este wiring las cards v3 son isla desconectada del SPA legacy.
+
+**Cambios:** public/js/ui-nav.js función showPage (~80 LOC neto).
+- `page === 'grupos'`: invoca window.v3GruposMount() en lugar de initGrupos()/_gruposInitPromise.
+- `page === 'elim'`: invoca window.v3ElimMount() en lugar de koInit()/elimShellResetAction()/renderElimShell().
+- Final showPage: dispatch CustomEvent('mundial:page-changed', {detail:{page}}) + ensurePageShellV3(page) fallback.
+- Variable huérfana `_gruposInitPromise` eliminada.
+
+**Conservado:**
+- fcShellApply(page) — tabbar inferior F7.4-C, ortogonal a v3.
+- closeMobileFocus cleanup al salir de grupos.
+- Guard auth + toggle display de las 8 pages.
+
+**Verificación gates (grep):**
+- 0 invocaciones de initGrupos()/_gruposInitPromise/renderElimShell/elimShellResetAction (solo menciones en comentarios explicativos).
+- 1 invocación de window.v3GruposMount() y 1 de window.v3ElimMount().
+- 1 dispatch 'mundial:page-changed' + 1 fcShellApply.
+- koInit solo aparece como definición (no llamada en showPage).
+- node --check syntax OK.
+
+**Smoke localhost:** NO ejecutado en sandbox (sin browser/vite). San valida pasos 2a-2d localmente tras vite restart + hard-reload.
+
+**TODO post-I1:**
+- Verificar v3ElimMount cubre resolveAllSlots() + locked-screen (grupos<72) + #ko-dice-btn show/hide. Si no, mover ANTES de v3ElimMount() en showPage('elim').
+- I3: event bus 'mundial:predictions-changed' para re-render v3 tras savePredictions() legacy.
+- I4: close-porra read-only en cards v3.
+
+**HEAD anterior:** f509a82 (audit doc nomenclatura).
