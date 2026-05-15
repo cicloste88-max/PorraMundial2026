@@ -1983,3 +1983,24 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK. Grep gates: data-user-mount solo en comentario (no en HTML generado), column-gap 40px presente, 24px ausente.
 
 **HEAD anterior:** 3b079c2.
+
+## 2026-05-16 — fix(elim): HF-14 cards SEMIS empujadas hacia bordes externos
+
+**Contexto:** smoke HF-13 (column-gap 40px) seguía mostrando cards SF pegadas al trofeo. Análisis: el `.v3-trophy` tiene filter chain con 3 drop-shadows (gold 18px + dark 28px + ambient 80px). El ambient halo + el glow propio de la card (box-shadow 14px) ocupan ~32px que consumen casi todo el column-gap 40px → solo ~3.7px de aire visible.
+
+**User intent:** "abrir hacia el exterior un par de puntos los brackets de semifinal" — mover cards OUTWARD, no tocar trofeo.
+
+**Cambios:** public/css/v3/eliminatoria-v3.css — añadidas 2 reglas negative-margin scope SF:
+- `.v3-column-left .v3-ko-card { margin-left: -10px }` → card izquierda empujada 10px hacia el borde izquierdo del viewport.
+- `.v3-column-right .v3-ko-card { margin-right: -10px }` → card derecha empujada 10px hacia el borde derecho.
+
+**Aritmética verificada:**
+- Bracket-board padding lateral: 12px → card a 12-10=2px del borde viewport (sin overflow).
+- Card ancho intacto (92.5px en column-gap 40): contenido no se compresa.
+- Distancia card→trofeo aumenta 10px → aire visible neto sube de ~3.7px a ~13.7px.
+- Trofeo intacto (aspect ratio, glow chain, max-width 110px todos sin cambios).
+- column-gap 40px intacto (HF-13).
+
+**Scope:** solo SF (San: "el resto OK"). R32/R16/QF/F sin cambios.
+
+**HEAD anterior:** 5d07913.
