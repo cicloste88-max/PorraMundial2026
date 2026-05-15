@@ -1959,3 +1959,27 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Cambios:** public/css/v3/eliminatoria-v3.css — añadida regla `.v3-bracket-board.v3-ko-board--SF { column-gap: 24px }`. Cards SF pasan de 105px → 93px; gap visible 12 → 24 (10px aire neto tras descontar glow). Scope solo SF. Otras rondas intactas.
 
 **HEAD anterior:** 4562e51.
+
+## 2026-05-16 — fix(shell+elim): HF-13 mount fantasma fifa-bar + solape SEMIS trofeo
+
+**Contexto:** smoke F3-I1.6.4+HF-12 reportó 2 problemas vivos:
+ 1) Badge legacy (⚙ ADMIN + avatar C + nombre "ciclote88" + "Cerrar sesión") seguía apareciendo en la fifa-bar v3 tras unos segundos. Las defenses F3-I1.6.4 (CSS body.fc-shell-active #wc-auth-bar + JS toggle) NO lo detenían.
+ 2) Cards de SEMIS solapaban con el trofeo central pese a HF-12 column-gap 24px.
+
+**Diagnóstico problema 1 (root cause):**
+- mundial-shell-v3.js:67 incluía `<div class="v3-fifa-bar__user" data-user-mount></div>` dentro de fifaBarHTML(). F1.1f-v3 lo añadió como bridge para renderAuthBar() de auth.js (líneas 225-235) que busca TODOS los `[data-user-mount]` y les inyecta admin+avatar+nombre+"Cerrar sesión". Se re-llama en cada login state change → "vuelve a aparecer".
+- Las defenses F3-I1.6.4 apuntaban a #wc-auth-bar (otro elemento) — nunca alcanzaban este mount. Mount era REDUNDANTE tras F3-I1.6 (chips ADMIN + ↩ ya en stage-row) y duplicaba ADMIN + añadía avatar+nombre que San decidió quitar.
+
+**Diagnóstico problema 2 (aritmética):**
+- Trofeo max-width 110px en track 86px → overflow 12px por lado.
+- Glow .v3-ko-card__body box-shadow 0 0 14px → consume 14px más.
+- HF-12 column-gap 24px → 24-12=12 libres - 14 glow = **-2px (solapa visible)**.
+- HF-13 column-gap 40px → 40-12=28 libres - 14 glow = **14px de aire neto**.
+
+**Cambios:**
+- public/js/v3/mundial-shell-v3.js: eliminada línea 67 con `<div ... data-user-mount></div>` de fifaBarHTML(). Comentario HF-13 explica el porqué. Mount removido → renderAuthBar() ya no inyecta nada en fifa-bar.
+- public/css/v3/eliminatoria-v3.css: column-gap SF subido de 24px (HF-12) a 40px (HF-13). Cards SF pasan de ~93 a ~85px de ancho efectivo; códigos 3 letras siguen legibles.
+
+**Verificación:** node --check OK. Grep gates: data-user-mount solo en comentario (no en HTML generado), column-gap 40px presente, 24px ausente.
+
+**HEAD anterior:** 3b079c2.

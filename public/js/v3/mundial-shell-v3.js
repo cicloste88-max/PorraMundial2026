@@ -64,7 +64,13 @@
       +       '<div class="v3-cd-block"><span class="v3-cd-num" data-countdown="seconds">--</span><span class="v3-cd-lbl">seg.</span></div>'
       +     '</div>'
       +   '</div>'
-      +   '<div class="v3-fifa-bar__user" data-user-mount></div>'
+      // HF-13: eliminado <div class="v3-fifa-bar__user" data-user-mount></div>.
+      // F1.1f-v3 lo añadió como bridge para que renderAuthBar() inyectara
+      // admin+avatar+nombre+logout en la fifa-bar. Tras F3-I1.6 los chips
+      // ADMIN + ↩ ya viven en el stage-row del shell; este mount duplicaba
+      // ADMIN y añadía avatar+nombre (que San decidió quitar). Mount fantasma
+      // recreado en cada renderAuthBar() → defenses F3-I1.6.4 no podían
+      // detenerlo (apuntaban a #wc-auth-bar, otro elemento distinto).
       + '</header>';
   }
 
