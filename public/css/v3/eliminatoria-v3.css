@@ -89,6 +89,18 @@
   grid-template-columns: 1fr 86px 1fr;
 }
 
+/* HF-12: separar cards de SEMIS del trofeo. Override puntual del
+   column-gap (heredado 12px del .v3-bracket-board base) → 24px.
+   Causa: en SF el .v3-ko-card__body tiene box-shadow 0 0 14px
+   que consume visualmente el gap de 12px → cards aparentaban
+   pegadas al trofeo. 24px - 14 (glow) = 10px de aire visible.
+   Scope SF únicamente (San: "el resto OK"). Cards SF pasan de
+   105px → 93px de ancho, códigos 3 letras siguen legibles
+   (verificado en vivo: 0 overflow). */
+.v3-bracket-board.v3-ko-board--SF {
+  column-gap: 24px;
+}
+
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
    leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L.
    F2.9 HF-06-quater #1: añadido min-width:0 para grid 1fr estricto. Sin esto,

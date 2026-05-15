@@ -1951,3 +1951,11 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Tamaño**: 1016 → 897 líneas (-119) · 25810 bytes.
 
 **HEAD anterior:** 8992f8a.
+
+## 2026-05-16 — fix(elim): HF-12 separar cards SEMIS del trofeo
+
+**Contexto:** smoke HF-11 reveló cards SEMIS pegadas al trofeo por el glow del card-body (14px) consumiendo el gap base (12px). San: "separar SEMIS, resto OK, cambio mínimo".
+
+**Cambios:** public/css/v3/eliminatoria-v3.css — añadida regla `.v3-bracket-board.v3-ko-board--SF { column-gap: 24px }`. Cards SF pasan de 105px → 93px; gap visible 12 → 24 (10px aire neto tras descontar glow). Scope solo SF. Otras rondas intactas.
+
+**HEAD anterior:** 4562e51.
