@@ -198,8 +198,11 @@ function v3RenderKoCard(match, meta) {
 
   var homeSlot = match.home;
   var awaySlot = match.away;
-  var homeLabel = v3ResolveSlotLabel(homeSlot);
-  var awayLabel = v3ResolveSlotLabel(awaySlot);
+  // HF-09: si el slot está resuelto, mostrar código 3 letras
+  // (legible en card de 105px). Si no, fallback al label
+  // descriptivo ("1º Gr.A", "Mejor 3º", "G.M97"…).
+  var homeLabel = v3ResolveSlotCode(homeSlot) || v3ResolveSlotLabel(homeSlot);
+  var awayLabel = v3ResolveSlotCode(awaySlot) || v3ResolveSlotLabel(awaySlot);
 
   var homeFlag = v3FlagFor(homeSlot);
   var awayFlag = v3FlagFor(awaySlot);
@@ -347,6 +350,23 @@ function v3ResolveWinner(pred, homeSlot, awaySlot) {
   if (pred.l > pred.v) return 'home';
   if (pred.v > pred.l) return 'away';
   return pred.classifier ? (pred.classifier === v3ResolveSlotLabel(homeSlot) ? 'home' : 'away') : null;
+}
+
+// HF-09: helper para obtener código 3 letras del slot resuelto.
+// Mismo formato que grupos post-sim (F3-I1.6.4): equipo.code ||
+// equipo.flag || slice(0,3).toUpperCase(). equipo.flag en EQUIPOS
+// ya contiene códigos FIFA estándar (MEX, BRA, USA, KOR…).
+function v3ResolveSlotCode(slot) {
+  if (typeof resolvedSlots === 'undefined' || !resolvedSlots[slot]) {
+    return null;
+  }
+  var teamName = resolvedSlots[slot];
+  if (typeof EQUIPOS === 'undefined') return teamName;
+  var team = EQUIPOS.find(function (e) { return e.name === teamName; });
+  if (!team) return teamName;
+  return team.code
+      || team.flag
+      || teamName.slice(0, 3).toUpperCase();
 }
 
 function v3ResolveSlotLabel(slot) {

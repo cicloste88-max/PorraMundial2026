@@ -215,11 +215,13 @@
 }
 
 /* Fila de equipo (home o away) */
+/* HF-09: padding 1px 2px para coherencia con .v3-team-row de grupos
+   (códigos 3 letras post-resoluciónSlots, mismo formato visual). */
 .v3-ko-row {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 0;
+  padding: 1px 2px;
   min-height: 14px;
 }
 
@@ -234,9 +236,12 @@
 }
 
 /* Código del equipo (1A, 2B, G.M73, etc.) */
+/* HF-09: font-size 9px (era 10px) para coherencia con
+   .v3-team-row__code de grupos. R16/QF/SF mantienen sus overrides
+   progresivos (11/12/13px) — tienen más espacio horizontal. */
 .v3-ko-row__code {
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--ink-100);
   letter-spacing: 0.03em;

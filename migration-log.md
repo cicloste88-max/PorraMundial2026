@@ -1897,3 +1897,21 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK. resolveAllSlots: 3 menciones (1 comentario + 1 typeof + 1 línea con invocación+warn label) = funcionalmente 1 typeof + 1 call. HF-08: 2 menciones (header + warn label).
 
 **HEAD anterior:** f896e4a.
+
+## 2026-05-16 — fix(elim+ko): HF-09 home/away literal + códigos 3 letras + coherencia visual
+
+**Contexto:** smoke HF-08 reveló 3 issues adicionales:
+ 1) Simuladores legacy escriben pred.classifier="home"|"away" literal → resolvedSlots queda con esas cadenas → bracket muestra "away"/"home" como nombre de equipo.
+ 2) Cards KO muestran nombre completo truncado ilegible (38px disponibles, "México" se trunca a "M…").
+ 3) Inconsistencia visual con grupos post-sim (font 10px vs 9px, padding 1px 0 vs 1px 2px).
+
+**Cambios:**
+- public/js/ko.js resolveKO() bloque empate: blindaje defensivo "home"→hTeam, "away"→aTeam, otros→pred.classifier. Cubre predicciones pasadas y futuras sin tocar simuladores legacy.
+- public/js/v3/eliminatoria-v3.js: nueva función v3ResolveSlotCode() insertada justo antes de v3ResolveSlotLabel (mismo formato que F3-I1.6.4 grupos: equipo.code || equipo.flag || slice(0,3)). v3RenderKoCard usa código 3 letras si slot resuelto, fallback al label descriptivo si no.
+- public/css/v3/eliminatoria-v3.css: font-size 9px (era 10px) en .v3-ko-row__code + padding 1px 2px (era 1px 0) en .v3-ko-row para igualar grupos. R16/QF/SF mantienen sus overrides progresivos (11/12/13px) — tienen más espacio horizontal.
+
+**Scope no tocado (per brief):** v3RenderFinalCard (líneas 298/299) y v3RenderZoomKO (líneas 440/441) también invocan v3ResolveSlotLabel pero NO se modifican. Final usa cards más anchas; zoom es modal full-screen. Si futuro smoke confirma necesidad, follow-up trivial.
+
+**Verificación:** node --check OK ambos JS. Grep gates: HF-09 ko.js 1, elim JS 2 (helper + render), elim CSS 2 (row + code), v3ResolveSlotCode 3 (def + 2 invocaciones home/away).
+
+**HEAD anterior:** d7dee8d.
