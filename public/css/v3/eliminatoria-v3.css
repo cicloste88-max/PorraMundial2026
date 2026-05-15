@@ -979,3 +979,20 @@
   background: rgba(255, 255, 255, 0.06);
   border-color: var(--zoom-color, var(--fifa-gold));
 }
+
+/* F3-I1.6.5: cleanup CSS rápido — ocultar elementos legacy F7.X.4
+   de #page-elim cuando el shell v3 está activo (body.fc-shell-active).
+   fc-elim-header/stepper/list ocupaban ~154px de altura visible
+   entre el shell v3 y el #v3-elim-mount. .container añadía 60px más.
+   Eliminación del HTML queda diferida a F3-I1.7 (cleanup elim análogo
+   al de F3-I1.6 con grupos). */
+body.fc-shell-active #page-elim > #fc-elim-header,
+body.fc-shell-active #page-elim > #fc-elim-stepper,
+body.fc-shell-active #page-elim > #fc-elim-dice-banner,
+body.fc-shell-active #page-elim > #fc-elim-list,
+body.fc-shell-active #page-elim > #fc-elim-awards-pane,
+body.fc-shell-active #page-elim > #fc-elim-bracket-pane,
+body.fc-shell-active #page-elim > .container,
+body.fc-shell-active #page-elim > #modal {
+  display: none !important;
+}

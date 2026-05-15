@@ -1870,3 +1870,17 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK ambos JS. Grep gates: F3-I1.6.4 shell JS 3, shell CSS 3, grupos JS 2, grupos CSS 1. v3-team-row__pts eliminado de render grupos JS (ya solo aparece en regla CSS, intacta).
 
 **HEAD anterior:** 7feb800.
+
+## 2026-05-16 — feat(grupos+elim): F3-I1.6.5 cleanup margen elim + 8 mejores 3eros
+
+**Contexto:** cierre sprint F3-I1.6.x. 2 tareas adicionales tras smoke F3-I1.6.4.
+
+**Cambios:**
+- public/css/v3/eliminatoria-v3.css: regla display:none para 8 elementos legacy F7.X.4 (#fc-elim-header, #fc-elim-stepper, #fc-elim-dice-banner, #fc-elim-list, #fc-elim-awards-pane, #fc-elim-bracket-pane, .container, #modal) bajo body.fc-shell-active #page-elim > ... Gap stagepill→mount reduce de ~290px a <50px.
+- public/js/v3/grupos-v3.js: nueva función v3ComputeBestThirds() que recorre los 12 grupos, toma rank 3 de cada uno y devuelve Set de los 8 mejores (pts > gd > gf > nombre). Solo computa si TODOS los 12 grupos están completos. Cache en _v3BestThirdsCache, invalidada al inicio de v3RenderBoardGrupos. v3RenderGroup branch isComplete: marca is-qualified al 3º si está en cache.
+
+**Diferido a F3-I1.7:** eliminación del HTML de los elementos legacy en #page-elim (análogo a F3-I1.6 con grupos). Por ahora ocultos vía CSS.
+
+**Verificación:** node --check OK. Grep gates: F3-I1.6.5 elim CSS 1, grupos JS 3, v3ComputeBestThirds 2 (def+invocation), _v3BestThirdsCache 4 lines (decl+write+comment+read). Smoke localhost no ejecutado en sandbox.
+
+**HEAD anterior:** 3c481cd.

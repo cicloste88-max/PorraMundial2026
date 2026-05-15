@@ -104,7 +104,49 @@ function v3ComputeStandings(letter) {
   return stats;
 }
 
+// F3-I1.6.5: cache de los 8 mejores terceros. Se computa al inicio
+// de v3RenderBoardGrupos y se invalida en cada render.
+var _v3BestThirdsCache = null;
+
+function v3ComputeBestThirds() {
+  // Solo tiene sentido cuando TODOS los 12 grupos están completos
+  // (regla FIFA: solo se decide post-fase-de-grupos al 100%).
+  var letras = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  var allComplete = letras.every(function (l) { return v3IsGroupComplete(l); });
+  if (!allComplete) return new Set();
+
+  // Recoger los 3os de cada grupo
+  var thirds = [];
+  letras.forEach(function (l) {
+    var standings = v3ComputeStandings(l);
+    if (standings && standings[2]) {
+      var t = standings[2];
+      thirds.push({
+        name: t.name,
+        pts: t.pts || 0,
+        gd:  t.gd  || 0,
+        gf:  t.gf  || 0
+      });
+    }
+  });
+
+  // Ordenar: pts desc → gd desc → gf desc (regla FIFA. Fair play y
+  // sorteo no implementables → orden alfabético como tiebreaker final).
+  thirds.sort(function (a, b) {
+    return (b.pts - a.pts)
+        || (b.gd  - a.gd)
+        || (b.gf  - a.gf)
+        || a.name.localeCompare(b.name);
+  });
+
+  return new Set(thirds.slice(0, 8).map(function (t) { return t.name; }));
+}
+
 function v3RenderBoardGrupos() {
+  // F3-I1.6.5: precomputar cache de 8 mejores 3eros antes de iterar
+  // grupos. Se invalida en cada render para reflejar cambios de
+  // simulación / predicciones.
+  _v3BestThirdsCache = v3ComputeBestThirds();
   var left = document.querySelector('.phone .v3-column-left');
   var right = document.querySelector('.phone .v3-column-right');
   if (!left || !right) return;
@@ -141,7 +183,15 @@ function v3RenderGroup(grupo) {
       var equipo = v3FindEquipoByName(row.name);
       var r = document.createElement('div');
       r.className = 'v3-team-row';
-      if (idx < 2) r.classList.add('is-qualified');
+      // F3-I1.6.5: 1º y 2º clasifican directos. 3º clasifica solo si
+      // está en los 8 mejores terceros (Set _v3BestThirdsCache computado
+      // por v3RenderBoardGrupos). Si la cache es null o vacía (no todos
+      // los grupos están completos), el 3º NO se marca.
+      if (idx < 2) {
+        r.classList.add('is-qualified');
+      } else if (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name)) {
+        r.classList.add('is-qualified');
+      }
 
       var pos = document.createElement('div');
       pos.className = 'v3-team-row__pos';
