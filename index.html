@@ -519,65 +519,14 @@ try {
 
 
 <!-- ═══════════════════════════════════════════════════════════════
-     HTML · PAGE: FASE DE GRUPOS  (id=page-grupos)
-     Archivo destino : index.html
-     ─────────────────────────────────────────────────────────────
-     Usa             : showPage
-     Expone          : #page-grupos
-     Deps            : js-main
-     Notas           : Tarjetas de partido generadas dinámicamente
+     HTML · PAGE: GRUPOS  (id=page-grupos)
+     Header legacy eliminado en F3-I1.6 (15-may 2026).
+     v3GruposMount() (public/js/v3/grupos-v3.js) monta #v3-grupos-mount
+     como hijo directo. ADMIN + logout viven en chips del shell v3
+     (mundial-shell-v3.js) junto al stage pill.
 ════════════════════════════════════════════════════════════════ -->
 <div id="page-grupos" style="display:none">
 <a id="top"></a>
-<div class="container">
-  <div id="global-header" style="
-    position:sticky;top:0;z-index:100;
-    background:rgba(15,23,42,.95);backdrop-filter:blur(12px);
-    border-bottom:1px solid #1e293b;
-    display:flex;justify-content:space-between;align-items:center;
-    padding:12px 0 12px;margin-bottom:24px;flex-wrap:wrap;gap:10px;">
-    <div style="display:flex;align-items:center;gap:12px">
-      <a href="#" onclick="showPage('welcome');return false;" style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#6b7280;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid #27272a;background:#1c1c1e;transition:all .15s" onmouseover="this.style.borderColor='#4ade80';this.style.color='#4ade80'" onmouseout="this.style.borderColor='#27272a';this.style.color='#6b7280'">← Inicio</a>
-      <div>
-        <h1 style="color:#fff;font-size:22px;font-family:'Inter Tight',sans-serif;font-weight:900;letter-spacing:-.02em">⚽ Porra <span style="color:#4ade80">Mundial 2026</span></h1>
-        <p style="color:#6b7280;font-size:12px;">Fase de grupos — 72 partidos</p>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <button onclick="showPage('score')"
-        style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
-               color:#fbbf24;padding:6px 14px;border-radius:10px;
-               border:1px solid #78350f;background:#1c1008;cursor:pointer;
-               transition:all .15s;font-family:'Inter',sans-serif"
-        onmouseover="this.style.borderColor='#f59e0b';this.style.background='#292010'"
-        onmouseout="this.style.borderColor='#78350f';this.style.background='#1c1008'">
-        🏆 Clasificación
-      </button>
-      <div style="background:#111318;border:1px solid #27272a;padding:6px 14px;border-radius:24px;display:flex;align-items:center;gap:8px;">
-        <span style="color:#6b7280;font-size:11px;">Puntos:</span>
-        <strong id="total-points" style="color:#4ade80;font-size:20px;font-family:'Inter Tight',sans-serif;font-weight:900;">0</strong>
-      </div>
-      <div id="grupos-user-bar"></div>
-    </div>
-  </div>
-  <!-- F7.4-D-1: selector vista grupos/jornada/directo eliminado.
-       Tabs ahora en bottom-tab del shell. boost-ticker movido a #page-jornada. -->
-  <!-- Barra global de simulación -->
-  <div id="dice-global-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:rgba(30,27,75,.35);border:1px solid rgba(99,82,199,.2);border-radius:10px">
-    <span style="font-size:11px;color:#9ca3af;margin-right:4px">🎲 Simular al azar:</span>
-    <button class="dice-btn" onclick="diceSimulateAllGroups()" style="padding:5px 12px;font-size:11px">
-      <span class="dice-icon">🎲</span> Todos los grupos (72)
-    </button>
-  </div>
-  <div id="grupos-letter-bar"></div>
-  <div id="groups-container" style="min-height:400px"></div>
-<!-- F7.4-D-1: jornada-user-strip + jornada-container + directo-container movidos a #page-jornada / #page-directo -->
-<!-- Awards movidos a fase eliminatoria -->
-  <!-- F7.4-D-A: banner #cta-eliminatorias eliminado (gate Fase final vive en bottom-tab + #fc-gate-modal). -->
-
-</div>
-
-<!-- Awards overlay movido a eliminatorias -->
 </div>
 
 

@@ -166,16 +166,20 @@
     if (!pageEl) return null;
 
     var existing = pageEl.querySelector('[data-v3-shell-mount]');
-    if (existing) return existing;
+    if (existing) {
+      refreshShellUserChips(existing); // F3-I1.6
+      return existing;
+    }
 
     var mount = document.createElement('div');
     mount.className = 'phone v3-shell-host';
     mount.setAttribute('data-v3-shell-mount', '');
     mount.innerHTML = fifaBarHTML()
       + (pageId === 'grupos' ? qualifiedCtaHTML() : '')
-      + stagePillHTML(stageLabelForPage(pageId));
+      + stagePillRowHTML(stageLabelForPage(pageId));
 
     pageEl.insertBefore(mount, pageEl.firstChild);
+    refreshShellUserChips(mount); // F3-I1.6
     return mount;
   }
 
@@ -188,6 +192,35 @@
       default:          return '● MUNDIAL';
     }
   }
+
+  // F3-I1.6: wrap stage pill con chips ADMIN + logout
+  function stagePillRowHTML(label) {
+    return '' +
+      '<div class="v3-stage-row">' +
+        stagePillHTML(label) +
+        '<button class="v3-shell-chip v3-shell-chip--admin" ' +
+          'data-v3-admin-chip ' +
+          'onclick="if(typeof showPage===\'function\')showPage(\'admin\')" ' +
+          'aria-label="Panel admin">⚙ ADMIN</button>' +
+        '<button class="v3-shell-chip v3-shell-chip--logout do-logout" ' +
+          'data-v3-logout-chip ' +
+          'aria-label="Cerrar sesión">↩ Salir</button>' +
+      '</div>';
+  }
+
+  // F3-I1.6: refresca visibilidad de chips según currentUser global.
+  // Idempotente; safe si chips no existen. Llamado por ensureShellMount
+  // y expuesto a window para invocación externa (ui-nav, auth, etc.).
+  function refreshShellUserChips(mount) {
+    if (!mount) return;
+    var adminChip  = mount.querySelector('[data-v3-admin-chip]');
+    var logoutChip = mount.querySelector('[data-v3-logout-chip]');
+    var isLogged = !!window.currentUser;
+    var isAdmin  = !!(window.currentUser && window.currentUser.is_admin);
+    if (adminChip)  adminChip.style.display  = isAdmin  ? 'inline-flex' : 'none';
+    if (logoutChip) logoutChip.style.display = isLogged ? 'inline-flex' : 'none';
+  }
+  window.refreshShellUserChips = refreshShellUserChips;
 
   function ensureZoomOverlay() {
     // F2.6: alinear con design source — 2 nodos siblings direct body children

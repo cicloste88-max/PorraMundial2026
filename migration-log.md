@@ -1788,3 +1788,28 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 **Verificación:** node --check OK. 7/7 grep gates = 1 (3 CSS + 4 JS). Smoke localhost no ejecutado en sandbox (sin browser/vite).
 
 **HEAD anterior:** d6bae7c (F3-I1).
+
+## 2026-05-15 — feat(spa): F3-I1.6 cleanup #page-grupos + chips ADMIN/logout shell v3
+
+**Contexto:** smoke F3-I1 mostró v3-board renderizado pero a 1029px del top, oculto por header legacy de 746px (div.container con global-header, grupos-user-bar, dice-global-bar, letter-bar, groups-container).
+
+**Cambios:**
+- index.html: eliminado <div class="container">...</div> completo de #page-grupos. Conservado <a id="top"></a>. v3GruposMount monta #v3-grupos-mount directo como hijo del page.
+- public/js/v3/mundial-shell-v3.js: nuevas funciones stagePillRowHTML() (wrap stage pill con 2 chips) y refreshShellUserChips() (visibilidad según currentUser/is_admin). ensureShellMount invoca refresh en ambos paths (existing + new). window.refreshShellUserChips expuesto.
+- public/css/v3/mundial-shell-v3.css: append estilos .v3-stage-row, .v3-shell-chip, .v3-shell-chip--admin, .v3-shell-chip--logout (con hover states; display:none default; toggle inline-flex via JS).
+
+**Chips se ven en 4 SHELL_PAGES (grupos/jornada/directo/elim) automáticamente.** Predictor NO carga shell v3 (su propio ui-pred-shell.js gestiona ahí).
+
+**Diferido a F3-I1.7:** cleanup análogo de #page-elim (legacy denso: fc-elim-* mounts F7.X.4, view-cinematic, view-bracket, view-stadium, finalizar-section, modal — requiere análisis de referencias vivas tipo #total-ko-pts que updateKOPts en ui-nav.js sigue invocando).
+
+**Riesgo conocido — null-deref sin guard tras eliminar IDs:** scan post-edit reveló 2 sitios CRÍTICOS sin null-check:
+- public/js/scoring.js:1239 — `document.getElementById('total-points').textContent=totalPoints;`
+- public/js/scoring.js:1315 — `const container=document.getElementById('groups-container'); container.innerHTML='';` (función renderAll).
+
+Otros sites con guard correcto (no crashean): auth.js:223 (grupos-user-bar), leagues.js:116 (global-header con `if(!header)return`), ui-nav.js:560/admin.js:394,796/ui-groups.js:838,904 (dice-global-bar, ui-groups.js:904 grupos-letter-bar).
+
+renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desde savePredictions u otros caminos. **San valida console en smoke**; si TypeError aparece, follow-up F3-I1.6.1 con null-guards puntuales.
+
+**Pendiente verificación:** chip logout usa class `do-logout` asumiendo listener legacy lo captura. Si tras smoke no funciona, follow-up con onclick="doLogout()" directo o exponer doLogout en window.
+
+**HEAD anterior:** e1de51f.
