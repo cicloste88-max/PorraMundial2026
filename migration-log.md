@@ -1915,3 +1915,16 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Verificación:** node --check OK ambos JS. Grep gates: HF-09 ko.js 1, elim JS 2 (helper + render), elim CSS 2 (row + code), v3ResolveSlotCode 3 (def + 2 invocaciones home/away).
 
 **HEAD anterior:** d7dee8d.
+
+## 2026-05-16 — fix(elim): HF-10 cards más anchas en QF/SF (reducir trofeo)
+
+**Contexto:** smoke HF-09 reveló que R32/R16 quedaron OK con 3 letras pero QF (font 12) y SF (font 13) seguían viéndose recortadas. Cards permanecían 105px en todas las rondas; solo el font cambiaba. Códigos 3 letras a font 12-13 ocupaban 39-50px → rebasaban el card visualmente por border-radius + overflow:hidden (último píxel/letra cortado).
+
+**Cambios:**
+- public/css/v3/eliminatoria-v3.css: regla grid-template-columns separada por ronda. R32/R16 mantienen `1fr 86px 1fr` (intacto). QF cambia a `1fr 50px 1fr` (cards +13px). SF cambia a `1fr 40px 1fr` (cards +18px). Trofeo decorativo se comprime al carril (max-width:110px → 50/40 efectivo), visualmente menor pero proporcional a las rondas avanzadas.
+
+**Decisión San:** Final (F) mantiene nombres completos vía v3RenderFinalCard que usa v3ResolveSlotLabel (no tocado en HF-09). No se modifica render de F.
+
+**Verificación:** Grep gates OK (HF-10 3 menciones; QF `1fr 50px 1fr`; SF `1fr 40px 1fr`). Smoke localhost no ejecutado en sandbox.
+
+**HEAD anterior:** 66db0fe.

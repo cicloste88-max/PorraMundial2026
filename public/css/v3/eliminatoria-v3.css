@@ -77,17 +77,30 @@
   position: relative;
 }
 
-/* Rondas R32, R16, QF, SF — layout grid 3 cols (1fr <trofeo central> 1fr).
-   F2.9 HF-06-ter: track central 40px → 86px (alineado con prototipo
-   design/v3-prototype/mundial-2026.css L379+ que usa exactamente 1fr 86px 1fr).
-   HF-06-bis había usado 40px conservador, pero el trofeo decorativo del prototipo
-   es 110px max-width — necesita 86px de carril para flotar centrado sin solapar
-   las cards laterales. Cards laterales: 155.5px (HF-06-bis) → 138.5px (HF-06-ter). */
+/* R32/R16 — layout grid 3 cols (1fr <trofeo 86px> 1fr). Alineado con
+   prototipo. Cards ~105px en mobile 375 con códigos 3 letras a font
+   9-11px cabe holgado. */
 .v3-bracket-board.v3-ko-board--R32,
-.v3-bracket-board.v3-ko-board--R16,
-.v3-bracket-board.v3-ko-board--QF,
-.v3-bracket-board.v3-ko-board--SF {
+.v3-bracket-board.v3-ko-board--R16 {
   grid-template-columns: 1fr 86px 1fr;
+}
+
+/* HF-10: QF y SF tienen menos cards (4/2) y fonts más grandes (12-13px).
+   Códigos 3 letras a font 12-13 ocupan 39-50px, rebasando visualmente
+   el card de 105px por el border-radius + overflow:hidden.
+   Solución: reducir el track central del trofeo para que las cards
+   ganen ancho. Trofeo decorativo (max-width:110px) se comprime al
+   carril, visualmente menor pero proporcional a la ronda.
+   Aritmética target mobile 375:
+     QF: 1fr 50px 1fr → cards ~118px (+13px), row ~96, code 39 + flag 22
+                        + score 18 + gaps 8 = 87 + holgura 9px ✓
+     SF: 1fr 40px 1fr → cards ~123px (+18px), row ~101, code 50 + flag 22
+                        + score 18 + gaps 8 = 98 + holgura 3px (justo) */
+.v3-bracket-board.v3-ko-board--QF {
+  grid-template-columns: 1fr 50px 1fr;
+}
+.v3-bracket-board.v3-ko-board--SF {
+  grid-template-columns: 1fr 40px 1fr;
 }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
