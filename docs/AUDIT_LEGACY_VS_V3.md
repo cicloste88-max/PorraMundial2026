@@ -60,7 +60,7 @@ Las match-cards v3 viven en el modal zoom (`v3RenderMatchesList` + `v3RenderZoom
 | Feature | Wire en | Helper a reusar |
 |---|---|---|
 | IA tooltip + frase | `v3RenderMatchesList` modal Grupos + `v3RenderZoomKO` modal Elim | `iaPredictions[matchKey]` global · `iaBonusWillApply(matchKey, pred, realL, realR)` |
-| EN VIVO indicator | `v3RenderGroup` cards del board + `v3RenderKoCard` | `window._liveScoresByMatchKey[matchKey]` (live-sync.js) |
+| EN VIVO indicator | `v3GruposMount` cards del board + `v3RenderKoCard` | `window._liveScoresByMatchKey[matchKey]` (live-sync.js) |
 | Boost ×2 | Nueva tab "Boost" en modal grupo + badge en `v3-match-card` de la jornada elegida | `boostPicks[date]` global · `savePredictions()` ya soporta |
 | Stadium pill | Header del modal v3 + en cards de jornada | `match.stadium` (PARTIDOS) · `match.venue` (BRACKET) |
 | Pizarra trigger | Flag click en card v3 con long-press 600ms OR botón en sub-overlay goleador | `window.openPizarraTactica({nameEn})` ya expuesto |
@@ -83,7 +83,7 @@ Las match-cards v3 viven en el modal zoom (`v3RenderMatchesList` + `v3RenderZoom
 
 | # | Punto de integración | Evidencia | Decisión / Effort F3 | Prioridad |
 |---|---|---|---|---|
-| **I1** | **Routing tabbar → render v3.** `ui-nav.showPage('grupos')` y `'elim')` deben (a) destruir contenido legacy del screen, (b) montar shell v3 + invocar `v3RenderGroup` / `v3RenderKO`. | Shell v3 escucha `mundial:page-changed`; `ui-nav.showPage` NO lo dispara. SPA stub. | M (~80 LOC en `ui-nav.js`: dispatch event + remove legacy render en 2 pages). | 🔴 ALTA |
+| **I1** | **Routing tabbar → render v3.** `ui-nav.showPage('grupos')` y `'elim')` deben (a) destruir contenido legacy del screen, (b) montar shell v3 + invocar `v3GruposMount` / `v3ElimMount`. | Shell v3 escucha `mundial:page-changed`; `ui-nav.showPage` NO lo dispara. SPA stub. | M (~80 LOC en `ui-nav.js`: dispatch event + remove legacy render en 2 pages). | 🔴 ALTA |
 | **I2** | **Scope shell v3.** Pages donde se monta fifa-bar+countdown+qualified-cta+stage-pill. | Actual: `SHELL_PAGES = ['grupos','jornada','directo','elim','predictor']`. Decisión San (15 may): **todas menos predictor** → `['grupos','jornada','directo','elim']`. Predictor mantiene su propio header legacy `ui-pred-shell.js`. | S (~3 LOC: ajustar array en `mundial-shell-v3.js`). | 🔴 ALTA |
 | **I3** | **State global compartido.** `userPredictions`, `koPredictions`, `iaPredictions`, `boostPicks`, `currentLeague`, `_porraDb`. Legacy escribe, v3 lee. Mutaciones legacy deben re-renderizar v3. | v3 cards consumen `window.userPredictions` etc. Re-render tras `savePredictions()` legacy: no garantizado. | M (~60 LOC: event bus `mundial:predictions-changed` disparado en savePredictions + listeners en v3). | 🔴 ALTA |
 | **I4** | **Cierre porra → cards v3 read-only.** Tras kickoff, `close-porra.js` legacy fija flag. Cards v3 grupos/elim deben respetarlo: deshabilitar chips, picker, save. | `close-porra.js` expone state porra-cerrada. v3 cards no lo consultan. | M (~50 LOC: read flag en `grupos-v3.js` + `eliminatoria-v3.js`). | 🔴 ALTA (bloqueador 11 jun) |

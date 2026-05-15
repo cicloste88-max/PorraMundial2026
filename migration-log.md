@@ -1722,3 +1722,19 @@ Sesión larga con múltiples iteraciones ↔ smoke checks de San. 14 commits squ
 [12:00] F2.9-HF-cierre (doc only): rename docs/AUDIT_CARDS_LEGACY_VS_V3.md → docs/AUDIT_LEGACY_VS_V3.md vía git mv. AÑADIDA sección 'Funcionalidades transversales' con tabla 9 puntos integración v3↔legacy I1-I9 (I1 Routing tabbar→render v3, I2 Scope shell v3 4 pages sin predictor, I3 State global compartido, I4 Cierre porra→cards read-only, I5 EN VIVO indicator, I6 IA Predictor wiring, I7 Boost UX, I8 Pizarra entry, I9 CSS cascada) con evidencia legacy vs v3 extraída de árbol HEAD d43caf6 (25 ficheros legacy en public/js/ vs 4 en public/js/v3/, SHELL_PAGES declara 5 pages → decisión I2 reduce a 4). Reframe scope v3 explicitado: v3 son 2 screens (Grupos+Fase final) que sustituyen contenido equivalente en tabbar legacy; no es rewrite completo. Prioridades I1-I9: 🔴 ALTA 7 (I1+I2+I3+I4+I5+I6+I7) 🟡 MEDIA 1 (I9) 🟢 BAJA 1 (I8). AÑADIDA sección 'Backlog F3' con HF-08 (5 bloques A-E: Simulación E2E + Propagación grupos→KO + Resolución equipos brackets + Render nombres reales + Tests integración) + cleanup técnico (ui-groups-mobile.js candidato git rm post-F3). UPDATED CLAUDE.md: estado actual F2.9 con 14 HFs listados + reframe scope v3 + Top-3 reordenado (1. F3 fundamentos I1-I4, 2. HF-08, 3. F3 UX I5-I7) + mapa documentación actualizado con nuevo nombre audit + ampliación scope. UPDATED CHANGELOG.md: entry F2.9 con 14 HFs detallados + sección HF-cierre doc-only. Tamaño CLAUDE.md verificado <10KB. NO toca código. Cerrada F2.9 funcional, F3 abierta.
 
 [01:08] F3-I2 (3 LOC): excluir 'predictor' de SHELL_PAGES en public/js/v3/mundial-shell-v3.js. Cambio 1: SHELL_PAGES = ['grupos','jornada','directo','elim','predictor'] -> ['grupos','jornada','directo','elim']. Cambio 2: removed dead case 'predictor' en stageLabelForPage (no se alcanzaría tras Cambio 1). Decisión documentada en docs/AUDIT_LEGACY_VS_V3.md sec Funcionalidades transversales (I2 ALTA prioridad, predictor mantiene su propio header ui-pred-shell.js). Sin efecto observable hasta I1 (routing wiring) hecho. Build vite no disponible en sandbox; node --check OK. F3 fundamentos kickoff.
+
+## 2026-05-15 — fix(docs): nomenclatura canónica audit — v3GruposMount/v3ElimMount
+
+**Origen:** mismatch HF-cierre F2.9 (commit 18cb8bb), detectado en nueva sesión Claude.ai (15-may) leyendo audit doc en limpio.
+
+**Cambios:** docs/AUDIT_LEGACY_VS_V3.md
+- `v3RenderGroup` → `v3GruposMount` (2 ocurrencias)
+- `v3RenderKO`    → `v3ElimMount`    (1 ocurrencia)
+
+**Verificación:** sed con backticks como delimitador (unívoco). Pre/post grep counts (2/1 → 0/0/2/1). Helpers reales v3RenderKoCard (3), v3RenderZoomKO (2), v3RenderMatchesList (3), v3RenderZoomGrupos (1) intactos.
+
+**Fuente de verdad:**
+- public/js/v3/grupos-v3.js byte 33142
+- public/js/v3/eliminatoria-v3.js byte 1523
+
+**No toca:** código. Prepara terreno para F3-I1 wiring que usará nombres reales desde el inicio.
