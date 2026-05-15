@@ -83,8 +83,10 @@ Las match-cards v3 viven en el modal zoom (`v3RenderMatchesList` + `v3RenderZoom
 
 | # | Punto de integración | Evidencia | Decisión / Effort F3 | Prioridad |
 |---|---|---|---|---|
-| **I1** | **Routing tabbar → render v3.** `ui-nav.showPage('grupos')` y `'elim')` deben (a) destruir contenido legacy del screen, (b) montar shell v3 + invocar `v3GruposMount` / `v3ElimMount`. | Shell v3 escucha `mundial:page-changed`; `ui-nav.showPage` NO lo dispara. SPA stub. | M (~80 LOC en `ui-nav.js`: dispatch event + remove legacy render en 2 pages). | 🔴 ALTA |
-| **I2** | **Scope shell v3.** Pages donde se monta fifa-bar+countdown+qualified-cta+stage-pill. | Actual: `SHELL_PAGES = ['grupos','jornada','directo','elim','predictor']`. Decisión San (15 may): **todas menos predictor** → `['grupos','jornada','directo','elim']`. Predictor mantiene su propio header legacy `ui-pred-shell.js`. | S (~3 LOC: ajustar array en `mundial-shell-v3.js`). | 🔴 ALTA |
+| **I1** ✅ | **Routing tabbar → render v3.** `ui-nav.showPage('grupos')` y `'elim')` deben (a) destruir contenido legacy del screen, (b) montar shell v3 + invocar `v3GruposMount` / `v3ElimMount`. | ✅ DONE (HEAD `d6bae7c`) — `showPage` invoca `v3GruposMount`/`v3ElimMount` con guard `typeof === 'function'`; dispatch `CustomEvent('mundial:page-changed')` + fallback `ensurePageShellV3`. Variable huérfana `_gruposInitPromise` eliminada. | M (~80 LOC en `ui-nav.js`: dispatch event + remove legacy render en 2 pages). | 🔴 ALTA |
+| **I1.5** ✅ | **Carga assets v3 en SPA** (retroactivo). F2.x desarrolló v3 en sandbox aislado (`/sandbox/v3-pages-smoke.html`); scripts y CSS nunca migrados al SPA principal → I1 era `console.warn` no-op. | ✅ DONE (HEAD `e1de51f`) — 3 `<link>` v3 en `index.html` tras CSS legacy + 4 `loadScript('/js/v3/...')` en `js/main-entry.js` chain (next-match-resolver → mundial-shell → grupos → eliminatoria). | S (3 `<link>` + 4 `loadScript`). | 🔴 BLOQUEADOR |
+| **I1.6** ✅ | **Cleanup `#page-grupos` legacy + chips ADMIN/logout en shell v3.** Smoke I1 mostró v3-board oculto bajo header legacy de 746px (global-header, grupos-user-bar, dice-global-bar, letter-bar, groups-container vacío). | ✅ DONE (HEAD `e048815`) — `index.html`: `<div class="container">` entero eliminado de `#page-grupos` (61 LOC -), conservado `<a id="top">`. `mundial-shell-v3.js`: `stagePillRowHTML()` + `refreshShellUserChips()` (chips ⚙ ADMIN / ↩ Salir junto al stage pill, visibilidad según `currentUser`/`is_admin`). CSS append `.v3-stage-row` + `.v3-shell-chip`. Chips visibles en 4 `SHELL_PAGES`. | M (~144 LOC neto: 61 LOC -, 83 LOC +). | 🔴 ALTA |
+| **I2** ✅ | **Scope shell v3.** Pages donde se monta fifa-bar+countdown+qualified-cta+stage-pill. | ✅ DONE (HEAD `8bac28f`) — `SHELL_PAGES = ['grupos','jornada','directo','elim']` (4 pages, sin `'predictor'`). Predictor mantiene `ui-pred-shell.js`. Dead case `'predictor'` eliminado de `stageLabelForPage`. | S (~3 LOC: ajustar array en `mundial-shell-v3.js`). | 🔴 ALTA |
 | **I3** | **State global compartido.** `userPredictions`, `koPredictions`, `iaPredictions`, `boostPicks`, `currentLeague`, `_porraDb`. Legacy escribe, v3 lee. Mutaciones legacy deben re-renderizar v3. | v3 cards consumen `window.userPredictions` etc. Re-render tras `savePredictions()` legacy: no garantizado. | M (~60 LOC: event bus `mundial:predictions-changed` disparado en savePredictions + listeners en v3). | 🔴 ALTA |
 | **I4** | **Cierre porra → cards v3 read-only.** Tras kickoff, `close-porra.js` legacy fija flag. Cards v3 grupos/elim deben respetarlo: deshabilitar chips, picker, save. | `close-porra.js` expone state porra-cerrada. v3 cards no lo consultan. | M (~50 LOC: read flag en `grupos-v3.js` + `eliminatoria-v3.js`). | 🔴 ALTA (bloqueador 11 jun) |
 | **I5** | **EN VIVO indicator** en cards v3 grupos/elim durante partido. | `live-sync.js` carga `window._liveScoresByMatchKey`. v3 cards no consumen. Solapa audit item 4 match-cards. | M (~60 LOC). | 🔴 ALTA |
@@ -93,14 +95,26 @@ Las match-cards v3 viven en el modal zoom (`v3RenderMatchesList` + `v3RenderZoom
 | **I8** | **Pizarra Táctica entry point** desde flag en cards v3 grupos/elim. | `window.openPizarraTactica({nameEn})` expuesta. v3 cards no la consumen. Solapa audit item 3 match-cards. | S (~30 LOC). | 🟢 BAJA |
 | **I9** | **CSS cascada / z-index colisiones.** Modales legacy (banner cierre porra, toast, dropdowns leagues) vs zoom-overlay+panel v3 cuando coexisten en DOM. | Prefix `.v3-*` mitiga selector specificity, pero `position`/`z-index` no. Riesgo: overlay legacy sobre/debajo de panel v3 mal. | S-M (auditoría z-index map tras inspección). | 🟡 MEDIA |
 
-**Resumen prioridades:**
-- 🔴 ALTA (7): I1+I2+I3 fundamentos integración; I4 bloqueador 11 jun; I5+I6+I7 UX en cards (solapa audit match-cards).
+**Resumen prioridades (post sesión 15-may):**
+- ✅ DONE (4): I1 (d6bae7c) + I1.5 (e1de51f) + I1.6 (e048815) + I2 (8bac28f).
+- 🔴 ALTA pendientes (4): I3 + I4 (bloqueador 11 jun) + I5 + I6 + I7.
 - 🟡 MEDIA (1): I9 CSS cascada.
 - 🟢 BAJA (1): I8 pizarra entry point.
 
+**Bugs UX detectados smoke I1.6 (próxima sesión):**
+1. Hueco demasiado grande entre stage pill "GROUP STAGE" y v3-board (CSS spacing tweak).
+2. Post-simulación grupos: "Clasificación" en cada bracket rompe estética.
+3. Eliminatorias post-simulación: NO usa banderas ni formato amigable.
+4. **F3-I1.6.2** — chip logout no funciona (class `do-logout` no captura listener legacy). Fix: `onclick="doLogout()"` o expose `doLogout` en window (~5 LOC).
+5. **F3-I1.6.1** — posibles null-deref `scoring.js:1239`/`1315` tras cleanup (verificar consola; ~5 LOC `if(el)` guards).
+
+**Cleanup pendiente:**
+- **F3-I1.7** — cleanup análogo `#page-elim` (legacy F7.X.4 mounts + view-cinematic/view-bracket/view-stadium + finalizar-section + modal). Requiere análisis de referencias vivas tipo `#total-ko-pts` que `updateKOPts` en `ui-nav.js` sigue invocando.
+
 **Notas implementación:**
-- **I1 + I2 + I3 son los 3 fundamentos.** Sin ellos las cards v3 son "isla" desconectada del state legacy.
-- **Orden sugerido F3:** I2 (3 LOC trivial) → I1 (wiring SPA) → I3 (event bus) → I4 (close-porra) → I5+I6+I7 (UX cards) → I8+I9 (refinamiento).
+- ✅ **Fundamentos integración cerrados** (I1+I1.5+I1.6+I2). Cards v3 ya no son "isla" — el SPA ruteea, monta y limpia legacy en grupos.
+- **Orden ejecutado:** I2 (3 LOC) → I1 (wiring) → I1.5 (assets retroactivos) → I1.6 (cleanup grupos + chips) → [próximo] I3 (event bus) → I4 (close-porra) → bugs UX 1-3 + I1.7 elim cleanup → I5+I6+I7 (UX cards) → I8+I9 (refinamiento).
+- **Lección F3-I1.5 retroactivo:** F2.x cerrado en sandbox aislado ≠ integrado al SPA. Verificar SIEMPRE que scripts/CSS estén incluidos en `index.html` y `main-entry.js` antes de asumir wiring funcional. Causa de commit retroactivo `e1de51f`.
 - **Solapamiento con audit match-cards (15 features tabla anterior):** I5↔item 4, I6↔items 1+7+15, I7↔item 9, I8↔item 3. La tabla transversales referencia el wiring; la tabla match-cards detalla las features específicas.
 - **HF-08 (propagación grupos→KO + render nombres reales) NO está en transversales** — es trabajo de scoring/state interno de los 2 screens v3. Va en Backlog F3 abajo.
 
