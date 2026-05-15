@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Rama **`claude/port-world-cup-design-FvZpD`** HEAD `5b87645` — **redesign v3 base estable** Grupos cerrado visualmente por San (14 may). Modal 3 tabs (Marcadores / Goleadores / Clasificación), chips puntuación 3 estados, goleador picker unificado (1 pick por partido, sub-overlay con secciones home+away). 4 colisiones namespace resueltas en serie (trophy-col display, @keyframes trophy-float, .v3-zoom-panel skeleton, function declarations grupos↔elim). **ERR-43** nuevo (pointer-events gating en sub-overlays). **NO mergeado a main** — F3 wiring SPA pendiente. Rama paralela `sync/ef-get-squad-v6` (squads 7/48, runtime EF `get-squad` v6) sigue abierta. Próximo: F2.9 smoke Eliminatoria + F3 wiring SPA + audit cards legacy → v3 (`docs/AUDIT_CARDS_LEGACY_VS_V3.md`).
+Rama **`claude/port-world-cup-design-FvZpD`** HEAD `d43caf6` — **redesign v3: F2.9 funcional cerrada (15 may)**. Grupos cerrado visualmente (F2.8.2) + Eliminatoria smoke visual cerrado F2.9 con 14 HFs CSS/JS (HOTFIX-01..04 shell+modal+ERR-43+sandbox; HF-05 EDITAR/overflow/penaltis; HF-06 trofeo/prototipo en 6 iter; HF-09 motor +2 goleador sin filtros 7/7 tests; HF-10-bis winner static header). 4 colisiones namespace resueltas (F2.3-F2.7). **ERR-43** documentado (pointer-events gating sub-overlays). **Reframe scope v3 (15 may):** v3 sustituye 2 screens del tabbar (Grupos+Fase final); shell v3 monta en 4 pages (todas menos predictor — decisión I2). **HF-08 propagación grupos→KO en Backlog F3** — `docs/AUDIT_LEGACY_VS_V3.md`. **9 puntos integración v3↔legacy I1-I9** auditados en misma doc. **NO mergeado a main** — F3 wiring SPA pendiente. Rama paralela `sync/ef-get-squad-v6` (squads 7/48) sigue abierta. Próximo: F3 fundamentos (I2→I1→I3→I4) + HF-08 + UX cards (I5-I7) + cleanup legacy.
 
 ## Top-3 pendientes inmediatos
 
-1. **Boost UX en v3**: defaults ×2 / FIFA-calendar / lock-1er-partido. Legacy `ui-groups.js` lo tenía via `boostPicks` + `boost-ticker`. Sin esto el día-boost no funciona en redesign.
-2. **Integración IA Predictor + Bot Zayu en v3**: tooltip IA contraria + frase IA + `iaBonusWillApply` wiring en cards modal. Legacy lo tenía, redesign aún no.
-3. **Audit cards-de-partido legacy vs v3**: deliverable `docs/AUDIT_CARDS_LEGACY_VS_V3.md` lista features no portadas (tooltip IA, CEST pill, Pizarra long-press, EN VIVO indicator, stadium info, award badges, etc.). NO implementar — solo documentar antes de F3.
+1. **F3 wiring SPA — fundamentos I1+I2+I3+I4**: (I2) `SHELL_PAGES` sin `'predictor'` 3 LOC; (I1) `ui-nav.showPage` dispatch `mundial:page-changed` + remove render legacy en grupos/elim ~80 LOC; (I3) event bus `mundial:predictions-changed` re-render v3 cards ~60 LOC; (I4) read `_porraIsClosed` en cards v3 → read-only post-kickoff ~50 LOC. Detalle: `docs/AUDIT_LEGACY_VS_V3.md` sección Funcionalidades transversales.
+2. **HF-08 simulación E2E + propagación grupos→KO + nombres reales brackets**: 5 bloques A-E detallados en `docs/AUDIT_LEGACY_VS_V3.md` Backlog F3. 3-5h estimadas.
+3. **F3 wiring SPA — UX I5+I6+I7**: EN VIVO indicator (I5 ~60 LOC), IA Predictor tooltip+frase+score (I6 ~80 LOC), Boost UX completo en modal grupos (I7 ~200 LOC). Solapa audit items 4/1+7+15/9 match-cards.
 
 ## Pendientes — Bugs UI
 
@@ -97,7 +97,7 @@ ERR-01..43: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
 - `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..43 (síntoma/causa/fix/patrón).
-- `docs/AUDIT_CARDS_LEGACY_VS_V3.md` — audit features match-card legacy vs redesign v3 (tooltip IA, CEST, Pizarra long-press, EN VIVO, stadium, boost, award badges, etc.). Generado F2.8.2 cierre. NO implementado — referencia para F3 wiring.
+- `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs redesign v3: 15 match-card features (IA tooltip, CEST, Pizarra long-press, EN VIVO, stadium, boost, awards, etc.) + **9 puntos integración v3↔legacy I1-I9** (routing, scope shell, state global, cierre porra, EN VIVO, IA wiring, Boost UX, Pizarra entry, CSS cascada) + **Backlog F3** con HF-08 detallado 5 bloques A-E. Generado F2.8.2, ampliado F2.9 HF-cierre (15 may). NO implementado — referencia para F3 wiring.
 
 ## End-of-session protocol
 
