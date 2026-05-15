@@ -475,20 +475,25 @@
 .v3-zoom-tab:disabled { opacity: .35; cursor: not-allowed; }
 
 /* F3-I1.6: row contenedor del stage pill + chips de usuario */
+/* F3-I1.6.4: grid 1fr/auto/1fr para que pill quede SIEMPRE centrado
+   en viewport. ADMIN chip en col 1 (start), pill en col 2 (center),
+   SALIR chip en col 3 (end). */
 .v3-stage-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  column-gap: 8px;
   margin-top: 12px;
 }
+.v3-stage-row > .v3-stage-pill-wrap { grid-column: 2; justify-self: center; margin-bottom: 0; }
+.v3-stage-row > .v3-shell-chip--admin  { grid-column: 1; justify-self: start; }
+.v3-stage-row > .v3-shell-chip--logout { grid-column: 3; justify-self: end; }
 
 .v3-shell-chip {
   display: none;
-  font-size: 11px;
+  font-size: 10px;          /* F3-I1.6.4: más compacto */
   font-weight: 600;
-  padding: 6px 12px;
+  padding: 4px 8px;          /* F3-I1.6.4: lo más pequeño legible */
   border-radius: 999px;
   cursor: pointer;
   border: 1px solid;

@@ -1844,3 +1844,29 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Desviación menor del brief:** el selector real para el shell host es `.phone.v3-shell-host` (clases encadenadas), no `.v3-shell-host` simple como indicaba el brief. Preservé el selector original más específico para mantener cascade intacto.
 
 **HEAD anterior:** 2bb4523.
+
+## 2026-05-16 — fix(spa+shell+grupos): F3-I1.6.4 layout chips + códigos 3 letras + refuerzo wc-auth-bar
+
+**Contexto:** smoke F3-I1.6.3 reveló 3 bugs adicionales (16-may).
+
+**Cambios:**
+- public/js/v3/mundial-shell-v3.js:
+  - stagePillRowHTML: reordenar DOM (admin → pill → salir) para layout grid. Chip salir reducido a solo icon "↩".
+  - refreshShellUserChips: refuerzo defensivo — ocultar #wc-auth-bar via JS al refrescar chips (defense in depth contra cache/timing).
+  - Nuevo listener 'mundial:page-changed' tras subscribeAuthChangesForChips: toggle de wc-auth-bar (display:'' en welcome, display:'none' en SHELL_PAGES y otras).
+- public/js/v3/grupos-v3.js:
+  - v3RenderGroup branch isComplete: códigos 3 letras en lugar de equipo.name. Chain `equipo.code || equipo.flag || slice(0,3).toUpperCase()` — **equipo.code NO existe en EQUIPOS (data.js)** pero equipo.flag ya contiene códigos FIFA reales (MEX/BRA/ESP/CZE/RSA/KOR). Slice fallback genérico daría "REP" para "República Checa" → indeseado, por eso chain prefiere flag.
+  - ELIMINADA creación de elemento pts. Resultado per row: pos | nombre3 | bandera.
+- public/css/v3/mundial-shell-v3.css:
+  - .v3-stage-row: cambio de flex a grid 1fr/auto/1fr. Pill SIEMPRE en col 2 (centrado en viewport). Admin col 1 start, salir col 3 end. Independiente de qué chips estén visibles.
+  - .v3-shell-chip: font-size 11→10px, padding 6px 12px → 4px 8px.
+- public/css/v3/grupos-v3.css:
+  - Simplificado override post-sim del __code (innecesario el ellipsis con 3 letras; mantenido solo desactivación wrap vertical).
+
+**Diseño:** opción A San — códigos FIFA estándar. Layout grid garantiza centrado del pill independiente de chips presentes (admin/no admin). Logout chip reducido a icon-only.
+
+**Desviación de brief — equipo.code:** brief usaba `equipo.code` con fallback genérico slice(0,3). Verificación in-data reveló que la propiedad real es `equipo.flag` (ya contiene MEX/BRA/ESP códigos FIFA estándar). Chain `code → flag → slice` cumple brief literal + da resultado correcto inmediato + permite migración trivial si se decide renombrar a `code`.
+
+**Verificación:** node --check OK ambos JS. Grep gates: F3-I1.6.4 shell JS 3, shell CSS 3, grupos JS 2, grupos CSS 1. v3-team-row__pts eliminado de render grupos JS (ya solo aparece en regla CSS, intacta).
+
+**HEAD anterior:** 7feb800.

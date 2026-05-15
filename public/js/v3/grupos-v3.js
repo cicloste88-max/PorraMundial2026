@@ -150,7 +150,15 @@ function v3RenderGroup(grupo) {
 
       var code = document.createElement('div');
       code.className = 'v3-team-row__code';
-      code.textContent = equipo.name;
+      // F3-I1.6.4: códigos 3 letras FIFA estándar. equipo.code no existe en
+      // EQUIPOS (data.js); equipo.flag ya contiene el código FIFA real
+      // (MEX/BRA/ESP/CZE/RSA/KOR). Chain: code → flag → slice fallback
+      // genérico (slice(0,3) daría "REP" para "República Checa", indeseado).
+      code.textContent = (equipo && equipo.code)
+        ? equipo.code
+        : (equipo && equipo.flag)
+          ? equipo.flag
+          : (equipo && equipo.name ? equipo.name.slice(0, 3).toUpperCase() : '???');
       r.appendChild(code);
 
       var flag = document.createElement('div');
@@ -166,10 +174,8 @@ function v3RenderGroup(grupo) {
       flag.appendChild(img);
       r.appendChild(flag);
 
-      var pts = document.createElement('div');
-      pts.className = 'v3-team-row__pts';
-      pts.textContent = row.pts;
-      r.appendChild(pts);
+      // F3-I1.6.4: pts columna ELIMINADA (San: queda pos | nombre3 | bandera).
+      // Los puntos siguen visibles en el zoom de detalle (v3RenderStandingsTable).
 
       card.appendChild(r);
     });

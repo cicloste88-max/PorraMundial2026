@@ -197,14 +197,17 @@
   function stagePillRowHTML(label) {
     return '' +
       '<div class="v3-stage-row">' +
-        stagePillHTML(label) +
+        // F3-I1.6.4: admin chip primero (grid-column: 1, justify-self: start).
         '<button class="v3-shell-chip v3-shell-chip--admin" ' +
           'data-v3-admin-chip ' +
           'onclick="if(typeof showPage===\'function\')showPage(\'admin\')" ' +
           'aria-label="Panel admin">⚙ ADMIN</button>' +
+        // Pill al centro (grid-column: 2, justify-self: center). Siempre presente.
+        stagePillHTML(label) +
+        // Logout chip a la derecha (grid-column: 3, justify-self: end).
         '<button class="v3-shell-chip v3-shell-chip--logout do-logout" ' +
           'data-v3-logout-chip ' +
-          'aria-label="Cerrar sesión">↩ Salir</button>' +
+          'aria-label="Cerrar sesión">↩</button>' +
       '</div>';
   }
 
@@ -225,6 +228,13 @@
     var isAdmin  = hasUser && !!currentUser.is_admin;
     if (adminChip)  adminChip.style.display  = isAdmin  ? 'inline-flex' : 'none';
     if (logoutChip) logoutChip.style.display = isLogged ? 'inline-flex' : 'none';
+    // F3-I1.6.4: refuerzo defensivo — ocultar wc-auth-bar legacy
+    // en SHELL_PAGES (independiente de body.fc-shell-active CSS).
+    // Screenshot de San con ronaldo_n11 mostraba wc-auth-bar visible;
+    // este toggle JS garantiza estado correcto incluso si CSS falla
+    // por cache/timing/race.
+    var authBar = document.getElementById('wc-auth-bar');
+    if (authBar) authBar.style.display = 'none';
   }
   window.refreshShellUserChips = refreshShellUserChips;
 
@@ -338,6 +348,21 @@
   // Init: la suscripción es seguro hacerla pre-DOM ready (sólo
   // registra callback).
   subscribeAuthChangesForChips();
+
+  // F3-I1.6.4: restaurar wc-auth-bar al volver a welcome. Listener
+  // del mismo event que dispara showPage (ui-nav.js F3-I1).
+  window.addEventListener('mundial:page-changed', function (e) {
+    var page = e && e.detail && e.detail.page;
+    var bar = document.getElementById('wc-auth-bar');
+    if (!bar) return;
+    if (page === 'welcome') {
+      // En welcome, restaurar visibilidad (CSS default = flex via renderAuthBar).
+      bar.style.removeProperty('display');
+    } else {
+      // SHELL_PAGES y otras: oculto.
+      bar.style.display = 'none';
+    }
+  });
 
   // Auto-arrancar con red de seguridad (ERR-01) — main-entry también llama init().
   if (document.readyState === 'loading') {
