@@ -2048,3 +2048,20 @@ filter: drop-shadow(0 12px 28px rgba(0,0,0,.55));
 **Otras rondas (R32/R16/QF/F)** mantienen el filter chain completo con los 3 drop-shadows.
 
 **HEAD anterior:** b0fd0b2.
+
+## 2026-05-16 — fix(elim): HF-15 más separación SEMIS (gap 50 + margin -15)
+
+**Contexto:** smoke HF-14 con San en DevTools mobile 375px reveló que aire visible neto de 13px era insuficiente. Aritmética: card glow 14 + trophy glow + track overflow consumían 27px del column-gap 40.
+
+**REVERT previo:** mis HF-15 (halo gold 18→8) y HF-16 (halos gold removidos) eran intervenciones unilaterales sobre el filter del trofeo que NO estaban en el roadmap del brief. Revertidas para mantener `HF-15` sin ambigüedad y respetar el approach del brief (gap+margin bumps, trophy filter intacto). Override scope SF del .v3-trophy eliminado por completo → trophy en SF vuelve a usar el filter base (3 drop-shadows: 18 gold + 28 dark + 80 ambient).
+
+**Cambios:** public/css/v3/eliminatoria-v3.css
+- .v3-bracket-board.v3-ko-board--SF column-gap: 40 → 50.
+- .v3-ko-board--SF .v3-column-left .v3-ko-card margin-left: -10 → -15.
+- .v3-ko-board--SF .v3-column-right .v3-ko-card margin-right: -10 → -15.
+
+Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
+
+**Verificación:** Grep gates 3/3 positivos OK (gap 50, margin -15 ×2). Grep gates negativos OK (0 hits para gap 40, margin -10, trophy SF override, HF-16). HF-15 marker presente 3 veces (comentario header + 2 menciones en aritmética).
+
+**HEAD anterior:** 3627e3c (HF-16 mi versión revertida en este commit).

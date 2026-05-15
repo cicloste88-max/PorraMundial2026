@@ -98,30 +98,21 @@
    Cards SF pasan de 105 → 85px de ancho efectivo; códigos 3 letras
    siguen legibles. */
 .v3-bracket-board.v3-ko-board--SF {
-  column-gap: 40px;
+  column-gap: 50px;
 }
 
-/* HF-14: empujar cards SF hacia los bordes externos del viewport.
-   column-gap 40 + drop-shadow ambient 80px del trofeo seguían dando
-   sensación de solape. Negative margin lateral en cada card mueve la
-   card 10px hacia su lado exterior SIN cambiar su ancho (contenido
-   intacto) ni tocar el trofeo ni el column-gap. Resultado neto:
-   ~14px de aire visible entre el glow de la card y el ambient halo
-   del trofeo. Las cards quedan a 2px del borde izquierdo/derecho del
-   bracket-board (board padding 12 - margin 10 = 2), aún dentro del
-   viewport sin overflow. Scope SF únicamente. */
-.v3-bracket-board.v3-ko-board--SF .v3-column-left  .v3-ko-card { margin-left: -10px; }
-.v3-bracket-board.v3-ko-board--SF .v3-column-right .v3-ko-card { margin-right: -10px; }
-
-/* HF-16: en SF, REMOVER por completo los drop-shadows gold del trofeo.
-   HF-15 había reducido el directo 18→8, pero el ambient 80px (opacidad 0.2)
-   seguía extendiendo halo gold visible ~50-60px efectivos, invadiendo cards.
-   Mantener SOLO la sombra inferior dark (proyección natural del cup sobre la
-   base). Cup shape, aspect ratio, max-width 110, max-height 160, animation
-   float: TODO intacto. Aspect ratio = width:height del SVG: PRESERVADO. */
-.v3-bracket-board.v3-ko-board--SF .v3-trophy {
-  filter: drop-shadow(0 12px 28px rgba(0,0,0,.55));
-}
+/* HF-14 + HF-15 (16-may): empujar cards SF hacia los bordes externos del
+   viewport. column-gap 40 + drop-shadow ambient 80px del trofeo seguían
+   dando sensación de solape. Negative margin lateral en cada card mueve
+   la card hacia su lado exterior SIN cambiar su ancho (contenido intacto)
+   ni tocar el trofeo. HF-14 inicialmente -10px → ~14px aire neto, San
+   reportó insuficiente. HF-15 bumps: column-gap 40→50 + margin -10→-15.
+   Total ganancia HF-15 ~10px por lado → aire neto estimado ~23-25px
+   (casi doble). Card body padding/contenido intacto: códigos 3 letras
+   a font 13px caben holgados (margins negativos en grid items NO comen
+   del width interno). Scope SF únicamente. */
+.v3-bracket-board.v3-ko-board--SF .v3-column-left  .v3-ko-card { margin-left: -15px; }
+.v3-bracket-board.v3-ko-board--SF .v3-column-right .v3-ko-card { margin-right: -15px; }
 
 /* F2.3 fix: scope a contexto KO. ANTES `.v3-column { min-height: 150px }` global
    leakeaba a Grupos (clase compartida), forzando 150px en columnas A-F/G-L.
