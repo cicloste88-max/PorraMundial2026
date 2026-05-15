@@ -298,6 +298,41 @@
   }
   window.mundialShellV3Init = init;
 
+  // F3-I1.6.2: suscribir a cambios de auth para refrescar chips
+  // ADMIN/logout cuando el user state cambie DESPUÉS del primer mount.
+  // Causa raíz del bug "logout no funciona": refreshShellUserChips
+  // solo se llamaba 1 vez al montar shell, leyendo currentUser en ese
+  // momento (típicamente welcome con user=null). Tras login, branch
+  // idempotente del ensureShellMount NO re-evaluaba → chips quedaban
+  // display:none → no recibían clicks aunque listener .do-logout de
+  // auth.js es correcto.
+  function subscribeAuthChangesForChips() {
+    if (window._v3ShellAuthSubscribed) return;
+    if (!window._porraDb || !window._porraDb.auth) {
+      // Retry: data.js debería haber creado el cliente antes que
+      // mundial-shell-v3 en main-entry, pero seguro por si load order.
+      return setTimeout(subscribeAuthChangesForChips, 200);
+    }
+    window._v3ShellAuthSubscribed = true;
+    window._porraDb.auth.onAuthStateChange(function (event, session) {
+      // TOKEN_REFRESHED / USER_UPDATED: auth.js los ignora (se emiten
+      // al cambiar de pestaña). Nosotros tampoco refrescamos.
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+      // setTimeout(0): dejar que el handler de auth.js termine primero
+      // (es quien popula window.currentUser tras consultar profiles).
+      setTimeout(function () {
+        var mounts = document.querySelectorAll('[data-v3-shell-mount]');
+        for (var i = 0; i < mounts.length; i++) {
+          refreshShellUserChips(mounts[i]);
+        }
+      }, 0);
+    });
+  }
+
+  // Init: la suscripción es seguro hacerla pre-DOM ready (sólo
+  // registra callback).
+  subscribeAuthChangesForChips();
+
   // Auto-arrancar con red de seguridad (ERR-01) — main-entry también llama init().
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

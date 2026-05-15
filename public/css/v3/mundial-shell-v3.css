@@ -512,3 +512,16 @@
   border-color: #ef4444;
   background: rgba(41, 12, 12, 0.95);
 }
+
+/* F3-I1.6.2: ocultar wc-auth-bar legacy (avatar + nombre + Cerrar
+   sesión) en pages donde shell v3 ya muestra chips ADMIN + ↩ Salir.
+   body.fc-shell-active es gestionada por F7.4-C fcShellApply
+   EXACTAMENTE en las pages con tabbar inferior (todas menos welcome).
+   Verificado en vivo (sesión 16-may):
+     - welcome: body className=""           → wc-auth-bar visible (login btn)
+     - grupos:  body className="fc-shell-active" → oculto
+     - predictor: idem → oculto
+   #wc-auth-bar es body-child global, no scoped a page-X. */
+body.fc-shell-active #wc-auth-bar {
+  display: none !important;
+}

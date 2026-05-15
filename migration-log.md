@@ -1813,3 +1813,17 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 **Pendiente verificación:** chip logout usa class `do-logout` asumiendo listener legacy lo captura. Si tras smoke no funciona, follow-up con onclick="doLogout()" directo o exponer doLogout en window.
 
 **HEAD anterior:** e1de51f.
+
+## 2026-05-16 — fix(shell): F3-I1.6.2 chip logout funcional + ocultar wc-auth-bar en SHELL_PAGES
+
+**Contexto:** smoke F3-I1.6 reportó (a) chip "↩ Salir" no funciona por display:none persistente tras login, y (b) avatar "C" + nombre + "Cerrar sesión" del header global #wc-auth-bar (DISTINTO del legacy #grupos-user-bar ya eliminado en F3-I1.6) seguían visibles arriba del shell v3.
+
+**Cambios:**
+- public/js/v3/mundial-shell-v3.js: añadida subscribeAuthChangesForChips() que suscribe a db.auth.onAuthStateChange() y refresca TODOS los shell mounts en SIGNED_IN/SIGNED_OUT. Ignora TOKEN_REFRESHED/USER_UPDATED (mismo patrón que auth.js). setTimeout(0) para que auth.js popule currentUser primero. Init invocado al cargar el fichero. Insertado tras `window.mundialShellV3Init = init` y antes del bloque auto-arrancar (dentro del IIFE para acceso a refreshShellUserChips).
+- public/css/v3/mundial-shell-v3.css: regla display:none para #wc-auth-bar bajo body.fc-shell-active (clase gestionada por F7.4-C fcShellApply). Aprovecha estado existente sin añadir JS; verificado en vivo que cobertura coincide exactamente con pages donde el shell v3 muestra chips (todas menos welcome).
+
+**Diseño:** opción B (San 15-may) — shell v3 self-contained; auth.js intacto. Acoplamiento mínimo a window._porraDb. Avatar redundante con chips v3 → ocultar via CSS aprovechando body.fc-shell-active existente (San 16-may; cero JS extra).
+
+**Verificación:** node --check OK. 5/5 grep gates. Smoke localhost no ejecutado en sandbox (sin browser/vite).
+
+**HEAD anterior:** 7646e79.
