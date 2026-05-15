@@ -2023,3 +2023,28 @@ renderAll legacy ya no se invoca desde F3-I1 routing; pero puede dispararse desd
 - Otras rondas (R32/R16/QF/F): sin cambios (regla scope SF únicamente)
 
 **HEAD anterior:** 8b17ee2.
+
+## 2026-05-16 — fix(elim): HF-16 remover halos gold del trofeo en SF
+
+**Contexto:** smoke HF-15 seguía mostrando solape (screenshot user con red box marcando halo invasivo). Análisis: el drop-shadow ambient 80px a opacidad 0.2 extendía halo gold visible ~50-60px efectivos, invadiendo las cards aunque la geometría real ya daba aire visible.
+
+**Cambios:** public/css/v3/eliminatoria-v3.css — override scope SF del filter del trofeo, ahora con SOLO la sombra inferior dark (proyección natural). Eliminadas las 2 drop-shadows gold (directo 8px de HF-15 + ambient 80px original).
+
+**Antes (HF-15):**
+```
+filter:
+  drop-shadow(0 0 8px rgba(201,169,97,.5))   /* halo gold directo */
+  drop-shadow(0 12px 28px rgba(0,0,0,.55))   /* sombra inferior */
+  drop-shadow(0 0 80px rgba(201,169,97,.2)); /* halo gold ambient invasivo */
+```
+
+**Después (HF-16):**
+```
+filter: drop-shadow(0 12px 28px rgba(0,0,0,.55));
+```
+
+**Constraint respetada:** cup shape, aspect ratio (width:height del SVG), max-width 110, max-height 160, animation float — TODO intacto. Solo se elimina el halo decorativo en SF.
+
+**Otras rondas (R32/R16/QF/F)** mantienen el filter chain completo con los 3 drop-shadows.
+
+**HEAD anterior:** b0fd0b2.
