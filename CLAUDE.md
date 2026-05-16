@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Rama **`claude/port-world-cup-design-FvZpD`** HEAD `ffb360a` — **Sprint F3-I1.6.x + 8 HFs cerrado (16 may), branch lista para merge a main**. Sesión 16-may PM: 8 hotfixes consecutivos sobre el bracket KO v3 y la fifa-bar. **Roll-up de la sesión**: HF-08 wiring `resolveAllSlots()` en `v3RenderBoard` (R32 muestra nombres reales) · HF-09 blindaje `home`/`away` literal en `resolveKO` + códigos 3 letras KO + coherencia visual con grupos · HF-10 reducir trofeo QF/SF (REVERTIDO en HF-11) · HF-11 replantar CSS cards KO con prototipo literal del autor (-119 LOC) · HF-12+13 separar cards SEMIS del trofeo (column-gap) · HF-13 también eliminó **mount fantasma `data-user-mount`** en `mundial-shell-v3.js:67` que `renderAuthBar` interceptaba (root cause real del badge fantasma — defensas F3-I1.6.2/4 apuntaban a `#wc-auth-bar` legacy, sospechoso equivocado) · HF-14 margin -10 cards SF · HF-15 bump final gap 50 + margin -15 (aire visible ~23-25px). Resultado visual: bracket KO v3 completo + propagación grupos→KO funcional + SEMIS con aire visible al trofeo + fifa-bar limpia. **NO mergeado a main todavía** — San hace merge manual + smoke prod Vercel. Rama paralela `sync/ef-get-squad-v6` (squads 7/48) sigue abierta.
+Main HEAD `eb9c9d1` (post-merge sprint sync-squads, 16-may). **Sprint anterior F3-I1.6.x + HF-08..HF-15 cerrado y mergeado** (bracket KO v3 visualmente completo, fifa-bar limpia, propagación grupos→KO funcional). **Sprint sync-squads cerrado y mergeado** (CLI `scripts/sync-squads.mjs` + workflow CI `.github/workflows/sync-squads.yml` activo con cron 6h UTC). **10/48 squads operativas** (5 FINAL: FRA/BIH/JPN/BEL/SWE; 5 pre-lista: ARG/BRA/ESP/MEX/QAT). Detalle commits + lecciones en `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Merge a main + smoke prod Vercel**: `git checkout main && git merge --no-ff claude/port-world-cup-design-FvZpD && git push origin main`. Vercel auto-deploy. Smoke en porramundial2026-seven.vercel.app verificando bracket KO + fifa-bar limpia + propagación grupos→KO.
-2. **Pendientes pre-11jun (decisiones San)**: boost mechanic v3 (ALTA), IA Predictor wiring v3 (tooltip + frase + score IA), audit cards legacy vs v3 — IA tooltip / EN VIVO pill / CEST kickoff display / Pizarra long-press. Detalle: `docs/AUDIT_LEGACY_VS_V3.md` tabla transversales (I3..I7 pendientes).
-3. **pg_cron `update-results` activate June 11**: bloqueador operacional. Verificar también JSON `_results.ko_results` con update-results real, IDs SofaScore KO (~28 jun post fase grupos), email confirmación cierre porra.
+1. **Audit v3 vs legacy funcionalidades**: el redesign v3 es SOLO estético (2 pantallas reemplazadas Grupos + Fase Final + 2 más con redesign interno). Asegurar que ninguna funcionalidad legacy se pierde + recolocar reminiscencias en el nuevo layout. Referencia: `docs/v3-vs-legacy.md` (inventario por pantalla) + `docs/AUDIT_LEGACY_VS_V3.md` (audit previo I1-I9).
+2. **Boost mechanic v3** (decisión San, ALTA prioridad pre-11jun) + IA Predictor wiring v3 (tooltip + frase + score IA) + cards prioritarias: IA tooltip / EN VIVO pill / Pizarra long-press / CEST kickoff display.
+3. **pg_cron `update-results` activate 11-jun**: bloqueador operacional. Verificar JSON `_results.ko_results` con update-results real, IDs SofaScore KO (~28 jun post fase grupos), email confirmación cierre porra.
 
 ## Pendientes — Bugs UI
 
@@ -54,10 +54,13 @@ Vault/EF + Turnstile DESACTIVADO 30abr2026: ver `docs/secrets.md`.
 ## Comandos útiles
 
 ```bash
-npm run dev    # localhost:5173
-npm run build  # dist/
+npm run dev                                                          # localhost:5173
+npm run build                                                        # dist/
+npm run sync-squads -- --mode=scrape --refresh-final --verbose       # update squads BD
 apify call N8vUChlhok5JU3cnL -i '{"eventId":"15832749"}' -t 90
 ```
+
+Dispatch manual del sync vía GitHub UI: `Actions → Sync Squads → Run workflow` (4 inputs configurables).
 
 Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`.
 
@@ -77,6 +80,8 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
 | `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
 | `globo-mundial.md` | Globo 3D — factory globe.gl, OVERRIDE/ALIAS, polygonsData re-render, panel detalle, banderas Supabase, WIKI_BIO v3 | Cambios en globo o países |
+| `sync-squads.md` | CLI scripts/sync-squads.mjs + workflow CI: modos, pipeline FF/TM, calendario operativo, casos especiales | Cambios en sync de plantillas o frecuencia cron |
+| `v3-vs-legacy.md` | Inventario funcionalidades v3 vs legacy + reminiscencias + gaps + roadmap consolidación estética | Audit redesign v3 / decidir recolocación de features |
 
 ### `.claude/rules/` — auto-cargadas por path-scoping
 
@@ -87,16 +92,17 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `frontend-js.md` | `public/js/**`, `js/main-entry.js` | DOMContentLoaded, var/const, shims, badge-fallback |
 | `apify-actor.md` | `apify-actors/**` | Contrato I/O, push, eventId discovery, Cloudflare 403 |
 | `multi-agent-sync.md` | `index.html`, `public/**`, `js/**`, `docs/**`, `supabase/**`, `apify-actors/**`, `.claude/rules/**`, `CLAUDE.md`, `migration-log.md` | Sync Code↔San: push inmediato, reinicio Vite tras pull, detección desincronía, switch branch limpio, post-squash cleanup |
+| `sync-squads.md` | `scripts/sync-squads*`, `scripts/lib/**`, `.github/workflows/sync-squads.yml` | `--refresh-final` semántica, añadir país, TM IDs, fuentes nuevas, cron schedule, decode in-flight |
 
 ### Errores conocidos
 
-ERR-01..43: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42), Overlay v3 (43).
+ERR-01..50: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42), Overlay v3 (43), simuladores KO (44-45), sync-squads (46-50).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..43 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..50 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs redesign v3: 15 match-card features (IA tooltip, CEST, Pizarra long-press, EN VIVO, stadium, boost, awards, etc.) + **9 puntos integración v3↔legacy I1-I9** (routing, scope shell, state global, cierre porra, EN VIVO, IA wiring, Boost UX, Pizarra entry, CSS cascada) + **Backlog F3** con HF-08 detallado 5 bloques A-E. Generado F2.8.2, ampliado F2.9 HF-cierre (15 may). NO implementado — referencia para F3 wiring.
 
 ## End-of-session protocol

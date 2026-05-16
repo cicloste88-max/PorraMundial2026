@@ -2065,3 +2065,26 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 **Verificación:** Grep gates 3/3 positivos OK (gap 50, margin -15 ×2). Grep gates negativos OK (0 hits para gap 40, margin -10, trophy SF override, HF-16). HF-15 marker presente 3 veces (comentario header + 2 menciones en aritmética).
 
 **HEAD anterior:** 3627e3c (HF-16 mi versión revertida en este commit).
+
+## 2026-05-16 — Squads BD limpieza + workflow CI activo
+
+**Sprint:** `claude/post-merge-sprint-hotfixes-FkMx5` → main como `eb9c9d1` (8 commits).
+
+**Cambios BD:**
+- BIH limpieza entidades crudas heredadas: `Kola&scaron;inac` → `Kolašinac`, `&Scaron;unjić` → `Šunjić`, `Ba&scaron;ić` → `Bašić` (3 jugadores afectados de los 25 totales). Aplicado vía decode in-flight en `--refresh-final` (no re-scrape). `fuente='as+tm'` preservada.
+- Recuperación enrich-tm post-pérdida del `--refresh-final` pre-Fix C: BIH 19/25 jugadores enriquecidos (6 no presentes en TM); SWE 25/26 jugadores enriquecidos. Datos restaurados: edad, dob, valor, foto_url, posición específica.
+
+**Estado final 16-may 23:59:** 10/48 squads con datos.
+- 5 FINAL: FRA (26 jug, 11 tit, ff), BIH (25 jug, 11 tit, as+tm), JPN (26 jug, 0 tit pendiente, ff), BEL (26 jug, 0 tit placeholder, ff), SWE (26 jug, 0 tit placeholder, ff+tm).
+- 5 pre-lista: ARG (55, ff+tm), BRA (51, 365+tm), ESP (53, ff), MEX (55, 365+tm), QAT (33, infobae).
+- 38 pendientes (incluyendo IRN, en revisión geopolítica desde 11-mar).
+
+**Automatización:** `.github/workflows/sync-squads.yml` activo. Cron `'0 */6 * * *'` UTC. Primera ejecución run `25962281040`, 49s, 5 países `no-op` (idempotencia confirmada).
+
+**Secrets configurados a nivel repo:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. El workflow genera `.env` en el runner efímero para parity con flow local.
+
+**Sin DDL en este sprint.** Solo UPDATEs sobre `squads.jugadores` + `jugadores_is_final` + `jugadores_fuente` + `jugadores_synced_at` + `updated_at`. Schema intacto.
+
+**Top-3 errores cerrados:** ERR-46 (entidades centroeuropeas/turcas con `html-entities`), ERR-47 (`--refresh-final` preserva incondicionalmente), ERR-48 (detector `/alineaciones/0.jpg` SSR). ERR-49 + ERR-50 secundarios (apóstrofos tipográficos, slice cut revertido).
+
+**Nueva documentación:** `docs/sync-squads.md` (operacional), `.claude/rules/sync-squads.md` (regla path-scoped), `docs/v3-vs-legacy.md` (inventario funcionalidades). Entrada CHANGELOG completa con 8 commits + lecciones.
