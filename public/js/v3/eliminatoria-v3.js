@@ -239,6 +239,51 @@ function v3RenderKoCard(match, meta) {
   return div;
 }
 
+// ─── Cuadro de Honor — data helper (HF-CdH-01) ──────────────
+// Extrae los 4 puestos del torneo (Campeón, Subcampeón, 3.º, 4.º) desde el
+// state global (BRACKET, resolvedSlots, koPredictions, EQUIPOS). Idempotente.
+// Retorna null si BRACKET aún no existe (pre-load) o {champion, runnerUp,
+// third, fourth, finalPred, thirdPred} con NAMES (o null) en cada puesto.
+// Lógica portada 1:1 de buildChampionPodium (ko.js:676) — NO modificar legacy.
+function _v3ComputePodium() {
+  if (typeof BRACKET === 'undefined' || !BRACKET.final || !BRACKET.final[0]) return null;
+  if (typeof EQUIPOS === 'undefined') return null;
+
+  var matchFinal = BRACKET.final[0];
+  var matchThird = BRACKET.third && BRACKET.third[0];
+
+  var hName = (typeof resolvedSlots === 'object' && resolvedSlots) ? resolvedSlots[matchFinal.home] : null;
+  var aName = (typeof resolvedSlots === 'object' && resolvedSlots) ? resolvedSlots[matchFinal.away] : null;
+  var finalPred = (typeof koPredictions === 'object' && koPredictions)
+    ? (koPredictions[matchFinal.id] || koPredictions[String(matchFinal.id)] || {})
+    : {};
+
+  var champion = null;
+  if (finalPred.saved && finalPred.l !== null && finalPred.l !== undefined) {
+    if (finalPred.l > finalPred.v)       champion = hName;
+    else if (finalPred.v > finalPred.l)  champion = aName;
+    else if (finalPred.classifier)       champion = finalPred.classifier;
+  }
+  var runnerUp = champion ? (champion === hName ? aName : hName) : null;
+
+  var third = null, fourth = null;
+  var thirdPred = matchThird && (typeof koPredictions === 'object' && koPredictions)
+    ? (koPredictions[matchThird.id] || koPredictions[String(matchThird.id)] || {})
+    : {};
+  if (matchThird && thirdPred.saved && thirdPred.l !== null && thirdPred.l !== undefined) {
+    var t3h = resolvedSlots[matchThird.home];
+    var t3a = resolvedSlots[matchThird.away];
+    if (thirdPred.l > thirdPred.v)      { third = t3h; fourth = t3a; }
+    else if (thirdPred.v > thirdPred.l) { third = t3a; fourth = t3h; }
+    else if (thirdPred.classifier)      {
+      third = thirdPred.classifier;
+      fourth = (thirdPred.classifier === t3h) ? t3a : t3h;
+    }
+  }
+
+  return { champion: champion, runnerUp: runnerUp, third: third, fourth: fourth, finalPred: finalPred, thirdPred: thirdPred };
+}
+
 // ─── Final block (round F) ──────────────────────────────────
 function v3RenderFinalBlock() {
   var board = document.getElementById('v3-bracket-board');
