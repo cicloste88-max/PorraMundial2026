@@ -1,0 +1,113 @@
+name: Sync Squads
+
+on:
+  schedule:
+    # Cada 6h UTC: cubre el snapshot FIFA del 2-jun y bajas durante el Mundial.
+    # Cron de GitHub Actions puede retrasarse ~30min en horas pico (aceptable).
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Modo de ejecución'
+        type: choice
+        options:
+          - scrape
+          - enrich-tm
+        default: scrape
+      refresh_final:
+        description: 'Aplicar --refresh-final (solo modo scrape)'
+        type: boolean
+        default: true
+      iso3_filter:
+        description: 'iso3 a procesar (vacío = --all-missing en scrape, --all en enrich-tm)'
+        type: string
+        default: ''
+      verbose:
+        description: 'Log detallado de fetches y matches'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-squads
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write .env from secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          {
+            printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL"
+            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY"
+          } > .env
+
+      - name: Build CLI flags
+        id: flags
+        env:
+          # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
+          # solo cuando está unset/empty, preservando "false" explícito de UI.
+          MODE: ${{ inputs.mode }}
+          REFRESH_FINAL: ${{ inputs.refresh_final }}
+          ISO3_FILTER: ${{ inputs.iso3_filter }}
+          VERBOSE: ${{ inputs.verbose }}
+        run: |
+          MODE="${MODE:-scrape}"
+          REFRESH_FINAL="${REFRESH_FINAL:-true}"
+          VERBOSE="${VERBOSE:-true}"
+          ISO3_FILTER="${ISO3_FILTER:-}"
+
+          # Sanity check del input libre: bloquea caracteres no esperados
+          # antes de que se interpolen en el comando del siguiente step.
+          if [ -n "${ISO3_FILTER}" ] && ! printf '%s' "${ISO3_FILTER}" | grep -qE '^[A-Z]{3}(,[A-Z]{3})*$'; then
+            echo "ERROR: iso3_filter debe ser código de 3 letras MAYUS, opcionalmente coma-separado (e.g. FRA, FRA,JPN)"
+            exit 1
+          fi
+
+          FLAGS="--mode=${MODE}"
+          if [ "${MODE}" = "scrape" ] && [ "${REFRESH_FINAL}" = "true" ]; then
+            FLAGS="${FLAGS} --refresh-final"
+          fi
+          if [ -n "${ISO3_FILTER}" ]; then
+            FLAGS="${FLAGS} --iso3=${ISO3_FILTER}"
+          elif [ "${MODE}" = "scrape" ] && [ "${REFRESH_FINAL}" != "true" ]; then
+            FLAGS="${FLAGS} --all-missing"
+          elif [ "${MODE}" = "enrich-tm" ]; then
+            FLAGS="${FLAGS} --all"
+          fi
+          if [ "${VERBOSE}" = "true" ]; then
+            FLAGS="${FLAGS} --verbose"
+          fi
+
+          echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
+          echo "Resolved flags: ${FLAGS}"
+
+      - name: Run sync-squads
+        run: npm run sync-squads -- ${{ steps.flags.outputs.flags }} 2>&1 | tee sync-squads.log
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-squads-log-${{ github.run_id }}
+          path: sync-squads.log
+          retention-days: 14
