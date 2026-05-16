@@ -984,7 +984,9 @@ body.fc-shell-active #page-elim > #modal {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 14px;
+  /* HF-CdH-04: padding-top extra (26px) reserva el carril del chip flotante
+     +30 pts, que sale del flex flow para liberar ancho al nombre del campeón. */
+  padding: 26px 14px 14px;
   border-radius: 16px;
   border: 1.5px solid rgba(201, 169, 97, 0.38);
   background:
@@ -994,6 +996,16 @@ body.fc-shell-active #page-elim > #modal {
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 4px 18px rgba(0, 0, 0, 0.35);
   overflow: hidden;
+}
+
+/* HF-CdH-04: chip +30 pts flotante en esquina superior derecha.
+   Sale del flex flow → el body (eyebrow + nombre) tiene todo el ancho
+   restante tras logo + separador + escudo, sin competir con el chip. */
+.v3-champion-card .v3-podium-pts--gold {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
 }
 
 .v3-champion-card__logo {
@@ -1039,23 +1051,23 @@ body.fc-shell-active #page-elim > #modal {
   margin-bottom: 6px;
 }
 
-/* HF-CdH-03: nombre uppercase grande con clamp a 2 líneas para evitar
-   truncado de "Jordania" / "Bosnia and Herzegovina" / "República Checa". */
+/* HF-CdH-04: nombre en 1 línea con clamp() responsive en font-size.
+   15px (mínimo) ← 5.5vw ← 24px (máximo). El chip flotante (top-right
+   absolute) libera ancho horizontal, y el clamp evita truncado en mobile
+   estrecho para nombres largos (Bosnia and Herzegovina, República Checa,
+   Países Bajos). Si aún se trunca a 15px, cae a ellipsis. */
 .v3-champion-card__name {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: clamp(15px, 5.5vw, 24px);
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1;
+  line-height: 1.05;
   color: #FEF9C3;
   text-transform: uppercase;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  white-space: nowrap;
   overflow: hidden;
-  word-break: break-word;
-  hyphens: auto;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Estado placeholder (sin pronóstico de Final) */
