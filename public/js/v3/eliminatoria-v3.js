@@ -738,19 +738,31 @@ function v3BindButtonsAndSwitcher() {
   if (resetBtn) {
     resetBtn.onclick = function() {
       if (!confirm('¿Borrar pronósticos KO?')) return;
+      // HF-SIM-01: mutar in-place — koPredictions es una variable global declarada
+      // con `let` en ko.js (línea 79). Asignar `koPredictions = {}` desde aquí
+      // crea una variable local del scope de v3 y deja la global intacta, así
+      // que el borrado no surte efecto. Mismo cuidado con resolvedSlots: limpiar
+      // solo W*/L* (los slots de grupos 1A/2B/T_… se reconstruyen al renderizar
+      // pero conviene preservarlos para no romper el bracket).
       if (typeof koPredictions !== 'undefined') {
-        koPredictions = {};
-        if (typeof saveKO === 'function') saveKO();
-        v3RenderAll();
+        Object.keys(koPredictions).forEach(function(k){ delete koPredictions[k]; });
       }
+      if (typeof resolvedSlots !== 'undefined') {
+        Object.keys(resolvedSlots).forEach(function(k){
+          if (k.startsWith('W') || k.startsWith('L')) delete resolvedSlots[k];
+        });
+      }
+      if (typeof saveKO === 'function') saveKO();
+      v3RenderAll();
     };
   }
 
   // Dice button
   var diceBtn = document.querySelector('[data-v3-elim-dice]');
   if (diceBtn) {
+    // HF-SIM-01: sin confirm duplicado — diceSimulateAllKO (admin.js:702)
+    // muestra su propio confirm con texto más informativo.
     diceBtn.onclick = function() {
-      if (!confirm('¿Simular pronósticos aleatorios?')) return;
       v3SimulateDice();
     };
   }
@@ -769,41 +781,20 @@ function v3BindButtonsAndSwitcher() {
   }
 }
 
+// HF-SIM-01 · Delegación al motor real. La implementación previa era un stub
+// hardcoded (R32 random + R16 89-92 fijo 2-1 + QF 97 fijo 0-0 + Final/3.er
+// puesto fijos), que dejaba SF 101-102 + R16 93-96 + QF 98-100 sin pred y
+// rompía la propagación de slots → el Cuadro de Honor v3 (HF-CdH-01) no
+// recibía W101/W102 resueltos. diceSimulateAllKO (admin.js:700) sí recorre
+// las 6 rondas con propagación slot-by-slot.
+//
+// setTimeout post-call: diceSimulateAllKO no emite `mundial:predictions-changed`
+// (I3 pendiente), así que forzamos re-render del board v3 con un tick de
+// margen para que saveKO()/refreshAllViews() terminen sus mutaciones.
 function v3SimulateDice() {
-  if (typeof BRACKET === 'undefined' || typeof koPredictions === 'undefined') return;
-
-  // Fill R32 (M73-M88)
-  var r32 = BRACKET.r32 || [];
-  r32.forEach(function(m) {
-    var h = Math.floor(Math.random() * 4);
-    var a = Math.floor(Math.random() * 4);
-    koPredictions[m.id] = {
-      l: h, v: a,
-      classifier: (h === a) ? 'home' : null,
-      saved: true
-    };
-  });
-
-  // Some R16 (M89-M92)
-  var r16 = BRACKET.r16 || [];
-  for (var i = 0; i < Math.min(4, r16.length); i++) {
-    koPredictions[r16[i].id] = { l: 2, v: 1, classifier: null, saved: true };
-  }
-
-  // One QF (M97)
-  var qf = BRACKET.qf || [];
-  if (qf[0]) {
-    koPredictions[qf[0].id] = { l: 0, v: 0, classifier: 'away', saved: true };
-  }
-
-  // Final + 3rd
-  var final = BRACKET.final || [];
-  var third = BRACKET.third || [];
-  if (final[0]) koPredictions[final[0].id] = { l: 2, v: 1, classifier: null, saved: true };
-  if (third[0]) koPredictions[third[0].id] = { l: 3, v: 2, classifier: null, saved: true };
-
-  if (typeof saveKO === 'function') saveKO();
-  v3RenderAll();
+  if (typeof diceSimulateAllKO !== 'function') return;
+  diceSimulateAllKO();
+  setTimeout(function(){ if (typeof v3RenderAll === 'function') v3RenderAll(); }, 100);
 }
 
 // ─── Main render ────────────────────────────────────────────
