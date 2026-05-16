@@ -162,17 +162,11 @@ export async function parseStartingXI(slug, opts = {}) {
   const url = `${FF_BASE}/equipos/${slug}`;
   const html = await fetchText(url, opts);
 
-  // Si FF aún no ha publicado el XI predicho, sale placeholder
-  // "Alineación aún no disponible" / "Once aún no disponible" /
-  // "Sin alineación disponible". En esos casos devolvemos [] y
-  // runScrape (--refresh-final) preserva el roster intacto sin
-  // marcar titulares (Fix C).
-  if (
-    /[Aa]lineaci[óo]n\s+a[úu]n\s+no\s+disponible/i.test(html) ||
-    /[Oo]nce\s+a[úu]n\s+no\s+disponible/i.test(html) ||
-    /[Ss]in\s+alineaci[óo]n\s+disponible/i.test(html)
-  ) {
-    if (opts.verbose) console.log('  → XI placeholder detectado (página sin once tipo publicado), xi_names=[]');
+  // Si FF aún no ha publicado el XI predicho, sirve la imagen de campo vacío
+  // (alineaciones/0.jpg). El texto "Alineación aún no disponible" se inyecta por JS
+  // tras hidratación cliente, no aparece en HTML servido, por eso detectamos la imagen.
+  if (/\/alineaciones\/0\.jpg/i.test(html)) {
+    if (opts.verbose) console.log('  → XI placeholder (alineaciones/0.jpg) detectado, xi_names=[]');
     return [];
   }
 
