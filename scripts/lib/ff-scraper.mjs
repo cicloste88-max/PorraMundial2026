@@ -164,7 +164,16 @@ export async function parseStartingXI(slug, opts = {}) {
 
   // Localizar el inicio de la sección "Posible once tipo" / "Once tipo" en el HTML
   const anchor = html.search(/Posible once tipo|Once tipo|Once probable/i);
-  const slice = anchor >= 0 ? html.slice(anchor) : html;
+  let slice = anchor >= 0 ? html.slice(anchor) : html;
+  // Cerrar slice antes de secciones que contienen escudos de rivales/competiciones
+  // (Próximos partidos / Historial / Calendario...). En BEL/JPN/SWE estas secciones
+  // están físicamente cerca tras "Posible once tipo" y sus alts (alt="Eurocopa",
+  // alt="Francia", etc.) se colaban como primeros 11 nombres del XI.
+  const END_MARKERS_RE = /(Pr[oó]ximos partidos|Historial de partidos|Calendario|Resultados|Posibles alineaciones|Lesionados|Sancionados|Apercibidos|Convocatorias previas|Ver todas? las noticias|Pr[oó]ximos rivales)/i;
+  const endMatch = slice.match(END_MARKERS_RE);
+  if (endMatch && endMatch.index > 200) {
+    slice = slice.slice(0, endMatch.index);
+  }
 
   // Estrategia A: extraer todos los alt= de <img> dentro de la sección (los 11 primeros)
   const altRe = /<img\b[^>]*\balt="([^"]+)"/gi;

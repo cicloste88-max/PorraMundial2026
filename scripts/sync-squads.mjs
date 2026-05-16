@@ -156,15 +156,17 @@ async function runScrape(targets) {
       let isFinal = scrape.is_final;
       let fuente = 'ff';
 
-      if (refreshFinal && (players.length === 0 || !isFinal)) {
-        // No hay noticia nueva: cargar roster existente y solo aplicar titulares scraped
+      if (refreshFinal) {
+        // --refresh-final es siempre conservador: si hay roster en BD se preserva
+        // tal cual (nombres + fuente con sufijo +tm intactos) y solo se reaplica
+        // es_titular según el XI extraído. Bloquea pérdidas de enrichment TM
+        // cuando aparezcan listas finales para países ya enriquecidos.
         const existing = await getSquadRow(iso3);
         if (Array.isArray(existing?.jugadores) && existing.jugadores.length > 0) {
           players = existing.jugadores.map((p) => ({ ...p, es_titular: false }));
           isFinal = !!existing.jugadores_is_final;
           fuente = existing.jugadores_fuente || 'ff';
 
-          // Aplicar XI titular vía matcher
           if (scrape.xi_names.length > 0) {
             const { matchAgainstRoster } = await import('./lib/name-matcher.mjs');
             const { matches } = matchAgainstRoster(scrape.xi_names, players, { minScore: 65 });
@@ -174,6 +176,8 @@ async function runScrape(targets) {
             scrape.titulares = matches.length;
           }
         }
+        // Si no hay existing roster, players queda con scrape.roster del flujo
+        // normal (cae a no-list si vacío, o se inserta como nueva FINAL).
       }
 
       if (players.length === 0) {
