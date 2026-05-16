@@ -16,3 +16,4 @@ porra_2026_checkpoint_v1*.html
 !index.html
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+cache/
