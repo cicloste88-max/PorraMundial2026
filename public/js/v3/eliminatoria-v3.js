@@ -29,6 +29,13 @@ function v3FlagURLByCode(code) {
 
 var _v3ElimInited = false;
 
+// HF-Deadline: deadline global pre-Mundial para validación de envíos.
+// Duplicada de mundial-shell-v3.js KICKOFF_UTC (classic scripts, sin module
+// imports). Si cambia KICKOFF_UTC, actualizar también aquí y el guard
+// análogo en admin.js diceSimulateAllKO.
+var WC_KICKOFF_UTC = '2026-06-11T19:00:00Z';
+var WC_PRESIM_DEADLINE_MS = new Date(WC_KICKOFF_UTC).getTime() - 24 * 60 * 60 * 1000;
+
 window.v3ElimMount = function() {
   if (_v3ElimInited) {
     v3RenderAll();
@@ -61,6 +68,7 @@ window.v3ElimMount = function() {
 
   var actions = document.createElement('div');
   actions.className = 'v3-actions';
+  actions.setAttribute('data-v3-actions', '');  // HF-Deadline: selector para visibility helper
   actions.innerHTML = `
     <button class="v3-btn" data-v3-elim-dice>🎲 Simular KO</button>
     <button class="v3-btn v3-btn--danger" data-v3-elim-reset>Borrar KO</button>
@@ -822,9 +830,27 @@ function v3SimulateDice() {
 }
 
 // ─── Main render ────────────────────────────────────────────
+
+// HF-Deadline: regla de visibilidad de los botones de simulación KO.
+// Oculta si el usuario finalizó (profiles.porra_cerrada → window._porraCerrada)
+// O si estamos dentro de las últimas 24h pre-kickoff (deadline global para
+// que San valide envíos antes del primer partido).
+function v3ShouldShowSimActions() {
+  if (window._porraCerrada) return false;
+  if (Date.now() >= WC_PRESIM_DEADLINE_MS) return false;
+  return true;
+}
+
+function v3RefreshActionsVisibility() {
+  var el = document.querySelector('[data-v3-actions]');
+  if (!el) return;
+  el.style.display = v3ShouldShowSimActions() ? '' : 'none';
+}
+
 function v3RenderAll() {
   v3RenderSwitcher();
   v3RenderBoard();
+  v3RefreshActionsVisibility();  // HF-Deadline
 }
 
 // ─── Defensivo: pattern readyState ──────────────────────────
