@@ -418,6 +418,16 @@ function v3RenderFinalBlock() {
   trophyCol.appendChild(belowStack);
 
   board.appendChild(trophyCol);
+
+  // HF-CdH-01: Cuadro de Honor (Campeón + Clasificación Final) bajo el bracket.
+  // Solo se ejecuta cuando round === 'f' (v3RenderBoard:144 early-return arriba),
+  // así que no hace falta guard extra de ronda. Idempotente y defensivo.
+  try {
+    var cdh = v3RenderCuadroHonor();
+    if (cdh) board.appendChild(cdh);
+  } catch (e) {
+    console.warn('[HF-CdH] error rendering Cuadro de Honor:', e);
+  }
 }
 
 function v3RenderFinalCard(match, meta, kind) {
