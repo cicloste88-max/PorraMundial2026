@@ -405,7 +405,31 @@ function v3RenderCuadroHonor() {
     rowsHtml;
   wrap.appendChild(classCard);
 
+  // HF-CdH-05: programar auto-shrink del nombre tras el primer layout.
+  // requestAnimationFrame asegura que el wrap esté insertado por el caller
+  // (v3RenderFinalBlock) y que clientWidth del body refleje el ancho real.
+  if (podium.champion && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(v3FitChampionName);
+  }
+
   return wrap;
+}
+
+// HF-CdH-05 · Auto-shrink del nombre del campeón. El clamp() CSS solo
+// escala por viewport (vw), pero el body interno del champion-card tiene
+// un ancho fijo ≈180px tras logo (44) + separador (1) + escudo (64) +
+// gaps (3×14) + paddings (2×14) — invariante respecto al vw. Reducimos
+// font-size en pasos de 1px desde 24 hasta 11 hasta que `scrollWidth`
+// (ancho real del texto) deje de exceder `clientWidth` (ancho disponible
+// del contenedor). Máx 14 iteraciones; si a 11px aún no cabe, el
+// text-overflow:ellipsis del CSS toma el control como fallback final.
+function v3FitChampionName() {
+  var el = document.querySelector('.v3-champion-card__name');
+  if (!el || el.clientWidth <= 0) return;
+  for (var fs = 24; fs >= 11; fs--) {
+    el.style.fontSize = fs + 'px';
+    if (el.scrollWidth <= el.clientWidth) return;
+  }
 }
 
 // ─── Final block (round F) ──────────────────────────────────
