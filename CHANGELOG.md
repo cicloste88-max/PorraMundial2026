@@ -2,6 +2,79 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-16 — Sprint sync-squads + GitHub Actions workflow
+
+**Branch:** `claude/post-merge-sprint-hotfixes-FkMx5` mergeada a main (`eb9c9d1`).
+
+### Funcionalidades nuevas
+
+- **CLI `scripts/sync-squads.mjs`** — sincronización idempotente de `squads.jugadores`
+  desde futbolfantasy.com (3 pasos: detect lista → parse roster → extract XI con fuzzy
+  match) y enrich con Transfermarkt (edad/dob/valor/foto, cache 24h). Modos
+  `--mode=scrape` (con `--iso3` / `--all-missing` / `--refresh-final` / `--all`) y
+  `--mode=enrich-tm`. Flags transversales `--dry-run` / `--force` / `--verbose` /
+  `--skip=...` / `--delay=...`.
+- **Workflow CI `.github/workflows/sync-squads.yml`** — schedule cron `'0 */6 * * *'`
+  + `workflow_dispatch` con 4 inputs configurables desde la UI de GitHub Actions
+  (mode, refresh_final, iso3_filter, verbose). Log artifact retention 14d, sanity
+  check del input libre con regex `^[A-Z]{3}(,[A-Z]{3})*$`.
+
+### 8 commits del sprint
+
+- `8e4d4ee` `feat(squads)` — script inicial (CLI + ff-scraper + tm-scraper +
+  name-matcher + squads-db) + 48 iso3-slugs + 6 TM IDs conocidos + brief md.
+- `e874b0c` `fix(sync-squads)` — decode HTML entities (tabla manual ~70 entradas
+  Latin-1/escandinavas/tipográficas) + filtro `Alineación` / `Formación` /
+  `Titulares` etc. en parseStartingXI.
+- `e81e058` `fix(sync-squads)` — normalizar apóstrofos U+2018/2019/201A/2032 → `'`
+  ASCII y U+201C/201D/201E/2033 → `"` ASCII para idempotencia contra BD escrita
+  con teclado normal.
+- `58979b5` `fix(sync-squads)` — Fix B (overzealous slice cut, revertido en
+  `89e5d51`) + Fix C: `--refresh-final` preserva incondicionalmente roster +
+  fuente +tm con decode in-flight de nombre/club.
+- `89e5d51` `fix(sync-squads)` — revertir Fix B + intento de detector regex de
+  texto "Alineación aún no disponible" (inviable, texto inyectado por JS).
+- `b54fff8` `fix(sync-squads)` — detector definitivo del placeholder vía imagen
+  SSR `/alineaciones/0.jpg`.
+- `0d51fa4` `fix(sync-squads)` — migrar a paquete `html-entities` v2.6
+  (HTML5 completo ~2000 entidades) reemplazando tabla manual. Cubre eslavo-sur
+  (BIH/CRO), eslavo-occidental (CZE) y turco (TUR).
+- `2cf8327` `feat(ci)` — workflow `.github/workflows/sync-squads.yml`.
+
+### Bugs resueltos
+
+- **ERR-46** — HTML entities centroeuropeas/turcas no decodificadas con tabla manual.
+- **ERR-47** — `--refresh-final` pisaba enrichment TM cuando había noticia nueva.
+- **ERR-48** — `parseStartingXI` extraía escudos de rivales cuando página sin XI.
+- **ERR-49** — Apóstrofos tipográficos U+2019 rompen idempotencia ASCII en BD.
+- **ERR-50** — `END_MARKERS_RE` corte de slice overzealous (intervención contraproducente).
+
+### BD
+
+- 10/48 squads operativas: 5 FINAL (FRA 11/11 titulares, BIH 11/11 + TM tras
+  recuperación, JPN pendiente XI, BEL/SWE con `/alineaciones/0.jpg` SSR → sin XI
+  publicado todavía), 5 pre-listas (ARG/BRA/ESP/MEX/QAT).
+- `synced_at` automatizado vía cron cada 6h UTC.
+- Limpieza in-flight de entidades crudas heredadas (BIH `Kola&scaron;inac` →
+  `Kolašinac` y similares) sin re-scrapear, preservando `fuente=as+tm`.
+
+### Lecciones
+
+- **Lib oficial > tabla manual** para parsers de HTML. La tabla manual fue válida
+  para 5 países, frágil para 10, insostenible para 48.
+- **Flags `preserve` deben preservar incondicionalmente** — no solo en cierto
+  branch del if. El nombre del flag es contrato. ERR-47 lo viola con un predicado
+  innecesario.
+- **Marcadores SSR > marcadores hidratados-JS** para parsing server-side. ERR-48
+  costó 2 rounds de intentos especulativos antes de pedir screenshot real.
+- **No especular sobre estructura HTML sin ver la página servida** (`curl`).
+  ERR-50 dobla la apuesta sobre un diagnóstico sin verificación.
+
+### Primera ejecución del workflow CI
+
+Run `25962281040`, duración 49s, resultado: 5 países `no-op` (idempotencia
+confirmada). Sin pérdida ni cambio espurio.
+
 ## 2026-05-16 — Sprint F3-I1.6.x + HF-08..HF-15: KO bracket visual completo + bug fixes
 
 **Branch:** `claude/port-world-cup-design-FvZpD` HEAD `ffb360a` (NO mergeado a main, listo para fast-forward).
@@ -104,175 +177,3 @@ HEAD `5b87645`. **NO mergeado a main** — F3 wiring SPA pendiente. Cierre sesi�
 
 **Próximos**: F2.9 smoke Eliminatoria + F3 wiring SPA + squads reales EF `get-squad` v6.
 
-## 2026-05-13 — Squads pre-listas Mundial + EF v6 (deploy directo Claude.ai) — rama `sync/ef-get-squad-v6`
-
-Sesión liderada desde Claude.ai. Cambios aplicados directamente al runtime Supabase (BBDD + EF) vía MCP. Esta rama sincroniza el repo con ese runtime; **no contiene cambios de lógica nuevos** (commit etiquetado `[no-deploy]`).
-
-### Backend — schema squads (aplicado runtime, sin migration file)
-
-3 columnas nuevas en `public.squads` para soportar plantillas completas (no solo XI titular):
-
-- `jugadores_is_final` `boolean NOT NULL DEFAULT false` — true si la plantilla es la prelista/lista FINAL FIFA (no provisional).
-- `jugadores_fuente` `text` — fuente concreta del array jugadores (`ff` | `as` | `365` | `infobae` | `fifa-official`).
-- `jugadores_synced_at` `timestamptz` — timestamp del último sync del array (distinto de `updated_at` general).
-
-ALTER aplicado directo por Claude.ai vía Supabase MCP el 13 may. No replicable con `supabase db push` (no hay migration file canónico). Documentado en `docs/db-schema.md` § Tablas Pizarra Táctica.
-
-### Backend — Edge Function `get-squad` v6 ACTIVE
-
-Deploy directo vía Supabase MCP. ID `aaf02673-e301-46e3-8ed1-c836ea2cb575`, version=6, `verify_jwt=true`. Retrocompatible v5 (frontend Pizarra Táctica no requiere cambios). Código sincronizado en `supabase/functions/get-squad/index.ts` (220 LOC) — primera línea `// supabase/functions/get-squad/index.ts — v6` como marker de versión.
-
-Cambios v5 → v6:
-- `extractXI(jugadores, formacion)`: filtra `es_titular === true` si al menos un elemento del array tiene el flag; si el array tiene exactamente 11 elementos sin flag → formato v5 antiguo (XI directo); en caso contrario → placeholders desde formación.
-- `buildPlantilla(jugadores)`: normaliza el array completo al schema `PlantillaPlayer` (nombre, club, posicion_bucket, es_titular, posicion, dorsal, foto_url, dob, fuente).
-- Respuesta enriquecida con `plantilla` (array completo, variable 23-55 jugadores) + `plantilla_meta` ({n, fuente, is_final, synced_at}). Mantiene `jugadores` (11 elementos XI) + `plantilla_completa` (bool legacy) + `fuente` + `updated_at` del contrato v5.
-
-### Carga de plantillas — estado 13 may
-
-7 de 48 selecciones cargadas en `squads.jugadores`:
-
-| ISO3 | N jugadores | Estado | Fuente | Notas |
-|---|---|---|---|---|
-| ARG | 55 | prov | ff | con clubs |
-| BIH | 26 | **FINAL** | as | — |
-| BRA | 51 | prov | 365 | — |
-| ESP | 53 | prov | ff | SIN clubs (FF no los trae) |
-| MEX | 55 | prov | 365 | — |
-| QAT | 33 | prov | infobae | SIN clubs |
-| SWE | 26 | **FINAL** | ff | sustituye AS provisional |
-
-UZB descartado este ciclo: prelista anunciada pero ninguna fuente accesible publica los 40 nombres completos parseables.
-
-### Estrategia de carga ratificada
-
-1. **FutbolFantasy** primaria (info más fresca, castellano).
-2. **AS** backup.
-3. **Transfermarkt** enriquecimiento (edad, valor) — Claude.ai en flight 13 may.
-4. **FIFA.com** snapshot final 2 jun (dorsales + fotos, probablemente vía Chrome MCP).
-
-### Lecciones operativas
-
-- **`supabase functions download` requiere `SUPABASE_ACCESS_TOKEN`** en env del sandbox. Si no está disponible, alternativa: MCP `get_edge_function` retorna el código deployado vía `files[].content`. Workflow validado esta sesión (token ausente → MCP usado como source of truth).
-- **Sync runtime → repo** requerido tras deploys directos desde Claude.ai. Sin esta sync, cualquier deploy futuro desde Code (`supabase functions deploy get-squad` u otro) machacaría el runtime v6 con la versión vieja del repo (v5 anterior, o NINGUNA versión si nunca se commiteó — caso real esta sesión, el directorio `supabase/functions/get-squad/` no existía en repo).
-- **ALTER TABLE sin migration file** rompe paridad `supabase db push` / nueva instancia. Estado del schema vive en runtime + en `docs/db-schema.md`; no en `supabase/migrations/`. Anotar en migration-log + db-schema obligatorio.
-
-## 2026-05-08 — Sprint Pizarra Táctica + Cuadro de Honor restore (rama `claude/pizarra-tactica-modal-kmTEw`)
-
-4 commits sobre `claude/pizarra-tactica-modal-kmTEw` (base `f6847ab` post-merge globo). HEAD `533ec15`. **Lista para PR a `main`** (squash-merge desde GitHub UI). Sprint dual: (1) modal "Pizarra Táctica" con ficha visual de selección (escudo + 11 tokens en formación + stats) abierto desde el Globo y desde tarjetas de partido en Directo; (2) restauración del Cuadro de Honor (cajas Campeón + Podio) bajo la fila Final del nuevo `fc-elim-list` (huérfano tras la migración F7.4-F al App Shell — ERR-42).
-
-### Commits del sprint (orden cronológico)
-
-| SHA | Mensaje | Fase |
-|---|---|---|
-| `d34db7c` | feat: pizarra táctica modal con squads + EF get-squad | Base modal + 4 patches |
-| `02aed94` | fix(pizarra): banda bandera 90→130px + título sobre fondo blanco | Hot-fix banda |
-| `5a3ddde` | fix(pizarra): dark mode + tooltip tap + stats alineadas | Dark mode + tooltip |
-| `533ec15` | feat(ko): restaurar Cuadro de Honor (cajas 2+3) bajo fila Final | Cuadro Honor restore |
-
-### Funcionalidad nueva consolidada
-
-**Pizarra Táctica modal** (`public/js/ui-pizarra-tactica.js` 540 LOC + `public/css/components/pizarra-tactica.css` 8.5 KB):
-- Entry point único `window.openPizarraTactica({iso3 | iso2 | nameEn})`. Acepta los 3 identificadores (mapping interno `NAME_EN_TO_ISO3` con 48 selecciones para entrada desde Globo en inglés).
-- 12 formaciones predefinidas con coordenadas % en `FORMATION_COORDS`: 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 5-3-2, 4-1-4-1, 4-3-2-1, 3-4-3, 5-4-1, 4-4-1-1, 3-4-2-1, 4-1-3-2.
-- Cache en memoria (`Map`) por iso3/iso2 — una sola request por selección por sesión.
-- Auth: lee JWT de `window._porraToken` (publicado por `auth.js` en `SIGNED_IN`/`TOKEN_REFRESHED`) con fallback a `sessionStorage.porra_token`.
-- UI: modal centrado mobile-first 380px, dark theme `#1f2937`, banda superior 130px con bandera + mask gradient destination-out fade 75%, escudo 80px con drop-shadow, tokens 11.5% width circulares con halo negro sólido (8px) en apellido, tres stats (edad media · valor plantilla · goles/partido) con icon button info que despliega tooltip oscuro con flecha (auto-cierra 4s, cierra al tap fuera).
-- Render token: `j.dorsal` + `j.nombre.split(' ').slice(-1)[0]` (apellido); placeholder posicional si `nombre === '—'`. Color de ficha desde `team.color_ficha` (#fff blanco → border #1f2937; oscuro → border #fff). Portero usa `team.color_portero`.
-- Hooks de entrada: `window._globoNavPlantilla` (botón "🏟 Ver plantilla" del panel detalle Globo) y listener delegado en `ui-directo.js` que captura clics en `.dv2-mini-flag-btn`/`.dv2-exp-flag-btn`.
-
-**Cuadro de Honor (cajas 2+3 bajo fila Final)** (`public/js/ko.js` +133 LOC + `public/js/ui-elim-shell.js` +11 LOC):
-- Nueva función pública `window.buildChampionPodium(matchFinal)` en `ko.js` justo antes de `buildFinalSection` (sin tocar la función original — sigue usándose en el legacy `#view-cinematic`). Devuelve un único bloque DOM con caja 2 (Campeón con gradient dorado + escudo + sub-banner "FIFA World Cup 2026" + dato de sede MetLife / placeholder "Pronostica la final…") y caja 3 (Podio 🥈/🥉/4️⃣ con escudos pequeños + nombres + labels de posición) apiladas mobile-first (column gap 12px).
-- Hook en `ui-elim-shell.js#_renderList`: tras procesar la fila `r.key === 'final'` y el bloque expanded, invoca `window.buildChampionPodium(BRACKET.final[0])` y `appendChild` al mount, **siempre visible** (no condicional a `expanded` ni `locked`).
-- Resolución de equipos vía `resolvedSlots[matchFinal.home/away]` + `koPredictions[matchFinal.id]`. Puesto 2 deducido del perdedor de la final; puestos 3/4 del partido `BRACKET.third[0]`. Empates: usa `classifier` si está presente.
-- Premios (caja 4 awards) sigue intacto en `#fc-elim-awards-pane` y NO se duplica.
-
-**Backend (ya en producción al iniciar el sprint, sin cambios desde Code en esta sesión):**
-- Tabla `public.squads` (48 filas) con columnas `iso3`, `iso2`, `equipo`, `formacion`, `entrenador`, `stat_edad`, `stat_valor`, `stat_goles`, `color_ficha`, `color_portero`, `plantilla_completa`. Una fila por selección clasificada al Mundial 2026.
-- Edge Function `get-squad` v4 ACTIVE (en `supabase/functions/get-squad/`). Acepta `?iso3=XXX` o `?iso2=XX`, devuelve `TeamData` listo para `loadTeam()` con `flag_url`, `badge_url`, jugadores serializados con dorsal/nombre/posición, stats agregados.
-- Storage `miniatures/pizarra/campo.webp` (38 KB, fondo del campo de fútbol) + `miniatures/badges/{slug}.png` (43 archivos — faltan BIH/COD/CZE/IRQ/SWE) + `miniatures/flags/{ISO2}.png` (48) + `miniatures/flags-sm/{ISO2}.webp` (48 versión small 148× para banderas in-line).
-
-### Patches mecánicos aplicados (4 sobre código existente)
-
-- `index.html` (+1 line): nuevo `<link rel="stylesheet" href="/css/components/pizarra-tactica.css">` tras `globo-equipos.css`.
-- `js/main-entry.js` (+1 line): `loadScript('/js/ui-pizarra-tactica.js')` entre `ui-globo-equipos.js` y `ko.js`.
-- `public/js/ui-directo.js` (4 cambios): `<span class="dv2-mini-flag">` → `<button class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="X">` (×2 home/away en `_buildDMini`) + `<div class="dv2-exp-flag">` → `<button class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="X">` (×2 home/away en `_buildDExpanded`) + listener delegado al final del IIFE que invoca `window.openPizarraTactica({iso2})`.
-
-### Iteraciones de UI (3 hot-fixes para llegar a la versión final)
-
-1. **Banda + texto legible** (`02aed94`): banda bandera 90→130px, mask fade 60→75%; título antes blanco con shadow → ahora `#111827` plano (cae sobre fondo blanco tras el fade); coach antes blanco → `#4b5563`. Header `margin-top` -32→-50px para compensar banda más alta.
-2. **Dark mode + tooltip tap + stats centradas** (`5a3ddde`): modal background `#fff` → `#1f2937` (todos los textos invertidos a paleta clara); nuevo `.fc-pizarra-stat-val-wrap` que envuelve valor+icono con `position:relative + inline-flex` para centrado correcto; `.fc-pizarra-stat-info` convertida a `<button>` posicionado absoluto `left:100% top:50%` (no afecta centrado del valor); nuevo `.fc-pizarra-stat-tooltip` oscuro con flecha CSS pseudo `::before`; listener delegado en `buildOverlay()` que tap abre / tap fuera cierra / auto-close 4s.
-3. **Cuadro de Honor** (`533ec15`): diagnóstico Chrome MCP DOM inspection sobre localhost:5173 reveló panels[0]=view-cinematic con `display:none` ancho 0, fila row2 con `final-box4 + final-box3` existían pero nunca renderizadas. Fix: extracción de la lógica de cajas 2+3 a función pública independiente + hook en `_renderList`. ERR-42 documentado.
-
-### Lecciones técnicas
-
-- **Network blocking**: el sandbox de Code (proxy Anthropic) bloquea Supabase Storage (`Host not in allowlist`) y solo deja pasar GitHub vía API autenticada (private repos requieren MCP — `api.github.com` sin auth devuelve 404). Workflow validado: si un sprint requiere assets, San los sube a la rama `handoff-pizarra` del propio repo y Code los lee con `mcp__github__get_file_contents`.
-- **Verificación byte-equivalence**: tras escribir un archivo desde MCP, comparar `wc -c` con tamaño esperado y hacer un re-fetch de verificación. La conversión de escape sequences `'—'` ↔ literal `'—'` (em-dash UTF-8) cambia bytes pero no semántica — restaurar con `python3 sed-like` para paridad exacta.
-- **Documentación de bugs vivos**: cuando un sprint diagnostica un bug que ya estaba "vivo" en main pero no detectado, documentarlo en `errores_conocidos_porra.md` aunque se haya cerrado en el mismo commit. ERR-42 es ejemplo: bug introducido en F7.4-F (28 abr) detectado y cerrado en sprint del 08 may.
-
-### Bugs conocidos cerrados / nuevos ERR documentados
-
-- **ERR-42 nuevo**: Cuadro de Honor invisible tras F7.4-F (cajas 2+3 huérfanas en `#view-cinematic` legacy). Detalle en `errores_conocidos_porra.md`.
-
-## 2026-05-06 — Sprint Globo PR2+PR3+Enrichment (rama `feature/globo-pr2-pr3`)
-
-12 commits sobre `feature/globo-pr2-pr3` (base `99fb581`). Pendiente squash-merge a `main` desde GitHub UI por San. Convierte el globo MVP (PR#54) en una experiencia interactiva enriquecida: leyenda con banderas circulares Supabase + chips de sedes, panel de detalle con formación + frase + dos bios (sport.es narrativo + ESPN táctico), highlight rojo del país clickado, separadores A/B/C en carrusel, leyenda clasificados/sedes en lateral derecho.
-
-### Commits del sprint (orden cronológico)
-
-| SHA | Mensaje | Fase |
-|---|---|---|
-| `3c5801d` | feat: add wiki-data-globo.js with 45 teams + 16 venues | PR2 — datos |
-| `c0f32ed` | feat(globo): PR2+PR3 flag legend + detail panel | PR2+PR3 — UI base |
-| `a8ccd23` | feat(globo): UX polish — flag-only legend, venue chips, bio expand, squad stub | Polish |
-| `11a7bde` | fix(globo): canvas flex + flag emoji from ISO3 table | Fix legend |
-| `b8a2ef2` | fix(globo): badge images from Supabase (intermedio, superseded) | Iter |
-| `6cb8f4b` | fix(globo): circular flag images from Supabase flags bucket | Iter final |
-| `e205a84` | feat(globo): highlight país seleccionado en rojo + reset zoom al cerrar | Highlight |
-| `adfff22` | fix(globo): clear flag is-active on reset | One-liner |
-| `2a4bbad` | fix(globo): center extensive countries + sede highlight + tooltip cleanup | 3-fixes |
-| `851ca93` | feat(globo): formación + frase ESPN + bios duales + grupos en carrusel | Enrichment v2 |
-| `010b189` | polish(globo): fix wiki-bio textos + chip formación + leyenda lateral | Polish v2 |
-| `6d058b2` | fix(globo): chip formación con ancho ajustado al contenido | Final fix |
-
-### Funcionalidad nueva consolidada
-
-- **Datos**: `public/js/data/wiki-data-globo.js` (45 selecciones + 16 sedes — apodo, grupo, confederación, mundiales, mejor resultado, entrenador, estrella, frase) + `public/js/data/wiki-bio.js` v3 (48 selecciones — apodo, formación, frase, bio sport.es, bio_espn ESPN). Las 4 selecciones nuevas en v3 (Turkey, Sweden, DR Congo, Iraq) ya tienen ficha completa.
-- **Carrusel banderas**: rejilla horizontal scrollable con 48 banderas circulares 28×28 (`object-fit:cover; border-radius:50%`) servidas desde bucket Supabase `flags/<ISO3>.png`. Separadores A→L cada 4 banderas (mini-badge dorado monospace `pointer-events:none`).
-- **Carrusel sedes**: segunda fila scrollable bajo banderas con 16 chips `📍 Nombre` clicables.
-- **Leyenda tipos**: dos chips translúcidos verticales en lateral derecho (`position:absolute; right:12; top:50%; backdrop-filter:blur(4px)`), libera espacio inferior para los carruseles.
-- **Panel detalle país** (`renderPanelPais`): header con título + apodo + pill formación (`Formación: 4-3-3` con `__pill-label` uppercase + valor monospace dorado, ancho ajustado al contenido) + frase italic con border-left dorado + grupo/confed/mundiales/mejor/coach + estrella card + dos `<details>` colapsables (sport.es abierto + ESPN cerrado) + botón `🏟 Ver plantilla` (stub PR4) + atribución dual.
-- **Panel detalle sede** (`renderPanelSede`): estadio + país + capacidad + inauguración + equipo local + ronda máxima + dato destacado.
-- **Highlight 3D del país clickado**: `_selectedNE` + `polygon*Color` callbacks usan `COL.SEL_CAP/SEL_STROK/SEL_SIDE` (`#d93025`/`#ff6b5b`/`#a01f16`). Re-render con `globe.polygonsData(globe.polygonsData())`. Cerrar panel → reset color + animación `pointOfView` al inicial.
-- **Highlight de sede**: `_selectedSede` + `pointColor/Altitude/Radius` como funciones reactivas. Sede activa: roja + altitude `0.12` + radius `0.9`.
-- **Centroides override** (`COUNTRY_LATLNG_OVERRIDE`): tabla manual de 12 países con bounding box engañoso (USA con Alaska, UK/France/Russia/Australia/Brasil/Norway/NZ con extensión continental). Override gana sobre EQUIPOS.lat/lng y sobre el centroide de `polygonsData`.
-- **Tooltip cleanup** (`hideGlobeTooltip`): `display:none + setTimeout 50ms` reset, evita tooltip `.scene-tooltip` colgado cuando el panel cubre el cursor.
-- **Canvas flex layout**: `.fc-globo-overlay { display:flex; flex-direction:column }` con `.is-open`. Canvas como `flex:1 1 0; min-height:0` y leg como `flex-shrink:0` reservan espacio. `globe.height(canvasEl.clientHeight || (window.innerHeight - 200))` con fallback + `requestAnimationFrame` en onResize / openOverlay-cached.
-
-### Bugs conocidos cerrados / nuevos ERR documentados
-
-- **ERR-39** (nuevo): ESPN scraping con regex non-greedy corta frases con comillas anidadas. Solución: regex greedy en `wiki-bio` v3.
-- **ERR-40** (nuevo): ESPN HTML inserta espacios falsos tras vocales con tilde (`"Panam á"`). Solución: parser robusto con clean_html.
-- **ERR-41** (nuevo): pill flex hijo en contenedor flex column hereda `align-items:stretch`. Solución: `align-self:flex-start + max-width:max-content`.
-
-### Lecciones técnicas
-
-- **Cherry-pick de commits inexistentes**: brief intermedio pidió `git cherry-pick 0dea54f` que solo vivía en local de San. Verificar `git rev-parse <SHA>` antes de aplicar; si el commit no está en remoto, reportar y proponer alternativas. Resultó ser no-op (los valores 5.0/4.2 ya estaban desde PR2).
-- **Tabla ISO3 emoji incompleta**: el brief omitía TUR/SWE/COD de los 48 EQUIPOS. Verificación cruzada `EQUIPOS[].flag` vs tabla del brief evita fallback feo.
-- **Patrón badge-with-flag-fallback** (`CLAUDE.md`): siempre dual-render. Cuando el brief solo render uno, mantener el patrón completo y notarlo como deviation. Regla de proyecto manda sobre el brief específico.
-- **Inline `onclick` con escapes**: HTML entities (`&#39;`) más robustos que `\'` para single-quotes anidados en JS string → HTML attribute.
-- **Subagentes**: ninguno en este sprint (tareas demasiado acopladas a `ui-globo-equipos.js`).
-
-## 2026-05-06 — fix(ia): tooltip explainer z-index sobre cluster 9999 (PR#58)
-
-PR #58 squash a main (`ae8090f`).
-
-**Bug:** el tooltip explainer del IA Predictor (`#ia-explainer-popover`) quedaba detrás del modal de edición al hacer click en `.ia-pct-trigger` (76% / 78% etc). El popover se mostraba con su contenido correcto pero ofuscado por el modal.
-
-**Causa:** `.ia-explainer` y `#jcard-modal-overlay` ambos con `z-index:9999` (`base.css:1170` y `ui-groups.js:615` inline respectivamente), ambos hijos directos de `body`. El modal se recrea en cada apertura → queda DESPUÉS en el DOM → gana por la regla CSS "empate de z-index → orden de pintado".
-
-**Fix:** `.ia-explainer` `z-index 9999 → 10001` (sobre cluster `9999` completo: `#jcard-modal-overlay`, `#splash-screen`, `.adm-toast`, `.fc-globo-overlay`).
-
-**Alternativa rechazada:** re-appendear el popover al `body` en cada `showFor()` era frágil — dependería del orden DOM y se rompería si futuro componente se appendea más tarde.
-
-<!-- Entrada 2026-05-06 fix(grupos) PR#56 archivada en CHANGELOG-archive-202605.md el 2026-05-16 (cierre sprint F3-I1.6.x + HF-08..HF-15, CHANGELOG.md superaba 30KB) -->
-<!-- Entrada 2026-05-06 Sprint Globo MVP archivada en CHANGELOG-archive-202605.md el 2026-05-15 (cierre F3-I1.x, CHANGELOG.md superaba 30KB) -->

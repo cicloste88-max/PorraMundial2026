@@ -698,3 +698,48 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** cuando un bug visual persiste pese a defensas, **buscar TODOS los mount points relacionados** en el repo, no solo el sospechoso obvio. Greps útiles: `data-user-mount`, `wc-user-badge`, `do-logout`, etc. Usar Chrome MCP DOM inspection en runtime para verificar qué elemento realmente vive en pantalla. F1.1f-v3 había añadido el mount como bridge transitorio mientras los chips no existían en el shell — debe limpiarse cuando el bridge ya no es necesario.
 - **Lección sister:** los comentarios de la función relevante (`renderAuthBar` en `auth.js:217-220`) ya advertían explícitamente "F4 cleanup elimina los 3 viejos" — leer comentarios de código antes de bordear el síntoma con defensas paralelas.
 - **Fecha detección:** 16 may 2026 (smoke HF-12, root cause encontrado tras 2 intentos fallidos en F3-I1.6.2 y F3-I1.6.4).
+
+## ERR-46 — HTML entities centroeuropeas/turcas no decodificadas con tabla manual
+
+- **Síntoma:** roster BIH en BD con nombres tipo `Sead Kola&scaron;inac`, `Ivan &Scaron;unjić`, `Ivan Ba&scaron;ić`. El matcher posterior comparaba `Kolašinac` del XI scrape (alt= UTF-8 directo) contra la entidad cruda del roster → 9/11 matches en vez de 11/11. Para TUR, CRO, CZE: entidades equivalentes (`&cacute; &dstrok; &rcaron; &gbreve; &Lstrok;` etc., ~28 entidades faltantes).
+- **Causa:** `scripts/lib/ff-scraper.mjs` tenía una tabla manual `HTML_ENTITIES` con ~70 entradas (Latin-1 + escandinavas + tipográficas). No cubría eslavo-sur, eslavo-occidental ni turco. Cada vez que aparecía un idioma nuevo había que parchear la tabla — frágil por construcción.
+- **Fix aplicado:** sustituir tabla manual + función `decodeHtmlEntities()` por el paquete NPM `html-entities` v2.6+ que cubre HTML5 completo (~2000 entidades). Wrapper `decodeHtml(s) = decode(s) + normalización ASCII tipográficas` para preservar idempotencia (ver ERR-49). Commit `0d51fa4` (16-may, sprint sync-squads).
+- **Patrón preventivo:** para parsers de fuentes HTML, **usar lib oficial maintained**, no tabla manual. Si la fuente añade un idioma nuevo, la lib ya lo cubre sin patches.
+- **Fecha detección:** 16 may 2026 (round 6 del sprint sync-squads, revisando los 48 países antes de extender ejecución).
+
+## ERR-47 — `--refresh-final` pisaba enrichment TM cuando había noticia nueva
+
+- **Síntoma:** tras correr `npm run sync-squads -- --mode=scrape --refresh-final --verbose` sobre BIH/SWE, ambos perdieron `jugadores_fuente=as+tm` / `ff+tm` pasando a `ff`. BIH bajó de 26 a 25 jugadores (uno del enrichment AS desapareció); SWE mantuvo 26 pero perdió todos los `edad/valor/foto` del enrich TM. Recuperado parcialmente con `--mode=enrich-tm` (19/25 BIH, 25/26 SWE).
+- **Causa:** el predicado en `scripts/sync-squads.mjs` runScrape era `if (refreshFinal && (players.length === 0 || !isFinal))` — solo preservaba roster existente cuando NO había noticia nueva. Cuando BIH/SWE tenían noticia FF (IDs 143918 / 143784), el scrape devolvía `players.length>0` e `isFinal=true` → flujo normal con `fuente='ff'` hardcoded → pisaba.
+- **Fix aplicado:** commit `58979b5` (16-may) — semantizar `--refresh-final` como SIEMPRE conservador. Si existe roster en BD se preserva tal cual con `nombre`/`club`/`jugadores_fuente` intactos. Solo se reaplica `es_titular` según `scrape.xi_names`. Decode HTML in-flight de `nombre` + `club` para limpiar entidades crudas heredadas (ver ERR-46) sin re-scrapear.
+- **Patrón preventivo:** flags con nombre tipo `preserve` / `refresh` / `keep-` deben preservar **incondicionalmente**, no solo en cierto branch del if. El nombre del flag promete una propiedad — el código debe cumplirla en todos los caminos. Cuando hay duda, **leer el flag como contrato** y razonar qué pasaría en el caso adversarial.
+- **Fecha detección:** 16 may 2026 (round 5 del sprint, San reportó pérdida tras primer `--refresh-final` masivo).
+
+## ERR-48 — `parseStartingXI` extraía escudos de rivales cuando página no tenía XI publicado
+
+- **Síntoma:** `parseStartingXI('belgica' | 'japon' | 'suecia')` devolvía `["Eurocopa","Francia","Bélgica","Ucrania","Rumanía","Eslovaquia","Amistoso","Luxemburgo","Mundial","Egipto","Irán"]` en lugar de apellidos de jugadores. BIH funcionaba (devolvía apellidos correctos).
+- **Causa raíz (tras 2 diagnósticos fallidos):** futbolfantasy renderiza el campo placeholder "Alineación aún no disponible" cuando la federación no ha publicado el once tipo, pero **ese texto se inyecta por JavaScript tras hidratación del cliente** y NO aparece en el HTML SSR (`html.indexOf('disponible') === -1`). El widget lateral "Próximos partidos" sí está en SSR y sus `<img alt="Eurocopa" / "Francia">` quedaban como los primeros 11 alts capturados.
+- **Diagnósticos intermedios fallidos (referenciados como ERR-50):**
+  - Hipótesis "rival shields entre anchor y XI" → fix con `END_MARKERS_RE` cortando el slice. Inviable: cortar el slice eliminaba alts legítimos cuando los marcadores estaban antes del XI real.
+  - Hipótesis "detector regex de texto 'Alineación aún no disponible'" → no disparaba porque el texto no está en HTML SSR.
+- **Fix definitivo:** commit `b54fff8` (16-may). Detector binario al inicio de `parseStartingXI`: `if (/\/alineaciones\/0\.jpg/i.test(html)) return [];`. La imagen del campo vacío SÍ está en HTML SSR como `src` de una `<img>` cuando FF no tiene XI publicado. Marcador robusto frente a cambios de copy.
+- **Patrón preventivo:** para parsing server-side, **preferir marcadores SSR** (imágenes, atributos `data-*`, clases CSS estáticas) sobre marcadores que dependen de hidratación (textos visibles, contenido inyectado). Antes de escribir un regex de texto, verificar con `curl -s <url> | grep <texto>` que el texto está en el HTML servido. Si no, buscar otro marcador.
+- **Fecha detección:** 16 may 2026 (rounds 4-5 del sprint, San aportó screenshot del campo placeholder real tras 2 fixes especulativos fallidos).
+
+## ERR-49 — Apóstrofos tipográficos U+2019 rompen idempotencia ASCII en BD
+
+- **Síntoma:** `npm run sync-squads -- --mode=scrape --iso3=FRA --dry-run` reportaba diff perpetuo en jugadores con apellido tipo `N'Golo Kanté`. 25/26 jugadores idénticos a BD + 1 diff (Kanté). La idempotencia rota generaba un UPDATE en cada run, rompiendo el `synced_at` como marcador de "última vez que algo cambió de verdad".
+- **Causa:** `decodeHtml()` decodificaba `&rsquo;` → `'` (U+2019, apóstrofo tipográfico Unicode). La BD tenía `'` ASCII (U+0027) porque San tecleó los SQL iniciales con teclado normal. Mismo carácter visualmente, código distinto. Deep-equal byte a byte detectaba diff.
+- **Fix aplicado:** commit `e81e058` (16-may, defensa en 2 capas):
+  1. `HTML_ENTITIES.{lsquo,rsquo,ldquo,rdquo}` mapean directo a ASCII en lugar de Unicode tipográfico (cubre vía habitual: entidad nombrada).
+  2. Dos `.replace` finales en `decodeHtml()`: `[‘’‚′] → '` y `[“”„″] → "` (cubre Unicode directo en HTML servido).
+- **Patrón preventivo:** cuando un dato sale de un parser y se compara con dato manual del operador, **normalizar a ASCII**. Apóstrofos, comillas, espacios (NBSP), guiones (em/en-dash) tienen variantes Unicode que rompen igualdad byte a byte aunque el ojo no las distinga.
+- **Fecha detección:** 16 may 2026 (round 3 del sprint, tras primer dry-run real de FRA contra BD).
+
+## ERR-50 — `END_MARKERS_RE` corte de slice overzealous (intervención contraproducente)
+
+- **Síntoma:** intento de fix de ERR-48 cortando el slice de `parseStartingXI` en markers de secciones ruidosas (`Próximos partidos`, `Historial`, `Calendario`...) empeoró el problema. BEL/JPN/SWE pasaron de 11 alts basura a 8 alts basura (cortábamos antes del XI legítimo en algunas estructuras).
+- **Causa:** diagnóstico inicial asumió que la sección de partidos venía **después** del XI en HTML → cortar antes de ella protegería el XI. Realidad descubierta luego: BEL/JPN/SWE **no tienen XI publicado** (ERR-48 root cause); los escudos basura venían de un widget lateral inline, no de una sección posterior. El corte por markers eliminaba alts legítimos en estructuras donde sí había XI pero con marker cerca.
+- **Fix:** commit `89e5d51` revierte completamente el `END_MARKERS_RE`. Vuelta a `const slice = anchor >= 0 ? html.slice(anchor) : html;` simple. El problema real (placeholder) se resuelve con detector de imagen (ERR-48).
+- **Patrón preventivo:** **no especular sobre estructura HTML sin screenshot del UI real**. Antes de un fix de parsing, pedir / capturar la página servida con `curl` y verificar la hipótesis. Si un fix funciona contra una estructura sintética pero rompe en producción, la sintética no refleja la realidad — descartarla, no doblar la apuesta. Lección hermana: el README del módulo y los tests sintéticos no garantizan correctitud contra fuentes reales; siempre validar con el operador.
+- **Fecha detección:** 16 may 2026 (round 4 del sprint, dispatch tras reporte de San del nuevo comportamiento erróneo).
