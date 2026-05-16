@@ -35,6 +35,38 @@ async function fetchText(url, { verbose = false } = {}) {
   return await r.text();
 }
 
+// Tabla de entidades HTML nombradas más frecuentes en futbolfantasy (Latin-1
+// extendido + tipográficas). Necesario porque la página sirve nombres como
+// "Th&eacute;o", "N&rsquo;Golo", "Za&iuml;re-Emery" que rompen el matcher
+// y dejan basura en BD si no se decodifican.
+const HTML_ENTITIES = {
+  nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú',
+  Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  agrave: 'à', egrave: 'è', igrave: 'ì', ograve: 'ò', ugrave: 'ù',
+  Agrave: 'À', Egrave: 'È', Igrave: 'Ì', Ograve: 'Ò', Ugrave: 'Ù',
+  acirc: 'â', ecirc: 'ê', icirc: 'î', ocirc: 'ô', ucirc: 'û',
+  Acirc: 'Â', Ecirc: 'Ê', Icirc: 'Î', Ocirc: 'Ô', Ucirc: 'Û',
+  auml: 'ä', euml: 'ë', iuml: 'ï', ouml: 'ö', uuml: 'ü', yuml: 'ÿ',
+  Auml: 'Ä', Euml: 'Ë', Iuml: 'Ï', Ouml: 'Ö', Uuml: 'Ü', Yuml: 'Ÿ',
+  ntilde: 'ñ', Ntilde: 'Ñ', atilde: 'ã', otilde: 'õ', Atilde: 'Ã', Otilde: 'Õ',
+  ccedil: 'ç', Ccedil: 'Ç', szlig: 'ß',
+  aring: 'å', Aring: 'Å', aelig: 'æ', AElig: 'Æ', oelig: 'œ', OElig: 'Œ',
+  oslash: 'ø', Oslash: 'Ø',
+  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  laquo: '«', raquo: '»',
+  ndash: '–', mdash: '—', hellip: '…', middot: '·', bull: '•',
+};
+
+function decodeHtmlEntities(s) {
+  return String(s)
+    .replace(/&([a-zA-Z]+);/g, (m, name) =>
+      HTML_ENTITIES[name] !== undefined ? HTML_ENTITIES[name] : m
+    )
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
 // Convierte HTML a un texto markdown-ish donde:
 //   <h1..h6>, <strong>, <b>  → **texto**
 //   <br>, </p>, </li>        → newline
@@ -57,15 +89,8 @@ function htmlToMd(html) {
   s = s.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1');
   // strip resto de tags
   s = s.replace(/<[^>]+>/g, '');
-  // decodificar entidades comunes
-  s = s
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+  // decodificar entidades (numéricas + nombradas Latin-1/tipográficas)
+  s = decodeHtmlEntities(s);
   // colapsar whitespace
   s = s.replace(/\r/g, '');
   s = s.replace(/\n{3,}/g, '\n\n');
@@ -144,9 +169,9 @@ export async function parseStartingXI(slug, opts = {}) {
   const alts = [];
   let m;
   while ((m = altRe.exec(slice)) !== null) {
-    const alt = m[1].trim();
-    // filtrar alts genéricos (escudos, banderas, iconos)
-    if (/escudo|bandera|flag|icon|logo|sponsor|patrocinador|^once$|^xi$|^equipo$/i.test(alt)) continue;
+    const alt = decodeHtmlEntities(m[1]).trim();
+    // filtrar alts genéricos (escudos, banderas, iconos, etiquetas de sección)
+    if (/escudo|bandera|flag|icon|logo|sponsor|patrocinador|^once$|^xi$|^equipo$|^alineaci[óo]n$|^formaci[óo]n$|^titulares?$|^plantilla$|^banco$|^suplent/i.test(alt)) continue;
     if (alt.length < 3 || alt.length > 60) continue;
     alts.push(alt);
     if (alts.length >= 22) break; // margen para descartar duplicados/icons
