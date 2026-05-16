@@ -284,6 +284,100 @@ function _v3ComputePodium() {
   return { champion: champion, runnerUp: runnerUp, third: third, fourth: fourth, finalPred: finalPred, thirdPred: thirdPred };
 }
 
+// ─── Cuadro de Honor — render (HF-CdH-01) ───────────────────
+// Retorna un <div.v3-podium-wrap> con divider + caja Campeón + caja
+// Clasificación Final. Si no hay champion saved → caja Campeón muestra
+// placeholder. Si no hay 3.er puesto saved → filas 3º/4º muestran "—".
+// Reusa v3FlagURLByCode + EQUIPOS para escudos. NO inventa URL nueva.
+function v3RenderCuadroHonor() {
+  var podium = _v3ComputePodium();
+  if (!podium) return null;
+
+  var PTS = (typeof window !== 'undefined' && window.FINAL_CLASSIFICATION_PTS)
+    ? window.FINAL_CLASSIFICATION_PTS
+    : { champion: 30, runner_up: 20, third: 15, fourth: 10 };
+
+  // Helper: bandera 32×32 cuadrada redondeada a partir de NAME de equipo.
+  function _flagByName(name) {
+    if (!name) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    if (typeof EQUIPOS === 'undefined') return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    var team = EQUIPOS.find(function(e) { return e.name === name; });
+    if (!team || !team.flag) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    var flagUrl = v3FlagURLByCode(team.flag);
+    if (!flagUrl) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    return '<div class="v3-class-row__flag"><img src="' + flagUrl + '" alt="" onerror="this.parentNode.classList.add(\'v3-class-row__flag--empty\');this.remove();"/></div>';
+  }
+
+  var WC_LOGO = (typeof WORLD_CUP_LOGO !== 'undefined') ? WORLD_CUP_LOGO : '';
+
+  // Wrap externo
+  var wrap = document.createElement('div');
+  wrap.className = 'v3-podium-wrap';
+
+  // Divider "★ CUADRO DE HONOR ★"
+  var divider = document.createElement('div');
+  divider.className = 'v3-podium-divider';
+  divider.innerHTML =
+    '<span class="v3-podium-divider__line"></span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__label">CUADRO DE HONOR</span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__line"></span>';
+  wrap.appendChild(divider);
+
+  // ─ Caja Campeón ─
+  var champCard = document.createElement('div');
+  champCard.className = 'v3-champion-card' + (podium.champion ? '' : ' v3-champion-card--empty');
+
+  if (podium.champion) {
+    champCard.innerHTML =
+      '<img class="v3-champion-card__logo" src="' + WC_LOGO + '" alt="" onerror="this.style.display=\'none\'"/>' +
+      '<div class="v3-champion-card__sep"></div>' +
+      '<div class="v3-champion-card__body">' +
+        '<div class="v3-champion-card__eyebrow">🏆 CAMPEÓN DEL MUNDO</div>' +
+        '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
+        '<div class="v3-champion-card__sub">FIFA World Cup 2026</div>' +
+        '<div class="v3-champion-card__venue">19 jul · MetLife Stadium, Nueva York</div>' +
+      '</div>' +
+      '<div class="v3-podium-pts v3-podium-pts--gold">+' + PTS.champion + ' pts</div>';
+  } else {
+    champCard.innerHTML =
+      '<img class="v3-champion-card__logo v3-champion-card__logo--muted" src="' + WC_LOGO + '" alt="" onerror="this.style.display=\'none\'"/>' +
+      '<div class="v3-champion-card__placeholder">Pronostica la Gran Final para ver el campeón</div>';
+  }
+  wrap.appendChild(champCard);
+
+  // ─ Caja Clasificación Final ─
+  var classCard = document.createElement('div');
+  classCard.className = 'v3-classification-card';
+
+  var rows = [
+    { medal: '🥈', name: podium.runnerUp, label: '2.º Subcampeón', pts: PTS.runner_up },
+    { medal: '🥉', name: podium.third,    label: '3.º Puesto',     pts: PTS.third     },
+    { medal: '④', name: podium.fourth,   label: '4.º Puesto',     pts: PTS.fourth    }
+  ];
+
+  var rowsHtml = rows.map(function(r, i) {
+    var isLast = (i === rows.length - 1);
+    return '<div class="v3-class-row' + (isLast ? ' v3-class-row--last' : '') + '">' +
+      '<div class="v3-class-row__medal">' + r.medal + '</div>' +
+      _flagByName(r.name) +
+      '<div class="v3-class-row__info">' +
+        '<div class="v3-class-row__name">' + (r.name || '—') + '</div>' +
+        '<div class="v3-class-row__label">' + r.label + '</div>' +
+      '</div>' +
+      '<div class="v3-podium-pts">+' + r.pts + ' pts</div>' +
+    '</div>';
+  }).join('');
+
+  classCard.innerHTML =
+    '<div class="v3-classification-card__eyebrow">CLASIFICACIÓN FINAL</div>' +
+    rowsHtml;
+  wrap.appendChild(classCard);
+
+  return wrap;
+}
+
 // ─── Final block (round F) ──────────────────────────────────
 function v3RenderFinalBlock() {
   var board = document.getElementById('v3-bracket-board');
