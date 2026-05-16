@@ -1031,41 +1031,31 @@ body.fc-shell-active #page-elim > #modal {
 
 .v3-champion-card__eyebrow {
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.16em;
-  color: rgba(201, 169, 97, 0.7);
+  letter-spacing: 0.22em;
+  color: var(--fifa-gold);
   text-transform: uppercase;
-  margin-bottom: 2px;
+  margin-bottom: 6px;
 }
 
+/* HF-CdH-03: nombre uppercase grande con clamp a 2 líneas para evitar
+   truncado de "Jordania" / "Bosnia and Herzegovina" / "República Checa". */
 .v3-champion-card__name {
   font-family: var(--font-display);
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 1;
   color: #FEF9C3;
-  white-space: nowrap;
+  text-transform: uppercase;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.v3-champion-card__sub {
-  font-family: var(--font-text);
-  font-size: 10px;
-  font-style: italic;
-  color: rgba(201, 169, 97, 0.55);
-}
-
-.v3-champion-card__venue {
-  font-family: var(--font-text);
-  font-size: 10px;
-  color: var(--ink-500);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 /* Estado placeholder (sin pronóstico de Final) */

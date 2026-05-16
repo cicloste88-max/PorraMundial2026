@@ -366,10 +366,8 @@ function v3RenderCuadroHonor() {
       '<div class="v3-champion-card__sep"></div>' +
       champBadgeHtml +
       '<div class="v3-champion-card__body">' +
-        '<div class="v3-champion-card__eyebrow">🏆 CAMPEÓN DEL MUNDO</div>' +
+        '<div class="v3-champion-card__eyebrow">CAMPEÓN</div>' +
         '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
-        '<div class="v3-champion-card__sub">FIFA World Cup 2026</div>' +
-        '<div class="v3-champion-card__venue">19 jul · MetLife Stadium, Nueva York</div>' +
       '</div>' +
       '<div class="v3-podium-pts v3-podium-pts--gold">+' + PTS.champion + ' pts</div>';
   } else {
