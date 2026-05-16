@@ -53,7 +53,7 @@ const HTML_ENTITIES = {
   ccedil: 'ç', Ccedil: 'Ç', szlig: 'ß',
   aring: 'å', Aring: 'Å', aelig: 'æ', AElig: 'Æ', oelig: 'œ', OElig: 'Œ',
   oslash: 'ø', Oslash: 'Ø',
-  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  lsquo: "'", rsquo: "'", ldquo: '"', rdquo: '"',
   laquo: '«', raquo: '»',
   ndash: '–', mdash: '—', hellip: '…', middot: '·', bull: '•',
 };
@@ -64,7 +64,9 @@ function decodeHtmlEntities(s) {
       HTML_ENTITIES[name] !== undefined ? HTML_ENTITIES[name] : m
     )
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/[‘’‚′]/g, "'")
+    .replace(/[“”„″]/g, '"');
 }
 
 // Convierte HTML a un texto markdown-ish donde:
