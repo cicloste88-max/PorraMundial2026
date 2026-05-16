@@ -1082,6 +1082,50 @@ body.fc-shell-active #page-elim > #modal {
   line-height: 1.4;
 }
 
+/* HF-CdH-02: escudo del equipo campeón + glow dorado animado.
+   v3GoldPulse es nuevo (el `goldPulse` del legacy no estaba definido en el repo,
+   la animación nunca se ejecutaba). */
+.v3-champion-card__team {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v3-champion-card__team-glow {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.18), transparent 70%);
+  pointer-events: none;
+  animation: v3GoldPulse 2.5s ease-in-out infinite;
+}
+
+.v3-champion-card__team-badge {
+  position: relative;
+  z-index: 1;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes v3GoldPulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.95); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+
+/* Respetar prefers-reduced-motion (accesibilidad) */
+@media (prefers-reduced-motion: reduce) {
+  .v3-champion-card__team-glow {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 /* ── Caja Clasificación Final ─────────────────────────────── */
 .v3-classification-card {
   background: var(--ink-900);

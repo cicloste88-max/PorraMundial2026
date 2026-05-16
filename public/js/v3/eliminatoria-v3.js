@@ -330,9 +330,33 @@ function v3RenderCuadroHonor() {
   champCard.className = 'v3-champion-card' + (podium.champion ? '' : ' v3-champion-card--empty');
 
   if (podium.champion) {
+    // HF-CdH-02: resolver escudo del equipo campeón.
+    // getBadgeUrl(slug) en ko.js prioriza badge oficial (PNG en BADGE_MAP);
+    // fallback a v3FlagURLByCode(flag) para mantener consistencia con el resto
+    // del bracket v3 que ya usa esa función para banderas.
+    var champTeam = (typeof EQUIPOS !== 'undefined')
+      ? EQUIPOS.find(function(e) { return e.name === podium.champion; })
+      : null;
+    var champBadge = (champTeam && typeof getBadgeUrl === 'function')
+      ? getBadgeUrl(champTeam.slug) : null;
+    var champFlag = (champTeam && champTeam.flag && typeof v3FlagURLByCode === 'function')
+      ? v3FlagURLByCode(champTeam.flag) : '';
+    var champImgSrc = champBadge || champFlag;
+    var champBadgeHtml = champImgSrc
+      ? '<div class="v3-champion-card__team">' +
+          '<div class="v3-champion-card__team-glow"></div>' +
+          '<img class="v3-champion-card__team-badge" src="' + champImgSrc + '" alt="" ' +
+          (champFlag && champImgSrc !== champFlag
+            ? 'onerror="this.src=\'' + champFlag + '\'"'
+            : 'onerror="this.style.display=\'none\'"') +
+          '/>' +
+        '</div>'
+      : '';
+
     champCard.innerHTML =
       '<img class="v3-champion-card__logo" src="' + WC_LOGO + '" alt="" onerror="this.style.display=\'none\'"/>' +
       '<div class="v3-champion-card__sep"></div>' +
+      champBadgeHtml +
       '<div class="v3-champion-card__body">' +
         '<div class="v3-champion-card__eyebrow">🏆 CAMPEÓN DEL MUNDO</div>' +
         '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
