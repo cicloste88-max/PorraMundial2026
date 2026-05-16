@@ -163,7 +163,18 @@ async function runScrape(targets) {
         // cuando aparezcan listas finales para países ya enriquecidos.
         const existing = await getSquadRow(iso3);
         if (Array.isArray(existing?.jugadores) && existing.jugadores.length > 0) {
-          players = existing.jugadores.map((p) => ({ ...p, es_titular: false }));
+          // Decodificar in-flight nombres y clubs por si quedaron entidades crudas de scrapes previos
+          // (e.g. BIH con &scaron; / &Scaron; tras el round del 16-may pre html-entities)
+          const { decode } = await import('html-entities');
+          const decodeName = (s) => decode(String(s ?? ''))
+            .replace(/[‘’‚′]/g, "'")
+            .replace(/[“”„″]/g, '"');
+          players = existing.jugadores.map((p) => ({
+            ...p,
+            nombre: decodeName(p.nombre),
+            club: decodeName(p.club),
+            es_titular: false,
+          }));
           isFinal = !!existing.jugadores_is_final;
           fuente = existing.jugadores_fuente || 'ff';
 
