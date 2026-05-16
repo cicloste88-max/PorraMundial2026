@@ -162,18 +162,23 @@ export async function parseStartingXI(slug, opts = {}) {
   const url = `${FF_BASE}/equipos/${slug}`;
   const html = await fetchText(url, opts);
 
+  // Si FF aún no ha publicado el XI predicho, sale placeholder
+  // "Alineación aún no disponible" / "Once aún no disponible" /
+  // "Sin alineación disponible". En esos casos devolvemos [] y
+  // runScrape (--refresh-final) preserva el roster intacto sin
+  // marcar titulares (Fix C).
+  if (
+    /[Aa]lineaci[óo]n\s+a[úu]n\s+no\s+disponible/i.test(html) ||
+    /[Oo]nce\s+a[úu]n\s+no\s+disponible/i.test(html) ||
+    /[Ss]in\s+alineaci[óo]n\s+disponible/i.test(html)
+  ) {
+    if (opts.verbose) console.log('  → XI placeholder detectado (página sin once tipo publicado), xi_names=[]');
+    return [];
+  }
+
   // Localizar el inicio de la sección "Posible once tipo" / "Once tipo" en el HTML
   const anchor = html.search(/Posible once tipo|Once tipo|Once probable/i);
-  let slice = anchor >= 0 ? html.slice(anchor) : html;
-  // Cerrar slice antes de secciones que contienen escudos de rivales/competiciones
-  // (Próximos partidos / Historial / Calendario...). En BEL/JPN/SWE estas secciones
-  // están físicamente cerca tras "Posible once tipo" y sus alts (alt="Eurocopa",
-  // alt="Francia", etc.) se colaban como primeros 11 nombres del XI.
-  const END_MARKERS_RE = /(Pr[oó]ximos partidos|Historial de partidos|Calendario|Resultados|Posibles alineaciones|Lesionados|Sancionados|Apercibidos|Convocatorias previas|Ver todas? las noticias|Pr[oó]ximos rivales)/i;
-  const endMatch = slice.match(END_MARKERS_RE);
-  if (endMatch && endMatch.index > 200) {
-    slice = slice.slice(0, endMatch.index);
-  }
+  const slice = anchor >= 0 ? html.slice(anchor) : html;
 
   // Estrategia A: extraer todos los alt= de <img> dentro de la sección (los 11 primeros)
   const altRe = /<img\b[^>]*\balt="([^"]+)"/gi;
