@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `eb9c9d1` (post-merge sprint sync-squads, 16-may). **Sprint anterior F3-I1.6.x + HF-08..HF-15 cerrado y mergeado** (bracket KO v3 visualmente completo, fifa-bar limpia, propagación grupos→KO funcional). **Sprint sync-squads cerrado y mergeado** (CLI `scripts/sync-squads.mjs` + workflow CI `.github/workflows/sync-squads.yml` activo con cron 6h UTC). **10/48 squads operativas** (5 FINAL: FRA/BIH/JPN/BEL/SWE; 5 pre-lista: ARG/BRA/ESP/MEX/QAT). Detalle commits + lecciones en `CHANGELOG.md`.
+Main HEAD `e8d9c65` (post-merge sprint Cuadro de Honor v3, 17-may). **Sprint Cuadro de Honor v3 cerrado y mergeado** — 11 hotfixes (podio + escudo glow v3, fix dice KO, reset grupos limpia KO+slots+BD, gate v3ElimMount, persist+auto-restore `_activeLeague`) + 2 migraciones RLS DELETE (predictions/ko + award/boost picks) aplicadas via MCP. **Sprints previos** sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL: FRA/BIH/JPN/BEL/SWE; 5 pre-lista: ARG/BRA/ESP/MEX/QAT). Detalle commits + lecciones en `CHANGELOG.md`. **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth (`onAuthStateChange` antes de `leagueLoadMyLeagues`); manualmente funciona. Mejorar en Completion Flow.
 
 ## Top-3 pendientes inmediatos
 

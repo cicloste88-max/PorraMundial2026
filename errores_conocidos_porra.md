@@ -743,3 +743,18 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Fix:** commit `89e5d51` revierte completamente el `END_MARKERS_RE`. Vuelta a `const slice = anchor >= 0 ? html.slice(anchor) : html;` simple. El problema real (placeholder) se resuelve con detector de imagen (ERR-48).
 - **Patrón preventivo:** **no especular sobre estructura HTML sin screenshot del UI real**. Antes de un fix de parsing, pedir / capturar la página servida con `curl` y verificar la hipótesis. Si un fix funciona contra una estructura sintética pero rompe en producción, la sintética no refleja la realidad — descartarla, no doblar la apuesta. Lección hermana: el README del módulo y los tests sintéticos no garantizan correctitud contra fuentes reales; siempre validar con el operador.
 - **Fecha detección:** 16 may 2026 (round 4 del sprint, dispatch tras reporte de San del nuevo comportamiento erróneo).
+
+---
+
+## ERR-51 — RLS DELETE policies ausentes → false-positive éxito (rows no se borran)
+
+- **Síntoma:** `db.from(tabla).delete().eq(...)` devuelve `{ data: null, error: null }` (éxito aparente, sin excepción). La memoria del cliente coincide con la expectativa (predictions/koPredictions vaciadas en RAM), pero al recargar la página los datos antiguos reaparecen porque NUNCA se borraron en BD.
+- **Causa:** RLS habilitado en la tabla pero sin política con `FOR DELETE`. Postgres aplica un filter implícito que descarta TODAS las filas (porque no hay policy que las haga visibles para DELETE), no produce error. PostgREST tampoco propaga el caso porque desde su POV el query completó "correctamente" (0 rows afectadas == 0 rows matched). Diferente a una violación de policy en INSERT/UPDATE, que sí lanza `42501 row violates row-level security policy`.
+- **Fix aplicado:** crear `CREATE POLICY <tabla>_delete ON public.<tabla> FOR DELETE USING (...)` con el mismo predicado que UPDATE (en este caso `auth.uid()=user_id AND (league_id IS NULL OR is_porra_abierta(...))`). Aplicado vía MCP el 17may2026 sobre 4 tablas críticas (predictions, ko_predictions, award_picks, boost_picks) y documentado retroactivamente en `supabase/migrations/20260517000001_*.sql` + `20260517000002_*.sql`.
+- **Patrón preventivo:** auditar siempre que las **4 operaciones** (SELECT/INSERT/UPDATE/DELETE) tengan policy cuando el cliente las usa. Query de auditoría:
+  ```sql
+  SELECT tablename, array_agg(cmd ORDER BY cmd) AS policies
+  FROM pg_policies WHERE schemaname='public' GROUP BY tablename;
+  ```
+  Si una tabla acepta DELETEs del cliente y NO aparece `DELETE` en su array, falta policy. Validar también con un `delete().eq('id', X).select()` que devuelva el row borrado — si devuelve `[]` sin error, hay false-positive.
+- **Fecha detección:** 17 may 2026 (QA in-vivo via Chrome MCP durante validación de HF-Reset-02; reset visual reflejaba 0/0 en RAM pero F5 traía predictions de vuelta).

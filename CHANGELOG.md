@@ -2,6 +2,43 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-17 — Sprint Cuadro de Honor v3 + HF Reset/Bootstrap + RLS DELETE
+
+**Branch:** `claude/hf-sim01-fix-dice-button` mergeada a main (`e8d9c65`, +824/-98 LOC, 17 commits).
+
+### 11 hotfixes incluidos
+
+- **HF-CdH-01..05** — Cuadro de Honor v3: champion card + escudo glow `v3GoldPulse` + auto-shrink texto + podio 2º/3º/4º + chips de puntos.
+- **HF-SIM-01** — Fix dice button KO: delegación a `diceSimulateAllKO` + `koPredictions` in-place delete (evitaba pérdida de referencia que rompía resolver de slots).
+- **HF-Deadline** — Ocultar sim buttons cuando `_porraCerrada=true` o `Date.now() >= T-24h` respecto al kickoff del primer partido.
+- **HF-Reset-01** — Reset de grupos también limpia KO + `resolvedSlots` (coherencia memoria-DOM, evita slots zombi tras vaciar grupos).
+- **HF-Reset-02** — DELETE explícito a Supabase en handlers async de reset (los `savePredictions`/`saveKO` solo UPSERT-ean, no eliminan rows previas). Reset visual ya no deja basura en BD.
+- **HF-Empty-State** — Guard `hasGroupScores` en `resolveAllSlots` (ko.js) evita poblar slots basura cuando `predictions` está vacío.
+- **HF-Gate-Groups** — Gate síncrono en `v3ElimMount`: `areGroupsComplete()` + `_porraCerrada` antes de mount. Evita render parcial de eliminatoria cuando faltan resultados de grupos.
+- **HF-Reset-Bootstrap** — Persist `_activeLeague.id` en `localStorage.porra_active_league_id` (escrito en `leagueSelect`) + auto-restore en INITIAL_SESSION via `leagueSelectById`. Stale id → cleanup + fallback al panel. Logout barre el key automáticamente vía `includes('porra_')`. Bug P2 pendiente: race condition con bootstrap de auth (mejorar sprint siguiente).
+- **Fix dice confirm** — Eliminar doble popup + añadir `v3RenderBoardGrupos` tras simulación.
+
+### 2 migraciones RLS DELETE (aplicadas via MCP)
+
+Documentadas retroactivamente en repo:
+
+- `20260517000001_rls_delete_predictions_ko.sql` — `CREATE POLICY predictions_delete` + `ko_predictions_delete` con USING `(SELECT auth.uid())=user_id AND (league_id IS NULL OR is_porra_abierta(...))`.
+- `20260517000002_rls_delete_award_boost_picks.sql` — Mismo patrón para `award_picks` + `boost_picks`.
+
+Bug raíz: las 4 tablas tenían RLS habilitado SIN policy `FOR DELETE`. `db.from(...).delete()` devolvía `{data:null,error:null}` (false-positive éxito) pero las rows NO se borraban en BD. Memoria del cliente coincidía con expectativa, pero F5 traía datos de vuelta.
+
+### Bugs resueltos
+
+- **ERR-51** — RLS DELETE policies ausentes → false-positive éxito (rows no se borran). Síntoma + causa + patrón preventivo de auditoría documentados.
+
+### Cambios de código relevantes
+
+- `public/js/leagues.js` — `leagueSelect` persiste leagueId + respeta `window._pendingPageRestore`.
+- `public/js/auth.js` — INITIAL_SESSION restaura saved league via `leagueSelectById` antes del `loadUserData` directo. Stale id → `localStorage.removeItem` + fallback.
+- `public/js/v3/grupos-v3.js` + `public/js/v3/eliminatoria-v3.js` — DELETE explícito en handlers de reset (HF-Reset-02).
+- `public/js/ko.js` — Guard `hasGroupScores` en `resolveAllSlots` (HF-Empty-State).
+- Cuadro de Honor v3 — nuevos estilos podio + chips + escudo glow.
+
 ## 2026-05-16 — Sprint sync-squads + GitHub Actions workflow
 
 **Branch:** `claude/post-merge-sprint-hotfixes-FkMx5` mergeada a main (`eb9c9d1`).
