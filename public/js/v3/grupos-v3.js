@@ -862,10 +862,13 @@ function v3BindDiceBtn() {
   var btn = document.querySelector('[data-v3-dice]');
   if (!btn) return;
   btn.onclick = () => {
-    if (!confirm('¿Simular aleatoriamente los 72 partidos?')) return;
-    if (window.diceSimulateAllGroups) {
-      window.diceSimulateAllGroups();
-    }
+    // HF-SIM-02: delegar confirm a diceSimulateAllGroups, que ya tiene el suyo propio.
+    // Doble confirm eliminado — ver bug report 2026-05-17.
+    if (!window.diceSimulateAllGroups) return;
+    window.diceSimulateAllGroups();
+    // HF-SIM-02: refrescar board v3 tras simulación (mismo patrón que dice de KO).
+    // setTimeout permite que diceSimulateAllGroups termine de mutar memoria antes del render.
+    setTimeout(v3RenderBoardGrupos, 100);
   };
 }
 
