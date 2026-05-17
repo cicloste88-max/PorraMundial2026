@@ -724,6 +724,33 @@ function v3RenderZoomKO() {
     ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong></div>`
     : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
 
+  // F1 — picker goleador KO. Lookup nombre del jugador desde EQUIPOS resueltos.
+  var scorerKey = pred.gol || null;
+  var scorerName = null;
+  if (scorerKey) {
+    var homeName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.home] : null;
+    var awayName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.away] : null;
+    var homeEq = homeName ? v3FindEquipoByName(homeName) : null;
+    var awayEq = awayName ? v3FindEquipoByName(awayName) : null;
+    var found = (homeEq && homeEq.players || []).find(function (p) { return p.key === scorerKey; })
+             || (awayEq && awayEq.players || []).find(function (p) { return p.key === scorerKey; });
+    scorerName = found ? found.name : scorerKey;
+  }
+  var goleadorHtml = `
+    <div class="v3-zoom-ko-goleador">
+      <div class="v3-zoom-ko-goleador__label">Goleador</div>
+      ${scorerKey
+        ? `<div class="v3-zoom-ko-goleador__picked">
+             <span class="v3-zoom-ko-goleador__name">${escapeHtml(scorerName)}</span>
+             <div class="v3-zoom-ko-goleador__actions">
+               <button class="v3-zoom-ko-goleador__btn" data-v3-ko-gol-change>Cambiar</button>
+               <button class="v3-zoom-ko-goleador__btn v3-zoom-ko-goleador__btn--clear" data-v3-ko-gol-clear>Quitar</button>
+             </div>
+           </div>`
+        : `<button class="v3-zoom-ko-goleador__pick" data-v3-ko-gol-pick>Elige goleador</button>`}
+    </div>
+  `;
+
   inner.innerHTML = `
     <div class="v3-zoom-header">
       <div class="v3-zoom-header__letter">${match.id}</div>
@@ -760,6 +787,7 @@ function v3RenderZoomKO() {
         </div>
       </div>
       ${penaltyHtml}
+      ${goleadorHtml}
       ${summaryHtml}
     </div>
   `;
@@ -780,6 +808,18 @@ function v3RenderZoomKO() {
       v3SetPenaltyWinner(match.id, btn.dataset.pen === 'home' ? homeLabel : awayLabel);
     };
   });
+
+  // F1 — goleador picker bindings.
+  var pickBtn = inner.querySelector('[data-v3-ko-gol-pick]') || inner.querySelector('[data-v3-ko-gol-change]');
+  if (pickBtn) pickBtn.onclick = function (e) {
+    e.stopPropagation();
+    v3OpenGoleadorPickerKO(match.id);
+  };
+  var clearBtn = inner.querySelector('[data-v3-ko-gol-clear]');
+  if (clearBtn) clearBtn.onclick = function (e) {
+    e.stopPropagation();
+    v3SaveGoleadorKO(match.id, null);
+  };
 }
 
 function v3AdjustScoreKO(matchId, side, delta) {
@@ -820,6 +860,128 @@ function v3SetPenaltyWinner(matchId, side) {
   if (typeof saveKO === 'function') saveKO();
 
   v3RenderZoomKO();
+}
+
+// ─── F1 — Picker de goleador KO ─────────────────────────────
+// Reutiliza el sub-overlay singleton `.v3-squad-picker-overlay` montado por grupos-v3
+// (v3EnsureSquadPickerOverlay) y la sección de jugadores por equipo
+// (v3RenderSquadPickerTeamSection). Funciones de grupos asumidas globales (classic scripts).
+var _v3KOGoleadorPickerMatchId = null;
+
+function v3OpenGoleadorPickerKO(matchId) {
+  _v3KOGoleadorPickerMatchId = matchId;
+  if (typeof v3EnsureSquadPickerOverlay === 'function') v3EnsureSquadPickerOverlay();
+  v3RenderGoleadorPickerKO();
+  var overlay = document.querySelector('.v3-squad-picker-overlay');
+  if (overlay) overlay.classList.add('is-open');
+}
+
+function v3RenderGoleadorPickerKO() {
+  var matchId = _v3KOGoleadorPickerMatchId;
+  if (matchId === null) return;
+
+  var inner = document.querySelector('.v3-squad-picker-panel__inner');
+  if (!inner) return;
+
+  // Localizar match en BRACKET (todas las rondas).
+  var allKO = (typeof BRACKET !== 'undefined')
+    ? [].concat(BRACKET.r32 || [], BRACKET.r16 || [], BRACKET.qf || [], BRACKET.sf || [], BRACKET.third || [], BRACKET.final || [])
+    : [];
+  var match = allKO.find(function (m) { return m.id === matchId; });
+  if (!match) return;
+
+  var pred = (typeof koPredictions !== 'undefined')
+    ? (koPredictions[matchId] || koPredictions[String(matchId)] || {})
+    : {};
+  var currentPickKey = pred.gol || null;
+
+  // Resolver nombres reales de equipos desde resolvedSlots para encontrar los EQUIPOS.
+  var homeName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.home] : null;
+  var awayName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.away] : null;
+  var homeEquipo = homeName ? v3FindEquipoByName(homeName) : { name: v3ResolveSlotLabel(match.home), players: [] };
+  var awayEquipo = awayName ? v3FindEquipoByName(awayName) : { name: v3ResolveSlotLabel(match.away), players: [] };
+
+  var homeLabel = v3ResolveSlotLabel(match.home);
+  var awayLabel = v3ResolveSlotLabel(match.away);
+  var roundMeta = _v3GetRoundMetaForMatch(matchId);
+  var eyebrow = (roundMeta ? roundMeta.label : 'Eliminatoria') + ' · ' + matchId;
+
+  var html = '<div class="v3-squad-picker-header">'
+    + '<div class="v3-squad-picker-header__title">'
+    + '<div class="v3-squad-picker-header__eyebrow">' + eyebrow + '</div>'
+    + '<div class="v3-squad-picker-header__scoreline">' + escapeHtml(homeLabel) + ' vs ' + escapeHtml(awayLabel) + '</div>'
+    + '</div>'
+    + '<button class="v3-zoom-close" data-v3-ko-gol-close aria-label="Cerrar (ESC)">✕</button>'
+    + '</div>'
+    + '<div class="v3-squad-picker-body">'
+    + '<h3 class="v3-squad-picker-body__title">Elige goleador</h3>';
+
+  var bothEmpty = (!homeEquipo.players || !homeEquipo.players.length) && (!awayEquipo.players || !awayEquipo.players.length);
+  if (bothEmpty) {
+    html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
+  } else {
+    html += v3RenderSquadPickerTeamSection(homeEquipo, currentPickKey);
+    html += v3RenderSquadPickerTeamSection(awayEquipo, currentPickKey);
+    if (currentPickKey) {
+      html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+    }
+  }
+  html += '</div>';
+
+  inner.innerHTML = html;
+
+  var closeBtn = inner.querySelector('[data-v3-ko-gol-close]');
+  if (closeBtn) closeBtn.onclick = v3CloseGoleadorPickerKO;
+
+  inner.querySelectorAll('[data-v3-squad-player]').forEach(function (btn) {
+    btn.onclick = function () {
+      if (btn.disabled) return;
+      v3SaveGoleadorKO(matchId, btn.dataset.v3SquadPlayer || null);
+    };
+  });
+}
+
+function v3CloseGoleadorPickerKO() {
+  var overlay = document.querySelector('.v3-squad-picker-overlay');
+  if (overlay) overlay.classList.remove('is-open');
+  var inner = document.querySelector('.v3-squad-picker-panel__inner');
+  if (inner) inner.innerHTML = '';
+  _v3KOGoleadorPickerMatchId = null;
+}
+
+// CRÍTICO: NO replica HF-BUG-13 (CLAUDE.md Backlog #3). saved=true NO se marca
+// indiscriminadamente desde el path goleador. v3AdjustScoreKO y v3SetPenaltyWinner
+// lo controlan (introducen marcador o classifier). Goleador puro deja saved como estaba.
+// Coherente con HF-BUG-05 + HF-BUG-05-bis: pred {l:null, v:null, gol:'X', saved:false}
+// puntúa solo goleador en scoring (+2 si acierta), sin signo/exact fantasma.
+function v3SaveGoleadorKO(matchId, playerKey) {
+  if (typeof koPredictions === 'undefined') return;
+  if (!koPredictions[matchId]) {
+    koPredictions[matchId] = { l: null, v: null, classifier: null, gol: null, saved: false };
+    koPredictions[String(matchId)] = koPredictions[matchId];
+  }
+  koPredictions[matchId].gol = playerKey || null;
+  // saved se preserva en su valor previo. NO marcar saved=true aquí.
+  if (typeof saveKO === 'function') saveKO();
+  v3CloseGoleadorPickerKO();
+  v3RenderZoomKO();
+}
+
+function _v3GetRoundMetaForMatch(matchId) {
+  if (typeof BRACKET === 'undefined') return null;
+  var rounds = [
+    { key: 'r32', label: '16avos' },
+    { key: 'r16', label: '8vos' },
+    { key: 'qf',  label: '4tos' },
+    { key: 'sf',  label: 'Semis' },
+    { key: 'third', label: '3er puesto' },
+    { key: 'final', label: 'Final' }
+  ];
+  for (var i = 0; i < rounds.length; i++) {
+    var arr = BRACKET[rounds[i].key] || [];
+    if (arr.find(function (m) { return m.id === matchId; })) return rounds[i];
+  }
+  return null;
 }
 
 // ─── Buttons ────────────────────────────────────────────────
@@ -879,13 +1041,22 @@ function v3BindButtonsAndSwitcher() {
   // HF-BUG-08/BUG-01: listeners delegados en document -- cubren backdrop click Y ESC.
   // _v3ElimGlobalListenersBound (module-scope, nunca reseteado) garantiza registro unico
   // por page-load aunque _v3ElimInited se resetee en la rama gate-locked.
+  // F1: jerarquía de cierre — picker goleador KO tiene prioridad sobre el zoom KO.
   if (!_v3ElimGlobalListenersBound) {
     _v3ElimGlobalListenersBound = true;
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
+      if (e.key !== 'Escape') return;
+      if (_v3KOGoleadorPickerMatchId !== null) { v3CloseGoleadorPickerKO(); return; }
+      if (v3CurrentMatch) v3CloseZoomKO();
     });
     document.addEventListener('click', function(e) {
-      if (e.target && e.target.classList.contains('v3-zoom-overlay')) v3CloseZoomKO();
+      if (!e.target || !e.target.classList) return;
+      // Sub-overlay del picker goleador tiene prioridad.
+      if (e.target.classList.contains('v3-squad-picker-overlay')) {
+        if (_v3KOGoleadorPickerMatchId !== null) v3CloseGoleadorPickerKO();
+        return;
+      }
+      if (e.target.classList.contains('v3-zoom-overlay')) v3CloseZoomKO();
     });
   }
 }

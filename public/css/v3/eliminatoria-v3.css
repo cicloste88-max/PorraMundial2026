@@ -726,6 +726,83 @@
   box-shadow: 0 2px 12px rgba(201, 169, 97, 0.4);
 }
 
+/* F1 — Goleador picker en modal KO */
+.v3-zoom-ko-goleador {
+  background: rgba(201, 169, 97, 0.06);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v3-zoom-ko-goleador__label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fifa-gold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.v3-zoom-ko-goleador__picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.v3-zoom-ko-goleador__name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: 0.02em;
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-zoom-ko-goleador__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.v3-zoom-ko-goleador__btn,
+.v3-zoom-ko-goleador__pick {
+  background: transparent;
+  border: 1px solid var(--ink-700);
+  color: var(--ink-200);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.v3-zoom-ko-goleador__pick {
+  width: 100%;
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  border-color: var(--fifa-gold);
+  text-transform: uppercase;
+}
+
+.v3-zoom-ko-goleador__pick:hover,
+.v3-zoom-ko-goleador__btn:hover {
+  filter: brightness(1.08);
+}
+
+.v3-zoom-ko-goleador__btn--clear {
+  border-color: rgba(220, 80, 80, 0.55);
+  color: rgba(220, 80, 80, 0.95);
+}
+
 /* Summary message */
 .v3-zoom-ko-summary {
   background: rgba(0, 0, 0, 0.3);
