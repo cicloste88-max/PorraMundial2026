@@ -100,7 +100,11 @@ function v3ComputeStandings(letter) {
   });
 
   stats.forEach(s => s.gd = s.gf - s.gc);
-  stats.sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.teamIdx - b.teamIdx);
+  // HF-BUG-11: tiebreaker alfabetico antes del indice de array (que es arbitrario).
+  // FIFA real usa head-to-head y sorteo -- no implementables sin datos; localeCompare
+  // es al menos predecible y documentado.
+  stats.sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf
+    || a.name.localeCompare(b.name) || a.teamIdx - b.teamIdx);
   return stats;
 }
 
@@ -466,7 +470,10 @@ function v3RenderStandingsTable(grupo) {
 
   standings.forEach((row, idx) => {
     var equipo = v3FindEquipoByName(row.name);
-    html += '<div class="v3-standings-row ' + (idx < 2 ? 'is-qualified' : '') + '">'
+    // HF-BUG-12: aplicar mismo criterio de clasificacion que el board principal.
+    // idx<2 siempre clasifica; idx===2 clasifica si esta en los 8 mejores terceros.
+    var _stIsQualif = idx < 2 || (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name));
+    html += '<div class="v3-standings-row ' + (_stIsQualif ? 'is-qualified' : '') + '">'
       + '<div class="v3-st-pos">' + (idx+1) + '</div>'
       + '<div class="v3-st-team">'
       + '<div class="v3-st-flag"><img src="' + v3FlagURLByEquipo(equipo) + '" alt="' + equipo.flag + '" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'is-broken\')"/></div>'
@@ -965,7 +972,17 @@ window.v3GruposMount = function() {
     v3BindDiceBtn();
     v3BindResetBtn();
     v3BindEscapeAndBackdrop();
-
+    // I3/HF-BUG-09: escuchar evento global de cambio de predicciones para refrescar
+    // el board cuando la simulacion viene desde fuera de la UI v3 (admin, consola).
+    // Registro unico aqui (dentro del bloque init-once) -- no se acumula en re-mounts.
+    // Visibility guard: si la pagina grupos no esta visible (otra pestana),
+    // no renderizar -- el render ocurrira en el proximo v3GruposMount().
+    document.addEventListener('mundial:predictions-changed', function() {
+      if (!_v3GruposInited) return;
+      var pageEl = document.getElementById('page-grupos');
+      if (pageEl && pageEl.style.display === 'none') return;
+      v3RenderBoardGrupos();
+    });
     _v3GruposInited = true;
   }
 
