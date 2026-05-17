@@ -759,7 +759,12 @@ function v3SaveGoleadorGrupos(matchIdx, playerKey) {
   var key = getMatchKey(match);
 
   if (!predictions[key]) {
-    predictions[key] = { l: 0, v: 0, saved: true, home: match.home, away: match.away };
+    // HF-BUG-05: inicializar l/v=null evita que scoring lea {l:0,v:0} como
+    // pronostico de empate 0-0. saved=true sigue marcandose al final de la
+    // funcion (path normal de persistencia); scoring.js descarta marcador
+    // (l===null falla isExact y signo) pero si puntua goleador si acierta
+    // -- comportamiento deseado: usuario pronostica solo goleador, no marcador.
+    predictions[key] = { l: null, v: null, saved: false, home: match.home, away: match.away };
   }
 
   if (playerKey) {
