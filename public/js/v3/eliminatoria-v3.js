@@ -8,18 +8,18 @@
 // "/flags/MEX.svg"). Reusa el mismo mapping que grupos-v3.js. F3 cleanup puede
 // extraerlo a shell común.
 var V3_FLAG_SLUG_ELIM = {
-  MEX:'Mexico', RSA:'SouthAfrica', KOR:'KoreaRepublic', CZE:'Czechia',
-  CAN:'Canada', BIH:'Bosnia', QAT:'Qatar', SUI:'Switzerland',
-  BRA:'Brazil', MAR:'Morocco', HAI:'Haiti', SCO:'Scotland',
-  USA:'USA', PAR:'Paraguay', AUS:'Australia', TUR:'Turkiye',
-  GER:'Germany', CUW:'Curacao', CIV:'CoteIvoire', ECU:'Ecuador',
-  NED:'Netherlands', JPN:'Japan', SWE:'Sweden', TUN:'Tunisia',
-  BEL:'Belgium', EGY:'Egypt', IRN:'Iran', NZL:'NewZealand',
-  ESP:'Spain', CPV:'CaboVerde', KSA:'SaudiArabia', URU:'Uruguay',
-  FRA:'France', SEN:'Senegal', IRQ:'Iraq', NOR:'Norway',
-  ARG:'Argentina', ALG:'Algeria', AUT:'Austria', JOR:'Jordan',
-  POR:'Portugal', COD:'CongoDR', UZB:'Uzbekistan', COL:'Colombia',
-  ENG:'England', CRO:'Croatia', GHA:'Ghana', PAN:'Panama'
+  MEX: 'Mexico', RSA: 'SouthAfrica', KOR: 'KoreaRepublic', CZE: 'Czechia',
+  CAN: 'Canada', BIH: 'Bosnia', QAT: 'Qatar', SUI: 'Switzerland',
+  BRA: 'Brazil', MAR: 'Morocco', HAI: 'Haiti', SCO: 'Scotland',
+  USA: 'USA', PAR: 'Paraguay', AUS: 'Australia', TUR: 'Turkiye',
+  GER: 'Germany', CUW: 'Curacao', CIV: 'CoteIvoire', ECU: 'Ecuador',
+  NED: 'Netherlands', JPN: 'Japan', SWE: 'Sweden', TUN: 'Tunisia',
+  BEL: 'Belgium', EGY: 'Egypt', IRN: 'Iran', NZL: 'NewZealand',
+  ESP: 'Spain', CPV: 'CaboVerde', KSA: 'SaudiArabia', URU: 'Uruguay',
+  FRA: 'France', SEN: 'Senegal', IRQ: 'Iraq', NOR: 'Norway',
+  ARG: 'Argentina', ALG: 'Algeria', AUT: 'Austria', JOR: 'Jordan',
+  POR: 'Portugal', COD: 'CongoDR', UZB: 'Uzbekistan', COL: 'Colombia',
+  ENG: 'England', CRO: 'Croatia', GHA: 'Ghana', PAN: 'Panama'
 };
 function v3FlagURLByCode(code) {
   if (!code) return null;
@@ -36,7 +36,7 @@ var _v3ElimInited = false;
 var WC_KICKOFF_UTC = '2026-06-11T19:00:00Z';
 var WC_PRESIM_DEADLINE_MS = new Date(WC_KICKOFF_UTC).getTime() - 24 * 60 * 60 * 1000;
 
-window.v3ElimMount = function() {
+window.v3ElimMount = function () {
   if (_v3ElimInited) {
     v3RenderAll();
     return;
@@ -102,7 +102,7 @@ function v3RenderSwitcher() {
   wrap.innerHTML = '';
 
   var rounds = ['r32', 'r16', 'qf', 'sf', 'f'];
-  rounds.forEach(function(key) {
+  rounds.forEach(function (key) {
     var meta = v3RoundMeta[key];
     if (!meta) return;
 
@@ -116,7 +116,7 @@ function v3RenderSwitcher() {
       btn.style.setProperty('--r-glow', meta.glow);
     }
 
-    btn.onclick = function() {
+    btn.onclick = function () {
       v3CurrentRound = key;
       v3RenderAll();
     };
@@ -166,7 +166,7 @@ function v3RenderBoard() {
   // Left column
   var leftCol = document.createElement('div');
   leftCol.className = 'v3-column v3-column-left';
-  leftMatches.forEach(function(m) {
+  leftMatches.forEach(function (m) {
     leftCol.appendChild(v3RenderKoCard(m, meta));
   });
   board.appendChild(leftCol);
@@ -180,14 +180,14 @@ function v3RenderBoard() {
   trophy.className = 'v3-trophy';
   trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
   trophy.alt = 'Trophy';
-  trophy.onerror = function() { this.style.display = 'none'; };
+  trophy.onerror = function () { this.style.display = 'none'; };
   trophyCol.appendChild(trophy);
   board.appendChild(trophyCol);
 
   // Right column
   var rightCol = document.createElement('div');
   rightCol.className = 'v3-column v3-column-right';
-  rightMatches.forEach(function(m) {
+  rightMatches.forEach(function (m) {
     rightCol.appendChild(v3RenderKoCard(m, meta));
   });
   board.appendChild(rightCol);
@@ -240,7 +240,7 @@ function v3RenderKoCard(match, meta) {
     </div>
   `;
 
-  div.onclick = function() {
+  div.onclick = function () {
     v3OpenZoom(match, v3RoundMeta[v3CurrentRound]);
   };
 
@@ -268,9 +268,9 @@ function _v3ComputePodium() {
 
   var champion = null;
   if (finalPred.saved && finalPred.l !== null && finalPred.l !== undefined) {
-    if (finalPred.l > finalPred.v)       champion = hName;
-    else if (finalPred.v > finalPred.l)  champion = aName;
-    else if (finalPred.classifier)       champion = finalPred.classifier;
+    if (finalPred.l > finalPred.v) champion = hName;
+    else if (finalPred.v > finalPred.l) champion = aName;
+    else if (finalPred.classifier) champion = finalPred.classifier;
   }
   var runnerUp = champion ? (champion === hName ? aName : hName) : null;
 
@@ -281,9 +281,9 @@ function _v3ComputePodium() {
   if (matchThird && thirdPred.saved && thirdPred.l !== null && thirdPred.l !== undefined) {
     var t3h = resolvedSlots[matchThird.home];
     var t3a = resolvedSlots[matchThird.away];
-    if (thirdPred.l > thirdPred.v)      { third = t3h; fourth = t3a; }
+    if (thirdPred.l > thirdPred.v) { third = t3h; fourth = t3a; }
     else if (thirdPred.v > thirdPred.l) { third = t3a; fourth = t3h; }
-    else if (thirdPred.classifier)      {
+    else if (thirdPred.classifier) {
       third = thirdPred.classifier;
       fourth = (thirdPred.classifier === t3h) ? t3a : t3h;
     }
@@ -309,7 +309,7 @@ function v3RenderCuadroHonor() {
   function _flagByName(name) {
     if (!name) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
     if (typeof EQUIPOS === 'undefined') return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
-    var team = EQUIPOS.find(function(e) { return e.name === name; });
+    var team = EQUIPOS.find(function (e) { return e.name === name; });
     if (!team || !team.flag) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
     var flagUrl = v3FlagURLByCode(team.flag);
     if (!flagUrl) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
@@ -343,7 +343,7 @@ function v3RenderCuadroHonor() {
     // fallback a v3FlagURLByCode(flag) para mantener consistencia con el resto
     // del bracket v3 que ya usa esa función para banderas.
     var champTeam = (typeof EQUIPOS !== 'undefined')
-      ? EQUIPOS.find(function(e) { return e.name === podium.champion; })
+      ? EQUIPOS.find(function (e) { return e.name === podium.champion; })
       : null;
     var champBadge = (champTeam && typeof getBadgeUrl === 'function')
       ? getBadgeUrl(champTeam.slug) : null;
@@ -352,13 +352,13 @@ function v3RenderCuadroHonor() {
     var champImgSrc = champBadge || champFlag;
     var champBadgeHtml = champImgSrc
       ? '<div class="v3-champion-card__team">' +
-          '<div class="v3-champion-card__team-glow"></div>' +
-          '<img class="v3-champion-card__team-badge" src="' + champImgSrc + '" alt="" ' +
-          (champFlag && champImgSrc !== champFlag
-            ? 'onerror="this.src=\'' + champFlag + '\'"'
-            : 'onerror="this.style.display=\'none\'"') +
-          '/>' +
-        '</div>'
+      '<div class="v3-champion-card__team-glow"></div>' +
+      '<img class="v3-champion-card__team-badge" src="' + champImgSrc + '" alt="" ' +
+      (champFlag && champImgSrc !== champFlag
+        ? 'onerror="this.src=\'' + champFlag + '\'"'
+        : 'onerror="this.style.display=\'none\'"') +
+      '/>' +
+      '</div>'
       : '';
 
     champCard.innerHTML =
@@ -366,8 +366,8 @@ function v3RenderCuadroHonor() {
       '<div class="v3-champion-card__sep"></div>' +
       champBadgeHtml +
       '<div class="v3-champion-card__body">' +
-        '<div class="v3-champion-card__eyebrow">CAMPEÓN</div>' +
-        '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
+      '<div class="v3-champion-card__eyebrow">CAMPEÓN</div>' +
+      '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
       '</div>' +
       '<div class="v3-podium-pts v3-podium-pts--gold">+' + PTS.champion + ' pts</div>';
   } else {
@@ -383,21 +383,21 @@ function v3RenderCuadroHonor() {
 
   var rows = [
     { medal: '🥈', name: podium.runnerUp, label: '2.º Subcampeón', pts: PTS.runner_up },
-    { medal: '🥉', name: podium.third,    label: '3.º Puesto',     pts: PTS.third     },
-    { medal: '④', name: podium.fourth,   label: '4.º Puesto',     pts: PTS.fourth    }
+    { medal: '🥉', name: podium.third, label: '3.º Puesto', pts: PTS.third },
+    { medal: '④', name: podium.fourth, label: '4.º Puesto', pts: PTS.fourth }
   ];
 
-  var rowsHtml = rows.map(function(r, i) {
+  var rowsHtml = rows.map(function (r, i) {
     var isLast = (i === rows.length - 1);
     return '<div class="v3-class-row' + (isLast ? ' v3-class-row--last' : '') + '">' +
       '<div class="v3-class-row__medal">' + r.medal + '</div>' +
       _flagByName(r.name) +
       '<div class="v3-class-row__info">' +
-        '<div class="v3-class-row__name">' + (r.name || '—') + '</div>' +
-        '<div class="v3-class-row__label">' + r.label + '</div>' +
+      '<div class="v3-class-row__name">' + (r.name || '—') + '</div>' +
+      '<div class="v3-class-row__label">' + r.label + '</div>' +
       '</div>' +
       '<div class="v3-podium-pts">+' + r.pts + ' pts</div>' +
-    '</div>';
+      '</div>';
   }).join('');
 
   classCard.innerHTML =
@@ -460,7 +460,7 @@ function v3RenderFinalBlock() {
   // F2.9 HF-06: URL alineada con prototipo (miniatures/trophy/trophy.png) — antes apuntaba a trophy-2026.png.
   trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
   trophy.alt = 'Trophy';
-  trophy.onerror = function() { this.style.display = 'none'; };
+  trophy.onerror = function () { this.style.display = 'none'; };
   trophyCol.appendChild(trophy);
 
   // Third below
@@ -533,7 +533,7 @@ function v3RenderFinalCard(match, meta, kind) {
     </div>
   `;
 
-  div.onclick = function() {
+  div.onclick = function () {
     v3OpenZoom(match, meta);
   };
 
@@ -568,8 +568,8 @@ function v3ResolveSlotCode(slot) {
   var team = EQUIPOS.find(function (e) { return e.name === teamName; });
   if (!team) return teamName;
   return team.code
-      || team.flag
-      || teamName.slice(0, 3).toUpperCase();
+    || team.flag
+    || teamName.slice(0, 3).toUpperCase();
 }
 
 function v3ResolveSlotLabel(slot) {
@@ -595,7 +595,7 @@ function v3FlagFor(slot) {
   var teamName = resolvedSlots[slot];
   if (typeof EQUIPOS === 'undefined') return '';
 
-  var team = EQUIPOS.find(function(e) { return e.name === teamName; });
+  var team = EQUIPOS.find(function (e) { return e.name === teamName; });
   if (!team || !team.flag) return '';
 
   var flagUrl = v3FlagURLByCode(team.flag);
@@ -730,15 +730,15 @@ function v3RenderZoomKO() {
   // Bind events
   inner.querySelector('[data-close]').onclick = v3CloseZoomKO;
 
-  inner.querySelectorAll('[data-stepper]').forEach(function(btn) {
-    btn.onclick = function(e) {
+  inner.querySelectorAll('[data-stepper]').forEach(function (btn) {
+    btn.onclick = function (e) {
       e.stopPropagation();
       v3AdjustScoreKO(match.id, btn.dataset.side, +btn.dataset.delta);
     };
   });
 
-  inner.querySelectorAll('[data-pen]').forEach(function(btn) {
-    btn.onclick = function(e) {
+  inner.querySelectorAll('[data-pen]').forEach(function (btn) {
+    btn.onclick = function (e) {
       e.stopPropagation();
       v3SetPenaltyWinner(match.id, btn.dataset.pen === 'home' ? homeLabel : awayLabel);
     };
@@ -790,8 +790,11 @@ function v3BindButtonsAndSwitcher() {
   // Reset button
   var resetBtn = document.querySelector('[data-v3-elim-reset]');
   if (resetBtn) {
-    resetBtn.onclick = function() {
-      if (!confirm('¿Borrar pronósticos KO?')) return;
+    resetBtn.onclick = function () {
+      // HF-Reset-01: confirm explícito sobre la asimetría intencional. R32 leerá
+      // de los slots 1A/2B/T_* (derivados de grupos) y mostrará equipos resueltos
+      // aunque hayas borrado tus KO predictions — esto es coherencia con grupos.
+      if (!confirm('¿Borrar pronósticos KO?\n\nLos emparejamientos R32 (España vs Argentina…) seguirán visibles según tu clasificación de grupos. Para resetear todo el torneo usa "Borrar pronósticos" en la pantalla de grupos.')) return;
       // HF-SIM-01: mutar in-place — koPredictions es una variable global declarada
       // con `let` en ko.js (línea 79). Asignar `koPredictions = {}` desde aquí
       // crea una variable local del scope de v3 y deja la global intacta, así
@@ -816,20 +819,20 @@ function v3BindButtonsAndSwitcher() {
   if (diceBtn) {
     // HF-SIM-01: sin confirm duplicado — diceSimulateAllKO (admin.js:702)
     // muestra su propio confirm con texto más informativo.
-    diceBtn.onclick = function() {
+    diceBtn.onclick = function () {
       v3SimulateDice();
     };
   }
 
   // ESC key
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
   });
 
   // Overlay click
   var overlay = document.querySelector('.v3-zoom-overlay');
   if (overlay) {
-    overlay.onclick = function(e) {
+    overlay.onclick = function (e) {
       if (e.target === overlay) v3CloseZoomKO();
     };
   }
@@ -848,7 +851,7 @@ function v3BindButtonsAndSwitcher() {
 function v3SimulateDice() {
   if (typeof diceSimulateAllKO !== 'function') return;
   diceSimulateAllKO();
-  setTimeout(function(){ if (typeof v3RenderAll === 'function') v3RenderAll(); }, 100);
+  setTimeout(function () { if (typeof v3RenderAll === 'function') v3RenderAll(); }, 100);
 }
 
 // ─── Main render ────────────────────────────────────────────
@@ -876,7 +879,7 @@ function v3RenderAll() {
 }
 
 // ─── Defensivo: pattern readyState ──────────────────────────
-var v3RunInit = function() {
+var v3RunInit = function () {
   // Inicialización la hace el padre al llamar window.v3ElimMount()
 };
 

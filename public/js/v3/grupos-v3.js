@@ -819,10 +819,26 @@ function v3BindResetBtn() {
   var btn = document.querySelector('[data-v3-reset]');
   if (!btn) return;
   btn.onclick = () => {
-    if (!confirm('¿Borrar todos los pronósticos guardados?')) return;
+    // HF-Reset-01: borrar grupos sin borrar KO dejaba el bracket de fase final
+    // con clasificaciones huérfanas (los slots 1A/2B/T_* persisten cacheados y
+    // los pronósticos KO siguen apuntando a equipos que ya no se clasificarían).
+    // Coherencia: reset de grupos = reset de TODO el torneo.
+    if (!confirm('¿Borrar TODOS los pronósticos del torneo (grupos + KO)?')) return;
     predictions = {};
-    savePredictions();
+    if (typeof savePredictions === 'function') savePredictions();
+    // Limpiar koPredictions (mutación in-place, koPredictions es let en ko.js).
+    if (typeof koPredictions !== 'undefined') {
+      Object.keys(koPredictions).forEach(function(k) { delete koPredictions[k]; });
+    }
+    // Limpiar TODOS los slots resueltos (1A/2B/3C/T_*/W*/L*) — los de grupos
+    // también porque al borrar predictions la clasificación cambia.
+    if (typeof resolvedSlots !== 'undefined') {
+      Object.keys(resolvedSlots).forEach(function(k) { delete resolvedSlots[k]; });
+    }
+    if (typeof saveKO === 'function') saveKO();
     v3RenderBoardGrupos();
+    // Refrescar bracket si el módulo elim-v3 está montado.
+    if (typeof v3RenderAll === 'function') v3RenderAll();
   };
 }
 
