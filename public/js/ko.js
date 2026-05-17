@@ -134,26 +134,36 @@ function normKoPredictions() {
   // ─────────────────────────────────────────────────────────────
 function resolveAllSlots() {
   resolvedSlots = {};
-  const tables = {};
-  GRUPOS.forEach(g=>{ tables[g.letra]=calcGroupTableAdvanced(g.letra); });
-  const bestThirds = getBestThirdsAll();
 
-  // Resolve group slots: 1A, 2B, T_ABCDF
-  GRUPOS.forEach(g=>{
-    const t=tables[g.letra];
-    if(t&&t[0]) resolvedSlots['1'+g.letra]=t[0].name;
-    if(t&&t[1]) resolvedSlots['2'+g.letra]=t[1].name;
-    if(t&&t[2]) resolvedSlots['3'+g.letra]=t[2].name;
-  });
+  // HF-Empty-State: ni calcGroupTableAdvanced ni getBestThirdsAll detectan el
+  // caso "predictions sin marcadores" — tratan partidos vacíos como 0-0 y
+  // devuelven equipos en orden del array GRUPOS, rellenando slots con datos
+  // basura. Guard top-level: si no hay ningún score en grupos, skip los slots
+  // derivados de clasificación.
+  const hasGroupScores = Object.values(predictions || {}).some(p =>
+    Number.isInteger(p?.l) && Number.isInteger(p?.v)
+  );
 
-  // Resolve best-thirds slots (T_GROUPS)
-  // The assignment of best thirds to specific slots follows FIFA rules
-  // For simplicity: each T_XXXX slot gets the best available third from those groups
-  const thirdSlots = ['T_ABCDF','T_CDFGH','T_CEFHI','T_EHIJK','T_BEFIJ','T_AEHIJ','T_EFGIJ','T_DEIJL'];
-  let bestThirdsAvailable = [...bestThirds];
-  thirdSlots.forEach((slot,i)=>{
-    if(bestThirdsAvailable[i]) resolvedSlots[slot]=bestThirdsAvailable[i];
-  });
+  if (hasGroupScores) {
+    const tables = {};
+    GRUPOS.forEach(g=>{ tables[g.letra]=calcGroupTableAdvanced(g.letra); });
+    const bestThirds = getBestThirdsAll();
+
+    // Resolve group slots: 1A, 2B, T_ABCDF
+    GRUPOS.forEach(g=>{
+      const t=tables[g.letra];
+      if(t&&t[0]) resolvedSlots['1'+g.letra]=t[0].name;
+      if(t&&t[1]) resolvedSlots['2'+g.letra]=t[1].name;
+      if(t&&t[2]) resolvedSlots['3'+g.letra]=t[2].name;
+    });
+
+    // Resolve best-thirds slots (T_GROUPS)
+    const thirdSlots = ['T_ABCDF','T_CDFGH','T_CEFHI','T_EHIJK','T_BEFIJ','T_AEHIJ','T_EFGIJ','T_DEIJL'];
+    let bestThirdsAvailable = [...bestThirds];
+    thirdSlots.forEach((slot,i)=>{
+      if(bestThirdsAvailable[i]) resolvedSlots[slot]=bestThirdsAvailable[i];
+    });
+  }
 
   // Resolve W/L slots (knockout round results)
   function resolveKO(id) {

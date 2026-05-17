@@ -37,6 +37,37 @@ var WC_KICKOFF_UTC = '2026-06-11T19:00:00Z';
 var WC_PRESIM_DEADLINE_MS = new Date(WC_KICKOFF_UTC).getTime() - 24 * 60 * 60 * 1000;
 
 window.v3ElimMount = function () {
+  // HF-Gate-Groups: bloquear acceso si grupos incompletos. Cuando la porra
+  // está cerrada, mostrar bracket en modo read-only. Se chequea ANTES del
+  // guard idempotente porque _v3ElimInited cachearía el gate inicial y no
+  // re-evaluaría tras completarse los grupos.
+  var groupsComplete = (typeof areGroupsComplete === 'function')
+    ? areGroupsComplete() : true;
+  var cerrada = !!window._porraCerrada;
+
+  if (!cerrada && !groupsComplete) {
+    var pageElim = document.getElementById('page-elim');
+    if (!pageElim) return console.warn('No page-elim container found');
+    var mountGate = document.getElementById('v3-elim-mount');
+    if (!mountGate) {
+      mountGate = document.createElement('div');
+      mountGate.id = 'v3-elim-mount';
+      pageElim.appendChild(mountGate);
+    }
+    var progress = (typeof getGroupsProgress === 'function')
+      ? getGroupsProgress() : { filled: 0, total: 72, pct: 0 };
+    mountGate.innerHTML =
+      '<div class="v3-gate-locked">' +
+        '<div class="v3-gate-locked__icon">🔒</div>' +
+        '<h2 class="v3-gate-locked__title">Fase Final bloqueada</h2>' +
+        '<p class="v3-gate-locked__desc">Completa los 72 marcadores de la fase de grupos para desbloquear el bracket.</p>' +
+        '<div class="v3-gate-locked__progress">' + progress.filled + ' / ' + progress.total + ' marcadores</div>' +
+        '<button class="v3-btn v3-btn--gold" onclick="showPage(\'grupos\')">Ir a Grupos →</button>' +
+      '</div>';
+    _v3ElimInited = false;
+    return;
+  }
+
   if (_v3ElimInited) {
     v3RenderAll();
     return;
