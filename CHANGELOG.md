@@ -2,6 +2,32 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-17 — Hotfix Pack HF-BUG-05/08/01/09/11/12 (PR #66)
+
+**Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`855b6c4`, squash). Base `8c98e8a`. Sin migración SQL.
+
+### 5 hotfixes
+
+- **HF-BUG-05** (severidad ALTA, `grupos-v3.js` `v3SaveGoleadorGrupos`) — scoring fantasma con solo goleador. Antes inicializaba `predictions[key] = {l:0, v:0, saved:true}` cuando no existía → `scoring.js` puntuaba como pronóstico 0-0 válido. Ahora `{l:null, v:null, saved:false}`; la línea 783 sigue marcando `saved=true` al final del path normal pero `scoring.js` descarta marcador con `l===null` (falla isExact y signo). Goleador puntúa (+2) si acierta. Path `null + delta` cuando usuario añade marcador después defendido por `Number.isInteger` guard en `v3AdjustScoreGrupos:802`. **DEUDA RESIDUAL:** HF-BUG-05-bis (`scoring.js:60` evalúa signo por delta, `null-null===0` coincide con signo empate real → +1pt fantasma cuando pred es `null-null` Y resultado empate). Cubre 90% del bug, no el caso empate. Trazado completo en PR#66 comment: https://github.com/cicloste88-max/PorraMundial2026/pull/66#issuecomment-4470743039
+- **HF-BUG-08/BUG-01** (severidad MEDIA, `eliminatoria-v3.js` líneas 31 y 868) — listeners `keydown` ESC y `click` backdrop ambos detrás del guard `_v3ElimGlobalListenersBound` (module-scope, nunca reseteado). Antes ESC quedaba fuera del guard y se acumulaba en cada re-mount de `v3BindButtonsAndSwitcher` tras `gate-locked → unlocked`. Tras N navegaciones, ESC disparaba N veces `v3CloseZoomKO()`. Roza ERR-43.
+- **HF-BUG-09** (severidad BAJA-MEDIA, `admin.js:633` + `grupos-v3.js:970`) — evento `mundial:predictions-changed` desacopla `admin.js` ↔ v3. `diceSimulateAllGroups()` dispara el evento tras `savePredictions()`; listener en `v3GruposMount()` refresca el board solo si la página grupos visible y `_v3GruposInited===true`. Sustituye llamada directa a `v3RenderBoardGrupos()`. Caso KO sigue con `setTimeout` (I3 pendiente, HF-BUG-09-bis).
+- **HF-BUG-11** (severidad BAJA, `grupos-v3.js:103`) — tiebreaker alfabético vía `localeCompare` antes del índice de array arbitrario. FIFA real usa head-to-head + sorteo no implementables; `localeCompare` es predecible y documentado.
+- **HF-BUG-12** (severidad MEDIA, `grupos-v3.js:473`) — `is-qualified` también para el 3º si está en `_v3BestThirdsCache`. Antes la tabla detallada solo pintaba los 2 primeros, inconsistencia visual con el board principal en formato Mundial 2026 (8 mejores 3os clasifican).
+
+### QA
+
+Matriz ejecutada por Claude.ai: **8 PASS** + **1 PARTIAL** (BUG-05 residual de empate, documentado en PR comment) + **3 SKIPPED** (UX visual flow solo-goleador-sin-marcador, no reproducible sin mutar datos; código de render no cambió en este PR).
+
+### Backlog post-launch derivado
+
+- **HF-BUG-05-bis** — one-liner pre-F1/F3, guard `pred.l!==null && pred.v!==null` en `scoring.js:60` antes del check de signo.
+- **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO post-launch.
+- **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` post-launch (importante para F1 picker goleador KO).
+
+### Bugs resueltos
+
+- **ERR-52..ERR-56** — uno por HF, detalle en `errores_conocidos_porra.md`.
+
 ## 2026-05-17 — Sprint Cuadro de Honor v3 + HF Reset/Bootstrap + RLS DELETE
 
 **Branch:** `claude/hf-sim01-fix-dice-button` mergeada a main (`e8d9c65`, +824/-98 LOC, 17 commits).

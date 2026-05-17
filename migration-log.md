@@ -2088,3 +2088,11 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 **Top-3 errores cerrados:** ERR-46 (entidades centroeuropeas/turcas con `html-entities`), ERR-47 (`--refresh-final` preserva incondicionalmente), ERR-48 (detector `/alineaciones/0.jpg` SSR). ERR-49 + ERR-50 secundarios (apóstrofos tipográficos, slice cut revertido).
 
 **Nueva documentación:** `docs/sync-squads.md` (operacional), `.claude/rules/sync-squads.md` (regla path-scoped), `docs/v3-vs-legacy.md` (inventario funcionalidades). Entrada CHANGELOG completa con 8 commits + lecciones.
+
+## 2026-05-17 — Cierres documentales (PR #65, PR #66) + Hotfix Pack v3
+
+[04:31] MERGE: PR #65 (`8c98e8a`) — docs post-sprint Sprint Cuadro de Honor v3: migraciones RLS DELETE + ERR-51 + CLAUDE/CHANGELOG. Cierra deuda documental del sprint 11-hotfix mergeado a `e8d9c65`.
+
+[13:08] MERGE: PR #66 (`855b6c4` squash) — fix(v3) Hotfix Pack HF-BUG-05/08/01/09/11/12. Branch `claude/diagnose-esc-listener-bug-L23SC` rebase sobre `origin/main` (PR #65 base `8c98e8a` ortogonal — solo docs+migraciones). 2 commits originales (`92a68ab` HF-BUG-05 aislado + `bf72d64` 4 fixes amalgamados) colapsados en squash. Sin migración SQL.
+
+[14:15] DOCS: este PR (post-pr66) — `CHANGELOG.md` entry Hotfix Pack v3 + `errores_conocidos_porra.md` ERR-52..56 + `CLAUDE.md` estado actual a `855b6c4` + Backlog post-launch añadido (HF-BUG-05-bis/09-bis/13). Sin cambios de código. `CLAUDE.md` 10187 bytes (margen 53B sobre límite 10240).

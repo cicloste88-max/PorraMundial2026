@@ -758,3 +758,46 @@ Tres fallos encadenados que requirieron solución combinada.
   ```
   Si una tabla acepta DELETEs del cliente y NO aparece `DELETE` en su array, falta policy. Validar también con un `delete().eq('id', X).select()` que devuelva el row borrado — si devuelve `[]` sin error, hay false-positive.
 - **Fecha detección:** 17 may 2026 (QA in-vivo via Chrome MCP durante validación de HF-Reset-02; reset visual reflejaba 0/0 en RAM pero F5 traía predictions de vuelta).
+
+## ERR-52 — Scoring fantasma con solo goleador en grupos (PR #66 / HF-BUG-05)
+
+- **Síntoma:** usuario elige solo goleador en un partido de grupos (sin tocar el marcador) y `scoring.js` puntúa el partido como 0-0 válido (+3 exact o +1 signo si el resultado real es 0-0 o empate) cuando debería puntuar únicamente +2 por goleador acertado.
+- **Causa:** `v3SaveGoleadorGrupos` inicializaba `predictions[key] = {l:0, v:0, saved:true, ...}` cuando el registro no existía. `scoring.js` interpretaba el `0/0` como pronóstico real de empate 0-0.
+- **Fix aplicado:** inicializar con `{l:null, v:null, saved:false, ...}`. La línea 783 de la misma función sigue marcando `saved=true` al final del path normal de persistencia, pero `scoring.js` descarta el marcador con `l===null` (`pred.l===realL` da false, signo da `NaN`). El goleador, si se acierta, sí puntúa (+2 pts) — comportamiento deseado. Path `null + delta` cuando el usuario añade marcador después defendido por `Number.isInteger` guard en `v3AdjustScoreGrupos:802`.
+- **Patrón preventivo:** usar `null` (no `0`) para valores no introducidos por el usuario. `0` es un valor legítimo del dominio (marcador real); `null` señaliza "sin pronóstico" sin colisionar con el dominio. Cualquier comparación `===` con `null` falla de forma predecible.
+- **Deuda residual:** **HF-BUG-05-bis** — `scoring.js:60` evalúa signo del pronóstico por delta `pred.l - pred.v`; `null - null === 0`, `Math.sign(0) === 0`, coincide con el signo de empate real → +1pt fantasma cuando pred es `null-null` Y el resultado es empate. Cubre 90% del bug, no el caso empate. One-liner pendiente (guard `pred.l!==null && pred.v!==null` antes del check de signo).
+- **Fecha detección:** 17 may 2026.
+
+## ERR-53 — Acumulación de listeners ESC/backdrop tras re-mount del gate KO (PR #66 / HF-BUG-08+01)
+
+- **Síntoma:** tras N navegaciones del ciclo `gate-locked → unlocked` en la página KO, la tecla ESC dispara N veces `v3CloseZoomKO()` y el click en el backdrop puede no responder o responder múltiples veces. El bug solo aparece tras al menos un ciclo lock/unlock (no en navegación normal).
+- **Causa:** `v3BindButtonsAndSwitcher` registraba `document.addEventListener('keydown', ...)` sin guard de idempotencia. La rama `gate-locked` de `v3ElimMount` hace `_v3ElimInited = false`, lo que provoca que el siguiente mount vuelva a llamar a `v3BindButtonsAndSwitcher` y registre otro listener encima.
+- **Fix aplicado:** flag `_v3ElimGlobalListenersBound` declarada como `var` module-scope, nunca reseteada por ninguna rama. Ambos listeners (`keydown` ESC y `click` backdrop delegado en `document`) viven dentro del bloque `if (!_v3ElimGlobalListenersBound) { ... }`. El click delegado verifica `e.target.classList.contains('v3-zoom-overlay')` para no depender del lifecycle del overlay (que el shell crea lazy).
+- **Patrón preventivo:** cualquier `addEventListener` sobre `document`/`window` desde una función invocada múltiples veces requiere un flag de idempotencia INDEPENDIENTE del flag de mount. El flag de mount puede resetearse (gate, error recovery, etc.); el de listeners no debe. Naming: que el nombre del flag refleje el scope real (`*GlobalListenersBound`, no `*MountInited`).
+- **Relacionado:** ERR-43 (pointer-events overlay no gateado).
+- **Fecha detección:** 17 may 2026.
+
+## ERR-54 — admin.js invocaba v3RenderBoardGrupos() directo (PR #66 / HF-BUG-09)
+
+- **Síntoma:** al "Simular todos los grupos" desde el panel admin legacy, el board v3 quedaba stale hasta navegar (acoplamiento implícito + sin signal). Inversamente, una llamada directa cross-módulo desde admin a v3 hacía throw si v3 no estaba montado, o renderizaba innecesariamente si el usuario estaba en otra página del shell.
+- **Causa:** llamada directa `v3RenderBoardGrupos()` desde admin asume que v3 está montado y visible — asunción inválida.
+- **Fix aplicado:** `document.dispatchEvent(new CustomEvent('mundial:predictions-changed', { detail: { source: 'groups' } }))` tras `savePredictions()` en `diceSimulateAllGroups`. Listener registrado dentro del bloque init-once de `v3GruposMount` con doble guard: `_v3GruposInited === true` Y `page-grupos` con `display !== 'none'`. Si grupos no está visible, no renderiza — el render ocurrirá en el próximo `v3GruposMount()` al navegar.
+- **Patrón preventivo:** comunicación cross-módulo vía `CustomEvent` dispatched en `document`, no llamadas directas. El listener consumidor decide actuar o no según su propio estado (visibility, init flag). Idempotente por registro único en bloque init-once. Payload con `detail.source` extensible para que otros emisores (KO, importadores, etc.) sigan el mismo patrón sin colisionar.
+- **Deuda residual:** **HF-BUG-09-bis** — el path KO sigue con `setTimeout(v3RenderBoardGrupos, 100)` en `v3SimulateDice` (`eliminatoria-v3.js`) y en `diceSimulateAllKO`. Migrar al mismo `CustomEvent` post-launch para completar el patrón I3.
+- **Fecha detección:** 17 may 2026.
+
+## ERR-55 — Tiebreaker arbitrario en standings con empate completo (PR #66 / HF-BUG-11)
+
+- **Síntoma:** dos equipos con mismos `pts`/`gd`/`gf` aparecen en orden inestable entre re-renders. Inestabilidad puramente visual (no afecta puntuación) pero confusa para el usuario que compara dos pestañas o ve el orden cambiar tras un dispatch.
+- **Causa:** `stats.sort((a,b) => ... || a.teamIdx - b.teamIdx)`. `teamIdx` es la posición del equipo dentro del array `EQUIPOS` del grupo — orden arbitrario sin significado deportivo.
+- **Fix aplicado:** insertar `a.name.localeCompare(b.name)` antes de `a.teamIdx - b.teamIdx`. Determinista y predecible. FIFA real usa head-to-head + fair play + sorteo (no implementables sin datos), pero un orden alfabético es al menos consistente entre renders.
+- **Patrón preventivo:** cualquier `sort` cuyo resultado se muestre al usuario debe terminar con un comparador determinista basado en datos del propio item (nombre, ID estable) — nunca en índices del contenedor (`array.indexOf`, `teamIdx`, etc.) que dependen de orden de inserción.
+- **Fecha detección:** 17 may 2026.
+
+## ERR-56 — is-qualified ausente para el 3º en tabla detallada del grupo (PR #66 / HF-BUG-12)
+
+- **Síntoma:** el 3º clasificado de un grupo aparece marcado en verde (`is-qualified`) en el board principal pero blanco en la tabla detallada expandida del mismo grupo. Inconsistencia visual.
+- **Causa:** la condición de la tabla detallada era `idx < 2 ? 'is-qualified' : ''` — solo top-2. El board principal sí consultaba `_v3BestThirdsCache` para marcar al 3º si entraba entre los 8 mejores 3os del Mundial 2026.
+- **Fix aplicado:** factorizar el mismo predicado en ambas vistas: `idx < 2 || (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name))`. Defensa `_v3BestThirdsCache &&` evita `TypeError` si la cache aún no se computó (caso de tabla detallada abierta antes que el board principal renderice).
+- **Patrón preventivo:** factorizar el predicado de estilo entre vistas que representan la misma información para evitar drift visual. Refactor menor candidato post-launch para extraer `v3IsRowQualified(row, idx)` y compartir entre board y tabla detallada.
+- **Fecha detección:** 17 may 2026.
