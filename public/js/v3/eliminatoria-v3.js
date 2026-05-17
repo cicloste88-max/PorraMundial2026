@@ -61,15 +61,32 @@ window.v3ElimMount = function () {
       pageElim.appendChild(mountGate);
     }
     var progress = (typeof getGroupsProgress === 'function')
-      ? getGroupsProgress() : { filled: 0, total: 72, pct: 0 };
+      ? getGroupsProgress() : { filled: 0, total: 72, pct: 0, firstIncompleteLetter: null };
+    var ctaLabel = progress.firstIncompleteLetter
+      ? 'Ir al Grupo ' + progress.firstIncompleteLetter + ' →'
+      : 'Ir a Grupos →';
     mountGate.innerHTML =
       '<div class="v3-gate-locked">' +
         '<div class="v3-gate-locked__icon">🔒</div>' +
         '<h2 class="v3-gate-locked__title">Fase Final bloqueada</h2>' +
         '<p class="v3-gate-locked__desc">Completa los 72 marcadores de la fase de grupos para desbloquear el bracket.</p>' +
         '<div class="v3-gate-locked__progress">' + progress.filled + ' / ' + progress.total + ' marcadores</div>' +
-        '<button class="v3-btn v3-btn--gold" onclick="showPage(\'grupos\')">Ir a Grupos →</button>' +
+        '<button class="v3-btn v3-btn--gold" data-v3-elim-gate-cta>' + ctaLabel + '</button>' +
       '</div>';
+    // F3: bind programático del CTA — redirige al modal del primer grupo
+    // incompleto (más directo que showPage('grupos') sin contexto). Si por
+    // alguna razón firstIncompleteLetter es null pero groupsComplete es false
+    // (race), fallback a solo showPage sin abrir modal.
+    var ctaBtn = mountGate.querySelector('[data-v3-elim-gate-cta]');
+    if (ctaBtn) {
+      ctaBtn.onclick = function () {
+        if (typeof showPage === 'function') showPage('grupos');
+        var letter = progress.firstIncompleteLetter;
+        if (letter && typeof v3OpenZoomGrupos === 'function') {
+          setTimeout(function () { v3OpenZoomGrupos(letter); }, 250);
+        }
+      };
+    }
     _v3ElimInited = false;
     return;
   }
