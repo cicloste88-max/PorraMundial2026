@@ -790,17 +790,14 @@ function v3BindButtonsAndSwitcher() {
   // Reset button
   var resetBtn = document.querySelector('[data-v3-elim-reset]');
   if (resetBtn) {
-    resetBtn.onclick = function () {
+    resetBtn.onclick = async function() {
       // HF-Reset-01: confirm explícito sobre la asimetría intencional. R32 leerá
       // de los slots 1A/2B/T_* (derivados de grupos) y mostrará equipos resueltos
       // aunque hayas borrado tus KO predictions — esto es coherencia con grupos.
       if (!confirm('¿Borrar pronósticos KO?\n\nLos emparejamientos R32 (España vs Argentina…) seguirán visibles según tu clasificación de grupos. Para resetear todo el torneo usa "Borrar pronósticos" en la pantalla de grupos.')) return;
-      // HF-SIM-01: mutar in-place — koPredictions es una variable global declarada
-      // con `let` en ko.js (línea 79). Asignar `koPredictions = {}` desde aquí
-      // crea una variable local del scope de v3 y deja la global intacta, así
-      // que el borrado no surte efecto. Mismo cuidado con resolvedSlots: limpiar
-      // solo W*/L* (los slots de grupos 1A/2B/T_… se reconstruyen al renderizar
-      // pero conviene preservarlos para no romper el bracket).
+
+      // ─── 1. Vaciar memoria (UX inmediato) ───
+      // HF-SIM-01: mutar in-place — koPredictions es let en ko.js.
       if (typeof koPredictions !== 'undefined') {
         Object.keys(koPredictions).forEach(function(k){ delete koPredictions[k]; });
       }
@@ -811,6 +808,24 @@ function v3BindButtonsAndSwitcher() {
       }
       if (typeof saveKO === 'function') saveKO();
       v3RenderAll();
+
+      // ─── 2. HF-Reset-02: DELETE explícito en Supabase ko_predictions ───
+      // Sin esto, saveKO (UPSERT, no SYNC) deja las rows antiguas en BBDD
+      // y reaparecen al recargar la página.
+      try {
+        var leagueId = typeof getActiveLeagueId === 'function' ? getActiveLeagueId() : null;
+        var uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+        if (!uid || !leagueId || !db) {
+          console.warn('[HF-Reset-02 elim] No uid/leagueId/db, skip Supabase DELETE');
+          return;
+        }
+        var { error } = await db.from('ko_predictions').delete()
+          .eq('user_id', uid)
+          .eq('league_id', leagueId);
+        if (error) console.warn('[HF-Reset-02 elim] ko_predictions delete error:', error);
+      } catch (e) {
+        console.warn('[HF-Reset-02 elim] Supabase DELETE exception:', e);
+      }
     };
   }
 
