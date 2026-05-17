@@ -920,3 +920,374 @@ body.fc-shell-active #page-elim > #modal {
   min-height: 260px;
   justify-content: space-evenly;
 }
+
+/* ============================================================
+   HF-CdH-01 · Cuadro de Honor v3
+   Estructura: divider "★ CUADRO DE HONOR ★" + caja Campeón
+   (borde dorado) + caja Clasificación Final (3 filas con chips).
+   Aparece SOLO en ronda Final (round === 'f'), append al final
+   del v3-bracket-board.v3-ko-board--F.
+   ============================================================ */
+
+.v3-podium-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 0 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Divider "★ CUADRO DE HONOR ★" ────────────────────────── */
+.v3-podium-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.v3-podium-divider__line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--fifa-gold-deep) 50%,
+    transparent 100%
+  );
+  opacity: 0.55;
+}
+
+.v3-podium-divider__star {
+  color: var(--fifa-gold);
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(201, 169, 97, 0.35));
+}
+
+.v3-podium-divider__label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--fifa-gold);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* ── Caja Campeón ─────────────────────────────────────────── */
+.v3-champion-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* HF-CdH-04: padding-top extra (26px) reserva el carril del chip flotante
+     +30 pts, que sale del flex flow para liberar ancho al nombre del campeón. */
+  padding: 26px 14px 14px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(201, 169, 97, 0.38);
+  background:
+    radial-gradient(ellipse at 25% 50%, rgba(201, 169, 97, 0.08), transparent 70%),
+    linear-gradient(135deg, var(--ink-900) 0%, var(--ink-800) 45%, rgba(154, 123, 58, 0.18) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 18px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* HF-CdH-04: chip +30 pts flotante en esquina superior derecha.
+   Sale del flex flow → el body (eyebrow + nombre) tiene todo el ancho
+   restante tras logo + separador + escudo, sin competir con el chip. */
+.v3-champion-card .v3-podium-pts--gold {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+}
+
+.v3-champion-card__logo {
+  width: 44px;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+.v3-champion-card__logo--muted {
+  opacity: 0.35;
+  width: 52px;
+}
+
+.v3-champion-card__sep {
+  width: 1px;
+  height: 58px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(201, 169, 97, 0.32) 50%,
+    transparent 100%
+  );
+  flex-shrink: 0;
+}
+
+.v3-champion-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.v3-champion-card__eyebrow {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--fifa-gold);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* HF-CdH-04: nombre en 1 línea con clamp() responsive en font-size.
+   15px (mínimo) ← 5.5vw ← 24px (máximo). El chip flotante (top-right
+   absolute) libera ancho horizontal, y el clamp evita truncado en mobile
+   estrecho para nombres largos (Bosnia and Herzegovina, República Checa,
+   Países Bajos). Si aún se trunca a 15px, cae a ellipsis. */
+.v3-champion-card__name {
+  font-family: var(--font-display);
+  font-size: clamp(15px, 5.5vw, 24px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: #FEF9C3;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Estado placeholder (sin pronóstico de Final) */
+.v3-champion-card--empty {
+  justify-content: center;
+  text-align: center;
+  padding: 18px 16px;
+  gap: 10px;
+}
+.v3-champion-card--empty .v3-champion-card__placeholder {
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-500);
+  line-height: 1.4;
+}
+
+/* HF-CdH-02: escudo del equipo campeón + glow dorado animado.
+   v3GoldPulse es nuevo (el `goldPulse` del legacy no estaba definido en el repo,
+   la animación nunca se ejecutaba). */
+.v3-champion-card__team {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v3-champion-card__team-glow {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.18), transparent 70%);
+  pointer-events: none;
+  animation: v3GoldPulse 2.5s ease-in-out infinite;
+}
+
+.v3-champion-card__team-badge {
+  position: relative;
+  z-index: 1;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes v3GoldPulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.95); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+
+/* Respetar prefers-reduced-motion (accesibilidad) */
+@media (prefers-reduced-motion: reduce) {
+  .v3-champion-card__team-glow {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ── Caja Clasificación Final ─────────────────────────────── */
+.v3-classification-card {
+  background: var(--ink-900);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.v3-classification-card__eyebrow {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.v3-class-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ink-700);
+}
+.v3-class-row.v3-class-row--last { border-bottom: 0; }
+
+.v3-class-row__medal {
+  font-size: 22px;
+  line-height: 1;
+  width: 30px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.v3-class-row__flag {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--ink-800);
+  border: 1px solid var(--ink-700);
+}
+.v3-class-row__flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.v3-class-row__flag--empty {
+  background: var(--ink-800);
+}
+
+.v3-class-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v3-class-row__name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink-100);
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v3-class-row__label {
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-400);
+  line-height: 1.2;
+}
+
+/* ── Chip de puntos (+30/+20/+15/+10 pts) ─────────────────── */
+.v3-podium-pts {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(31, 36, 51, 0.85);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-300);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.v3-podium-pts--gold {
+  background: rgba(201, 169, 97, 0.14);
+  border-color: rgba(201, 169, 97, 0.45);
+  color: var(--fifa-gold);
+}
+
+.v3-btn--gold {
+  background: linear-gradient(180deg, rgba(201, 169, 97, 0.18), rgba(201, 169, 97, 0.06));
+  border-color: var(--fifa-gold, #C9A961);
+  color: var(--fifa-gold, #C9A961);
+}
+
+.v3-btn--gold:hover {
+  background: linear-gradient(180deg, rgba(201, 169, 97, 0.28), rgba(201, 169, 97, 0.12));
+  color: #fff;
+}
+
+/* HF-Gate-Groups: pantalla bloqueada cuando grupos incompletos */
+.v3-gate-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px 60px;
+  min-height: 360px;
+  gap: 14px;
+}
+
+.v3-gate-locked__icon {
+  font-size: 56px;
+  line-height: 1;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.v3-gate-locked__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fifa-gold, #C9A961);
+  margin: 0;
+}
+
+.v3-gate-locked__desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-200, #cbd5e1);
+  max-width: 320px;
+  margin: 0;
+}
+
+.v3-gate-locked__progress {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-300, #94a3b8);
+  padding: 6px 14px;
+  border: 1px solid var(--ink-700, #334155);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}

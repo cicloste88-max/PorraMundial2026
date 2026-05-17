@@ -419,6 +419,31 @@ const runAuthInit = async () => {
       const { data: profile } = await db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single();
       currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        // HF-Reset-Bootstrap: en INITIAL_SESSION (refresh con sesión existente),
+        // restaurar la última liga activa antes de loadUserData. Previene el
+        // edge case donde getActiveLeagueId() devuelve null tras F5 y los saves
+        // fallan silenciosamente (savePredictions/saveKO/savePicksToDB hacen
+        // return temprano sin error visible).
+        // Solo INITIAL_SESSION: login fresco (SIGNED_IN) mantiene "→ welcome".
+        if (event === 'INITIAL_SESSION') {
+          let savedLeagueId = null;
+          try { savedLeagueId = localStorage.getItem('porra_active_league_id'); } catch (e) {}
+          if (savedLeagueId && typeof leagueLoadMyLeagues === 'function') {
+            await leagueLoadMyLeagues();
+            const myLeagues = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
+            const found = myLeagues.find(l => l.id === savedLeagueId);
+            if (found) {
+              // leagueSelectById → leagueSelect → loadUserData(uid) con leagueId activo.
+              // leagueSelect lee window._pendingPageRestore para navegar correctamente.
+              await leagueSelectById(savedLeagueId);
+              renderAuthBar(); updateCTAs();
+              return;
+            }
+            // Stale id (user kickeado / liga borrada) → limpiar y caer al flow normal.
+            try { localStorage.removeItem('porra_active_league_id'); } catch (e) {}
+          }
+        }
+
         await loadUserData(session.user.id);
 
         // Restaurar última página SOLO en refresh (INITIAL_SESSION).

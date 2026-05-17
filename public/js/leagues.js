@@ -71,8 +71,12 @@ async function leagueSelectById(id) {
 }
 
 function leagueSelect(league) {
+  if (!league) return;
   _activeLeague = league;
   window._activeLeague = league;
+  // HF-Reset-Bootstrap: persistir para restauración tras F5/reload.
+  // Logout barre keys con prefijo 'porra_' (auth.js doLogout).
+  try { localStorage.setItem('porra_active_league_id', league.id); } catch (e) {}
   _finalizarDone = false;  // nueva liga — re-verificar estado
 
   // Restaurar estado porra_cerrada de esta liga en concreto
@@ -98,8 +102,14 @@ function leagueSelect(league) {
 
   // Actualizar pill en la barra de navegación
   leagueUpdateNavPill();
-  // Mostrar la porra
-  showPage('grupos');
+  // HF-Reset-Bootstrap: si auth.js dejó una página pendiente de restaurar
+  // tras F5, respetarla en lugar de forzar 'grupos'. Coherente con el flow
+  // existente de porra_lastPage.
+  var pending = window._pendingPageRestore;
+  if (pending) { window._pendingPageRestore = null; }
+  var targetPage = (typeof pending === 'string' && pending) ? pending : 'grupos';
+  if (targetPage === 'admin' && !(currentUser && currentUser.is_admin)) targetPage = 'grupos';
+  showPage(targetPage);
   // Tras cargar datos de la liga, re-evaluar sección de cerrar porra
   // loadUserData llama checkFinalizarReady al terminar, pero por si acaso:
   setTimeout(() => { if (typeof checkFinalizarReady === 'function') checkFinalizarReady(); }, 500);

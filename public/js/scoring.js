@@ -1589,3 +1589,12 @@ function renderAwardsCard(){
   `;
 }
 
+// HF-CdH-01: exposición global de FINAL_CLASSIFICATION_PTS para que el render
+// del Cuadro de Honor v3 (eliminatoria-v3.js) pueda leer los chips +30/+20/+15/+10.
+// FINAL_CLASSIFICATION_PTS se declara con `const` top-level (línea 30), que en
+// classic scripts NO se expone como window.* (ver .claude/rules/frontend-js.md
+// "var vs const top-level").
+if (typeof window !== 'undefined') {
+  window.FINAL_CLASSIFICATION_PTS = FINAL_CLASSIFICATION_PTS;
+}
+

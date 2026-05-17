@@ -699,6 +699,11 @@ function diceSimulateKOMatch(matchId) {
 // para que resolvedSlots se actualice entre rondas
 function diceSimulateAllKO() {
   if(window._porraCerrada) return;
+  // HF-Deadline: bloqueo global 24h pre-kickoff para validación de envíos.
+  // Mismo valor que WC_PRESIM_DEADLINE_MS en eliminatoria-v3.js — duplicado
+  // porque admin.js es classic script sin imports cruzados. Defensa en
+  // profundidad contra invocaciones desde consola del navegador.
+  if(Date.now() >= new Date('2026-06-11T19:00:00Z').getTime() - 24*60*60*1000) return;
   if(!confirm('¿Simular aleatoriamente los 32 partidos de eliminatorias que aún no están guardados?')) return;
 
   // Resolver los slots base (desde grupos) antes de empezar

@@ -8,18 +8,18 @@
 // "/flags/MEX.svg"). Reusa el mismo mapping que grupos-v3.js. F3 cleanup puede
 // extraerlo a shell común.
 var V3_FLAG_SLUG_ELIM = {
-  MEX:'Mexico', RSA:'SouthAfrica', KOR:'KoreaRepublic', CZE:'Czechia',
-  CAN:'Canada', BIH:'Bosnia', QAT:'Qatar', SUI:'Switzerland',
-  BRA:'Brazil', MAR:'Morocco', HAI:'Haiti', SCO:'Scotland',
-  USA:'USA', PAR:'Paraguay', AUS:'Australia', TUR:'Turkiye',
-  GER:'Germany', CUW:'Curacao', CIV:'CoteIvoire', ECU:'Ecuador',
-  NED:'Netherlands', JPN:'Japan', SWE:'Sweden', TUN:'Tunisia',
-  BEL:'Belgium', EGY:'Egypt', IRN:'Iran', NZL:'NewZealand',
-  ESP:'Spain', CPV:'CaboVerde', KSA:'SaudiArabia', URU:'Uruguay',
-  FRA:'France', SEN:'Senegal', IRQ:'Iraq', NOR:'Norway',
-  ARG:'Argentina', ALG:'Algeria', AUT:'Austria', JOR:'Jordan',
-  POR:'Portugal', COD:'CongoDR', UZB:'Uzbekistan', COL:'Colombia',
-  ENG:'England', CRO:'Croatia', GHA:'Ghana', PAN:'Panama'
+  MEX: 'Mexico', RSA: 'SouthAfrica', KOR: 'KoreaRepublic', CZE: 'Czechia',
+  CAN: 'Canada', BIH: 'Bosnia', QAT: 'Qatar', SUI: 'Switzerland',
+  BRA: 'Brazil', MAR: 'Morocco', HAI: 'Haiti', SCO: 'Scotland',
+  USA: 'USA', PAR: 'Paraguay', AUS: 'Australia', TUR: 'Turkiye',
+  GER: 'Germany', CUW: 'Curacao', CIV: 'CoteIvoire', ECU: 'Ecuador',
+  NED: 'Netherlands', JPN: 'Japan', SWE: 'Sweden', TUN: 'Tunisia',
+  BEL: 'Belgium', EGY: 'Egypt', IRN: 'Iran', NZL: 'NewZealand',
+  ESP: 'Spain', CPV: 'CaboVerde', KSA: 'SaudiArabia', URU: 'Uruguay',
+  FRA: 'France', SEN: 'Senegal', IRQ: 'Iraq', NOR: 'Norway',
+  ARG: 'Argentina', ALG: 'Algeria', AUT: 'Austria', JOR: 'Jordan',
+  POR: 'Portugal', COD: 'CongoDR', UZB: 'Uzbekistan', COL: 'Colombia',
+  ENG: 'England', CRO: 'Croatia', GHA: 'Ghana', PAN: 'Panama'
 };
 function v3FlagURLByCode(code) {
   if (!code) return null;
@@ -29,7 +29,45 @@ function v3FlagURLByCode(code) {
 
 var _v3ElimInited = false;
 
-window.v3ElimMount = function() {
+// HF-Deadline: deadline global pre-Mundial para validación de envíos.
+// Duplicada de mundial-shell-v3.js KICKOFF_UTC (classic scripts, sin module
+// imports). Si cambia KICKOFF_UTC, actualizar también aquí y el guard
+// análogo en admin.js diceSimulateAllKO.
+var WC_KICKOFF_UTC = '2026-06-11T19:00:00Z';
+var WC_PRESIM_DEADLINE_MS = new Date(WC_KICKOFF_UTC).getTime() - 24 * 60 * 60 * 1000;
+
+window.v3ElimMount = function () {
+  // HF-Gate-Groups: bloquear acceso si grupos incompletos. Cuando la porra
+  // está cerrada, mostrar bracket en modo read-only. Se chequea ANTES del
+  // guard idempotente porque _v3ElimInited cachearía el gate inicial y no
+  // re-evaluaría tras completarse los grupos.
+  var groupsComplete = (typeof areGroupsComplete === 'function')
+    ? areGroupsComplete() : true;
+  var cerrada = !!window._porraCerrada;
+
+  if (!cerrada && !groupsComplete) {
+    var pageElim = document.getElementById('page-elim');
+    if (!pageElim) return console.warn('No page-elim container found');
+    var mountGate = document.getElementById('v3-elim-mount');
+    if (!mountGate) {
+      mountGate = document.createElement('div');
+      mountGate.id = 'v3-elim-mount';
+      pageElim.appendChild(mountGate);
+    }
+    var progress = (typeof getGroupsProgress === 'function')
+      ? getGroupsProgress() : { filled: 0, total: 72, pct: 0 };
+    mountGate.innerHTML =
+      '<div class="v3-gate-locked">' +
+        '<div class="v3-gate-locked__icon">🔒</div>' +
+        '<h2 class="v3-gate-locked__title">Fase Final bloqueada</h2>' +
+        '<p class="v3-gate-locked__desc">Completa los 72 marcadores de la fase de grupos para desbloquear el bracket.</p>' +
+        '<div class="v3-gate-locked__progress">' + progress.filled + ' / ' + progress.total + ' marcadores</div>' +
+        '<button class="v3-btn v3-btn--gold" onclick="showPage(\'grupos\')">Ir a Grupos →</button>' +
+      '</div>';
+    _v3ElimInited = false;
+    return;
+  }
+
   if (_v3ElimInited) {
     v3RenderAll();
     return;
@@ -61,6 +99,7 @@ window.v3ElimMount = function() {
 
   var actions = document.createElement('div');
   actions.className = 'v3-actions';
+  actions.setAttribute('data-v3-actions', '');  // HF-Deadline: selector para visibility helper
   actions.innerHTML = `
     <button class="v3-btn" data-v3-elim-dice>🎲 Simular KO</button>
     <button class="v3-btn v3-btn--danger" data-v3-elim-reset>Borrar KO</button>
@@ -94,7 +133,7 @@ function v3RenderSwitcher() {
   wrap.innerHTML = '';
 
   var rounds = ['r32', 'r16', 'qf', 'sf', 'f'];
-  rounds.forEach(function(key) {
+  rounds.forEach(function (key) {
     var meta = v3RoundMeta[key];
     if (!meta) return;
 
@@ -108,7 +147,7 @@ function v3RenderSwitcher() {
       btn.style.setProperty('--r-glow', meta.glow);
     }
 
-    btn.onclick = function() {
+    btn.onclick = function () {
       v3CurrentRound = key;
       v3RenderAll();
     };
@@ -158,7 +197,7 @@ function v3RenderBoard() {
   // Left column
   var leftCol = document.createElement('div');
   leftCol.className = 'v3-column v3-column-left';
-  leftMatches.forEach(function(m) {
+  leftMatches.forEach(function (m) {
     leftCol.appendChild(v3RenderKoCard(m, meta));
   });
   board.appendChild(leftCol);
@@ -172,14 +211,14 @@ function v3RenderBoard() {
   trophy.className = 'v3-trophy';
   trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
   trophy.alt = 'Trophy';
-  trophy.onerror = function() { this.style.display = 'none'; };
+  trophy.onerror = function () { this.style.display = 'none'; };
   trophyCol.appendChild(trophy);
   board.appendChild(trophyCol);
 
   // Right column
   var rightCol = document.createElement('div');
   rightCol.className = 'v3-column v3-column-right';
-  rightMatches.forEach(function(m) {
+  rightMatches.forEach(function (m) {
     rightCol.appendChild(v3RenderKoCard(m, meta));
   });
   board.appendChild(rightCol);
@@ -232,11 +271,196 @@ function v3RenderKoCard(match, meta) {
     </div>
   `;
 
-  div.onclick = function() {
+  div.onclick = function () {
     v3OpenZoom(match, v3RoundMeta[v3CurrentRound]);
   };
 
   return div;
+}
+
+// ─── Cuadro de Honor — data helper (HF-CdH-01) ──────────────
+// Extrae los 4 puestos del torneo (Campeón, Subcampeón, 3.º, 4.º) desde el
+// state global (BRACKET, resolvedSlots, koPredictions, EQUIPOS). Idempotente.
+// Retorna null si BRACKET aún no existe (pre-load) o {champion, runnerUp,
+// third, fourth, finalPred, thirdPred} con NAMES (o null) en cada puesto.
+// Lógica portada 1:1 de buildChampionPodium (ko.js:676) — NO modificar legacy.
+function _v3ComputePodium() {
+  if (typeof BRACKET === 'undefined' || !BRACKET.final || !BRACKET.final[0]) return null;
+  if (typeof EQUIPOS === 'undefined') return null;
+
+  var matchFinal = BRACKET.final[0];
+  var matchThird = BRACKET.third && BRACKET.third[0];
+
+  var hName = (typeof resolvedSlots === 'object' && resolvedSlots) ? resolvedSlots[matchFinal.home] : null;
+  var aName = (typeof resolvedSlots === 'object' && resolvedSlots) ? resolvedSlots[matchFinal.away] : null;
+  var finalPred = (typeof koPredictions === 'object' && koPredictions)
+    ? (koPredictions[matchFinal.id] || koPredictions[String(matchFinal.id)] || {})
+    : {};
+
+  var champion = null;
+  if (finalPred.saved && finalPred.l !== null && finalPred.l !== undefined) {
+    if (finalPred.l > finalPred.v) champion = hName;
+    else if (finalPred.v > finalPred.l) champion = aName;
+    else if (finalPred.classifier) champion = finalPred.classifier;
+  }
+  var runnerUp = champion ? (champion === hName ? aName : hName) : null;
+
+  var third = null, fourth = null;
+  var thirdPred = matchThird && (typeof koPredictions === 'object' && koPredictions)
+    ? (koPredictions[matchThird.id] || koPredictions[String(matchThird.id)] || {})
+    : {};
+  if (matchThird && thirdPred.saved && thirdPred.l !== null && thirdPred.l !== undefined) {
+    var t3h = resolvedSlots[matchThird.home];
+    var t3a = resolvedSlots[matchThird.away];
+    if (thirdPred.l > thirdPred.v) { third = t3h; fourth = t3a; }
+    else if (thirdPred.v > thirdPred.l) { third = t3a; fourth = t3h; }
+    else if (thirdPred.classifier) {
+      third = thirdPred.classifier;
+      fourth = (thirdPred.classifier === t3h) ? t3a : t3h;
+    }
+  }
+
+  return { champion: champion, runnerUp: runnerUp, third: third, fourth: fourth, finalPred: finalPred, thirdPred: thirdPred };
+}
+
+// ─── Cuadro de Honor — render (HF-CdH-01) ───────────────────
+// Retorna un <div.v3-podium-wrap> con divider + caja Campeón + caja
+// Clasificación Final. Si no hay champion saved → caja Campeón muestra
+// placeholder. Si no hay 3.er puesto saved → filas 3º/4º muestran "—".
+// Reusa v3FlagURLByCode + EQUIPOS para escudos. NO inventa URL nueva.
+function v3RenderCuadroHonor() {
+  var podium = _v3ComputePodium();
+  if (!podium) return null;
+
+  var PTS = (typeof window !== 'undefined' && window.FINAL_CLASSIFICATION_PTS)
+    ? window.FINAL_CLASSIFICATION_PTS
+    : { champion: 30, runner_up: 20, third: 15, fourth: 10 };
+
+  // Helper: bandera 32×32 cuadrada redondeada a partir de NAME de equipo.
+  function _flagByName(name) {
+    if (!name) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    if (typeof EQUIPOS === 'undefined') return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    var team = EQUIPOS.find(function (e) { return e.name === name; });
+    if (!team || !team.flag) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    var flagUrl = v3FlagURLByCode(team.flag);
+    if (!flagUrl) return '<div class="v3-class-row__flag v3-class-row__flag--empty"></div>';
+    return '<div class="v3-class-row__flag"><img src="' + flagUrl + '" alt="" onerror="this.parentNode.classList.add(\'v3-class-row__flag--empty\');this.remove();"/></div>';
+  }
+
+  var WC_LOGO = (typeof WORLD_CUP_LOGO !== 'undefined') ? WORLD_CUP_LOGO : '';
+
+  // Wrap externo
+  var wrap = document.createElement('div');
+  wrap.className = 'v3-podium-wrap';
+
+  // Divider "★ CUADRO DE HONOR ★"
+  var divider = document.createElement('div');
+  divider.className = 'v3-podium-divider';
+  divider.innerHTML =
+    '<span class="v3-podium-divider__line"></span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__label">CUADRO DE HONOR</span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__line"></span>';
+  wrap.appendChild(divider);
+
+  // ─ Caja Campeón ─
+  var champCard = document.createElement('div');
+  champCard.className = 'v3-champion-card' + (podium.champion ? '' : ' v3-champion-card--empty');
+
+  if (podium.champion) {
+    // HF-CdH-02: resolver escudo del equipo campeón.
+    // getBadgeUrl(slug) en ko.js prioriza badge oficial (PNG en BADGE_MAP);
+    // fallback a v3FlagURLByCode(flag) para mantener consistencia con el resto
+    // del bracket v3 que ya usa esa función para banderas.
+    var champTeam = (typeof EQUIPOS !== 'undefined')
+      ? EQUIPOS.find(function (e) { return e.name === podium.champion; })
+      : null;
+    var champBadge = (champTeam && typeof getBadgeUrl === 'function')
+      ? getBadgeUrl(champTeam.slug) : null;
+    var champFlag = (champTeam && champTeam.flag && typeof v3FlagURLByCode === 'function')
+      ? v3FlagURLByCode(champTeam.flag) : '';
+    var champImgSrc = champBadge || champFlag;
+    var champBadgeHtml = champImgSrc
+      ? '<div class="v3-champion-card__team">' +
+      '<div class="v3-champion-card__team-glow"></div>' +
+      '<img class="v3-champion-card__team-badge" src="' + champImgSrc + '" alt="" ' +
+      (champFlag && champImgSrc !== champFlag
+        ? 'onerror="this.src=\'' + champFlag + '\'"'
+        : 'onerror="this.style.display=\'none\'"') +
+      '/>' +
+      '</div>'
+      : '';
+
+    champCard.innerHTML =
+      '<img class="v3-champion-card__logo" src="' + WC_LOGO + '" alt="" onerror="this.style.display=\'none\'"/>' +
+      '<div class="v3-champion-card__sep"></div>' +
+      champBadgeHtml +
+      '<div class="v3-champion-card__body">' +
+      '<div class="v3-champion-card__eyebrow">CAMPEÓN</div>' +
+      '<div class="v3-champion-card__name">' + podium.champion + '</div>' +
+      '</div>' +
+      '<div class="v3-podium-pts v3-podium-pts--gold">+' + PTS.champion + ' pts</div>';
+  } else {
+    champCard.innerHTML =
+      '<img class="v3-champion-card__logo v3-champion-card__logo--muted" src="' + WC_LOGO + '" alt="" onerror="this.style.display=\'none\'"/>' +
+      '<div class="v3-champion-card__placeholder">Pronostica la Gran Final para ver el campeón</div>';
+  }
+  wrap.appendChild(champCard);
+
+  // ─ Caja Clasificación Final ─
+  var classCard = document.createElement('div');
+  classCard.className = 'v3-classification-card';
+
+  var rows = [
+    { medal: '🥈', name: podium.runnerUp, label: '2.º Subcampeón', pts: PTS.runner_up },
+    { medal: '🥉', name: podium.third, label: '3.º Puesto', pts: PTS.third },
+    { medal: '④', name: podium.fourth, label: '4.º Puesto', pts: PTS.fourth }
+  ];
+
+  var rowsHtml = rows.map(function (r, i) {
+    var isLast = (i === rows.length - 1);
+    return '<div class="v3-class-row' + (isLast ? ' v3-class-row--last' : '') + '">' +
+      '<div class="v3-class-row__medal">' + r.medal + '</div>' +
+      _flagByName(r.name) +
+      '<div class="v3-class-row__info">' +
+      '<div class="v3-class-row__name">' + (r.name || '—') + '</div>' +
+      '<div class="v3-class-row__label">' + r.label + '</div>' +
+      '</div>' +
+      '<div class="v3-podium-pts">+' + r.pts + ' pts</div>' +
+      '</div>';
+  }).join('');
+
+  classCard.innerHTML =
+    '<div class="v3-classification-card__eyebrow">CLASIFICACIÓN FINAL</div>' +
+    rowsHtml;
+  wrap.appendChild(classCard);
+
+  // HF-CdH-05: programar auto-shrink del nombre tras el primer layout.
+  // requestAnimationFrame asegura que el wrap esté insertado por el caller
+  // (v3RenderFinalBlock) y que clientWidth del body refleje el ancho real.
+  if (podium.champion && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(v3FitChampionName);
+  }
+
+  return wrap;
+}
+
+// HF-CdH-05 · Auto-shrink del nombre del campeón. El clamp() CSS solo
+// escala por viewport (vw), pero el body interno del champion-card tiene
+// un ancho fijo ≈180px tras logo (44) + separador (1) + escudo (64) +
+// gaps (3×14) + paddings (2×14) — invariante respecto al vw. Reducimos
+// font-size en pasos de 1px desde 24 hasta 11 hasta que `scrollWidth`
+// (ancho real del texto) deje de exceder `clientWidth` (ancho disponible
+// del contenedor). Máx 14 iteraciones; si a 11px aún no cabe, el
+// text-overflow:ellipsis del CSS toma el control como fallback final.
+function v3FitChampionName() {
+  var el = document.querySelector('.v3-champion-card__name');
+  if (!el || el.clientWidth <= 0) return;
+  for (var fs = 24; fs >= 11; fs--) {
+    el.style.fontSize = fs + 'px';
+    if (el.scrollWidth <= el.clientWidth) return;
+  }
 }
 
 // ─── Final block (round F) ──────────────────────────────────
@@ -267,7 +491,7 @@ function v3RenderFinalBlock() {
   // F2.9 HF-06: URL alineada con prototipo (miniatures/trophy/trophy.png) — antes apuntaba a trophy-2026.png.
   trophy.src = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/trophy/trophy.png';
   trophy.alt = 'Trophy';
-  trophy.onerror = function() { this.style.display = 'none'; };
+  trophy.onerror = function () { this.style.display = 'none'; };
   trophyCol.appendChild(trophy);
 
   // Third below
@@ -279,6 +503,16 @@ function v3RenderFinalBlock() {
   trophyCol.appendChild(belowStack);
 
   board.appendChild(trophyCol);
+
+  // HF-CdH-01: Cuadro de Honor (Campeón + Clasificación Final) bajo el bracket.
+  // Solo se ejecuta cuando round === 'f' (v3RenderBoard:144 early-return arriba),
+  // así que no hace falta guard extra de ronda. Idempotente y defensivo.
+  try {
+    var cdh = v3RenderCuadroHonor();
+    if (cdh) board.appendChild(cdh);
+  } catch (e) {
+    console.warn('[HF-CdH] error rendering Cuadro de Honor:', e);
+  }
 }
 
 function v3RenderFinalCard(match, meta, kind) {
@@ -330,7 +564,7 @@ function v3RenderFinalCard(match, meta, kind) {
     </div>
   `;
 
-  div.onclick = function() {
+  div.onclick = function () {
     v3OpenZoom(match, meta);
   };
 
@@ -365,8 +599,8 @@ function v3ResolveSlotCode(slot) {
   var team = EQUIPOS.find(function (e) { return e.name === teamName; });
   if (!team) return teamName;
   return team.code
-      || team.flag
-      || teamName.slice(0, 3).toUpperCase();
+    || team.flag
+    || teamName.slice(0, 3).toUpperCase();
 }
 
 function v3ResolveSlotLabel(slot) {
@@ -392,7 +626,7 @@ function v3FlagFor(slot) {
   var teamName = resolvedSlots[slot];
   if (typeof EQUIPOS === 'undefined') return '';
 
-  var team = EQUIPOS.find(function(e) { return e.name === teamName; });
+  var team = EQUIPOS.find(function (e) { return e.name === teamName; });
   if (!team || !team.flag) return '';
 
   var flagUrl = v3FlagURLByCode(team.flag);
@@ -527,15 +761,15 @@ function v3RenderZoomKO() {
   // Bind events
   inner.querySelector('[data-close]').onclick = v3CloseZoomKO;
 
-  inner.querySelectorAll('[data-stepper]').forEach(function(btn) {
-    btn.onclick = function(e) {
+  inner.querySelectorAll('[data-stepper]').forEach(function (btn) {
+    btn.onclick = function (e) {
       e.stopPropagation();
       v3AdjustScoreKO(match.id, btn.dataset.side, +btn.dataset.delta);
     };
   });
 
-  inner.querySelectorAll('[data-pen]').forEach(function(btn) {
-    btn.onclick = function(e) {
+  inner.querySelectorAll('[data-pen]').forEach(function (btn) {
+    btn.onclick = function (e) {
       e.stopPropagation();
       v3SetPenaltyWinner(match.id, btn.dataset.pen === 'home' ? homeLabel : awayLabel);
     };
@@ -587,12 +821,41 @@ function v3BindButtonsAndSwitcher() {
   // Reset button
   var resetBtn = document.querySelector('[data-v3-elim-reset]');
   if (resetBtn) {
-    resetBtn.onclick = function() {
-      if (!confirm('¿Borrar pronósticos KO?')) return;
+    resetBtn.onclick = async function() {
+      // HF-Reset-01: confirm explícito sobre la asimetría intencional. R32 leerá
+      // de los slots 1A/2B/T_* (derivados de grupos) y mostrará equipos resueltos
+      // aunque hayas borrado tus KO predictions — esto es coherencia con grupos.
+      if (!confirm('¿Borrar pronósticos KO?\n\nLos emparejamientos R32 (España vs Argentina…) seguirán visibles según tu clasificación de grupos. Para resetear todo el torneo usa "Borrar pronósticos" en la pantalla de grupos.')) return;
+
+      // ─── 1. Vaciar memoria (UX inmediato) ───
+      // HF-SIM-01: mutar in-place — koPredictions es let en ko.js.
       if (typeof koPredictions !== 'undefined') {
-        koPredictions = {};
-        if (typeof saveKO === 'function') saveKO();
-        v3RenderAll();
+        Object.keys(koPredictions).forEach(function(k){ delete koPredictions[k]; });
+      }
+      if (typeof resolvedSlots !== 'undefined') {
+        Object.keys(resolvedSlots).forEach(function(k){
+          if (k.startsWith('W') || k.startsWith('L')) delete resolvedSlots[k];
+        });
+      }
+      if (typeof saveKO === 'function') saveKO();
+      v3RenderAll();
+
+      // ─── 2. HF-Reset-02: DELETE explícito en Supabase ko_predictions ───
+      // Sin esto, saveKO (UPSERT, no SYNC) deja las rows antiguas en BBDD
+      // y reaparecen al recargar la página.
+      try {
+        var leagueId = typeof getActiveLeagueId === 'function' ? getActiveLeagueId() : null;
+        var uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+        if (!uid || !leagueId || !db) {
+          console.warn('[HF-Reset-02 elim] No uid/leagueId/db, skip Supabase DELETE');
+          return;
+        }
+        var { error } = await db.from('ko_predictions').delete()
+          .eq('user_id', uid)
+          .eq('league_id', leagueId);
+        if (error) console.warn('[HF-Reset-02 elim] ko_predictions delete error:', error);
+      } catch (e) {
+        console.warn('[HF-Reset-02 elim] Supabase DELETE exception:', e);
       }
     };
   }
@@ -600,71 +863,69 @@ function v3BindButtonsAndSwitcher() {
   // Dice button
   var diceBtn = document.querySelector('[data-v3-elim-dice]');
   if (diceBtn) {
-    diceBtn.onclick = function() {
-      if (!confirm('¿Simular pronósticos aleatorios?')) return;
+    // HF-SIM-01: sin confirm duplicado — diceSimulateAllKO (admin.js:702)
+    // muestra su propio confirm con texto más informativo.
+    diceBtn.onclick = function () {
       v3SimulateDice();
     };
   }
 
   // ESC key
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
   });
 
   // Overlay click
   var overlay = document.querySelector('.v3-zoom-overlay');
   if (overlay) {
-    overlay.onclick = function(e) {
+    overlay.onclick = function (e) {
       if (e.target === overlay) v3CloseZoomKO();
     };
   }
 }
 
+// HF-SIM-01 · Delegación al motor real. La implementación previa era un stub
+// hardcoded (R32 random + R16 89-92 fijo 2-1 + QF 97 fijo 0-0 + Final/3.er
+// puesto fijos), que dejaba SF 101-102 + R16 93-96 + QF 98-100 sin pred y
+// rompía la propagación de slots → el Cuadro de Honor v3 (HF-CdH-01) no
+// recibía W101/W102 resueltos. diceSimulateAllKO (admin.js:700) sí recorre
+// las 6 rondas con propagación slot-by-slot.
+//
+// setTimeout post-call: diceSimulateAllKO no emite `mundial:predictions-changed`
+// (I3 pendiente), así que forzamos re-render del board v3 con un tick de
+// margen para que saveKO()/refreshAllViews() terminen sus mutaciones.
 function v3SimulateDice() {
-  if (typeof BRACKET === 'undefined' || typeof koPredictions === 'undefined') return;
-
-  // Fill R32 (M73-M88)
-  var r32 = BRACKET.r32 || [];
-  r32.forEach(function(m) {
-    var h = Math.floor(Math.random() * 4);
-    var a = Math.floor(Math.random() * 4);
-    koPredictions[m.id] = {
-      l: h, v: a,
-      classifier: (h === a) ? 'home' : null,
-      saved: true
-    };
-  });
-
-  // Some R16 (M89-M92)
-  var r16 = BRACKET.r16 || [];
-  for (var i = 0; i < Math.min(4, r16.length); i++) {
-    koPredictions[r16[i].id] = { l: 2, v: 1, classifier: null, saved: true };
-  }
-
-  // One QF (M97)
-  var qf = BRACKET.qf || [];
-  if (qf[0]) {
-    koPredictions[qf[0].id] = { l: 0, v: 0, classifier: 'away', saved: true };
-  }
-
-  // Final + 3rd
-  var final = BRACKET.final || [];
-  var third = BRACKET.third || [];
-  if (final[0]) koPredictions[final[0].id] = { l: 2, v: 1, classifier: null, saved: true };
-  if (third[0]) koPredictions[third[0].id] = { l: 3, v: 2, classifier: null, saved: true };
-
-  if (typeof saveKO === 'function') saveKO();
-  v3RenderAll();
+  if (typeof diceSimulateAllKO !== 'function') return;
+  diceSimulateAllKO();
+  setTimeout(function () { if (typeof v3RenderAll === 'function') v3RenderAll(); }, 100);
 }
 
 // ─── Main render ────────────────────────────────────────────
+
+// HF-Deadline: regla de visibilidad de los botones de simulación KO.
+// Oculta si el usuario finalizó (profiles.porra_cerrada → window._porraCerrada)
+// O si estamos dentro de las últimas 24h pre-kickoff (deadline global para
+// que San valide envíos antes del primer partido).
+function v3ShouldShowSimActions() {
+  if (window._porraCerrada) return false;
+  if (Date.now() >= WC_PRESIM_DEADLINE_MS) return false;
+  return true;
+}
+
+function v3RefreshActionsVisibility() {
+  var el = document.querySelector('[data-v3-actions]');
+  if (!el) return;
+  el.style.display = v3ShouldShowSimActions() ? '' : 'none';
+}
+
 function v3RenderAll() {
   v3RenderSwitcher();
   v3RenderBoard();
+  v3RefreshActionsVisibility();  // HF-Deadline
 }
 
 // ─── Defensivo: pattern readyState ──────────────────────────
-var v3RunInit = function() {
+var v3RunInit = function () {
   // Inicialización la hace el padre al llamar window.v3ElimMount()
 };
 

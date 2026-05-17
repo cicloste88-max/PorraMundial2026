@@ -818,11 +818,43 @@ function v3AdjustScoreGrupos(letter, matchIdx, side, delta) {
 function v3BindResetBtn() {
   var btn = document.querySelector('[data-v3-reset]');
   if (!btn) return;
-  btn.onclick = () => {
-    if (!confirm('¿Borrar todos los pronósticos guardados?')) return;
+  btn.onclick = async () => {
+    // HF-Reset-01: borrar grupos sin borrar KO dejaba el bracket de fase final
+    // con clasificaciones huérfanas. Coherencia: reset de grupos = reset de TODO.
+    if (!confirm('¿Borrar TODOS los pronósticos del torneo (grupos + KO)?')) return;
+
+    // ─── 1. Vaciar memoria (UX inmediato) ───
     predictions = {};
-    savePredictions();
+    if (typeof savePredictions === 'function') savePredictions();
+    if (typeof koPredictions !== 'undefined') {
+      Object.keys(koPredictions).forEach(function(k) { delete koPredictions[k]; });
+    }
+    if (typeof resolvedSlots !== 'undefined') {
+      Object.keys(resolvedSlots).forEach(function(k) { delete resolvedSlots[k]; });
+    }
+    if (typeof saveKO === 'function') saveKO();
     v3RenderBoardGrupos();
+    if (typeof v3RenderAll === 'function') v3RenderAll();
+
+    // ─── 2. HF-Reset-02: DELETE explícito en Supabase ───
+    // savePredictions/saveKO hacen UPSERT, no FULL SYNC. Sin DELETE, las rows
+    // antiguas persisten en BBDD y reaparecen al recargar.
+    try {
+      var leagueId = typeof getActiveLeagueId === 'function' ? getActiveLeagueId() : null;
+      var uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+      if (!uid || !leagueId || !db) {
+        console.warn('[HF-Reset-02] No uid/leagueId/db, skip Supabase DELETE');
+        return;
+      }
+      var [{ error: errP }, { error: errK }] = await Promise.all([
+        db.from('predictions').delete().eq('user_id', uid).eq('league_id', leagueId),
+        db.from('ko_predictions').delete().eq('user_id', uid).eq('league_id', leagueId)
+      ]);
+      if (errP) console.warn('[HF-Reset-02] predictions delete error:', errP);
+      if (errK) console.warn('[HF-Reset-02] ko_predictions delete error:', errK);
+    } catch (e) {
+      console.warn('[HF-Reset-02] Supabase DELETE exception:', e);
+    }
   };
 }
 
@@ -830,10 +862,13 @@ function v3BindDiceBtn() {
   var btn = document.querySelector('[data-v3-dice]');
   if (!btn) return;
   btn.onclick = () => {
-    if (!confirm('¿Simular aleatoriamente los 72 partidos?')) return;
-    if (window.diceSimulateAllGroups) {
-      window.diceSimulateAllGroups();
-    }
+    // HF-SIM-02: delegar confirm a diceSimulateAllGroups, que ya tiene el suyo propio.
+    // Doble confirm eliminado — ver bug report 2026-05-17.
+    if (!window.diceSimulateAllGroups) return;
+    window.diceSimulateAllGroups();
+    // HF-SIM-02: refrescar board v3 tras simulación (mismo patrón que dice de KO).
+    // setTimeout permite que diceSimulateAllGroups termine de mutar memoria antes del render.
+    setTimeout(v3RenderBoardGrupos, 100);
   };
 }
 
