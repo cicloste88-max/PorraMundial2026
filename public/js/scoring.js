@@ -57,7 +57,8 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   // Signo y exacto
   if(isExact) {
     pts += 3; // exacto (ya incluye el punto de signo)
-  } else if(Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
+  } else if(pred.l !== null && pred.v !== null &&
+            Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
     pts += 1; // solo signo
   }
 
