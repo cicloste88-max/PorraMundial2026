@@ -29,6 +29,12 @@ function v3FlagURLByCode(code) {
 
 var _v3ElimInited = false;
 
+// HF-BUG-08/BUG-01: guard anti-acumulacion. Cubre TANTO el listener keydown (ESC)
+// como el backdrop click delegado. Nombre refleja el scope real del flag.
+// Set una sola vez por page-load; independiente de _v3ElimInited (que se resetea
+// en la rama gate-locked). Ver analisis 2026-05-17.
+var _v3ElimGlobalListenersBound = false;
+
 // HF-Deadline: deadline global pre-Mundial para validación de envíos.
 // Duplicada de mundial-shell-v3.js KICKOFF_UTC (classic scripts, sin module
 // imports). Si cambia KICKOFF_UTC, actualizar también aquí y el guard
@@ -870,17 +876,17 @@ function v3BindButtonsAndSwitcher() {
     };
   }
 
-  // ESC key
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
-  });
-
-  // Overlay click
-  var overlay = document.querySelector('.v3-zoom-overlay');
-  if (overlay) {
-    overlay.onclick = function (e) {
-      if (e.target === overlay) v3CloseZoomKO();
-    };
+  // HF-BUG-08/BUG-01: listeners delegados en document -- cubren backdrop click Y ESC.
+  // _v3ElimGlobalListenersBound (module-scope, nunca reseteado) garantiza registro unico
+  // por page-load aunque _v3ElimInited se resetee en la rama gate-locked.
+  if (!_v3ElimGlobalListenersBound) {
+    _v3ElimGlobalListenersBound = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && v3CurrentMatch) v3CloseZoomKO();
+    });
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.classList.contains('v3-zoom-overlay')) v3CloseZoomKO();
+    });
   }
 }
 

@@ -630,6 +630,12 @@ function diceSimulateAllGroups() {
   }
   // Guardar en Supabase — checkFinalizarReady se llama desde savePredictions tras confirmar
   savePredictions();
+  // HF-BUG-09 v2 (I3): emitir evento desacoplado en vez de llamar v3RenderBoardGrupos()
+  // directamente. Ventajas: (a) admin.js no depende de que v3 este montado; (b) si
+  // _v3GruposInited===false el listener no actua; (c) mismo patron que el I3 pendiente
+  // en eliminatoria-v3.js. El boton v3 propio (v3BindDiceBtn) sigue usando su
+  // setTimeout(v3RenderBoardGrupos,100) para el path de UI v3 normal.
+  document.dispatchEvent(new CustomEvent('mundial:predictions-changed', { detail: { source: 'groups' } }));
 }
 
 // Función global que simula un partido KO y refresca el modal
