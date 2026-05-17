@@ -2,6 +2,61 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-17 — Sprint Completion Flow F1 + F3 (PR #69)
+
+**Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`b5fb89c`, squash 18:06 UTC). Base rebase: `dff1166` (post-PR #68). Sin migración SQL.
+
+Cierra los dos features pendientes pre-launch 11-jun. **`ko_predictions.scorer` ya existía en BD.**
+
+### F1 — Picker goleador KO (~280 LOC, `eliminatoria-v3.js` + `eliminatoria-v3.css`)
+
+- **UI**: bloque `.v3-zoom-ko-goleador` insertado en `v3RenderZoomKO` entre `penaltyHtml` y `summaryHtml`. Estado vacío = botón gold "Elige goleador"; estado lleno = nombre del jugador + Cambiar/Quitar.
+- **Funciones nuevas**: `v3OpenGoleadorPickerKO`, `v3RenderGoleadorPickerKO`, `v3CloseGoleadorPickerKO`, `v3SaveGoleadorKO`, `_v3GetRoundMetaForMatch`. Reutiliza `v3RenderSquadPickerTeamSection` (`grupos-v3.js:740`, agnóstica) y el singleton `.v3-squad-picker-overlay` (montado por `v3EnsureSquadPickerOverlay`).
+- **CRÍTICO**: `v3SaveGoleadorKO` **NO replica HF-BUG-13**. `saved=true` se controla solo por `v3AdjustScoreKO` y `v3SetPenaltyWinner` (que introducen marcador o classifier). Goleador puro deja `saved` como estaba.
+- **Jerarquía de cierre extendida** en `v3BindButtonsAndSwitcher`: ESC y backdrop click priorizan sub-overlay del picker sobre zoom KO. Compatible con HF-BUG-08/01 guard (mismo `_v3ElimGlobalListenersBound`).
+- **Persistencia BD sin cambios**: `saveKO` (`ko.js:102`) ya mapea `p.gol → scorer` en upsert; hidratación inicial (`auth.js:166`) ya mapea `p.scorer → koPredictions[id].gol`. In-memory unificado a `.gol` → `scoring.js` sin tocar.
+- **Tests sanity in-runtime**: T-KO-1 (solo goleador empate=2 pts gracias a HF-BUG-05-bis), T-KO-2 (exact + goleador=5), T-KO-3 (exact empate con classifier=3). **3/3 PASS**.
+
+### F3 — Hard lock grupos→KO refinado (~30 LOC, `ko.js` + `eliminatoria-v3.js`)
+
+- `getGroupsProgress()` (`ko.js:239`) amplía return con `firstIncompleteLetter`: letra A–L del primer grupo con marcadores faltantes (los 6 partidos con `l!==null && v!==null && saved`), `null` si todos completos.
+- Botón del gate en `eliminatoria-v3.js:64-86`: label dinámico "Ir al Grupo X →" + binding programático `data-v3-elim-gate-cta` → `showPage('grupos')` + `setTimeout 250ms` + `v3OpenZoomGrupos(letter)`. Fallback "Ir a Grupos →" si `firstIncompleteLetter` es `null`.
+- **Sanity Node**: escenario A completo + B incompleto devuelve `'B'`. UX in-vivo pendiente Vercel preview.
+
+### Stats
+
+`eliminatoria-v3.js` +192 −4, `eliminatoria-v3.css` +77, `ko.js` +15 −1. Total +284 −5 en 3 ficheros.
+
+### Backlog post-launch restante
+
+HF-BUG-09-bis (path KO sigue con `setTimeout` en `v3SimulateDice`), HF-BUG-13 (refactor `v3SaveGoleadorGrupos:783` — el picker goleador KO ya evita replicar el patrón).
+
+## 2026-05-17 — HF-BUG-05-bis null guard signo (PR #68)
+
+**Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`dff1166`, squash 16:49 UTC). Base rebase: `cff8080`. Sin migración SQL.
+
+Cierra la deuda residual de HF-BUG-05 (PR #66) documentada en CHANGELOG, ERR-52 y CLAUDE Backlog #1.
+
+### Bug
+
+Tras PR #66, `pred = {l:null, v:null, gol:'X', saved:true}` llegaba al check de signo en `scoring.js:60`. `Math.sign(null - null) === 0` coincide con `Math.sign(realL - realR) === 0` cuando el resultado real es empate (0-0, 1-1, 2-2, ...) → **+1 pt fantasma de signo** cuando la intención del usuario era "solo apuesto goleador". HF-BUG-05 cubrió el caso exact (línea 55, `pred.l === realL` falla con `null === 2`) pero no el signo.
+
+### Fix
+
+One-liner añadiendo guard `pred.l !== null && pred.v !== null` antes del check de signo. Patrón consistente con `getMySign(pred)` en `data.js:250`. Path IA verificado: `iaBonusWillApply` (`data.js:262`) usa `getMySign` que ya bloquea null-null devolviendo `null`, y `if (!mySign) return false` corta antes — **no hay BUG-05-ter latente**.
+
+### Tests sanity
+
+T1 (1-1 + solo goleador acertado) y T4 (0-0 + solo goleador acertado) pasan de **3 → 2 pts**. Validación inversa pre-fix confirmó que los tests detectaban el bug. **6/6 PASS** post-fix (T1, T4 + 4 casos de control). QA in-vivo en localhost contra `calcMatchPoints` real cargado en Vite: 6/6 PASS (no replica).
+
+### Stats
+
++2 −1 en `public/js/scoring.js`. Sin migración SQL.
+
+### Bugs resueltos
+
+- **ERR-57** — detalle completo en `errores_conocidos_porra.md`.
+
 ## 2026-05-17 — Hotfix Pack HF-BUG-05/08/01/09/11/12 (PR #66)
 
 **Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`855b6c4`, squash). Base `8c98e8a`. Sin migración SQL.

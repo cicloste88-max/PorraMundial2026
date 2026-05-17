@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `855b6c4` (PR #66 Hotfix Pack mergeado squash, 17-may). **Sprint Cuadro de Honor v3** cerrado (PR #65 / `8c98e8a`): 11 hotfixes + 2 migraciones RLS DELETE. **Hotfix Pack v3** mergeado (PR #66 / `855b6c4`): 5 HFs (scoring fantasma solo-goleador + listeners ESC/backdrop guardados + admin↔v3 evento desacoplado + tiebreaker alfabético + is-qualified 3º). Detalle ERR-52..56 + Hotfix Pack en `CHANGELOG.md`. Sprints previos sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL + 5 pre-lista). **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth.
+Main HEAD `b5fb89c` (PR #69 Sprint Completion Flow mergeado squash, 17-may 18:06 UTC). **5 PRs cerrados hoy** pre-launch: PR #65 (`8c98e8a`) Cuadro Honor v3 + RLS; PR #66 (`855b6c4`) Hotfix Pack 5 HFs; PR #67 (`cff8080`) docs post-PR66; PR #68 (`dff1166`) HF-BUG-05-bis null guard signo; PR #69 (`b5fb89c`) F1 picker goleador KO + F3 gate refinado (redirect 1-a-1 al primer grupo incompleto). Detalle ERR-52..57 + entradas en `CHANGELOG.md`. Sprints previos sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL + 5 pre-lista). **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth.
 
 ## Top-3 pendientes inmediatos
 
@@ -26,11 +26,10 @@ Main HEAD `855b6c4` (PR #66 Hotfix Pack mergeado squash, 17-may). **Sprint Cuadr
 5. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
 6. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
 
-## Backlog post-launch / Deuda PR #66
+## Backlog post-launch / Deuda técnica
 
-1. **HF-BUG-05-bis** — `scoring.js:60` guard `pred.l!==null && pred.v!==null` antes del check de signo (`null-null===0` coincide con signo empate → +1pt fantasma cuando pred solo-goleador y resultado empate). One-liner. PR aparte pre-F1/F3.
-2. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO`, `v3SimulateDice`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
-3. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783`: `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. **F1:** picker goleador KO NO replicar patrón.
+1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
+2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
