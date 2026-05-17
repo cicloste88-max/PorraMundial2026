@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `e8d9c65` (post-merge sprint Cuadro de Honor v3, 17-may). **Sprint Cuadro de Honor v3 cerrado y mergeado** — 11 hotfixes (podio + escudo glow v3, fix dice KO, reset grupos limpia KO+slots+BD, gate v3ElimMount, persist+auto-restore `_activeLeague`) + 2 migraciones RLS DELETE (predictions/ko + award/boost picks) aplicadas via MCP. **Sprints previos** sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL: FRA/BIH/JPN/BEL/SWE; 5 pre-lista: ARG/BRA/ESP/MEX/QAT). Detalle commits + lecciones en `CHANGELOG.md`. **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth (`onAuthStateChange` antes de `leagueLoadMyLeagues`); manualmente funciona. Mejorar en Completion Flow.
+Main HEAD `855b6c4` (PR #66 Hotfix Pack mergeado squash, 17-may). **Sprint Cuadro de Honor v3** cerrado (PR #65 / `8c98e8a`): 11 hotfixes + 2 migraciones RLS DELETE. **Hotfix Pack v3** mergeado (PR #66 / `855b6c4`): 5 HFs (scoring fantasma solo-goleador + listeners ESC/backdrop guardados + admin↔v3 evento desacoplado + tiebreaker alfabético + is-qualified 3º). Detalle ERR-52..56 + Hotfix Pack en `CHANGELOG.md`. Sprints previos sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL + 5 pre-lista). **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth.
 
 ## Top-3 pendientes inmediatos
 
@@ -25,6 +25,12 @@ Main HEAD `e8d9c65` (post-merge sprint Cuadro de Honor v3, 17-may). **Sprint Cua
 4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos.
 5. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
 6. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
+
+## Backlog post-launch / Deuda PR #66
+
+1. **HF-BUG-05-bis** — `scoring.js:60` guard `pred.l!==null && pred.v!==null` antes del check de signo (`null-null===0` coincide con signo empate → +1pt fantasma cuando pred solo-goleador y resultado empate). One-liner. PR aparte pre-F1/F3.
+2. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO`, `v3SimulateDice`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
+3. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783`: `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. **F1:** picker goleador KO NO replicar patrón.
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
