@@ -245,7 +245,21 @@ function getGroupsProgress() {
     const p = predictions[getMatchKey(m)];
     if (p && (p.saved || p.l !== null)) filled++;
   });
-  return { filled, total, pct: total ? Math.round(filled/total*100) : 0 };
+  // F3: identificar primer grupo incompleto (todos sus partidos con marcador
+  // l!==null Y v!==null Y saved). Permite al gate de KO redirigir directamente
+  // al modal del grupo correcto en lugar de a la página de grupos genérica.
+  let firstIncompleteLetter = null;
+  const letters = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  for (let i = 0; i < letters.length; i++) {
+    const letter = letters[i];
+    const matchesInGroup = PARTIDOS.filter(m => m.group === letter);
+    const allFilled = matchesInGroup.length > 0 && matchesInGroup.every(m => {
+      const pred = predictions[getMatchKey(m)];
+      return pred && pred.l !== null && pred.v !== null && pred.saved;
+    });
+    if (!allFilled) { firstIncompleteLetter = letter; break; }
+  }
+  return { filled, total, pct: total ? Math.round(filled/total*100) : 0, firstIncompleteLetter };
 }
 
 
