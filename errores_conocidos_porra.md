@@ -801,3 +801,12 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Fix aplicado:** factorizar el mismo predicado en ambas vistas: `idx < 2 || (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name))`. Defensa `_v3BestThirdsCache &&` evita `TypeError` si la cache aún no se computó (caso de tabla detallada abierta antes que el board principal renderice).
 - **Patrón preventivo:** factorizar el predicado de estilo entre vistas que representan la misma información para evitar drift visual. Refactor menor candidato post-launch para extraer `v3IsRowQualified(row, idx)` y compartir entre board y tabla detallada.
 - **Fecha detección:** 17 may 2026.
+
+## ERR-57 — Check de signo en scoring.js sin null guard (PR #68 / HF-BUG-05-bis)
+
+- **Síntoma:** tras el fix HF-BUG-05 (PR #66), un pronóstico con `pred.l=null` y `pred.v=null` (situación creada cuando usuario solo elige goleador en grupos, sin marcador) y resultado real empate (0-0, 1-1, 2-2, ...) puntuaba +1 pt fantasma de "signo" cuando debería puntuar solo +2 por goleador acertado (total 2 en lugar de 3).
+- **Causa:** `scoring.js:60` chequeaba `Math.sign(pred.l - pred.v) === Math.sign(realL - realR)` sin guard de null. En JS, `null - null === 0`, y `Math.sign(0) === 0`, que coincide con el signo de un empate real. HF-BUG-05 (PR #66) cubrió el caso exact (`pred.l === realL` con `null === 2` falla en línea 55) pero no el caso signo (línea 60).
+- **Fix aplicado:** añadir guard `pred.l !== null && pred.v !== null &&` al inicio del check de signo. One-liner. Test sanity Node + in-runtime localhost confirma T1/T4 pasan de 3 → 2 sin regresión en casos de control (exact, signo normal, solo goleador con no-empate real).
+- **Patrón preventivo:** cualquier check aritmético con coerción implícita de null (resta, comparación numérica, `Math.sign`, etc.) debe llevar guard explícito de null antes. Patrón canónico en este repo: `getMySign(pred)` en `data.js:250` (`if (pred.l===null || pred.v===null) return null` + consumidor `if (!mySign) return false`).
+- **Path IA verificado:** `iaBonusWillApply` (`data.js:262`) usa `getMySign(pred)` que ya bloquea null-null → no hay BUG-05-ter latente.
+- **Fecha detección:** 17 may 2026 (PR #66 QA matriz Claude.ai). **Fecha fix:** 17 may 2026 (PR #68).
