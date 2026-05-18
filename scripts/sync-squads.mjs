@@ -2,7 +2,14 @@
 // scripts/sync-squads.mjs — sincronización de plantillas Mundial 2026.
 //
 // Modos:
-//   --mode=scrape    Scrapea desde futbolfantasy.com
+//   --mode=detect    Cross-validate 2-of-3 sobre AS + Sport + Olympics (primarias).
+//                    Detecta listas FINAL y enriquece XI con FF (secundaria) sólo
+//                    sobre selecciones ya confirmadas como FINAL → evita falsos
+//                    positivos tipo Eurocopa 2024 (ver ERR-58).
+//                    Sin selección: procesa los 48 iso3.
+//   --mode=scrape    [LEGACY] Scrapea desde futbolfantasy.com (fuente primaria).
+//                    Conservado para compatibilidad y dispatch manual; el cron
+//                    NO lo usa más por defecto desde el 18-may-2026.
 //     Selección: --iso3=FRA | --all-missing | --refresh-final | --all
 //   --mode=enrich-tm Enriquece roster ya existente con Transfermarkt
 //     Selección: --iso3=FRA | --all
@@ -13,6 +20,7 @@
 //   --verbose        Log de cada fetch y match
 //   --skip=A,B,C     iso3 a saltar (csv)
 //   --delay=1500     Pausa entre fetches en ms (default 1500 ff, 2500 tm)
+//   --no-enrich-xi   En --mode=detect, saltar el paso de XI titular con FF.
 //
 // Reqs: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY en env (o `node --env-file=.env ...`).
 
@@ -23,6 +31,12 @@ import { fileURLToPath } from 'node:url';
 import { scrapeCountry } from './lib/ff-scraper.mjs';
 import { fetchTmKader, enrichRosterWithTm } from './lib/tm-scraper.mjs';
 import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
+import * as parserAS from './lib/parsers/as.mjs';
+import * as parserSport from './lib/parsers/sport.mjs';
+import * as parserOlympics from './lib/parsers/olympics.mjs';
+import { parseCalendar, expectedByDate } from './lib/parsers/calendar.mjs';
+import { crossValidate } from './lib/cross-validate.mjs';
+import { matchAgainstRoster } from './lib/name-matcher.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +45,9 @@ const ISO3_TO_SLUG = JSON.parse(
 );
 const TM_IDS = JSON.parse(
   await fs.readFile(path.join(__dirname, 'lib', 'tm-ids.json'), 'utf8')
+);
+const COUNTRY_MAP = JSON.parse(
+  await fs.readFile(path.join(__dirname, 'lib', 'parsers', 'country-map.json'), 'utf8')
 );
 
 // ─── argv parsing ─────────────────────────────────────────────────────────
@@ -62,7 +79,7 @@ const SKIP = new Set(
 );
 
 if (!MODE) {
-  console.error('Error: falta --mode=scrape o --mode=enrich-tm');
+  console.error('Error: falta --mode=detect | --mode=scrape | --mode=enrich-tm');
   printUsage();
   process.exit(1);
 }
@@ -70,14 +87,15 @@ if (!MODE) {
 function printUsage() {
   console.error(`
 Uso:
-  node scripts/sync-squads.mjs --mode=scrape --iso3=FRA
-  node scripts/sync-squads.mjs --mode=scrape --all-missing
-  node scripts/sync-squads.mjs --mode=scrape --refresh-final
-  node scripts/sync-squads.mjs --mode=scrape --all
+  node scripts/sync-squads.mjs --mode=detect                 (cron por defecto desde 18-may-2026)
+  node scripts/sync-squads.mjs --mode=detect --iso3=FRA,JPN
+  node scripts/sync-squads.mjs --mode=detect --no-enrich-xi
+  node scripts/sync-squads.mjs --mode=scrape --iso3=FRA      [LEGACY]
+  node scripts/sync-squads.mjs --mode=scrape --refresh-final [LEGACY]
   node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA
   node scripts/sync-squads.mjs --mode=enrich-tm --all
 
-Flags: --dry-run --force --verbose --skip=A,B --delay=2000
+Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi
 `);
 }
 
@@ -274,18 +292,195 @@ async function runEnrichTm(targets) {
   return results;
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────
-async function main() {
-  const targets = await resolveTargets();
-  if (targets.length === 0) {
-    console.log('Sin targets a procesar.');
-    process.exit(0);
+// ─── modo detect ──────────────────────────────────────────────────────────
+// Pipeline:
+//  1. Fetch en paralelo las 3 fuentes primarias (AS, Sport, Olympics). Tolerante
+//     a fallos: si una falla, se sigue con las otras dos.
+//  2. Parsear calendario Olympics → cache/squads-calendar.json.
+//  3. crossValidate() — 2-of-3 + Jaccard ≥ 0.7 + filtro por calendario.
+//  4. Para cada iso3 con confidence='high' o 'low': upsert con jugadores_is_final=true
+//     y fuente = "as+olympics" (o lo que haya). 'reject' se loguea y se descarta.
+//  5. Para cada FINAL recién escrita: enrich XI titular vía FF (filtro "Mundial 2026"
+//     embebido en el scraper FF actual + es responsabilidad del orquestador validar
+//     que la noticia detectada sea de Mundial — ver ERR-58).
+//  6. Tras el paso XI: dejar el enrich-tm para una pasada posterior (step 2 del
+//     workflow), no encadenarlo aquí para simplificar logs.
+async function runDetect(targetsArg) {
+  const enrichXi = argv['no-enrich-xi'] ? false : true;
+  const today = new Date().toISOString().slice(0, 10);
+  console.log(`\ndetect: fuentes AS + Sport + Olympics  dry=${DRY_RUN}  fecha=${today}\n`);
+
+  const settled = await Promise.allSettled([
+    parserAS.fetchAndParse({ verbose: VERBOSE }),
+    parserSport.fetchAndParse({ verbose: VERBOSE }),
+    parserOlympics.fetchAndParse({ verbose: VERBOSE }),
+  ]);
+
+  const parseResults = [];
+  for (const [i, src] of [parserAS, parserSport, parserOlympics].entries()) {
+    const r = settled[i];
+    if (r.status === 'fulfilled') {
+      const count = Object.keys(r.value.byIso3 || {}).length;
+      console.log(`  fuente ${src.SOURCE_NAME.padEnd(8)} → ${count} iso3 parseados`);
+      parseResults.push(r.value);
+    } else {
+      console.warn(`  fuente ${src.SOURCE_NAME.padEnd(8)} → FALLO: ${r.reason?.message || r.reason}`);
+    }
+  }
+  if (parseResults.length === 0) {
+    console.error('Todas las fuentes primarias fallaron. Abortando detect.');
+    return [];
   }
 
+  // calendar — best-effort sobre el HTML de Olympics si está disponible.
+  const olympicsResult = settled[2];
+  let calendarEntries = [];
+  if (olympicsResult.status === 'fulfilled') {
+    try {
+      const olympicsHtml = olympicsResult.value._html || null;
+      if (olympicsHtml) {
+        const parsed = parseCalendar(olympicsHtml, COUNTRY_MAP, { year: 2026 });
+        calendarEntries = parsed.entries;
+        await fs.mkdir(path.join(process.cwd(), 'cache'), { recursive: true });
+        await fs.writeFile(
+          path.join(process.cwd(), 'cache', 'squads-calendar.json'),
+          JSON.stringify({ generatedAt: new Date().toISOString(), entries: calendarEntries }, null, 2)
+        );
+        if (VERBOSE) console.log(`  calendario: ${calendarEntries.length} fechas detectadas`);
+      } else if (VERBOSE) {
+        console.log('  calendario: olympics no expuso _html en su ParseResult — skip');
+      }
+    } catch (err) {
+      console.warn(`  calendario: parse error — ${err.message}`);
+    }
+  }
+  const expectedSet = expectedByDate(calendarEntries, today);
+
+  const validated = crossValidate(parseResults, { minPlayers: 22, jaccardThr: 0.7, calendar: expectedSet.size > 0 ? expectedSet : null });
+
+  console.log('\n  iso3 | conf  | sources         | n   | reason');
+  console.log('  -----+-------+-----------------+-----+-------');
+
+  const targets = targetsArg && targetsArg.length > 0 ? new Set(targetsArg) : null;
+  const results = [];
+
+  for (const [iso3, v] of validated.entries()) {
+    if (targets && !targets.has(iso3)) continue;
+    if (SKIP.has(iso3)) {
+      console.log(`  ${iso3.padEnd(4)} | skip  | ${v.sources.join('+').padEnd(15)} | ${String(v.players.length).padEnd(3)} | manual --skip`);
+      results.push({ iso3, status: 'skipped' });
+      continue;
+    }
+    const sources = v.sources.join('+') || '-';
+    if (v.confidence === 'reject') {
+      console.log(`  ${iso3.padEnd(4)} | reject| ${sources.padEnd(15)} | ${String(v.players.length).padEnd(3)} | ${v.reason || ''}`);
+      results.push({ iso3, status: 'rejected', reason: v.reason });
+      continue;
+    }
+
+    try {
+      const existing = await getSquadRow(iso3);
+      const preserved = preserveEnrichment(existing?.jugadores, v.players);
+      const fuente = sources;
+      const up = await upsertSquad(iso3, preserved.players, {
+        isFinal: true,
+        fuente: existing?.jugadores_fuente?.includes('tm') ? `${fuente}+tm` : fuente,
+        dryRun: DRY_RUN,
+        force: FORCE,
+      });
+      const status = up.noop ? 'no-op' : DRY_RUN ? 'dry-run' : 'updated';
+      console.log(`  ${iso3.padEnd(4)} | ${v.confidence.padEnd(5)} | ${sources.padEnd(15)} | ${String(preserved.players.length).padEnd(3)} | ${status}${v.reason ? ` (${v.reason})` : ''}`);
+      results.push({ iso3, status, confidence: v.confidence, n: preserved.players.length });
+    } catch (err) {
+      console.log(`  ${iso3.padEnd(4)} | error | ${sources.padEnd(15)} | -   | ${err.message.slice(0, 60)}`);
+      results.push({ iso3, status: 'error', error: err.message });
+    }
+  }
+
+  if (enrichXi && !DRY_RUN) {
+    console.log('\n  Paso 2 — enrich XI titular vía FF (solo FINAL recién escritas)\n');
+    for (const r of results) {
+      if (!['updated', 'no-op'].includes(r.status)) continue;
+      const slug = ISO3_TO_SLUG[r.iso3];
+      if (!slug) continue;
+      try {
+        const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal: true });
+        if (!scrape.xi_names || scrape.xi_names.length === 0) {
+          if (VERBOSE) console.log(`    ${r.iso3} — FF sin XI titular`);
+          continue;
+        }
+        const row = await getSquadRow(r.iso3);
+        if (!Array.isArray(row?.jugadores) || row.jugadores.length === 0) continue;
+        const players = row.jugadores.map((p) => ({ ...p, es_titular: false }));
+        const { matches } = matchAgainstRoster(scrape.xi_names, players, { minScore: 65 });
+        for (const { matchIdx } of matches) players[matchIdx].es_titular = true;
+        await upsertSquad(r.iso3, players, {
+          isFinal: true,
+          fuente: row.jugadores_fuente || r.iso3,
+          dryRun: false,
+          force: false,
+        });
+        console.log(`    ${r.iso3} — XI matched: ${matches.length}/${scrape.xi_names.length}`);
+        await sleep(1500);
+      } catch (err) {
+        console.warn(`    ${r.iso3} — FF enrich-xi falló: ${err.message.slice(0, 80)}`);
+      }
+    }
+  }
+
+  return results;
+}
+
+// Preserva enrichment TM (edad, dob, valor, foto, club, jugadores_fuente '+tm') del
+// roster existente cuando coincide por nombre normalizado con un jugador de la lista
+// nueva. Conserva el orden de la lista nueva (lo que llega de las fuentes primarias).
+function preserveEnrichment(existing, fresh) {
+  if (!Array.isArray(existing) || existing.length === 0) return { players: fresh, kept: 0 };
+  const byKey = new Map();
+  for (const p of existing) {
+    const k = (p?.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    if (k) byKey.set(k, p);
+  }
+  let kept = 0;
+  const out = fresh.map((p) => {
+    const k = (p?.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const prev = byKey.get(k);
+    if (!prev) return p;
+    kept++;
+    return {
+      ...p,
+      edad: prev.edad ?? p.edad ?? null,
+      dob: prev.dob ?? p.dob ?? null,
+      valor: prev.valor ?? p.valor ?? null,
+      foto: prev.foto ?? p.foto ?? null,
+      club: p.club || prev.club || null,
+    };
+  });
+  return { players: out, kept };
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────
+async function main() {
   let results;
-  if (MODE === 'scrape') {
+
+  if (MODE === 'detect') {
+    const targets = argv.iso3
+      ? String(argv.iso3).split(',').map((s) => s.trim().toUpperCase()).filter((c) => ISO3_TO_SLUG[c])
+      : [];
+    results = await runDetect(targets);
+  } else if (MODE === 'scrape') {
+    const targets = await resolveTargets();
+    if (targets.length === 0) {
+      console.log('Sin targets a procesar.');
+      process.exit(0);
+    }
     results = await runScrape(targets);
   } else if (MODE === 'enrich-tm') {
+    const targets = await resolveTargets();
+    if (targets.length === 0) {
+      console.log('Sin targets a procesar.');
+      process.exit(0);
+    }
     results = await runEnrichTm(targets);
   } else {
     console.error(`Modo desconocido: ${MODE}`);
