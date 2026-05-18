@@ -831,6 +831,8 @@ function v3RenderSquadPickerTeamSection(equipo, currentPickKey) {
 
 // F2.8.1: save infiere side por lookup playerKey en EQUIPOS de ambos equipos del partido.
 function v3SaveGoleadorGrupos(matchIdx, playerKey) {
+  // Polish v1 B4: lock tras cerrar porra. v3IsPorraCerrada vive en eliminatoria-v3.js.
+  if (typeof v3IsPorraCerrada === 'function' && v3IsPorraCerrada()) return;
   var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
   var match = matchesInGroup[matchIdx];
   if (!match) return;
@@ -874,6 +876,8 @@ function v3SaveGoleadorGrupos(matchIdx, playerKey) {
 }
 
 function v3AdjustScoreGrupos(letter, matchIdx, side, delta) {
+  // Polish v1 B4: lock tras cerrar porra. v3IsPorraCerrada vive en eliminatoria-v3.js.
+  if (typeof v3IsPorraCerrada === 'function' && v3IsPorraCerrada()) return;
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
   var match = matchesInGroup[matchIdx];
   if (!match) return;

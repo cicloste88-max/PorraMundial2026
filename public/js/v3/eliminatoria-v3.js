@@ -129,6 +129,19 @@ window.v3ElimMount = function () {
   `;
   mount.appendChild(actions);
 
+  // Polish v1 B4 Items 12+13: bloque cerrar porra v3 — botón principal +
+  // bind a v3FinalizarPorra. Outside del .v3-actions data-v3-actions
+  // (que se oculta T-24h pre-kickoff por HF-Deadline). Cierre puede
+  // dispararse hasta el deadline manual o el cron 10-jun 21:59 UTC.
+  var cerrarWrap = document.createElement('div');
+  cerrarWrap.className = 'v3-actions v3-actions--cerrar';
+  cerrarWrap.innerHTML = `
+    <button class="v3-btn v3-btn--gold v3-btn--cerrar" data-v3-finalizar>
+      ✅ Cerrar y enviar mi porra
+    </button>
+  `;
+  mount.appendChild(cerrarWrap);
+
   // Bind event listeners
   v3BindButtonsAndSwitcher();
 
@@ -536,6 +549,14 @@ function v3RenderFinalBlock() {
   } catch (e) {
     console.warn('[HF-CdH] error rendering Cuadro de Honor:', e);
   }
+
+  // Polish v1 B4 Item 10: Awards Card v3 bajo el Cuadro de Honor.
+  try {
+    var awards = v3RenderAwardsCard();
+    if (awards) board.appendChild(awards);
+  } catch (e) {
+    console.warn('[Awards-v3] error rendering:', e);
+  }
 }
 
 function v3RenderFinalCard(match, meta, kind) {
@@ -884,6 +905,7 @@ function v3RenderZoomKO() {
 
 function v3AdjustScoreKO(matchId, side, delta) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
 
   if (!koPredictions[matchId]) koPredictions[matchId] = {};
   var p = koPredictions[matchId];
@@ -912,6 +934,7 @@ function v3AdjustScoreKO(matchId, side, delta) {
 
 function v3SetPenaltyWinner(matchId, side) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
   if (!koPredictions[matchId]) return;
 
   var p = koPredictions[matchId];
@@ -1016,6 +1039,7 @@ function v3CloseGoleadorPickerKO() {
 // puntúa solo goleador en scoring (+2 si acierta), sin signo/exact fantasma.
 function v3SaveGoleadorKO(matchId, playerKey) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
   if (!koPredictions[matchId]) {
     koPredictions[matchId] = { l: null, v: null, classifier: null, gol: null, saved: false };
     koPredictions[String(matchId)] = koPredictions[matchId];
@@ -1026,6 +1050,198 @@ function v3SaveGoleadorKO(matchId, playerKey) {
   v3CloseGoleadorPickerKO();
   v3RenderZoomKO();
 }
+
+// ─── Polish v1 B4 Item 10 — Awards Card v3 ──────────────────
+// Render bajo el Cuadro de Honor en v3RenderFinalBlock. Grid 2x2 con
+// 4 awards (Balon, Bota, Guante, Joven). Reutiliza motor legacy:
+// AWARDS_CFG + awPicks + openPicker(award) + selectAward(playerKey) +
+// renderPickerList (todos `const`/`function` top-level en scoring.js +
+// ui-nav.js, accesibles desde aqui como classic script global).
+// Persistencia BD `award_picks` la gestiona saveAwPicks legacy (sin tocar).
+function v3RenderAwardsCard() {
+  if (typeof awPicks === 'undefined' || typeof AWARDS_CFG === 'undefined') return null;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'v3-awards-wrap';
+
+  // Divider paralelo al de Cuadro de Honor.
+  var divider = document.createElement('div');
+  divider.className = 'v3-podium-divider v3-awards-divider';
+  divider.innerHTML =
+    '<span class="v3-podium-divider__line"></span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__label">PREMIOS INDIVIDUALES</span>' +
+    '<span class="v3-podium-divider__star">★</span>' +
+    '<span class="v3-podium-divider__line"></span>';
+  wrap.appendChild(divider);
+
+  // Grid 2x2.
+  var grid = document.createElement('div');
+  grid.className = 'v3-aw-grid';
+
+  // Metadatos compactos por award. Los AWARDS_CFG.icon legacy son <img>
+  // grandes; v3 usa emoji compacto para la cabecera de la tarjeta.
+  var meta = [
+    { key: 'golden_ball',  emoji: '🏆', name: 'Balón de Oro',     pts: 15 },
+    { key: 'golden_boot',  emoji: '👟', name: 'Bota de Oro',      pts: 15 },
+    { key: 'golden_glove', emoji: '🧤', name: 'Guante de Oro',    pts: 15 },
+    { key: 'young_player', emoji: '⭐', name: 'Mejor Joven ≤21',  pts: 20 }
+  ];
+
+  meta.forEach(function (m) {
+    var pick = awPicks[m.key];
+    var slot = document.createElement('button');
+    slot.className = 'v3-aw-slot' + (pick ? '' : ' v3-aw-slot--empty');
+    slot.type = 'button';
+    slot.setAttribute('data-v3-award', m.key);
+
+    var head = '<div class="v3-aw-slot__header">'
+      +   '<span class="v3-aw-slot__icon">' + m.emoji + '</span>'
+      +   '<span class="v3-aw-slot__name">' + m.name + '</span>'
+      +   '<span class="v3-aw-slot__pts">+' + m.pts + ' pts</span>'
+      + '</div>';
+
+    var body;
+    if (pick) {
+      var flagUrl = (typeof SB !== 'undefined' && pick.flag) ? (SB + '/flags/' + pick.flag + '.png') : '';
+      body = '<div class="v3-aw-slot__sel">'
+        + (flagUrl ? '<span class="v3-aw-slot__sel-flag"><img src="' + flagUrl + '" alt="" onerror="this.style.display=\'none\'"/></span>' : '')
+        + '<span class="v3-aw-slot__sel-name">' + (typeof escapeHtml === 'function' ? escapeHtml(pick.name || '') : (pick.name || '')) + '</span>'
+        + '</div>';
+    } else {
+      body = '<div class="v3-aw-slot__sel"><span class="v3-aw-slot__sel-empty">— Seleccionar —</span></div>';
+    }
+
+    slot.innerHTML = head + body;
+    slot.onclick = function (e) {
+      e.stopPropagation();
+      if (window._porraCerrada) return;
+      if (typeof openPicker === 'function') openPicker(m.key);
+    };
+
+    grid.appendChild(slot);
+  });
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+window.v3RenderAwardsCard = v3RenderAwardsCard;
+
+// Polish v1 B4: deducción automática para Bota de Oro.
+// Cuenta `gol` (grupos) + `gol` (KO) en predictions/koPredictions, filtra
+// no-porteros (role !== 'gk') del catálogo AW_PLAYERS, retorna el top.
+// Tiebreak: alfabético por playerKey. Llamado solo desde openPicker hooked
+// para golden_boot (NO preselecciona, solo destaca con badge).
+function _v3SuggestGoldenBoot() {
+  var counts = {};
+  function tally(map) {
+    if (!map) return;
+    Object.values(map).forEach(function (p) {
+      var key = p && (p.gol || p.scorer);
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+  }
+  if (typeof predictions === 'object') tally(predictions);
+  if (typeof koPredictions === 'object') tally(koPredictions);
+
+  var awList = window.AW_PLAYERS || (typeof AW_PLAYERS !== 'undefined' ? AW_PLAYERS : []);
+  var validKeys = new Set(
+    awList.filter(function (p) { return p.role !== 'gk'; }).map(function (p) { return p.key; })
+  );
+
+  var topKey = null, topCount = 0;
+  Object.keys(counts).forEach(function (k) {
+    if (!validKeys.has(k)) return;
+    var c = counts[k];
+    if (c > topCount || (c === topCount && topKey && k < topKey)) {
+      topKey = k;
+      topCount = c;
+    }
+  });
+  return topKey ? { key: topKey, count: topCount } : null;
+}
+window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
+
+// ─── Polish v1 B4 Items 12+13 — Cerrar porra v3 (sin email) ──
+// Equivalente self-contained a finalizarPorra legacy (close-porra.js)
+// pero sin dependencias DOM (`finalizar-btn`, etc.). Comprueba grupos+KO+
+// awards en BD, confirma, UPDATE league_members.porra_cerrada, set
+// window._porraCerrada, re-render. Email queda fuera (Resend pendiente).
+async function v3FinalizarPorra() {
+  if (typeof db === 'undefined' || typeof currentUser === 'undefined' || !currentUser) {
+    alert('Sesión no activa');
+    return;
+  }
+  var leagueId = (typeof getActiveLeagueId === 'function') ? getActiveLeagueId() : null;
+  if (!leagueId) {
+    alert('No hay liga activa');
+    return;
+  }
+  if (window._porraCerrada) {
+    alert('La porra ya está cerrada.');
+    return;
+  }
+
+  // Chequeo BD (en paralelo) — mismo criterio que checkFinalizarReady legacy:
+  // 72 grupos + 32 KO + 4 awards. (Boost queda fuera en v3 — no expuesto aún).
+  try {
+    var responses = await Promise.all([
+      db.from('predictions').select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id).eq('league_id', leagueId),
+      db.from('ko_predictions').select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id).eq('league_id', leagueId),
+      db.from('award_picks').select('golden_ball,golden_boot,golden_glove,young_player')
+        .eq('user_id', currentUser.id).eq('league_id', leagueId).maybeSingle()
+    ]);
+    var gF = responses[0].count || 0;
+    var kF = responses[1].count || 0;
+    var aD = responses[2].data;
+    var aF = (aD && aD.golden_ball && aD.golden_boot && aD.golden_glove && aD.young_player) ? 4 : 0;
+
+    var missing = [];
+    if (gF < 72) missing.push((72 - gF) + ' partidos de grupos');
+    if (kF < 32) missing.push((32 - kF) + ' partidos de eliminatorias');
+    if (aF < 4)  missing.push('premios individuales');
+
+    if (missing.length > 0) {
+      alert('Aún no puedes cerrar la porra.\n\nFalta:\n• ' + missing.join('\n• '));
+      return;
+    }
+  } catch (e) {
+    console.error('[v3FinalizarPorra] check error:', e);
+    alert('Error verificando pronósticos. Reintenta.');
+    return;
+  }
+
+  if (!confirm(
+    '¿Cerrar pronósticos definitivamente?\n\n' +
+    'Una vez cerrada la porra no podrás modificar ningún pronóstico.\n\n' +
+    'Pulsa Aceptar para confirmar.'
+  )) return;
+
+  try {
+    var result = await db.from('league_members')
+      .update({ porra_cerrada: true, cerrada_at: new Date().toISOString() })
+      .eq('user_id', currentUser.id).eq('league_id', leagueId);
+    if (result.error) console.warn('[v3FinalizarPorra] update warning:', result.error);
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] update exception:', e);
+  }
+
+  // Marcar cerrada y refrescar UI independiente del resultado del UPDATE.
+  window._porraCerrada = true;
+  alert('¡Pronósticos cerrados! Mucha suerte 🍀');
+  if (typeof v3RenderAll === 'function') v3RenderAll();
+}
+window.v3FinalizarPorra = v3FinalizarPorra;
+
+// Polish v1 B4: helper de lock state.
+// Llamado al inicio de las mutaciones v3 (adjustScore, save goleador, etc.)
+// para bloquear edición tras cerrar la porra (manual o cron 10-jun 21:59 UTC).
+function v3IsPorraCerrada() {
+  return window._porraCerrada === true;
+}
+window.v3IsPorraCerrada = v3IsPorraCerrada;
 
 function _v3GetRoundMetaForMatch(matchId) {
   if (typeof BRACKET === 'undefined') return null;
@@ -1095,6 +1311,15 @@ function v3BindButtonsAndSwitcher() {
     // muestra su propio confirm con texto más informativo.
     diceBtn.onclick = function () {
       v3SimulateDice();
+    };
+  }
+
+  // Polish v1 B4 Items 12+13: bind cerrar porra v3.
+  var cerrarBtn = document.querySelector('[data-v3-finalizar]');
+  if (cerrarBtn) {
+    cerrarBtn.onclick = function (e) {
+      e.preventDefault();
+      v3FinalizarPorra();
     };
   }
 

@@ -1486,7 +1486,15 @@ function openPicker(award) {
   };
   const cfg = sets[award];
   document.getElementById('picker-title').textContent = cfg.title;
-  renderPickerList(cfg.list, awPicks[award]);
+  // Polish v1 B4: para Bota de Oro sin pick previo, pasar sugerencia automática
+  // (_v3SuggestGoldenBoot cuenta scorers en predictions + KO). NO preselecciona
+  // — solo destaca con badge "💡 Sugerido — N goles previstos".
+  let suggestion = null;
+  if (award === 'golden_boot' && awPicks.golden_boot === null
+      && typeof _v3SuggestGoldenBoot === 'function') {
+    suggestion = _v3SuggestGoldenBoot();
+  }
+  renderPickerList(cfg.list, awPicks[award], suggestion);
   document.getElementById('aw-overlay').classList.add('open');
 }
 function closePicker() {
