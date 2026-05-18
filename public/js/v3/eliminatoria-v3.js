@@ -694,6 +694,48 @@ function v3CloseZoomKO() {
   v3RenderAll();
 }
 
+// Polish v1 B3: bloque "IA PREDICE" reutilizable (modal KO + modal Grupos).
+// matchKey: para grupos es getMatchKey(match) = "A_México_Sudáfrica".
+// Para KO es match.id (M81…), que normalmente no tendrá entry en
+// iaPredictions (loadIAPredictions solo reindexa partidos con `group`).
+// Defensa: retorna '' si no hay datos — no rompe el render.
+// Quip SIEMPRE visible si existe (sin badge dudoso; San: consistencia).
+function v3RenderIABlock(matchKey) {
+  if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
+  var pred = iaPredictions[matchKey] || iaPredictions[String(matchKey)];
+  if (!pred || pred.p_home == null || pred.p_away == null) return '';
+
+  var pHome = Math.round((pred.p_home || 0) * 100);
+  var pDraw = Math.round((pred.p_draw || 0) * 100);
+  var pAway = Math.round((pred.p_away || 0) * 100);
+  var quip = pred.quip || '';
+  var quipSafe = (typeof escapeHtml === 'function')
+    ? escapeHtml(quip)
+    : String(quip).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+
+  // Ocultar % en segmentos demasiado finos (< 10%) — texto desbordaría.
+  function seg(pct, cls) {
+    var label = pct >= 10 ? ('<span class="v3-zoom-ia__pct">' + pct + '%</span>') : '';
+    return '<div class="v3-zoom-ia__seg ' + cls + '" style="width:' + pct + '%">' + label + '</div>';
+  }
+
+  return '<div class="v3-zoom-ia">'
+    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE</div>'
+    + '<div class="v3-zoom-ia__bar">'
+    +   seg(pHome, 'v3-zoom-ia__seg--home')
+    +   seg(pDraw, 'v3-zoom-ia__seg--draw')
+    +   seg(pAway, 'v3-zoom-ia__seg--away')
+    + '</div>'
+    + '<div class="v3-zoom-ia__teams">'
+    +   '<span>Local</span><span>Empate</span><span>Visitante</span>'
+    + '</div>'
+    + (quip ? '<div class="v3-zoom-ia__quip">"' + quipSafe + '"</div>' : '')
+    + '</div>';
+}
+window.v3RenderIABlock = v3RenderIABlock;
+
 function v3RenderZoomKO() {
   var match = v3CurrentMatch;
   var meta = v3CurrentRoundObj;
@@ -805,6 +847,7 @@ function v3RenderZoomKO() {
       </div>
       ${penaltyHtml}
       ${goleadorHtml}
+      ${v3RenderIABlock(match.id)}
       ${summaryHtml}
     </div>
   `;

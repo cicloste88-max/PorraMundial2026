@@ -446,6 +446,13 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
 
     // F2.8: chips de puntuación post-partido (3 estados: pre-kickoff nada, 0 pts gris, N pts stack).
     html += v3RenderChipsGrupos(match, p);
+
+    // Polish v1 B3: bloque IA PREDICE por match-card. Si no hay datos IA
+    // para este match, retorna '' (no-op visual). v3RenderIABlock vive en
+    // eliminatoria-v3.js (classic script, global scope), llamado en render.
+    if (typeof v3RenderIABlock === 'function') {
+      html += v3RenderIABlock(key);
+    }
   });
 
   html += '</div>';
