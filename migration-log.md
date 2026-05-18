@@ -2102,3 +2102,13 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [18:06] MERGE: PR #69 (`b5fb89c` squash) — feat(v3) Sprint Completion Flow F1 picker goleador KO + F3 gate refinado redirect 1-a-1 al primer grupo incompleto. Branch `claude/diagnose-esc-listener-bug-L23SC` rebase sobre `origin/main` (post-PR #68 `dff1166`). 2 commits originales (`a60f529` F1 + `6ec8ad4` F3) colapsados en squash. +284 −5 en 3 ficheros (`eliminatoria-v3.js`, `eliminatoria-v3.css`, `ko.js`). Sin migración SQL. `ko_predictions.scorer` ya existía en schema.
 
 [18:35] DOCS: este PR (post-pr68-pr69) — `CHANGELOG.md` 2 entradas (PR #68 + PR #69) + `errores_conocidos_porra.md` ERR-57 (HF-BUG-05-bis cerrado) + `CLAUDE.md` estado actual a `b5fb89c` (5 PRs cerrados hoy) + Backlog reorganizado (HF-BUG-05-bis cerrado, quedan HF-BUG-09-bis + HF-BUG-13 con nota explícita de que F1 ya evita replicar el patrón). Sin cambios de código. `CLAUDE.md` 10103 bytes (margen 137B sobre límite 10240).
+
+## 2026-05-18 — Refactor sync-squads fuentes primarias (feat/squads-sources-refactor)
+
+[hh:mm] BRANCH: creada `feat/squads-sources-refactor` desde `origin/main` (`6038882`) tras detectar bug del 18-may (PR #69 mergeado pero `--mode=scrape --all-missing` detectó 3 falsos positivos CRO/NED/POR con datos Eurocopa 2024 IDs 115xxx). BD limpiada manualmente con UPDATE por San antes del refactor.
+
+[hh:mm] REFACTOR: nuevo `--mode=detect` orquestador con cross-validation 2-of-3 + Jaccard ≥ 0.7 sobre fuentes primarias AS + Sport.es + Olympics. FF queda como secundaria solo para enriquecer XI titular de FINAL ya confirmadas → cierra ERR-58 estructuralmente. Calendario de anuncios Olympics parseado a `cache/squads-calendar.json` y usado como filtro de plausibilidad. Workflow YAML reescrito: cron 6h ahora ejecuta detect→enrich-tm en serial (se elimina el conflicto `--refresh-final` vs `--all-missing` que dejaba al cron solo refrescando, nunca detectando).
+
+[hh:mm] STUBS: parsers AS/Sport/Olympics se entregan como stubs con contrato I/O documentado en `scripts/lib/parsers/README.md`. San los implementa en commit aparte sobre la misma rama tras consolidar HTML samples del 18-may. Calendar parser + cross-validate sí implementados (lógica agnóstica al HTML). 9/9 tests `node --test` pasan.
+
+[hh:mm] DOCS: ERR-58 añadido a `errores_conocidos_porra.md`, entrada CHANGELOG completa al frente del fichero, `.claude/rules/sync-squads.md` actualizada con §8 (FF degradada a secundaria) y §9 (operación `--mode=detect`). PR pendiente de creación cuando San dé visto bueno + apertura.

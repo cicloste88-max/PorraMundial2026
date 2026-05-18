@@ -2,6 +2,62 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## 2026-05-18 — sync-squads: refactor fuentes primarias + cross-validate (PR feat/squads-sources-refactor)
+
+**Branch:** `feat/squads-sources-refactor` (pendiente de merge a main). Sin migración SQL.
+
+Resuelve el bug del 18-may en `--mode=scrape --all-missing`: 3 falsos positivos
+(CRO/NED/POR) con datos de Eurocopa 2024 escritos a BD como "FINAL Mundial 2026".
+**Ya limpiados manualmente con UPDATE** antes de este refactor.
+
+### Cambios
+
+- **Nuevo `--mode=detect`** (default del cron desde este PR): fetch en paralelo
+  de 3 fuentes primarias — AS / Sport.es / Olympics.com — y cross-validation
+  2-of-3 + Jaccard ≥ 0.7 sobre nombres normalizados. Solo se marca FINAL si al
+  menos 2 fuentes coinciden con roster ≥ 22 jugadores y solape ≥ 0.7. Calendario
+  de anuncios de Olympics se parsea aparte y se usa como filtro de plausibilidad
+  (downgrade a `low` confidence si 2 fuentes dicen FINAL pero el calendario
+  Olympics no la lista ≤ hoy — caso CRO: AS+Sport decían FINAL, Olympics decía 1-jun).
+- **FF degradada a fuente secundaria**: ya no se usa para *detectar* nuevas listas,
+  solo para enriquecer XI titular de selecciones ya confirmadas FINAL por las
+  primarias. Esto cierra estructuralmente el vector de ERR-58 (noticias FF de
+  Eurocopa 2024 con IDs 115xxx mezcladas con Mundial 2026 con IDs 143xxx).
+- **Workflow YAML v2**: cron 6h ahora ejecuta `--mode=detect` + `--mode=enrich-tm`
+  en serial. Se elimina el conflicto mutuamente excluyente `--refresh-final` vs
+  `--all-missing`. Artifact incluye `cache/squads-calendar.json`.
+- **`--mode=scrape` y `--mode=enrich-tm` conservados** para dispatch manual.
+
+### Archivos
+
+```
+scripts/lib/parsers/README.md           contrato I/O parsers fuente
+scripts/lib/parsers/as.mjs              stub fuente AS
+scripts/lib/parsers/sport.mjs           stub fuente Sport.es
+scripts/lib/parsers/olympics.mjs        stub fuente Olympics
+scripts/lib/parsers/calendar.mjs        parser calendario anuncios Olympics
+scripts/lib/parsers/country-map.json    nombre país → iso3
+scripts/lib/cross-validate.mjs          Jaccard + 2-of-3 + filtro calendario
+scripts/sync-squads.mjs                 orquestador runDetect()
+tests/parsers/calendar.test.mjs         3 tests
+tests/parsers/cross-validate.test.mjs   6 tests
+.github/workflows/sync-squads.yml       cron detect→enrich-tm en serial
+```
+
+### Pendiente sobre esta rama antes de mergear
+
+Los 3 parsers de fuente primaria (`as.mjs` / `sport.mjs` / `olympics.mjs`) están
+en estado **stub** — contrato I/O definido, `parseHtml()` devuelve `byIso3: {}`.
+San aporta los parsers reales en commit aparte sobre esta misma rama tras
+consolidar HTML samples del 18-may. Mientras `parseHtml()` devuelve vacío,
+`runDetect` completa sin escribir nada (todos los iso3 caen a "0 fuentes
+parseadas"), por lo que mergear el scaffolding antes de los parsers reales no
+rompe el cron (solo lo deja sin efecto observable).
+
+### Detalle ERR-58 + caveats
+
+Ver `errores_conocidos_porra.md` ERR-58 y `.claude/rules/sync-squads.md` §8.
+
 ## 2026-05-17 — Sprint Completion Flow F1 + F3 (PR #69)
 
 **Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`b5fb89c`, squash 18:06 UTC). Base rebase: `dff1166` (post-PR #68). Sin migración SQL.
