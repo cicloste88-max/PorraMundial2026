@@ -1537,5 +1537,17 @@ window.renderAwardsBox4Legacy = function () {
   // legacy + loadUserData re-rendericen este box4 cuando cambian awPicks.
   window._renderBox4 = renderBox4Local;
   renderBox4Local();
+
+  // Polish v1 Fix-Pack-2 Fix-3+4: precarga de candidatos (BD-driven).
+  // Garantiza que las 4 listas estén en _awardCandidatesCache antes del
+  // primer click → openPicker resuelve instantáneamente.
+  if (typeof getAwardCandidates === 'function') {
+    setTimeout(function () {
+      ['golden_ball', 'golden_boot', 'golden_glove', 'young_player'].forEach(function (a) {
+        getAwardCandidates(a).catch(function (e) { console.warn('[awards] precarga', a, e); });
+      });
+    }, 100);
+  }
+
   return box4;
 };

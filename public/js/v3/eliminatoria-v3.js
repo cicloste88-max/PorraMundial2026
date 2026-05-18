@@ -1135,36 +1135,32 @@ function v3RenderAwardsCard() {
 }
 window.v3RenderAwardsCard = v3RenderAwardsCard;
 
-// Polish v1 B4: deducción automática para Bota de Oro.
-// Cuenta `gol` (grupos) + `gol` (KO) en predictions/koPredictions, filtra
-// no-porteros (role !== 'gk') del catálogo AW_PLAYERS, retorna el top.
-// Tiebreak: alfabético por playerKey. Llamado solo desde openPicker hooked
-// para golden_boot (NO preselecciona, solo destaca con badge).
+// Polish v1 B4 + Fix-Pack-2 Fix-3+4: deducción automática para Bota de Oro.
+// Cuenta scorers en predictions (grupos) + koPredictions, filtra por
+// _awardCandidatesCache.golden_boot (Centrocampistas + Delanteros top 30
+// Elo, BD-driven). Tiebreak: alfabético por playerKey. Retorna null si
+// cache vacío (BD aún no precargada) — el picker se abrirá sin sugerencia.
 function _v3SuggestGoldenBoot() {
+  if (typeof predictions !== 'object' || typeof koPredictions !== 'object') return null;
   var counts = {};
-  function tally(map) {
-    if (!map) return;
-    Object.values(map).forEach(function (p) {
+  function tally(predictionsMap) {
+    Object.values(predictionsMap || {}).forEach(function (p) {
       var key = p && (p.gol || p.scorer);
       if (key) counts[key] = (counts[key] || 0) + 1;
     });
   }
-  if (typeof predictions === 'object') tally(predictions);
-  if (typeof koPredictions === 'object') tally(koPredictions);
+  tally(predictions);
+  tally(koPredictions);
 
-  var awList = window.AW_PLAYERS || (typeof AW_PLAYERS !== 'undefined' ? AW_PLAYERS : []);
-  var validKeys = new Set(
-    awList.filter(function (p) { return p.role !== 'gk'; }).map(function (p) { return p.key; })
-  );
+  var cache = window._awardCandidatesCache && window._awardCandidatesCache.golden_boot;
+  if (!cache || !cache.length) return null;
+  var validKeys = new Set(cache.map(function (p) { return p.key; }));
 
   var topKey = null, topCount = 0;
-  Object.keys(counts).forEach(function (k) {
-    if (!validKeys.has(k)) return;
-    var c = counts[k];
-    if (c > topCount || (c === topCount && topKey && k < topKey)) {
-      topKey = k;
-      topCount = c;
-    }
+  Object.entries(counts).forEach(function (entry) {
+    if (!validKeys.has(entry[0])) return;
+    if (entry[1] > topCount) { topKey = entry[0]; topCount = entry[1]; }
+    else if (entry[1] === topCount && topKey && entry[0] < topKey) { topKey = entry[0]; }
   });
   return topKey ? { key: topKey, count: topCount } : null;
 }
