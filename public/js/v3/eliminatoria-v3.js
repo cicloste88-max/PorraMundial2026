@@ -721,14 +721,30 @@ function v3CloseZoomKO() {
 // iaPredictions (loadIAPredictions solo reindexa partidos con `group`).
 // Defensa: retorna '' si no hay datos — no rompe el render.
 // Quip SIEMPRE visible si existe (sin badge dudoso; San: consistencia).
+// Polish v1 Fix-2 sub-1: largest remainder method (Hamilton). Garantiza
+// que pHome+pDraw+pAway sume exactamente 100 (antes 3x Math.round daban
+// 99 o 101 por rounding error).
+function _v3DistributeTo100(probs) {
+  var raw = probs.map(function (p) { return (p || 0) * 100; });
+  var floors = raw.map(function (r) { return Math.floor(r); });
+  var sum = floors.reduce(function (a, b) { return a + b; }, 0);
+  var diff = 100 - sum;
+  if (diff <= 0) return floors;
+  var remainders = raw.map(function (r, i) { return { idx: i, dec: r - Math.floor(r) }; });
+  remainders.sort(function (a, b) { return b.dec - a.dec; });
+  for (var i = 0; i < diff; i++) {
+    floors[remainders[i % remainders.length].idx]++;
+  }
+  return floors;
+}
+
 function v3RenderIABlock(matchKey) {
   if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
   var pred = iaPredictions[matchKey] || iaPredictions[String(matchKey)];
   if (!pred || pred.p_home == null || pred.p_away == null) return '';
 
-  var pHome = Math.round((pred.p_home || 0) * 100);
-  var pDraw = Math.round((pred.p_draw || 0) * 100);
-  var pAway = Math.round((pred.p_away || 0) * 100);
+  var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
+  var pHome = pcts[0], pDraw = pcts[1], pAway = pcts[2];
   var quip = pred.quip || '';
   var quipSafe = (typeof escapeHtml === 'function')
     ? escapeHtml(quip)
@@ -749,8 +765,13 @@ function v3RenderIABlock(matchKey) {
     +   seg(pDraw, 'v3-zoom-ia__seg--draw')
     +   seg(pAway, 'v3-zoom-ia__seg--away')
     + '</div>'
+    // Polish v1 Fix-2 sub-2: labels con width = % del segmento (antes 3 spans
+    // con justify-content space-between los ponía en extremos del contenedor;
+    // "Empate" caía fuera cuando draw <15%).
     + '<div class="v3-zoom-ia__teams">'
-    +   '<span>Local</span><span>Empate</span><span>Visitante</span>'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pHome + '%">Local</div>'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pDraw + '%">Empate</div>'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pAway + '%">Visitante</div>'
     + '</div>'
     + (quip ? '<div class="v3-zoom-ia__quip">"' + quipSafe + '"</div>' : '')
     + '</div>';

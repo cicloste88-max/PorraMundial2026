@@ -1379,21 +1379,24 @@ body.fc-shell-active #page-elim > #modal {
    Compartido entre v3RenderZoomKO (eliminatoria-v3.js) y
    v3RenderMatchesList (grupos-v3.js, 1 por match-card).
    ============================================================ */
+/* Polish v1 Fix-2 sub-3: paleta integrada con fondo oscuro del modal.
+   Wrap más oscuro, gradientes verticales por segmento, bordes sutiles,
+   label/quip en tonos slate. */
 .v3-zoom-ia {
-  margin: 10px 0;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--ink-700);
+  margin: 12px 0;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
 }
 .v3-zoom-ia__label {
   font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.10em;
-  color: var(--ink-300);
+  font-size: 11px;
+  opacity: .8;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .v3-zoom-ia__bar {
   display: flex;
@@ -1410,9 +1413,10 @@ body.fc-shell-active #page-elim > #modal {
   min-width: 0;
   overflow: hidden;
 }
-.v3-zoom-ia__seg--home { background: #60a5fa; }
-.v3-zoom-ia__seg--draw { background: #6b7280; }
-.v3-zoom-ia__seg--away { background: #ef4444; }
+.v3-zoom-ia__seg--home { background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); }
+.v3-zoom-ia__seg--draw { background: linear-gradient(180deg, #475569 0%, #334155 100%); }
+.v3-zoom-ia__seg--away { background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); }
+.v3-zoom-ia__seg + .v3-zoom-ia__seg { border-left: 1px solid rgba(0, 0, 0, 0.2); }
 .v3-zoom-ia__pct {
   font-family: var(--font-display);
   font-size: 10px;
@@ -1422,24 +1426,33 @@ body.fc-shell-active #page-elim > #modal {
   white-space: nowrap;
   letter-spacing: 0;
 }
+/* Polish v1 Fix-2 sub-2: 3 divs con width proporcional al segmento. */
 .v3-zoom-ia__teams {
   display: flex;
-  justify-content: space-between;
   font-family: var(--font-text);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--ink-400);
+  opacity: .6;
   margin-top: 4px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.v3-zoom-ia__team {
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 .v3-zoom-ia__quip {
   font-family: var(--font-text);
-  font-size: 11px;
+  font-size: 12px;
   font-style: italic;
-  color: var(--ink-200);
-  margin-top: 8px;
-  line-height: 1.4;
+  opacity: .75;
+  color: #cbd5e1;
+  margin-top: 12px;
+  line-height: 1.5;
 }
 
 /* ============================================================
