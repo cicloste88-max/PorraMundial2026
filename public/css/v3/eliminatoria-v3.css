@@ -1010,8 +1010,11 @@ body.fc-shell-active #page-elim > #modal {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 24px;
+  /* Polish v1 B2 Item 7: bloque ~30% más compacto.
+     gap 14 -> 10, margin-top 24 -> 16, divider padding 4 -> 2.
+     Acerca el podium al bracket sin perder respiración visual. */
+  gap: 10px;
+  margin-top: 16px;
   padding: 0 4px;
   width: 100%;
   box-sizing: border-box;
@@ -1022,7 +1025,7 @@ body.fc-shell-active #page-elim > #modal {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .v3-podium-divider__line {

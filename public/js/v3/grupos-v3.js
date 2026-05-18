@@ -360,10 +360,7 @@ function v3RenderZoomGrupos() {
       + v3RenderStandingsTable(grupo)
       + '<div class="v3-qualif-legend">Top 2 clasifican a la fase eliminatoria</div>'
       + '<div class="v3-zoom-footer">'
-      + '<div class="v3-zoom-progress">'
-      + '<div class="v3-zoom-progress__label">Pronósticos guardados</div>'
-      + '<div class="v3-zoom-progress__bar"><div class="v3-zoom-progress__fill" style="width:100%"></div></div>'
-      + '</div>'
+      + v3RenderIAPredictionPanel(_v3CurrentLetter)
       + '</div>'
       + '</div>';
   }
@@ -453,6 +450,73 @@ function v3RenderMatchesList(grupo, matchesInGroup) {
 
   html += '</div>';
   return html;
+}
+
+// Polish v1 B2 Item 5: standings basadas en IA predictions.
+// iaPredictions[matchKey] solo tiene sign + probabilidades (sin l/v), así
+// que el ranking es sign-based pts y alfabético como tiebreaker. Si faltan
+// predicciones IA para alguno de los 6 partidos, ese partido suma 0 pts.
+function v3ComputeIAStandings(letter) {
+  var grupoIdx = v3GetGrupoLetterIndex(letter);
+  if (grupoIdx < 0) return [];
+  var grupo = GRUPOS[grupoIdx];
+  var stats = grupo.equipos.map(function (name, idx) {
+    return { teamIdx: idx, name: name, pts: 0, played: 0 };
+  });
+
+  var matchesInGroup = PARTIDOS.filter(function (m) { return m.group === letter; });
+  var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
+
+  matchesInGroup.forEach(function (match) {
+    var key = getMatchKey(match);
+    var p = iaMap[key];
+    if (!p || !p.sign) return;
+    var homeIdx = grupo.equipos.indexOf(match.home);
+    var awayIdx = grupo.equipos.indexOf(match.away);
+    if (homeIdx < 0 || awayIdx < 0) return;
+    var h = stats[homeIdx], a = stats[awayIdx];
+    h.played++; a.played++;
+    if (p.sign === '1') { h.pts += 3; }
+    else if (p.sign === '2') { a.pts += 3; }
+    else { h.pts += 1; a.pts += 1; }
+  });
+
+  stats.sort(function (a, b) {
+    return (b.pts - a.pts) || a.name.localeCompare(b.name);
+  });
+  return stats;
+}
+
+// Polish v1 B2 Item 5: panel "IA PREDICE" con top-4 banderitas+iso3.
+// Sustituye la antigua .v3-zoom-progress "Pronósticos guardados" en el
+// footer del tab Clasificación (siempre 100%, sin valor informativo).
+function v3RenderIAPredictionPanel(letter) {
+  var standings = v3ComputeIAStandings(letter);
+  var top4 = standings.slice(0, 4);
+  var hasAny = top4.some(function (s) { return s.played > 0; });
+
+  if (!hasAny) {
+    return '<div class="v3-zoom-ia-prediction">'
+      + '<div class="v3-zoom-ia-prediction__label">🤖 IA PREDICE</div>'
+      + '<div class="v3-zoom-ia-prediction__row v3-zoom-ia-prediction__row--empty">— Datos IA pendientes —</div>'
+      + '</div>';
+  }
+
+  var teamsHtml = top4.map(function (s, i) {
+    var equipo = v3FindEquipoByName(s.name);
+    var iso = (equipo && (equipo.code || equipo.flag)) || s.name.slice(0, 3).toUpperCase();
+    var url = equipo ? v3FlagURLByEquipo(equipo) : '';
+    return '<div class="v3-zoom-ia-prediction__team">'
+      + '<span class="v3-zoom-ia-prediction__pos">' + (i + 1) + '</span>'
+      + '<img src="' + url + '" alt="' + iso + '" onerror="this.style.display=\'none\'"/>'
+      + '<span class="v3-zoom-ia-prediction__iso">' + iso + '</span>'
+      + '</div>';
+  }).join('');
+
+  return '<div class="v3-zoom-ia-prediction">'
+    + '<div class="v3-zoom-ia-prediction__label">🤖 IA PREDICE</div>'
+    + '<div class="v3-zoom-ia-prediction__row">' + teamsHtml + '</div>'
+    + '</div>';
 }
 
 function v3RenderStandingsTable(grupo) {
