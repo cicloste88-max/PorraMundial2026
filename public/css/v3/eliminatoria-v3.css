@@ -1456,94 +1456,20 @@ body.fc-shell-active #page-elim > #modal {
 }
 
 /* ============================================================
-   Polish v1 B4 Item 10 — Awards Card v3
-   Render bajo Cuadro de Honor en v3RenderFinalBlock. Grid 2x2
-   con 4 awards. Click abre el picker overlay legacy (#aw-overlay
-   en index.html). Persistencia BD via saveAwPicks legacy.
+   Polish v1 B4 Item 10 + Fix-4 — Wrapper awards card v3
+   Solo necesitamos el wrap externo: el box4 interior lo render
+   window.renderAwardsBox4Legacy (ko.js) con CSS legacy .aw-slot/
+   .aw-grid/.aw-header/.aw-footer/.aw-player-bg de base.css.
+   Reglas .v3-awards-wrap/.v3-aw-* anteriores eliminadas en Fix-4.
    ============================================================ */
 .v3-awards-wrap {
   grid-column: 1 / -1;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
+  justify-content: center;
+  margin-top: 20px;
   padding: 0 4px;
   width: 100%;
   box-sizing: border-box;
-}
-.v3-awards-divider {
-  /* hereda layout de .v3-podium-divider */
-}
-.v3-aw-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.v3-aw-slot {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--ink-700);
-  border-radius: 12px;
-  cursor: pointer;
-  min-height: 92px;
-  text-align: left;
-  font-family: var(--font-text);
-  color: var(--ink-100);
-  transition: background 0.15s, border-color 0.15s;
-}
-.v3-aw-slot:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--fifa-gold-deep);
-}
-.v3-aw-slot__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-display);
-}
-.v3-aw-slot__icon { font-size: 18px; flex-shrink: 0; }
-.v3-aw-slot__name {
-  font-size: 11px;
-  font-weight: 700;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-}
-.v3-aw-slot__pts {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--fifa-gold);
-  flex-shrink: 0;
-}
-.v3-aw-slot__sel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-}
-.v3-aw-slot__sel-flag img {
-  width: 18px;
-  height: 13px;
-  border-radius: 2px;
-  object-fit: cover;
-}
-.v3-aw-slot__sel-name {
-  font-weight: 600;
-  color: var(--ink-100);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.v3-aw-slot--empty .v3-aw-slot__sel-empty {
-  font-style: italic;
-  color: var(--ink-400);
 }
 
 /* ============================================================

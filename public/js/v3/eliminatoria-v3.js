@@ -1112,78 +1112,25 @@ function v3SaveGoleadorKO(matchId, playerKey) {
   v3RenderZoomKO();
 }
 
-// ─── Polish v1 B4 Item 10 — Awards Card v3 ──────────────────
-// Render bajo el Cuadro de Honor en v3RenderFinalBlock. Grid 2x2 con
-// 4 awards (Balon, Bota, Guante, Joven). Reutiliza motor legacy:
-// AWARDS_CFG + awPicks + openPicker(award) + selectAward(playerKey) +
-// renderPickerList (todos `const`/`function` top-level en scoring.js +
-// ui-nav.js, accesibles desde aqui como classic script global).
-// Persistencia BD `award_picks` la gestiona saveAwPicks legacy (sin tocar).
+// ─── Polish v1 B4 Item 10 + Fix-4 — Awards Card v3 ──────────
+// Reutiliza diseño legacy renderBox4 (ko.js): imágenes de fondo
+// Maradona/Ronaldo/Casillas/Mejor sub21, header Premios Individuales +
+// Copa Mundial 2026, footer progress dots + botón guardar/deshacer.
+// Cambio Fix-4: NO replicamos la card en JS+CSS v3, sino que
+// invocamos window.renderAwardsBox4Legacy (factory expuesto en
+// ko.js que crea una instancia INDEPENDIENTE del box4 legacy con
+// su propio closure renderBox4). CSS reutilizado de base.css/admin.css
+// (.aw-slot, .aw-grid, .aw-header, etc.). Persistencia + suggestion
+// + lock _porraCerrada los maneja el motor legacy.
 function v3RenderAwardsCard() {
-  if (typeof awPicks === 'undefined' || typeof AWARDS_CFG === 'undefined') return null;
-
+  if (typeof window.renderAwardsBox4Legacy !== 'function') {
+    console.warn('[Awards-v3] renderAwardsBox4Legacy no disponible');
+    return null;
+  }
   var wrap = document.createElement('div');
   wrap.className = 'v3-awards-wrap';
-
-  // Divider paralelo al de Cuadro de Honor.
-  var divider = document.createElement('div');
-  divider.className = 'v3-podium-divider v3-awards-divider';
-  divider.innerHTML =
-    '<span class="v3-podium-divider__line"></span>' +
-    '<span class="v3-podium-divider__star">★</span>' +
-    '<span class="v3-podium-divider__label">PREMIOS INDIVIDUALES</span>' +
-    '<span class="v3-podium-divider__star">★</span>' +
-    '<span class="v3-podium-divider__line"></span>';
-  wrap.appendChild(divider);
-
-  // Grid 2x2.
-  var grid = document.createElement('div');
-  grid.className = 'v3-aw-grid';
-
-  // Metadatos compactos por award. Los AWARDS_CFG.icon legacy son <img>
-  // grandes; v3 usa emoji compacto para la cabecera de la tarjeta.
-  var meta = [
-    { key: 'golden_ball',  emoji: '🏆', name: 'Balón de Oro',     pts: 15 },
-    { key: 'golden_boot',  emoji: '👟', name: 'Bota de Oro',      pts: 15 },
-    { key: 'golden_glove', emoji: '🧤', name: 'Guante de Oro',    pts: 15 },
-    { key: 'young_player', emoji: '⭐', name: 'Mejor Joven ≤21',  pts: 20 }
-  ];
-
-  meta.forEach(function (m) {
-    var pick = awPicks[m.key];
-    var slot = document.createElement('button');
-    slot.className = 'v3-aw-slot' + (pick ? '' : ' v3-aw-slot--empty');
-    slot.type = 'button';
-    slot.setAttribute('data-v3-award', m.key);
-
-    var head = '<div class="v3-aw-slot__header">'
-      +   '<span class="v3-aw-slot__icon">' + m.emoji + '</span>'
-      +   '<span class="v3-aw-slot__name">' + m.name + '</span>'
-      +   '<span class="v3-aw-slot__pts">+' + m.pts + ' pts</span>'
-      + '</div>';
-
-    var body;
-    if (pick) {
-      var flagUrl = (typeof SB !== 'undefined' && pick.flag) ? (SB + '/flags/' + pick.flag + '.png') : '';
-      body = '<div class="v3-aw-slot__sel">'
-        + (flagUrl ? '<span class="v3-aw-slot__sel-flag"><img src="' + flagUrl + '" alt="" onerror="this.style.display=\'none\'"/></span>' : '')
-        + '<span class="v3-aw-slot__sel-name">' + (typeof escapeHtml === 'function' ? escapeHtml(pick.name || '') : (pick.name || '')) + '</span>'
-        + '</div>';
-    } else {
-      body = '<div class="v3-aw-slot__sel"><span class="v3-aw-slot__sel-empty">— Seleccionar —</span></div>';
-    }
-
-    slot.innerHTML = head + body;
-    slot.onclick = function (e) {
-      e.stopPropagation();
-      if (window._porraCerrada) return;
-      if (typeof openPicker === 'function') openPicker(m.key);
-    };
-
-    grid.appendChild(slot);
-  });
-
-  wrap.appendChild(grid);
+  var box = window.renderAwardsBox4Legacy();
+  if (box) wrap.appendChild(box);
   return wrap;
 }
 window.v3RenderAwardsCard = v3RenderAwardsCard;

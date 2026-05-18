@@ -1402,3 +1402,140 @@ function buildStadiumCompactCard(match, style, icon) {
 
 
 
+
+
+// ─── Polish v1 Fix-4 — Factory standalone awards box4 para v3 ────
+// Reutilizable desde v3RenderAwardsCard (eliminatoria-v3.js). Crea
+// una NUEVA instancia independiente del box4 legacy con su propio
+// closure renderBox4Local. El comportamiento es idéntico al renderBox4
+// definido dentro de buildChampionPodium (línea 944), pero esta versión
+// vive top-level y se invoca por demanda desde el flujo v3.
+//
+// awPicks, AWARDS_CFG, openPicker, selectAward, checkFinalizarReady,
+// saveAwPicks, updateAwardsFooter, SB, currentUser, getActiveLeagueId,
+// _porraDb y window._awPicksSaved son todos accesibles como globals
+// (classic scripts).
+//
+// Sobreescribe window._renderBox4 con la nueva instancia. La instancia
+// legacy (creada por buildChampionPodium) NO se ejecutará en flujo v3
+// porque buildChampionPodium no se invoca desde v3RenderFinalBlock.
+window.renderAwardsBox4Legacy = function () {
+  var box4 = document.createElement('div');
+  box4.id = 'awards-box4-v3';
+  box4.className = 'final-box4';
+  box4.style.cssText = 'border-radius:16px;overflow:hidden;background:#1c1c1e;border:1px solid #27272a;position:relative;width:100%;max-width:420px;margin:0 auto';
+
+  function renderBox4Local() {
+    var awFilled = Object.values(awPicks).filter(Boolean).length;
+    var AW_CFG_REF = window.AWARDS_CFG || AWARDS_CFG;
+    var awPts = Object.entries(awPicks).reduce(function (s, e) {
+      return s + (e[1] ? AW_CFG_REF[e[0]].pts : 0);
+    }, 0);
+    var awSaved = !!window._awPicksSaved;
+
+    function awSlotHtml(key, cfg, bgSrc, bgAlt) {
+      var sel = awPicks[key];
+      var selName = sel ? sel.name : '—';
+      var selTeam = sel ? (sel.teamName || '') : '—';
+      var selFlagSrc = sel ? (SB + '/flags/' + sel.flag + '.png') : '';
+      var selectedCls = sel ? ' selected' : '';
+      var lockedStyle = awSaved ? 'cursor:default;pointer-events:none;' : '';
+      return '<div class="aw-slot' + selectedCls + '" data-award="' + key + '" style="' + lockedStyle + '">'
+        + '<img class="aw-player-bg" src="' + bgSrc + '" alt="' + bgAlt + '"/>'
+        + '<div class="aw-top">'
+        +   '<div class="aw-icon">' + cfg.icon + '</div>'
+        +   '<div class="aw-name">' + cfg.name + '</div>'
+        + '</div>'
+        + '<div class="aw-bottom">'
+        +   '<div class="aw-empty"' + (sel ? ' style="display:none"' : '') + '>'
+        +     '<div class="aw-empty-ring">👤</div>'
+        +     '<div class="aw-empty-label">Seleccionar</div>'
+        +   '</div>'
+        +   '<div class="aw-selected-info"' + (sel ? '' : ' style="display:none"') + '>'
+        +     '<div class="aw-sel-name" id="sel-name-' + key + '">' + selName + '</div>'
+        +     '<div class="aw-sel-team">'
+        +       '<div class="aw-sel-flag"><img id="sel-flag-' + key + '" src="' + selFlagSrc + '" alt=""/></div>'
+        +       '<div class="aw-sel-teamname" id="sel-team-' + key + '">' + selTeam + '</div>'
+        +     '</div>'
+        +     (awSaved ? '' : '<div class="aw-sel-change">Cambiar →</div>')
+        +   '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    var slots =
+      awSlotHtml('golden_ball',  AW_CFG_REF.golden_ball,  SB + '/miniatures/MVP/MVP-maradona-1986.png', 'Maradona') +
+      awSlotHtml('golden_boot',  AW_CFG_REF.golden_boot,  SB + '/miniatures/Golden%20foot/Golden-Foot-Ronaldo.png', 'Ronaldo') +
+      awSlotHtml('golden_glove', AW_CFG_REF.golden_glove, SB + '/miniatures/Golden%20glove/Casillas-removebg-preview.png', 'Casillas') +
+      awSlotHtml('young_player', AW_CFG_REF.young_player, 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/MVP%20Young/Mejor%20sub%2021.png', 'Mejor sub 21');
+
+    var btnHtml = awFilled === 4
+      ? (awSaved
+          ? '<div style="display:flex;align-items:center;gap:6px">'
+            + '<div style="background:#052e16;border:1px solid #166534;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#4ade80;display:flex;align-items:center;gap:5px">✓ Guardado</div>'
+            + '<button id="aw-undo-btn-v3" style="background:transparent;color:#6b7280;border:1px solid #3a3a3e;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;font-family:\'Inter\',sans-serif">↩ Deshacer</button>'
+            + '</div>'
+          : '<button id="aw-save-btn-v3" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Inter\',sans-serif">Guardar</button>')
+      : '<button disabled style="background:#1f2937;color:#4b5563;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:\'Inter\',sans-serif">Guardar</button>';
+
+    box4.innerHTML =
+        '<div class="aw-header">'
+      +   '<div class="aw-title-group">'
+      +     '<div class="aw-title">Premios Individuales</div>'
+      +     '<div class="aw-subtitle">Copa Mundial 2026</div>'
+      +   '</div>'
+      +   '<div style="display:flex;align-items:center;gap:8px">'
+      +     '<div class="aw-pts-possible' + (awPts > 0 ? ' show' : '') + '" style="opacity:' + (awPts > 0 ? 1 : 0) + '">+' + awPts + ' pts</div>'
+      +     '<div class="aw-deadline"><div class="aw-deadline-dot"></div>Cierra antes de la final</div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="aw-grid" id="aw-grid-v3">' + slots + '</div>'
+      + '<div class="aw-footer">'
+      +   '<div class="aw-progress">'
+      +     '<div class="aw-prog-dots">'
+      +       '<div class="aw-prog-dot' + (awFilled > 0 ? ' done' : '') + '"></div>'
+      +       '<div class="aw-prog-dot' + (awFilled > 1 ? ' done' : '') + '"></div>'
+      +       '<div class="aw-prog-dot' + (awFilled > 2 ? ' done' : '') + '"></div>'
+      +       '<div class="aw-prog-dot' + (awFilled > 3 ? ' done' : '') + '"></div>'
+      +     '</div>'
+      +     '<div class="aw-prog-label">' + awFilled + '/4 premios</div>'
+      +   '</div>'
+      +   btnHtml
+      + '</div>';
+
+    var grid = box4.querySelector('#aw-grid-v3');
+    if (grid && !awSaved && !window._porraCerrada) {
+      grid.addEventListener('click', function (e) {
+        var slot = e.target.closest('.aw-slot');
+        if (slot && slot.dataset.award) openPicker(slot.dataset.award);
+      });
+    }
+    var saveBtn = box4.querySelector('#aw-save-btn-v3');
+    if (saveBtn) saveBtn.addEventListener('click', function () {
+      window._awPicksSaved = true;
+      if (typeof checkFinalizarReady === 'function') checkFinalizarReady();
+      if (typeof saveAwPicks === 'function') saveAwPicks();
+      renderBox4Local();
+    });
+    var undoBtn = box4.querySelector('#aw-undo-btn-v3');
+    if (undoBtn) undoBtn.addEventListener('click', function () {
+      Object.keys(awPicks).forEach(function (k) { awPicks[k] = null; });
+      window._awPicksSaved = false;
+      try { localStorage.removeItem('porra_aw_picks'); } catch (e) {}
+      if (currentUser && window._porraDb) {
+        window._porraDb.from('award_picks').delete()
+          .eq('user_id', currentUser.id)
+          .eq('league_id', getActiveLeagueId() || '')
+          .then(function (r) { if (r && r.error) console.warn('Error borrando award_picks:', r.error.message); });
+      }
+      renderBox4Local();
+      if (typeof updateAwardsFooter === 'function') updateAwardsFooter();
+    });
+  }
+
+  // Sobreescribir _renderBox4 con la instancia v3 para que selectAward
+  // legacy + loadUserData re-rendericen este box4 cuando cambian awPicks.
+  window._renderBox4 = renderBox4Local;
+  renderBox4Local();
+  return box4;
+};
