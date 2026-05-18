@@ -356,9 +356,20 @@ function v3RenderZoomGrupos() {
       + v3RenderGoleadoresTabGrupos(grupo, matchesInGroup)
       + '</div>';
   } else {
+    // Polish v1 Fix-1: leyenda dinámica del 3º clasificado.
+    // Misma lógica que aplica .is-qualified al 3º en standings rows
+    // (HF-BUG-12 / _v3BestThirdsCache, solo poblado cuando los 12
+    // grupos están completos — regla FIFA).
+    var _stForLegend = v3ComputeStandings(grupo.letra);
+    var _thirdQualif = (_stForLegend.length >= 3)
+      && _v3BestThirdsCache
+      && _v3BestThirdsCache.has(_stForLegend[2].name);
+    var _legendText = _thirdQualif
+      ? 'Top 2 + 3º (uno de los 8 mejores) clasifican a la fase eliminatoria'
+      : 'Top 2 clasifican a la fase eliminatoria';
     body += '<div data-v3-view="standings">'
       + v3RenderStandingsTable(grupo)
-      + '<div class="v3-qualif-legend">Top 2 clasifican a la fase eliminatoria</div>'
+      + '<div class="v3-qualif-legend">' + _legendText + '</div>'
       + '<div class="v3-zoom-footer">'
       + v3RenderIAPredictionPanel(_v3CurrentLetter)
       + '</div>'
