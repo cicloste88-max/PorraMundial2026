@@ -738,9 +738,49 @@ function _v3DistributeTo100(probs) {
   return floors;
 }
 
-function v3RenderIABlock(matchKey) {
+// Polish v1 Fix-3: helper para obtener ISO3 de un slot (KO).
+// Reusa v3ResolveSlotCode (ya implementa la cadena resolvedSlots→EQUIPOS→
+// team.code||team.flag) para devolver el código FIFA 3 letras.
+function v3GetMatchTeamIso3(match, side) {
+  if (!match) return null;
+  var slot = (side === 'home') ? match.home : match.away;
+  if (typeof v3ResolveSlotCode === 'function') {
+    return v3ResolveSlotCode(slot);
+  }
+  if (typeof resolvedSlots !== 'undefined' && resolvedSlots[slot] && typeof EQUIPOS !== 'undefined') {
+    var name = resolvedSlots[slot];
+    var team = EQUIPOS.find(function (e) { return e.name === name; });
+    return team ? (team.code || team.flag) : null;
+  }
+  return null;
+}
+window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
+
+// Polish v1 Fix-3: acepta string key (grupos: "A_México_Sudáfrica") o
+// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_2" desde
+// slots resueltos). BD ia_predictions.match_id formato confirmado:
+// 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
+// probamos ambos órdenes.
+function v3RenderIABlock(matchKeyOrMatch) {
   if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
-  var pred = iaPredictions[matchKey] || iaPredictions[String(matchKey)];
+  var pred = null;
+
+  if (typeof matchKeyOrMatch === 'string') {
+    pred = iaPredictions[matchKeyOrMatch];
+  } else if (typeof matchKeyOrMatch === 'object' && matchKeyOrMatch !== null) {
+    var match = matchKeyOrMatch;
+    if (match.group && typeof getMatchKey === 'function') {
+      pred = iaPredictions[getMatchKey(match)];
+    } else {
+      var homeIso3 = v3GetMatchTeamIso3(match, 'home');
+      var awayIso3 = v3GetMatchTeamIso3(match, 'away');
+      if (homeIso3 && awayIso3) {
+        pred = iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+            || iaPredictions['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+      }
+    }
+  }
+
   if (!pred || pred.p_home == null || pred.p_away == null) return '';
 
   var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
@@ -889,7 +929,7 @@ function v3RenderZoomKO() {
       </div>
       ${penaltyHtml}
       ${goleadorHtml}
-      ${v3RenderIABlock(match.id)}
+      ${v3RenderIABlock(match)}
       ${summaryHtml}
     </div>
   `;
