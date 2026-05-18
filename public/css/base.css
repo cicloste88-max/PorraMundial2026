@@ -470,26 +470,34 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
 .aw-slot[data-award="golden_boot"].selected::before{border-color:rgba(74,222,128,.3)}
 .aw-slot[data-award="golden_glove"].selected::before{border-color:rgba(147,197,253,.3)}
 .aw-slot[data-award="young_player"].selected::before{border-color:rgba(167,139,250,.3)}
+/* Polish v1 Fix-Pack-2 Fix-1: picker awards modal flotante (no bottom-sheet).
+   - align-items center en lugar de flex-end.
+   - padding-bottom 100px para que la tabbar v3 (--fc-z-tabbar=300) no
+     solape la parte baja del listado en mobile.
+   - z-index 10000: holgura sobre tabbar.
+   - .aw-picker: scale+opacity en vez de translateY, border-radius en todos
+     los corners, max-height calc para no desbordar viewport en mobile. */
 .aw-overlay{
-  position:fixed;inset:0;z-index:100;
-  background:rgba(0,0,0,.75);
-  backdrop-filter:blur(4px);
-  display:flex;align-items:flex-end;justify-content:center;
+  position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px 16px 100px;
   opacity:0;pointer-events:none;
   transition:opacity .25s;
 }
 .aw-overlay.open{opacity:1;pointer-events:all}
 .aw-picker{
   width:100%;max-width:460px;
-  background:#1c1c1e;
-  border-radius:20px 20px 0 0;
-  border-top:1px solid #3a3a3e;
-  max-height:70vh;overflow:hidden;
+  background:#0f172a;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.08);
+  max-height:calc(100vh - 140px);overflow:hidden;
   display:flex;flex-direction:column;
-  transform:translateY(100%);
-  transition:transform .3s cubic-bezier(.34,1.2,.64,1);
+  transform:scale(.96);opacity:0;
+  transition:transform .25s cubic-bezier(.34,1.2,.64,1), opacity .25s;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-.aw-overlay.open .aw-picker{transform:translateY(0)}
+.aw-overlay.open .aw-picker{transform:scale(1);opacity:1}
 .aw-picker-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px 10px;
@@ -916,26 +924,34 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
 .aw-slot[data-award="golden_boot"].selected::before{border-color:rgba(74,222,128,.3)}
 .aw-slot[data-award="golden_glove"].selected::before{border-color:rgba(147,197,253,.3)}
 .aw-slot[data-award="young_player"].selected::before{border-color:rgba(167,139,250,.3)}
+/* Polish v1 Fix-Pack-2 Fix-1: picker awards modal flotante (no bottom-sheet).
+   - align-items center en lugar de flex-end.
+   - padding-bottom 100px para que la tabbar v3 (--fc-z-tabbar=300) no
+     solape la parte baja del listado en mobile.
+   - z-index 10000: holgura sobre tabbar.
+   - .aw-picker: scale+opacity en vez de translateY, border-radius en todos
+     los corners, max-height calc para no desbordar viewport en mobile. */
 .aw-overlay{
-  position:fixed;inset:0;z-index:100;
-  background:rgba(0,0,0,.75);
-  backdrop-filter:blur(4px);
-  display:flex;align-items:flex-end;justify-content:center;
+  position:fixed;inset:0;z-index:10000;
+  background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px 16px 100px;
   opacity:0;pointer-events:none;
   transition:opacity .25s;
 }
 .aw-overlay.open{opacity:1;pointer-events:all}
 .aw-picker{
   width:100%;max-width:460px;
-  background:#1c1c1e;
-  border-radius:20px 20px 0 0;
-  border-top:1px solid #3a3a3e;
-  max-height:70vh;overflow:hidden;
+  background:#0f172a;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.08);
+  max-height:calc(100vh - 140px);overflow:hidden;
   display:flex;flex-direction:column;
-  transform:translateY(100%);
-  transition:transform .3s cubic-bezier(.34,1.2,.64,1);
+  transform:scale(.96);opacity:0;
+  transition:transform .25s cubic-bezier(.34,1.2,.64,1), opacity .25s;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
 }
-.aw-overlay.open .aw-picker{transform:translateY(0)}
+.aw-overlay.open .aw-picker{transform:scale(1);opacity:1}
 .aw-picker-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px 10px;

@@ -367,10 +367,13 @@
     font-size:12px !important;
   }
 
-  /* ── Picker de jugadores (bottom sheet) ── */
+  /* Polish v1 Fix-Pack-2 Fix-1: picker awards flotante (no bottom-sheet).
+     border-radius en todos los corners para mantener forma flotante en
+     mobile. align-items center + padding-bottom 100px (tabbar v3) heredados
+     del bloque base.css.aw-overlay (sin override aqui). */
   .aw-picker{
     max-width:100% !important;
-    border-radius:20px 20px 0 0;
+    border-radius:20px;
   }
 }
 
@@ -899,10 +902,13 @@
     font-size:12px !important;
   }
 
-  /* ── Picker de jugadores (bottom sheet) ── */
+  /* Polish v1 Fix-Pack-2 Fix-1: picker awards flotante (no bottom-sheet).
+     border-radius en todos los corners para mantener forma flotante en
+     mobile. align-items center + padding-bottom 100px (tabbar v3) heredados
+     del bloque base.css.aw-overlay (sin override aqui). */
   .aw-picker{
     max-width:100% !important;
-    border-radius:20px 20px 0 0;
+    border-radius:20px;
   }
 }
 
