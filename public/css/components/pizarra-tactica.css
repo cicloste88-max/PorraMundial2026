@@ -175,6 +175,11 @@
   position: relative;
   margin: 10px 12px 0;
   aspect-ratio: 2 / 3;       /* 0.666… vertical */
+  /* F-07: cap altura para no desbordar el modal en viewports cortos
+     (Safari iPhone con barras URL+gestos). Con max-height el ancho
+     queda libre dentro del modal pero la altura no excede el espacio
+     disponible (~modal 92dvh menos header+stats ≈ 200px). */
+  max-height: calc(92dvh - 220px);
   background-size: cover;
   background-position: center;
   border-radius: 10px;

@@ -295,7 +295,8 @@
     // (border dorado, summary marker custom, etc.). Primer details abierto.
     var bioHtml = '';
     if (b.bio) {
-      bioHtml += '<details class="fc-globo-detail__bio" open>' +
+      // F-06: ambas secciones arrancan colapsadas; usuario expande manualmente.
+      bioHtml += '<details class="fc-globo-detail__bio">' +
         '<summary class="fc-globo-detail__bio-toggle">📖 Sobre el equipo</summary>' +
         '<p class="fc-globo-detail__bio-text">' + b.bio + '</p>' +
       '</details>';
@@ -907,8 +908,15 @@
   function buildRosterHTML(iso3, pais, jugadores) {
     var grupos = { Portero: [], Defensa: [], Centrocampista: [], Delantero: [] };
     (jugadores || []).forEach(function (j) {
-      var b = j.posicion_bucket;
-      if (grupos[b]) grupos[b].push(j); else grupos.Delantero.push(j);
+      // Bucket prioritario: posicion_bucket si existe (ESP/ARG/MEX), si no
+      // posicion (FRA/BRA/SWE/BIH ya tienen el bucket en este campo).
+      var raw = j.posicion_bucket || j.posicion || '';
+      var b = null;
+      if (/portero/i.test(raw) || /^PO\b/i.test(raw)) b = 'Portero';
+      else if (/defensa/i.test(raw) || /^(DFC|LD|LI|CB|DF)\b/i.test(raw)) b = 'Defensa';
+      else if (/centrocampista|mediocampista|medio/i.test(raw) || /^(MC|MCD|MCO|MI|MD|MF|VOL)\b/i.test(raw)) b = 'Centrocampista';
+      else if (/delantero|extremo|punta/i.test(raw) || /^(DC|ED|EI|SD|FW)\b/i.test(raw)) b = 'Delantero';
+      if (b && grupos[b]) grupos[b].push(j); else grupos.Delantero.push(j);
     });
     var secciones = BUCKET_ORDER.map(function (b) {
       var arr = grupos[b];
@@ -962,27 +970,36 @@
     return el;
   }
   async function openRosterScreen(iso3, pais) {
+    console.log('[roster] openRosterScreen', { iso3: iso3, pais: pais });
     var modal = ensureRosterModal();
     modal.innerHTML = '<div class="fc-roster-modal__inner"><div class="fc-roster-loading">Cargando plantilla…</div></div>';
     modal.classList.add('is-open');
     document.body.style.overflow = 'hidden';
     var jugadores = [];
     var nombrePais = pais;
-    if (iso3 && window._porraDb) {
+    if (!iso3) {
+      console.warn('[roster] iso3 vacío — no se puede consultar squads');
+    } else if (!window._porraDb) {
+      console.warn('[roster] window._porraDb no disponible');
+    } else {
       try {
+        // Columna real en `squads` es `equipo` (no `nombre_pais`).
         var res = await window._porraDb
           .from('squads')
-          .select('jugadores, nombre_pais')
+          .select('jugadores, equipo, stat_edad, stat_valor')
           .eq('iso3', iso3)
-          .single();
+          .maybeSingle();
+        console.log('[roster] supabase result', res);
+        if (res && res.error) console.warn('[roster] error supabase', res.error);
         if (res && res.data) {
           jugadores = Array.isArray(res.data.jugadores) ? res.data.jugadores : [];
-          if (res.data.nombre_pais) nombrePais = res.data.nombre_pais;
+          if (res.data.equipo) nombrePais = res.data.equipo;
         }
       } catch (err) {
         console.warn('[roster] error fetch squads', iso3, err);
       }
     }
+    console.log('[roster] render', { iso3: iso3, nombrePais: nombrePais, count: jugadores.length });
     modal.innerHTML = '<div class="fc-roster-modal__inner">' + buildRosterHTML(iso3, nombrePais, jugadores) + '</div>';
   }
   function closeRosterScreen() {

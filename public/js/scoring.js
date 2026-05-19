@@ -744,7 +744,7 @@ function createMatchCard(match, idx) {
         '</div>',
       '</div>',
     '</div>',
-    '<div class="ia-bar" id="ia-bar-'+idx+'" style="display:none">',
+    '<div class="ia-bar" id="ia-bar-'+idx+'">',
       '<div class="ia-lbl">IA predice<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button></div>',
       '<div class="ia-content" id="ia-content-'+idx+'">',
         '<div id="ia-result-'+idx+'" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">',
@@ -1536,6 +1536,7 @@ let currentAward=null;
 // indicador "Cargando jugadores…" hasta que llegan los datos.
 // Cache _awardCandidatesCache evita re-fetch tras primera apertura.
 async function openPicker(award) {
+  console.log('[awards] openPicker called', award);
   currentAward = award;
   const cfg = {
     golden_ball:  { title: '🏆 Balón de Oro — MVP' },
@@ -1543,17 +1544,27 @@ async function openPicker(award) {
     golden_glove: { title: '🧤 Guante de Oro — Mejor portero' },
     young_player: { title: '⭐ Mejor Joven ≤21' },
   }[award];
-  if (!cfg) return;
-  document.getElementById('picker-title').textContent = cfg.title;
-  document.getElementById('aw-overlay').classList.add('open');
+  if (!cfg) { console.warn('[awards] award key desconocida', award); return; }
+  const titleEl = document.getElementById('picker-title');
+  const overlayEl = document.getElementById('aw-overlay');
+  if (!overlayEl) { console.error('[awards] #aw-overlay no existe en el DOM'); return; }
+  if (titleEl) titleEl.textContent = cfg.title;
+  // F-02 hardening: forzar visibilidad inline por si algún ancestro/style
+  // override tiene display:none o pointer-events:none. La clase .open ya
+  // gestiona opacity+pointer-events pero algunos containers (page-elim,
+  // modal-overlay parent) pueden tener overrides que la pisen.
+  overlayEl.style.display = 'flex';
+  overlayEl.style.opacity = '1';
+  overlayEl.style.pointerEvents = 'auto';
+  overlayEl.classList.add('open');
+  console.log('[awards] overlay opened, computedStyle.display=',
+    window.getComputedStyle(overlayEl).display, 'z-index=',
+    window.getComputedStyle(overlayEl).zIndex);
   const scroll = document.getElementById('picker-scroll');
   if (scroll) scroll.innerHTML = '<div style="padding:24px 18px;color:#94a3b8;font-size:13px">Cargando jugadores…</div>';
   const candidates = await getAwardCandidates(award);
-  // Si el usuario cambió de award antes de que llegara la BD, abortar.
+  console.log('[awards] candidates loaded', award, candidates.length);
   if (currentAward !== award) return;
-  // Para Bota de Oro sin pick previo, pasar sugerencia automática
-  // (_v3SuggestGoldenBoot cuenta scorers en predictions + KO). NO
-  // preselecciona — solo destaca con badge "💡 Sugerido".
   let suggestion = null;
   if (award === 'golden_boot' && awPicks.golden_boot === null
       && typeof _v3SuggestGoldenBoot === 'function') {
@@ -1566,9 +1577,17 @@ async function openPicker(award) {
   renderPickerList(candidates, awPicks[award], suggestion);
 }
 function closePicker() {
-  document.getElementById('aw-overlay').classList.remove('open');
+  const overlayEl = document.getElementById('aw-overlay');
+  if (overlayEl) {
+    overlayEl.classList.remove('open');
+    overlayEl.style.removeProperty('display');
+    overlayEl.style.removeProperty('opacity');
+    overlayEl.style.removeProperty('pointer-events');
+  }
   currentAward = null;
 }
+window.openPicker = openPicker;
+window.closePicker = closePicker;
 function overlayClick(e){if(e.target===document.getElementById('aw-overlay'))closePicker();}
 // Polish v1 Fix-Pack-2 Fix-3+4: selectAward usa _awardCandidatesCache
 // (poblado por openPicker async) en lugar de AW_PLAYERS/YOUNG_PLAYERS_NXGN
