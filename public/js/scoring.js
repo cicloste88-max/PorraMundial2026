@@ -1594,6 +1594,9 @@ window.closePicker = closePicker;
 // registra solo si !awSaved && !window._porraCerrada y vive ligado al
 // elemento #aw-grid-v3 (se pierde si box4.innerHTML se re-renderiza desde
 // fuera). Este delegate one-time captura el click venga de donde venga.
+// QA round 4: _awPicksSaved NO debe bloquear el click — el usuario tiene
+// derecho a editar awards hasta que se cierre la porra. Sólo blockear si
+// _porraCerrada=true.
 if (!window._awardSlotDelegateBound) {
   window._awardSlotDelegateBound = true;
   document.addEventListener('click', function (e) {
@@ -1601,10 +1604,7 @@ if (!window._awardSlotDelegateBound) {
     if (!slot) return;
     var award = slot.getAttribute('data-award');
     if (!award) return;
-    // No abrir si porra cerrada o picks guardados/locked (pointer-events:none
-    // ya bloquea visualmente, pero blindamos el handler también).
     if (window._porraCerrada) return;
-    if (window._awPicksSaved) return;
     console.log('[awards] aw-slot click delegate →', award);
     openPicker(award);
   }, true);

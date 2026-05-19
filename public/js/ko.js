@@ -1483,7 +1483,7 @@ function buildFinalSection(match) {
       const selTeam    = sel ? (sel.teamName||'') : '—';
       const selFlagSrc = sel ? `${SB}/flags/${sel.flag}.png` : '';
       const selectedCls = sel ? ' selected' : '';
-      const lockedStyle = awSaved ? 'cursor:default;pointer-events:none;' : '';
+      const lockedStyle = window._porraCerrada ? 'cursor:default;pointer-events:none;' : '';
       return `<div class="aw-slot${selectedCls}" data-award="${key}" style="${lockedStyle}">
         <img class="aw-player-bg" src="${bgSrc}" alt="${bgAlt}"/>
         <div class="aw-top">
@@ -1970,7 +1970,9 @@ window.renderAwardsBox4Legacy = function () {
       var selTeam = sel ? (sel.teamName || '') : '—';
       var selFlagSrc = sel ? (SB + '/flags/' + sel.flag + '.png') : '';
       var selectedCls = sel ? ' selected' : '';
-      var lockedStyle = awSaved ? 'cursor:default;pointer-events:none;' : '';
+      // QA r4: awSaved ya NO desactiva pointer-events — usuario puede
+      // re-abrir picker para editar mientras la porra esté abierta.
+      var lockedStyle = window._porraCerrada ? 'cursor:default;pointer-events:none;' : '';
       return '<div class="aw-slot' + selectedCls + '" data-award="' + key + '" style="' + lockedStyle + '">'
         + '<img class="aw-player-bg" src="' + bgSrc + '" alt="' + bgAlt + '"/>'
         + '<div class="aw-top">'
