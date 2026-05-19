@@ -833,3 +833,16 @@ Tres fallos encadenados que requirieron solución combinada.
 - **Patrón preventivo:** cuando un scraper depende de un orden cronológico de noticias para identificar el evento "más reciente", incluir verificación cruzada con metadata estable (URL canónica del torneo, slug del año, ID de competición) antes de aceptar el resultado. Si esa metadata no existe o es ambigua, NO usar la fuente para detección de eventos — solo para enriquecimiento sobre eventos ya confirmados por otra vía.
 - **Caveat operacional:** las URLs de noticias FF de Eurocopa 2024 seguirán reapareciendo en `/world-cup/equipos/<slug>/noticias/1` durante semanas/meses según el ritmo de publicación de nuevas noticias de Mundial 2026 por país. La defensa estructural (no usar FF para detección) cierra el vector permanentemente.
 - **Fecha detección:** 18 may 2026 (e2e test post PR #69). **Fecha fix:** 18-19 may 2026 (PR feat/squads-sources-refactor).
+
+## ERR-60: H2H tiebreaker ausente en v3ComputeStandings (HF-BUG-11)
+
+**Fecha:** 19-may-2026
+**Síntoma:** La clasificación de grupos saltaba de goles a favor (paso 3) directamente
+a orden alfabético, omitiendo el desempate H2H (pasos 4-6 del Art. 13 FIFA 2026).
+**Causa:** Comentario en HF-BUG-11 afirmaba erróneamente que los datos H2H no eran
+accesibles; los datos estaban disponibles en el scope de la función (`matchesInGroup` +
+`predictions`). El mismo gap existía en `calcGroupStandings` de `porra-ia-compute`.
+**Fix:** Sprint Reglamento FIFA (19-may-2026). Algoritmo bifásico: sort global
+(pts→gd→gf), luego `v3BreakTieH2H` por subgrupos empatados. Paridad en EF.
+**Patrón:** Cuando se documenta una limitación técnica ("no implementable sin datos"),
+verificar primero que los datos no estén ya disponibles en el scope.

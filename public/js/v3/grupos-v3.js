@@ -73,6 +73,33 @@ function v3CountFilled(letter) {
   }).length;
 }
 
+// v3BreakTieH2H — FIFA Art. 13 pasos 4-6: desempate H2H entre N equipos empatados.
+// tiedTeams: subarray de stats con idénticos (pts, gd, gf) globales.
+// h2hMap: { 'HomeTeam___AwayTeam': { h: golesLocal, a: golesVisitante } }
+// Retorna nueva array ordenada por pts_h2h -> gd_h2h -> gf_h2h -> localeCompare.
+function v3BreakTieH2H(tiedTeams, h2hMap) {
+  var h2h = {};
+  tiedTeams.forEach(function (t) { h2h[t.name] = { pts: 0, gd: 0, gf: 0 }; });
+  tiedTeams.forEach(function (t1) {
+    tiedTeams.forEach(function (t2) {
+      if (t1.name === t2.name) return;
+      var res = h2hMap[t1.name + '___' + t2.name];
+      if (!res) return;
+      var s1 = h2h[t1.name], s2 = h2h[t2.name];
+      s1.gf += res.h; s2.gf += res.a;
+      s1.gd += (res.h - res.a); s2.gd += (res.a - res.h);
+      if (res.h > res.a)      { s1.pts += 3; }
+      else if (res.h < res.a) { s2.pts += 3; }
+      else                    { s1.pts += 1; s2.pts += 1; }
+    });
+  });
+  return tiedTeams.slice().sort(function (a, b) {
+    var ha = h2h[a.name], hb = h2h[b.name];
+    return (hb.pts - ha.pts) || (hb.gd - ha.gd) || (hb.gf - ha.gf)
+      || a.name.localeCompare(b.name);
+  });
+}
+
 function v3ComputeStandings(letter) {
   var grupoIdx = v3GetGrupoLetterIndex(letter);
   var grupo = GRUPOS[grupoIdx];
@@ -81,7 +108,9 @@ function v3ComputeStandings(letter) {
   }));
 
   var matchesInGroup = PARTIDOS.filter(m => m.group === letter);
-  matchesInGroup.forEach((match, idx) => {
+  var h2hMap = {}; // 'HomeTeam___AwayTeam' -> {h, a} para Art. 13 H2H tiebreaker
+
+  matchesInGroup.forEach((match) => {
     var key = getMatchKey(match);
     var p = predictions[key];
     if (!p || !Number.isInteger(p.l) || !Number.isInteger(p.v)) return;
@@ -94,18 +123,36 @@ function v3ComputeStandings(letter) {
     h.gf += p.l; h.gc += p.v;
     a.gf += p.v; a.gc += p.l;
 
-    if (p.l > p.v) { h.pts += 3; h.pg++; a.pp++; }
+    if (p.l > p.v)      { h.pts += 3; h.pg++; a.pp++; }
     else if (p.l < p.v) { a.pts += 3; a.pg++; h.pp++; }
-    else { h.pts += 1; a.pts += 1; h.pe++; a.pe++; }
+    else                { h.pts += 1; a.pts += 1; h.pe++; a.pe++; }
+
+    // Art. 13: acumular resultados H2H para desempate posterior
+    h2hMap[match.home + '___' + match.away] = { h: p.l, a: p.v };
   });
 
   stats.forEach(s => s.gd = s.gf - s.gc);
-  // HF-BUG-11: tiebreaker alfabetico antes del indice de array (que es arbitrario).
-  // FIFA real usa head-to-head y sorteo -- no implementables sin datos; localeCompare
-  // es al menos predecible y documentado.
-  stats.sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf
-    || a.name.localeCompare(b.name) || a.teamIdx - b.teamIdx);
-  return stats;
+
+  // FIFA Art. 13 fases 1-3: pts -> gd -> gf de todos los partidos del grupo.
+  // ERR-60 (19-may-2026): antes caía a localeCompare sin pasar por H2H aunque
+  // los datos H2H estaban disponibles en el scope.
+  stats.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.name.localeCompare(b.name));
+
+  // FIFA Art. 13 fases 4-6: H2H dentro de cada subgrupo empatado en (pts, gd, gf).
+  var result = [];
+  var i = 0;
+  while (i < stats.length) {
+    var j = i + 1;
+    while (j < stats.length
+        && stats[j].pts === stats[i].pts
+        && stats[j].gd  === stats[i].gd
+        && stats[j].gf  === stats[i].gf) { j++; }
+    var tiedGroup = stats.slice(i, j);
+    if (tiedGroup.length > 1) tiedGroup = v3BreakTieH2H(tiedGroup, h2hMap);
+    result = result.concat(tiedGroup);
+    i = j;
+  }
+  return result;
 }
 
 // F3-I1.6.5: cache de los 8 mejores terceros. Se computa al inicio

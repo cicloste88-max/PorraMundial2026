@@ -79,3 +79,42 @@ Detalle del motor IA y fórmula del pronóstico en `docs/ia-predictor.md`.
 - **Total torneo**: **104 partidos**.
 
 **Inicio**: 11 jun 2026 — México vs Sudáfrica en el Estadio Azteca (`eventId=15186710`).
+
+## Desempate fase de grupos — Art. 13 FIFA 2026
+
+Cuando dos o más equipos terminan empatados en puntos dentro del mismo grupo,
+se aplica el siguiente orden de criterios (Art. 13 Reglamento FIFA 2026):
+
+| Paso | Criterio | Implementado |
+|------|----------|-------------|
+| 1 | Puntos (todos los partidos del grupo) | ✅ |
+| 2 | Diferencia de goles (todos los partidos) | ✅ |
+| 3 | Goles a favor (todos los partidos) | ✅ |
+| 4 | Puntos en partidos H2H entre los empatados | ✅ v3BreakTieH2H |
+| 5 | Diferencia de goles H2H entre los empatados | ✅ v3BreakTieH2H |
+| 6 | Goles a favor H2H entre los empatados | ✅ v3BreakTieH2H |
+| 7 | Puntos disciplinarios (amarillas/rojas) | ⚠️ sin datos → fallback alfabético |
+| 8 | Ranking FIFA / sorteo | ⚠️ sin datos → fallback alfabético |
+
+### Notas de implementación
+
+**Pasos 4-6 (H2H):** Implementados mediante un algoritmo de dos fases en
+`v3ComputeStandings()` (`grupos-v3.js`) y `calcGroupStandings()` (`porra-ia-compute`).
+Los equipos se agrupan primero por (pts, gd, gf) globales; dentro de cada
+subgrupo empatado se calcula una mini-clasificación H2H con solo los partidos
+entre ellos. El algoritmo es correcto para subgrupos de 2, 3 y 4 equipos.
+
+**Pasos 7-8 (fair play / ranking):** No implementables sin datos de tarjetas ni
+acceso a ranking FIFA en tiempo real. El fallback documentado es orden alfabético
+(`localeCompare`), que es predecible y reproducible. La probabilidad de llegar a
+este desempate es extremadamente baja en una porra de predicciones.
+
+**Paridad EF:** `calcGroupStandings()` en `porra-ia-compute` implementa el mismo
+algoritmo. Si se modifica la lógica de desempate, actualizar ambos ficheros.
+
+### Mejor clasificación de terceros (8 mejores)
+
+Los 8 mejores terceros clasificados para R32 se ordenan por:
+`pts → gd → gf → localeCompare` (implementado en `v3ComputeBestThirds()`).
+Este orden es el estándar FIFA para la selección de mejores terceros; no aplica
+H2H entre terceros de grupos distintos.

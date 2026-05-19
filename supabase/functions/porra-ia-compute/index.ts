@@ -1291,9 +1291,38 @@ type GroupStat = {
   gd: number;
 };
 
-// Replica calcGroupTableAdvanced(letra) de public/js/scoring.js.
-// Toma un grupo + map de predicciones (key=`${group}_${home}_${away}`) y
-// devuelve standings ordenadas pts → gd → gf.
+// breakTieH2H — FIFA Art. 13 pasos 4-6 para calcGroupStandings.
+// Paridad con v3BreakTieH2H de grupos-v3.js (JS frontend).
+function breakTieH2H(
+  tiedTeams: GroupStat[],
+  letra: string,
+  predictions: Record<string, { l: number; v: number }>,
+): GroupStat[] {
+  const h2h: Record<string, { pts: number; gd: number; gf: number }> = {};
+  for (const t of tiedTeams) h2h[t.name] = { pts: 0, gd: 0, gf: 0 };
+  for (const t1 of tiedTeams) {
+    for (const t2 of tiedTeams) {
+      if (t1.name === t2.name) continue;
+      const pred = predictions[`${letra}_${t1.name}_${t2.name}`];
+      if (!pred) continue;
+      const s1 = h2h[t1.name], s2 = h2h[t2.name];
+      s1.gf += pred.l; s2.gf += pred.v;
+      s1.gd += (pred.l - pred.v); s2.gd += (pred.v - pred.l);
+      if (pred.l > pred.v)      { s1.pts += 3; }
+      else if (pred.l < pred.v) { s2.pts += 3; }
+      else                      { s1.pts += 1; s2.pts += 1; }
+    }
+  }
+  return [...tiedTeams].sort((a, b) => {
+    const ha = h2h[a.name], hb = h2h[b.name];
+    return (hb.pts - ha.pts) || (hb.gd - ha.gd) || (hb.gf - ha.gf)
+      || a.name.localeCompare(b.name);
+  });
+}
+
+// Replica calcGroupTableAdvanced(letra) de public/js/scoring.js + Art. 13 H2H.
+// Paridad con v3ComputeStandings de grupos-v3.js. Clave de predicciones:
+// `${letra}_${teamNameES}_${teamNameES}` (local_visitante).
 function calcGroupStandings(
   letra: string,
   predictions: Record<string, { l: number; v: number }>,
@@ -1306,8 +1335,7 @@ function calcGroupStandings(
   for (const home of teams) {
     for (const away of teams) {
       if (home === away) continue;
-      const key = `${letra}_${home}_${away}`;
-      const pred = predictions[key];
+      const pred = predictions[`${letra}_${home}_${away}`];
       if (!pred) continue;
       const h = stats.find((s) => s.name === home);
       const a = stats.find((s) => s.name === away);
@@ -1315,14 +1343,31 @@ function calcGroupStandings(
       h.pj++; a.pj++;
       h.gf += pred.l; h.gc += pred.v;
       a.gf += pred.v; a.gc += pred.l;
-      if (pred.l > pred.v) { h.g++; h.pts += 3; a.p++; }
+      if (pred.l > pred.v)      { h.g++; h.pts += 3; a.p++; }
       else if (pred.l < pred.v) { a.g++; a.pts += 3; h.p++; }
-      else { h.e++; a.e++; h.pts += 1; a.pts += 1; }
+      else                      { h.e++; a.e++; h.pts += 1; a.pts += 1; }
     }
   }
   for (const s of stats) s.gd = s.gf - s.gc;
+
+  // FIFA Art. 13 fases 1-3
   stats.sort((a, b) => (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf));
-  return stats;
+
+  // FIFA Art. 13 fases 4-6: H2H entre subgrupos empatados en (pts, gd, gf).
+  const result: GroupStat[] = [];
+  let i = 0;
+  while (i < stats.length) {
+    let j = i + 1;
+    while (j < stats.length
+        && stats[j].pts === stats[i].pts
+        && stats[j].gd  === stats[i].gd
+        && stats[j].gf  === stats[i].gf) { j++; }
+    let group = stats.slice(i, j);
+    if (group.length > 1) group = breakTieH2H(group, letra, predictions);
+    result.push(...group);
+    i = j;
+  }
+  return result;
 }
 
 // Mejores 8 terceros — mismo orden que getBestThirdsAll() del frontend.
