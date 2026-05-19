@@ -745,7 +745,7 @@ function createMatchCard(match, idx) {
       '</div>',
     '</div>',
     '<div class="ia-bar" id="ia-bar-'+idx+'" style="display:none">',
-      '<div class="ia-lbl">IA predice</div>',
+      '<div class="ia-lbl">IA predice<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button></div>',
       '<div class="ia-content" id="ia-content-'+idx+'">',
         '<div id="ia-result-'+idx+'" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">',
           '<span class="ia-prediction" id="ia-pred-txt-'+idx+'"></span>',
@@ -899,6 +899,49 @@ function buildIAExplainer(ia, homeName, awayName) {
     '<ul class="ia-exp-data">' + items.join('') + '</ul>'
   );
 }
+
+// F-05 — Tooltip generico "Cómo funciona IA Predice". Singleton popover en
+// body, posicionado bajo el botón clickado. Cierre al click fuera, al click
+// en el mismo botón, o ESC. Texto fijo (resumen del docs/ia-predictor.md).
+function showIAInfoTooltip(btn) {
+  var pop = document.getElementById('ia-info-tooltip');
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.id = 'ia-info-tooltip';
+    pop.className = 'ia-info-tooltip';
+    pop.innerHTML =
+      '<div class="ia-info-tooltip__title">¿Cómo funciona la IA?</div>' +
+      '<p class="ia-info-tooltip__text">La predicción combina tres señales: ' +
+      '<b>ELO FIFA</b> (75%), <b>historial directo</b> entre ambas selecciones (10%) ' +
+      'y <b>forma reciente</b> de los últimos partidos (15%). Se aplica una ventaja ' +
+      'extra al país anfitrión. El porcentaje indica la confianza del modelo en el ' +
+      'signo predicho (1, X o 2).</p>' +
+      '<p class="ia-info-tooltip__text">Si pronosticas distinto a la IA y aciertas, ' +
+      'recibes un <b>+1 punto extra</b>.</p>';
+    document.body.appendChild(pop);
+    document.addEventListener('click', function (e) {
+      if (!pop.classList.contains('is-open')) return;
+      if (e.target === pop || pop.contains(e.target)) return;
+      if (e.target.classList && e.target.classList.contains('ia-info-btn')) return;
+      pop.classList.remove('is-open');
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') pop.classList.remove('is-open');
+    });
+  }
+  if (pop.classList.contains('is-open') && pop._anchor === btn) {
+    pop.classList.remove('is-open');
+    pop._anchor = null;
+    return;
+  }
+  pop._anchor = btn;
+  var r = btn.getBoundingClientRect();
+  pop.style.top = (window.scrollY + r.bottom + 6) + 'px';
+  var left = window.scrollX + r.left - 4;
+  pop.style.left = Math.max(8, Math.min(left, window.scrollX + window.innerWidth - 268)) + 'px';
+  pop.classList.add('is-open');
+}
+window.showIAInfoTooltip = showIAInfoTooltip;
 
 // Post-F commit 3 — handlers globales del popover explainer. Singleton DOM
 // en <body>, event delegation por document. Hover en desktop (matchMedia
