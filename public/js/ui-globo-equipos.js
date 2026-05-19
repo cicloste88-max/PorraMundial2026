@@ -309,7 +309,7 @@
     var btnPlantilla = (
       '<button type="button" class="fc-globo-detail__btn-plantilla" ' +
         'data-name-en="' + (nameEn || '').replace(/"/g, '&quot;') + '">' +
-        '🏟 Ver plantilla' +
+        '📋 Pizarra táctica' +
       '</button>'
     );
     return (
