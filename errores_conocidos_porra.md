@@ -846,3 +846,23 @@ accesibles; los datos estaban disponibles en el scope de la función (`matchesIn
 (pts→gd→gf), luego `v3BreakTieH2H` por subgrupos empatados. Paridad en EF.
 **Patrón:** Cuando se documenta una limitación técnica ("no implementable sin datos"),
 verificar primero que los datos no estén ya disponibles en el scope.
+
+## ERR-61: resolveAllSlots() asignaba terceros R32 en orden secuencial ignorando Anexo C
+
+**Fecha:** 19-may-2026
+**Síntoma:** Los 8 partidos de R32 con terceros (slots `T_*` en `BRACKET.r32`)
+mostraban emparejamientos incorrectos. El mejor tercero en puntos se asignaba al
+primer slot `T_ABCDF` independientemente de su grupo de origen, violando las
+constraints del Anexo C (e.g. el tercero del grupo G no puede ir a `T_ABCDF`).
+**Causa:** `resolveAllSlots()` en `public/js/ko.js` recorría `thirdSlots` y
+`bestThirdsAvailable` en paralelo con `forEach((slot,i) => ...)`. La FIFA define
+una tabla de lookup de 495 combinaciones (Anexo C, Art. 12.6 Reglamento WC2026)
+que no tiene forma cerrada.
+**Fix:** Sprint Annex-C (19-may-2026). Objeto `const ANNEX_C` generable desde
+`scripts/gen-annex-c.mjs` (fuente: Wikipedia). `resolveAllSlots()` ahora reconstruye
+`thirdEntries` con `{group, name}` desde `GRUPOS + tables`, calcula la clave
+(8 letras sorted) y asigna cada slot según `ANNEX_C[key]`. Fallback secuencial
+legacy si la clave no aparece o `ANNEX_C` está vacío (boot inicial).
+**Patrón:** Cuando FIFA define una tabla de lookup oficial, implementarla
+directamente — no intentar derivarla algorítmicamente. Mantener el fallback
+secuencial es defensa contra dataset incompleto o regresiones en la generación.
