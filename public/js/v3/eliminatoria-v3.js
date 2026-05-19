@@ -762,21 +762,24 @@ window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
 // 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
 // probamos ambos órdenes.
 function v3RenderIABlock(matchKeyOrMatch) {
-  if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
+  // F-05 (round 3): NO devolver '' aunque iaPredictions no esté disponible.
+  // Renderizar siempre al menos la cabecera label + '?' para que el tooltip
+  // explicativo esté accesible en TODAS las cards (grupos + KO QF/SF/F).
+  var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
   var pred = null;
 
   if (typeof matchKeyOrMatch === 'string') {
-    pred = iaPredictions[matchKeyOrMatch];
+    pred = iaMap[matchKeyOrMatch];
   } else if (typeof matchKeyOrMatch === 'object' && matchKeyOrMatch !== null) {
     var match = matchKeyOrMatch;
     if (match.group && typeof getMatchKey === 'function') {
-      pred = iaPredictions[getMatchKey(match)];
+      pred = iaMap[getMatchKey(match)];
     } else {
       var homeIso3 = v3GetMatchTeamIso3(match, 'home');
       var awayIso3 = v3GetMatchTeamIso3(match, 'away');
       if (homeIso3 && awayIso3) {
-        pred = iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
-            || iaPredictions['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+            || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
       }
     }
   }
