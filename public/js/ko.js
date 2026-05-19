@@ -63,6 +63,14 @@ const BRACKET = {
   ],
 };
 
+// ANNEX_C — Reglamento FIFA 2026 Anexo C (495 combinaciones de terceros → slots T_).
+// Generar/regenerar con: `node scripts/gen-annex-c.mjs` y pegar el bloque resultante.
+// Mientras esté vacío, resolveAllSlots() cae al fallback secuencial legacy.
+// ERR-61.
+const ANNEX_C = {
+  // PEGAR AQUÍ las 495 entradas generadas por scripts/gen-annex-c.mjs
+};
+
 const ROUND_CONFIG = [
   {key:'r32',  num:'16', name:'Dieciseisavos de Final', sub:'16 partidos · 28 jun – 3 jul', pts:'+192 pts posibles', gridCls:'r32'},
   {key:'r16',  num:'8',  name:'Octavos de Final',       sub:'8 partidos · 4–7 jul',         pts:'+136 pts posibles', gridCls:'r16'},
@@ -157,12 +165,41 @@ function resolveAllSlots() {
       if(t&&t[2]) resolvedSlots['3'+g.letra]=t[2].name;
     });
 
-    // Resolve best-thirds slots (T_GROUPS)
-    const thirdSlots = ['T_ABCDF','T_CDFGH','T_CEFHI','T_EHIJK','T_BEFIJ','T_AEHIJ','T_EFGIJ','T_DEIJL'];
-    let bestThirdsAvailable = [...bestThirds];
-    thirdSlots.forEach((slot,i)=>{
-      if(bestThirdsAvailable[i]) resolvedSlots[slot]=bestThirdsAvailable[i];
+    // Resolve best-thirds slots (T_GROUPS) — Anexo C Reglamento FIFA 2026.
+    // bestThirds (scoring.js) son solo nombres; necesitamos también el grupo
+    // de origen de cada uno para mirar la tabla. Reconstruimos a partir de
+    // GRUPOS + tables ya calculadas. ERR-61.
+    const thirdEntries = [];
+    GRUPOS.forEach(g => {
+      const t = tables[g.letra];
+      const third = t && t[2];
+      if (!third) return;
+      if (!bestThirds.includes(third.name)) return;
+      thirdEntries.push({ group: g.letra, name: third.name });
     });
+
+    const thirdSlotsFallback = ['T_ABCDF','T_CDFGH','T_CEFHI','T_EHIJK','T_BEFIJ','T_AEHIJ','T_EFGIJ','T_DEIJL'];
+
+    if (thirdEntries.length === 8 && typeof ANNEX_C === 'object' && ANNEX_C) {
+      const key = thirdEntries.map(e => e.group).sort().join('');
+      const row = ANNEX_C[key];
+      if (row) {
+        Object.entries(row).forEach(([slot, groupLetter]) => {
+          const entry = thirdEntries.find(e => e.group === groupLetter);
+          if (entry) resolvedSlots[slot] = entry.name;
+        });
+      } else {
+        console.warn('[resolveAllSlots] ANNEX_C miss para clave', key, '— fallback secuencial');
+        bestThirds.forEach((name, i) => {
+          if (thirdSlotsFallback[i]) resolvedSlots[thirdSlotsFallback[i]] = name;
+        });
+      }
+    } else {
+      // <8 terceros disponibles aún, o ANNEX_C no cargado: fallback secuencial
+      bestThirds.forEach((name, i) => {
+        if (thirdSlotsFallback[i]) resolvedSlots[thirdSlotsFallback[i]] = name;
+      });
+    }
   }
 
   // Resolve W/L slots (knockout round results)

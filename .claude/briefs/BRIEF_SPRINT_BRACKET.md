@@ -84,9 +84,15 @@ Reemplazar el banner informativo actual por:
   del primer grupo incompleto via `v3OpenZoomGrupos(letter)` + `showPage('grupos')`.
 - El usuario ve el grupo a completar, no un mensaje de bloqueo.
 
-### P2 — Slot mapping FIFA (defer hasta tabla oficial)
-No implementar hasta que FIFA publique la tabla de asignación de terceros.
-Placeholder T_XXXX es aceptable para simulacros previos al torneo.
+### P2 — Slot mapping FIFA — ✅ RESUELTO (sprint Annex-C, 19-may-2026)
+Implementado en `public/js/ko.js`: objeto `ANNEX_C` (495 combinaciones) consultado
+desde `resolveAllSlots()` via clave de 8 letras sorted. Generador en
+`scripts/gen-annex-c.mjs` (lee Wikipedia). Fallback secuencial legacy si la
+clave no aparece o `ANNEX_C` está vacío. ERR-61.
+
+> Nota F1/F3: ambos gaps ya estaban resueltos en código previo a este sprint
+> (`v3OpenGoleadorPickerKO` en `eliminatoria-v3.js`, redirect a `v3OpenZoomGrupos`
+> en `v3ElimMount`). No reabrir.
 
 ---
 
