@@ -5,6 +5,74 @@
 Al editar `scripts/sync-squads.mjs`, ficheros bajo `scripts/lib/**`, o el workflow
 `.github/workflows/sync-squads.yml`.
 
+## 0 · Jerarquía de fuentes (refactor 18-19 may 2026)
+
+Desde el refactor del 18-19 may (rama `feat/squads-sources-refactor`, ver ERR-59),
+la detección de listas FINAL **no usa FF**. La jerarquía es:
+
+**Primarias** (cross-validate 2-of-N + Jaccard ≥ 0.7, `--mode=detect`):
+- AS: `https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-...`
+- Sport.es: `https://www.sport.es/.../listas-convocados-mundial-2026-...`
+- Olympics: `https://www.olympics.com/es/noticias/mundial-2026-listas-48-selecciones`
+- Eurosport: `https://www.eurosport.es/futbol/mundial/2026/convocatorias-selecciones-...`
+- Marca: `https://www.marca.com/futbol/mundial/2026/05/16/convocatorias-oficiales-...`
+
+**Secundaria solo para XI titular**:
+- futbolfantasy.com: invocada únicamente sobre selecciones ya marcadas FINAL por
+  ≥ 2 primarias. Esto cierra el vector de ERR-59 (noticias FF de Eurocopa 2024
+  IDs 115xxx mezcladas con Mundial 2026 IDs 143xxx).
+
+**Enriquecimiento** (`--mode=enrich-tm`):
+- Transfermarkt: edad, dob, valor, foto. Step 2 del cron, no se acopla al detect.
+
+**No reintroducir FF como fuente de detección bajo ningún concepto**. Si surge la
+tentación de usarla porque "es más rápida" o "tiene XI titular incluido", recordar
+que el escenario de fallo del 18-may NO es un bug de parser sino de
+identificación de evento (¿esta noticia es de Mundial 2026 o de Eurocopa 2024?).
+Mientras FF no exponga metadata estable de torneo, no hay manera robusta de
+filtrar.
+
+## 9 · `--mode=detect` — operación
+
+Pipeline:
+
+1. Fetch en paralelo AS / Sport.es / Olympics vía `Promise.allSettled`. Tolera
+   fallo de hasta 1 fuente (degrade a "1 fuente con confidence='low'").
+2. `parseCalendar()` extrae el bloque de anuncios futuros de Olympics y guarda
+   `cache/squads-calendar.json`. Si la iso3 marcada FINAL por 2 fuentes no
+   aparece en el calendario ≤ hoy, downgrade a `low` confidence.
+3. `crossValidate()` con `minPlayers=22, jaccardThr=0.7`. Resultados:
+   - `confidence='high'`: 2+ fuentes con roster ≥ 22 y al menos 1 par con
+     Jaccard ≥ 0.7 sobre nombres normalizados.
+   - `confidence='low'`: 1 sola fuente, o 2 fuentes sin par válido de Jaccard,
+     o degrade por calendario.
+   - `confidence='reject'`: solo rosters < 22 — no marcable como FINAL.
+4. Upsert por iso3 con `preserveEnrichment()` para no perder edad/valor/foto/dob
+   del enrichment TM previo. Fuente registrada: csv de fuentes que pasaron el
+   threshold (e.g. `'as+olympics'`, o `'as+olympics+tm'` si había TM previo).
+5. Para cada iso3 actualizada, paso XI titular vía FF en serie (1.5s delay).
+   Saltar con `--no-enrich-xi` si solo se quiere refrescar el roster base.
+
+Importante: los 3 parsers de fuente primaria viven en `scripts/lib/parsers/`
+y se enchufan al orquestador por interfaz uniforme. **Si añades una 4ª fuente**:
+crear módulo nuevo con mismo contrato (ver `parsers/README.md`) e importarlo en
+`sync-squads.mjs` dentro del array de `Promise.allSettled` de `runDetect()`.
+
+## 10 · Workflow YAML — cron detect→enrich-tm
+
+El cron 6h ejecuta dos steps en serial sobre el mismo job (no es paralelo a
+propósito: enrich-tm necesita el roster ya actualizado por detect):
+
+```yaml
+- run: npm run sync-squads -- --mode=detect --verbose
+- run: npm run sync-squads -- --mode=enrich-tm --all --verbose
+```
+
+`workflow_dispatch` permite saltarse uno u otro escogiendo `mode={detect|scrape|enrich-tm}`.
+`--mode=scrape` queda como path legacy para dispatch manual; el cron ya no lo
+toca y por tanto el conflicto `--refresh-final` vs `--all-missing` que causó
+el bug 18-may ya no existe en flujo automático.
+
 ## 1 · `--refresh-final` vs `--mode=scrape` sin él
 
 - **`--refresh-final` SIEMPRE preserva el roster existente** (nombres + `jugadores_fuente`

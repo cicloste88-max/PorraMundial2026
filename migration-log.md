@@ -2114,3 +2114,15 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [11:10] CRON ACTIVO: `cerrar-porras-mundial-2026` (jobid 23, schedule `'59 21 10 6 *'`, active true) ya programado desde PR #71 base. Disparará `UPDATE league_members SET porra_cerrada=true WHERE porra_cerrada=false` el 10-jun 21:59 UTC = 23:59 Madrid CEST.
 
 [11:20] DOCS: este commit cierre — `CHANGELOG.md` entrada Polish v1+Fix Packs+Fix DB con secciones por bloque + entradas viejas movidas a `CHANGELOG-archive-202605.md` (F3-I1.x + F2.9 + 2026-05-14 Redesign v3 F2) para mantener bajo 30KB. `errores_conocidos_porra.md` ERR-58 (RLS enabled sin policy SELECT). `CLAUDE.md` estado actual a `bd6e977` + Top-3 reordenado (Reglamento FIFA / squads-sources-refactor PR / pre-launch operativo) + nueva regla CRÍTICA sobre migrations RLS idempotentes. `docs/db-schema.md` policy `ia_elo_fifa_select_authenticated` documentada + nota explícita sobre `ia_h2h`/`ia_last5_results` pendientes hardening. `docs/REGLAMENTO_FIFA_2026.md` placeholder vacío (sprint próximo).
+
+## 2026-05-19 — Refactor sync-squads fuentes primarias 5-of-N + parsers reales (feat/squads-sources-refactor)
+
+[18:00] BRANCH: `feat/squads-sources-refactor` viva sobre `origin/main` (`6038882`) desde 18-may, tras detectar bug del 18-may (PR #69 mergeado pero `--mode=scrape --all-missing` detectó 3 falsos positivos CRO/NED/POR con datos Eurocopa 2024 IDs 115xxx). BD limpiada manualmente con UPDATE por San antes del refactor.
+
+[18:30] REFACTOR: nuevo `--mode=detect` orquestador con cross-validation 2-of-N + Jaccard ≥ 0.7 sobre 5 fuentes primarias (AS + Sport.es + Olympics + Eurosport + Marca). FF queda como secundaria solo para enriquecer XI titular de FINAL ya confirmadas → cierra ERR-59 estructuralmente. Calendar greedy longest-match (4 fechas → 8 fechas, 12 iso3s únicos). `maxPlayers=30` añadido para rechazar pre-listas largas (ARG/COL/MEX/CZE/QAT 33-55 jugadores). Calendar semantics invertida: solo degrade si Olympics anuncia "(definitiva)" en fecha FUTURA. Workflow YAML reescrito: cron 6h ahora ejecuta detect→enrich-tm en serial.
+
+[18:45] PARSERS REALES: `olympics.mjs` con orphan continuation + cross-country reset (fix BEL 23→26, CUW 28→26); `sport.mjs` con `requireBullet: false` (antes 0 iso3 → ahora 48); AS parametrizado para `requireBullet`. Nuevos parsers `eurosport.mjs` y `marca.mjs` (alias AS sin bullet). 28/28 tests pasan (util.test.mjs + sources.test.mjs).
+
+[19:00] DRY-RUN: validado con 5 fuentes — 17 procesables (16 high con 4-5 fuentes coincidentes, 1 low CRO por calendario "(definitiva): 1 jun"), 5 rejected pre-lista. IRN aparece solo en Marca (señal nueva).
+
+[19:15] DOCS: ERR-59 añadido a `errores_conocidos_porra.md` (ERR-58 quedó asignado al RLS bug del PR #71), entrada CHANGELOG entrada `2026-05-19 — sync-squads refactor 5-of-N`, `.claude/rules/sync-squads.md` §0/§9/§10 actualizada con jerarquía 5 fuentes + workflow serial. PR pendiente de creación contra `main` (`bd6e977`).

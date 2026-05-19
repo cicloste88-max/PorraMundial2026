@@ -40,6 +40,67 @@ Sesión grande de polish v3 post-Completion Flow. 4 bloques temáticos + 2 fix p
 
 - **ERR-58** — detalle completo en `errores_conocidos_porra.md`.
 
+## 2026-05-19 — sync-squads: refactor fuentes primarias 5-of-N + parsers reales (PR feat/squads-sources-refactor)
+
+**Branch:** `feat/squads-sources-refactor` (pendiente de merge a main). Sin migración SQL.
+
+Resuelve el bug del 18-may en `--mode=scrape --all-missing`: 3 falsos positivos
+(CRO/NED/POR) con datos de Eurocopa 2024 escritos a BD como "FINAL Mundial 2026".
+**Ya limpiados manualmente con UPDATE** antes de este refactor.
+
+### Cambios
+
+- **Nuevo `--mode=detect`** (default del cron desde este PR): fetch en paralelo
+  de **5 fuentes primarias** — AS / Sport.es / Olympics.com / Eurosport / Marca —
+  y cross-validation 2-of-N + Jaccard ≥ 0.7 sobre nombres normalizados. Solo se
+  marca FINAL si al menos 2 fuentes coinciden con roster en `[22, 30]` jugadores
+  y solape ≥ 0.7. Calendario Olympics se parsea aparte y degrade `high → low`
+  solo si Olympics anuncia "(definitiva)" en fecha FUTURA (semánticamente
+  invertido vs versión inicial del PR).
+- **Parsers reales** (no stub): `olympics.mjs` con orphan continuation
+  (fix BEL 23→26, CUW 28→26), `sport.mjs` con bullet opcional (antes 0 iso3
+  → ahora 48), AS parametrizado para `requireBullet`, calendar greedy
+  longest-match (4 fechas → 8 fechas, 12 iso3s únicos).
+- **FF degradada a fuente secundaria**: ya no se usa para *detectar* nuevas listas,
+  solo para enriquecer XI titular de selecciones ya confirmadas FINAL por las
+  primarias. Esto cierra estructuralmente el vector de ERR-59.
+- **`maxPlayers=30`** en cross-validate: pre-listas largas (ARG/COL/MEX/CZE/QAT
+  con 33-55 jugadores) van a `reject` con razón "pre-lista detectada — esperar
+  cierre oficial".
+- **Workflow YAML v2**: cron 6h ahora ejecuta `--mode=detect` + `--mode=enrich-tm`
+  en serial. Se elimina el conflicto mutuamente excluyente `--refresh-final` vs
+  `--all-missing`. Artifact incluye `cache/squads-calendar.json`.
+- **`--mode=scrape` y `--mode=enrich-tm` conservados** para dispatch manual.
+- **Marca aporta IRN** (Irán) como única fuente publicada para esa selección.
+
+### Archivos
+
+```
+scripts/lib/parsers/_util.mjs           helpers compartidos (htmlToLines, etc.)
+scripts/lib/parsers/as.mjs              parser AS (requireBullet param)
+scripts/lib/parsers/sport.mjs           parser Sport.es
+scripts/lib/parsers/olympics.mjs        parser Olympics + orphan continuation
+scripts/lib/parsers/eurosport.mjs       parser Eurosport (nuevo)
+scripts/lib/parsers/marca.mjs           parser Marca (nuevo)
+scripts/lib/parsers/calendar.mjs        calendar greedy longest-match
+scripts/lib/parsers/country-map.json    nombre país → iso3 (expandido)
+scripts/lib/cross-validate.mjs          Jaccard + 2-of-N + maxPlayers + calendar invertido
+scripts/sync-squads.mjs                 orquestador 5 fuentes
+scripts/lib/parsers/__tests__/          util.test.mjs + sources.test.mjs (28 tests)
+tests/fixtures/squads/                  as.html + sport.html + olympics.html
+.github/workflows/sync-squads.yml       cron detect→enrich-tm en serial v2
+```
+
+### Dry-run validado
+
+19-may con 5 fuentes: `as=48 sport=48 olympics=21 eurosport=47 marca=47`.
+22 iso3 procesables → 17 dry-run (16 high con 4-5 fuentes, 1 low CRO por
+calendario "(definitiva): 1 jun"), 5 rejected pre-lista.
+
+### Detalle ERR-59 + caveats
+
+Ver `errores_conocidos_porra.md` ERR-59 y `.claude/rules/sync-squads.md` §0/§9/§10.
+
 ## 2026-05-17 — Sprint Completion Flow F1 + F3 (PR #69)
 
 **Branch:** `claude/diagnose-esc-listener-bug-L23SC` mergeada a main (`b5fb89c`, squash 18:06 UTC). Base rebase: `dff1166` (post-PR #68). Sin migración SQL.

@@ -2,30 +2,36 @@ name: Sync Squads
 
 on:
   schedule:
-    # Cada 6h UTC: cubre el snapshot FIFA del 2-jun y bajas durante el Mundial.
+    # Cada 6h UTC: detecta nuevas listas FINAL vía AS+Sport+Olympics (--mode=detect)
+    # + enriquece valor/edad vía Transfermarkt (--mode=enrich-tm) en pasada serial.
     # Cron de GitHub Actions puede retrasarse ~30min en horas pico (aceptable).
     - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Modo de ejecución'
+        description: 'Modo de ejecución (detect = nuevo flujo por defecto)'
         type: choice
         options:
+          - detect
           - scrape
           - enrich-tm
-        default: scrape
-      refresh_final:
-        description: 'Aplicar --refresh-final (solo modo scrape)'
-        type: boolean
-        default: true
+        default: detect
       iso3_filter:
-        description: 'iso3 a procesar (vacío = --all-missing en scrape, --all en enrich-tm)'
+        description: 'iso3 a procesar (vacío = todos). CSV ej "FRA,JPN"'
         type: string
         default: ''
       verbose:
         description: 'Log detallado de fetches y matches'
         type: boolean
         default: true
+      enrich_xi:
+        description: '[detect only] enriquecer XI titular vía FF tras detect'
+        type: boolean
+        default: true
+      refresh_final:
+        description: '[scrape only, LEGACY] aplicar --refresh-final'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,7 +43,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,50 +70,86 @@ jobs:
       - name: Build CLI flags
         id: flags
         env:
-          # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
-          # solo cuando está unset/empty, preservando "false" explícito de UI.
           MODE: ${{ inputs.mode }}
-          REFRESH_FINAL: ${{ inputs.refresh_final }}
           ISO3_FILTER: ${{ inputs.iso3_filter }}
           VERBOSE: ${{ inputs.verbose }}
+          ENRICH_XI: ${{ inputs.enrich_xi }}
+          REFRESH_FINAL: ${{ inputs.refresh_final }}
         run: |
-          MODE="${MODE:-scrape}"
-          REFRESH_FINAL="${REFRESH_FINAL:-true}"
-          VERBOSE="${VERBOSE:-true}"
+          # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
+          # solo cuando está unset/empty, preservando "false" explícito de UI.
+          MODE="${MODE:-detect}"
           ISO3_FILTER="${ISO3_FILTER:-}"
+          VERBOSE="${VERBOSE:-true}"
+          ENRICH_XI="${ENRICH_XI:-true}"
+          REFRESH_FINAL="${REFRESH_FINAL:-false}"
 
-          # Sanity check del input libre: bloquea caracteres no esperados
-          # antes de que se interpolen en el comando del siguiente step.
+          # Sanity check del input libre.
           if [ -n "${ISO3_FILTER}" ] && ! printf '%s' "${ISO3_FILTER}" | grep -qE '^[A-Z]{3}(,[A-Z]{3})*$'; then
             echo "ERROR: iso3_filter debe ser código de 3 letras MAYUS, opcionalmente coma-separado (e.g. FRA, FRA,JPN)"
             exit 1
           fi
 
-          FLAGS="--mode=${MODE}"
-          if [ "${MODE}" = "scrape" ] && [ "${REFRESH_FINAL}" = "true" ]; then
-            FLAGS="${FLAGS} --refresh-final"
-          fi
+          DETECT_FLAGS="--mode=detect"
+          SCRAPE_FLAGS="--mode=scrape"
+          TM_FLAGS="--mode=enrich-tm"
+
           if [ -n "${ISO3_FILTER}" ]; then
-            FLAGS="${FLAGS} --iso3=${ISO3_FILTER}"
-          elif [ "${MODE}" = "scrape" ] && [ "${REFRESH_FINAL}" != "true" ]; then
-            FLAGS="${FLAGS} --all-missing"
-          elif [ "${MODE}" = "enrich-tm" ]; then
-            FLAGS="${FLAGS} --all"
+            DETECT_FLAGS="${DETECT_FLAGS} --iso3=${ISO3_FILTER}"
+            SCRAPE_FLAGS="${SCRAPE_FLAGS} --iso3=${ISO3_FILTER}"
+            TM_FLAGS="${TM_FLAGS} --iso3=${ISO3_FILTER}"
+          else
+            TM_FLAGS="${TM_FLAGS} --all"
+          fi
+
+          if [ "${ENRICH_XI}" != "true" ]; then
+            DETECT_FLAGS="${DETECT_FLAGS} --no-enrich-xi"
+          fi
+          if [ "${REFRESH_FINAL}" = "true" ]; then
+            SCRAPE_FLAGS="${SCRAPE_FLAGS} --refresh-final"
+          elif [ -z "${ISO3_FILTER}" ]; then
+            SCRAPE_FLAGS="${SCRAPE_FLAGS} --all-missing"
           fi
           if [ "${VERBOSE}" = "true" ]; then
-            FLAGS="${FLAGS} --verbose"
+            DETECT_FLAGS="${DETECT_FLAGS} --verbose"
+            SCRAPE_FLAGS="${SCRAPE_FLAGS} --verbose"
+            TM_FLAGS="${TM_FLAGS} --verbose"
           fi
 
-          echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
-          echo "Resolved flags: ${FLAGS}"
+          {
+            echo "mode=${MODE}"
+            echo "detect=${DETECT_FLAGS}"
+            echo "scrape=${SCRAPE_FLAGS}"
+            echo "tm=${TM_FLAGS}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved mode: ${MODE}"
+          echo "  detect flags: ${DETECT_FLAGS}"
+          echo "  scrape flags: ${SCRAPE_FLAGS}"
+          echo "  tm flags:     ${TM_FLAGS}"
 
-      - name: Run sync-squads
-        run: npm run sync-squads -- ${{ steps.flags.outputs.flags }} 2>&1 | tee sync-squads.log
+      # Step principal del cron: detect primero, enrich-tm a continuación.
+      # En workflow_dispatch con mode != detect, el primer step se salta.
+      - name: Run detect (primary sources)
+        if: ${{ steps.flags.outputs.mode == 'detect' }}
+        run: npm run sync-squads -- ${{ steps.flags.outputs.detect }} 2>&1 | tee -a sync-squads.log
 
-      - name: Upload log
+      - name: Run scrape [legacy]
+        if: ${{ steps.flags.outputs.mode == 'scrape' }}
+        run: npm run sync-squads -- ${{ steps.flags.outputs.scrape }} 2>&1 | tee -a sync-squads.log
+
+      - name: Run enrich-tm
+        # Cron: corre tras detect. Manual mode=enrich-tm: corre directamente.
+        # Manual mode=scrape: NO corre (San lo invocará a mano si lo necesita).
+        if: ${{ steps.flags.outputs.mode == 'detect' || steps.flags.outputs.mode == 'enrich-tm' }}
+        run: npm run sync-squads -- ${{ steps.flags.outputs.tm }} 2>&1 | tee -a sync-squads.log
+
+      - name: Upload log + calendar artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sync-squads-log-${{ github.run_id }}
-          path: sync-squads.log
+          path: |
+            sync-squads.log
+            cache/squads-calendar.json
           retention-days: 14
+          if-no-files-found: warn

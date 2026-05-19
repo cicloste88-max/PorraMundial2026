@@ -5,12 +5,12 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `bd6e977` (PR #71 Polish v1 + Fix Packs 1, 2 + Fix DB, 19-may 10:57 UTC, squash 13 commits). B1-B4 Polish v1 (traducciones+chips, panel IA Clasificación, IA Predictor visual modales, awards card+cerrar porra+pg_cron 10-jun) + Fix Pack 1 (leyenda 3º, IA % Hamilton, lookup IA KO `ondemand_*`, awards legacy Maradona/Ronaldo/Casillas) + Fix Pack 2 (modal flotante, paleta slate/blue, listas BD-driven Elo+TM) + Fix DB RLS `ia_elo_fifa`. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC). Polish v3 a producción cerrado a nivel código. **10/48 squads operativas** — resto via sync-squads cron 6h hasta 2-jun. ERR-58 nuevo (RLS enabled sin policy SELECT). Branch `feat/squads-sources-refactor` con 4 commits pusheados, PR independiente próxima sesión.
+Main HEAD `bd6e977` (PR #71 Polish v1 + Fix Packs 1, 2 + Fix DB RLS, 19-may 10:57 UTC, squash). B1-B4 Polish + 4 fixes pack1 (leyenda 3º, IA % Hamilton, lookup IA KO, awards legacy) + 3 fixes pack2 (modal flotante, paleta slate/blue, listas BD-driven) + RLS `ia_elo_fifa`. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC). Polish v3 cerrado a nivel código. **10/48 squads operativas**. ERR-58 (RLS sin policy SELECT). Branch `feat/squads-sources-refactor` con 5 fuentes 2-of-N pushada, PR pendiente.
 
 ## Top-3 pendientes inmediatos
 
 1. **Sprint Reglamento FIFA** (3 commits): aplicar Art13 head-to-head + Art16 a scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md` reservado; brief específico cuando San active.
-2. **PR `feat/squads-sources-refactor`**: 4 commits ready sobre `bd6e977`. Refactor fuentes scraping (ff/365/infobae/tm) para limpieza arquitectónica + adición fácil de fuentes. San abrirá PR.
+2. **PR `feat/squads-sources-refactor`**: 4 commits sobre `bd6e977`. 5 fuentes primarias (AS+Sport+Olympics+Eurosport+Marca) cross-validate 2-of-N + maxPlayers=30. ERR-59. San abre PR.
 3. **Operacional pre-launch 11-jun**: activar `pg_cron update-results`, squads 38/48 via sync-squads, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked).
 
 ## Pendientes — Bugs UI
