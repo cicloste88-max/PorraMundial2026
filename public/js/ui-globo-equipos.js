@@ -306,10 +306,21 @@
         '<p class="fc-globo-detail__bio-text">' + b.bio_espn + '</p>' +
       '</details>';
     }
+    // F-10b: deriva iso3 desde EQUIPOS por name_en para el botón "Plantilla".
+    var iso3 = '';
+    if (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS) && nameEn) {
+      var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; });
+      if (eq) iso3 = eq.flag || '';
+    }
     var btnPlantilla = (
       '<button type="button" class="fc-globo-detail__btn-plantilla" ' +
         'data-name-en="' + (nameEn || '').replace(/"/g, '&quot;') + '">' +
         '📋 Pizarra táctica' +
+      '</button>' +
+      '<button type="button" class="fc-globo-detail__btn-roster" ' +
+        'data-iso3="' + iso3.replace(/"/g, '&quot;') + '" ' +
+        'data-pais="' + (nombrePais || '').replace(/"/g, '&quot;') + '">' +
+        '👥 Plantilla' +
       '</button>'
     );
     return (
@@ -775,6 +786,15 @@
         }
         return;
       }
+      var rosterBtn = e.target && e.target.closest && e.target.closest('.fc-globo-detail__btn-roster');
+      if (rosterBtn) {
+        openRosterScreen(rosterBtn.dataset.iso3 || '', rosterBtn.dataset.pais || '');
+        return;
+      }
+      if (e.target && e.target.id === 'fc-roster-close') {
+        closeRosterScreen();
+        return;
+      }
       if (e.target === overlay) closeOverlay();
     });
 
@@ -857,6 +877,119 @@
       console.log('[globo] navPlantilla →', nameEn, '(stub — PR4 pendiente)');
       closeOverlay();
     };
+  }
+
+  // F-10b — Roster screen: tabla agrupada por demarcación (Porteros / Defensas
+  // / Centrocampistas / Delanteros) con scroll horizontal en móvil. Lee
+  // squads.jugadores via window._porraDb. Render: bandera+país en cabecera,
+  // tabla Nombre|Pos.|Edad|Valor; null → "—".
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
+    });
+  }
+  function fmtValor(v) {
+    if (v == null || v === '') return '—';
+    if (typeof v === 'number') {
+      if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, '') + ' M€';
+      if (v >= 1e3) return Math.round(v / 1e3) + ' k€';
+      return v + ' €';
+    }
+    return String(v);
+  }
+  var BUCKET_ORDER = ['Portero', 'Defensa', 'Centrocampista', 'Delantero'];
+  var BUCKET_LABEL = {
+    Portero: 'PORTEROS',
+    Defensa: 'DEFENSAS',
+    Centrocampista: 'CENTROCAMPISTAS',
+    Delantero: 'DELANTEROS'
+  };
+  function buildRosterHTML(iso3, pais, jugadores) {
+    var grupos = { Portero: [], Defensa: [], Centrocampista: [], Delantero: [] };
+    (jugadores || []).forEach(function (j) {
+      var b = j.posicion_bucket;
+      if (grupos[b]) grupos[b].push(j); else grupos.Delantero.push(j);
+    });
+    var secciones = BUCKET_ORDER.map(function (b) {
+      var arr = grupos[b];
+      if (!arr.length) return '';
+      var rows = arr.map(function (j) {
+        return '<tr>' +
+          '<td class="fc-roster-name">' + escHtml(j.nombre || '—') +
+            (j.club ? '<span class="fc-roster-club">' + escHtml(j.club) + '</span>' : '') +
+          '</td>' +
+          '<td>' + escHtml(j.posicion || '—') + '</td>' +
+          '<td>' + (j.edad != null && j.edad !== '' ? escHtml(j.edad) : '—') + '</td>' +
+          '<td>' + escHtml(fmtValor(j.valor != null ? j.valor : j.valor_mercado)) + '</td>' +
+        '</tr>';
+      }).join('');
+      return '<div class="fc-roster-section">' +
+        '<div class="fc-roster-section-title">' + BUCKET_LABEL[b] + ' (' + arr.length + ')</div>' +
+        '<div class="fc-roster-table-wrapper">' +
+          '<table class="fc-roster-table">' +
+            '<thead><tr><th>Nombre</th><th>Pos.</th><th>Edad</th><th>Valor</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    var flagUrl = iso3
+      ? 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/flags/' + iso3 + '.png'
+      : '';
+    return '<div class="fc-roster-modal__head">' +
+      (flagUrl ? '<img class="fc-roster-modal__flag" src="' + flagUrl + '" alt=""/>' : '') +
+      '<span class="fc-roster-modal__title">' + escHtml(pais) + ' — Plantilla</span>' +
+      '<button type="button" id="fc-roster-close" class="fc-roster-modal__close" aria-label="Cerrar">✕</button>' +
+    '</div>' +
+    '<div class="fc-roster-modal__body">' +
+      (secciones || '<div class="fc-roster-empty">Datos de plantilla aún no disponibles para esta selección.</div>') +
+    '</div>';
+  }
+  function ensureRosterModal() {
+    var el = document.getElementById('fc-roster-modal');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'fc-roster-modal';
+    el.className = 'fc-roster-modal';
+    document.body.appendChild(el);
+    el.addEventListener('click', function (e) {
+      if (e.target === el) closeRosterScreen();
+      if (e.target && e.target.id === 'fc-roster-close') closeRosterScreen();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && el.classList.contains('is-open')) closeRosterScreen();
+    });
+    return el;
+  }
+  async function openRosterScreen(iso3, pais) {
+    var modal = ensureRosterModal();
+    modal.innerHTML = '<div class="fc-roster-modal__inner"><div class="fc-roster-loading">Cargando plantilla…</div></div>';
+    modal.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    var jugadores = [];
+    var nombrePais = pais;
+    if (iso3 && window._porraDb) {
+      try {
+        var res = await window._porraDb
+          .from('squads')
+          .select('jugadores, nombre_pais')
+          .eq('iso3', iso3)
+          .single();
+        if (res && res.data) {
+          jugadores = Array.isArray(res.data.jugadores) ? res.data.jugadores : [];
+          if (res.data.nombre_pais) nombrePais = res.data.nombre_pais;
+        }
+      } catch (err) {
+        console.warn('[roster] error fetch squads', iso3, err);
+      }
+    }
+    modal.innerHTML = '<div class="fc-roster-modal__inner">' + buildRosterHTML(iso3, nombrePais, jugadores) + '</div>';
+  }
+  function closeRosterScreen() {
+    var modal = document.getElementById('fc-roster-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    document.body.style.overflow = '';
   }
 
   // F1.1e — API pública para el CTA v3 (shell mundial-shell-v3.js).
