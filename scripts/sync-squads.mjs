@@ -2,7 +2,7 @@
 // scripts/sync-squads.mjs — sincronización de plantillas Mundial 2026.
 //
 // Modos:
-//   --mode=detect    Cross-validate 2-of-3 sobre AS + Sport + Olympics (primarias).
+//   --mode=detect    Cross-validate 2-of-N sobre AS + Sport + Olympics + Eurosport + Marca.
 //                    Detecta listas FINAL y enriquece XI con FF (secundaria) sólo
 //                    sobre selecciones ya confirmadas como FINAL → evita falsos
 //                    positivos tipo Eurocopa 2024 (ver ERR-58).
@@ -34,7 +34,9 @@ import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
 import * as parserOlympics from './lib/parsers/olympics.mjs';
-import { parseCalendar, expectedByDate } from './lib/parsers/calendar.mjs';
+import * as parserEurosport from './lib/parsers/eurosport.mjs';
+import * as parserMarca from './lib/parsers/marca.mjs';
+import { parseCalendar, pendingDefinitiveByDate } from './lib/parsers/calendar.mjs';
 import { crossValidate } from './lib/cross-validate.mjs';
 import { matchAgainstRoster } from './lib/name-matcher.mjs';
 
@@ -294,10 +296,10 @@ async function runEnrichTm(targets) {
 
 // ─── modo detect ──────────────────────────────────────────────────────────
 // Pipeline:
-//  1. Fetch en paralelo las 3 fuentes primarias (AS, Sport, Olympics). Tolerante
-//     a fallos: si una falla, se sigue con las otras dos.
+//  1. Fetch en paralelo las 5 fuentes primarias (AS, Sport, Olympics, Eurosport, Marca).
+//     Tolerante a fallos: si una falla, se sigue con las restantes.
 //  2. Parsear calendario Olympics → cache/squads-calendar.json.
-//  3. crossValidate() — 2-of-3 + Jaccard ≥ 0.7 + filtro por calendario.
+//  3. crossValidate() — 2-of-N + Jaccard ≥ 0.7 + filtro por calendario.
 //  4. Para cada iso3 con confidence='high' o 'low': upsert con jugadores_is_final=true
 //     y fuente = "as+olympics" (o lo que haya). 'reject' se loguea y se descarta.
 //  5. Para cada FINAL recién escrita: enrich XI titular vía FF (filtro "Mundial 2026"
@@ -305,26 +307,27 @@ async function runEnrichTm(targets) {
 //     que la noticia detectada sea de Mundial — ver ERR-58).
 //  6. Tras el paso XI: dejar el enrich-tm para una pasada posterior (step 2 del
 //     workflow), no encadenarlo aquí para simplificar logs.
+const PRIMARY_PARSERS = [parserAS, parserSport, parserOlympics, parserEurosport, parserMarca];
+
 async function runDetect(targetsArg) {
   const enrichXi = argv['no-enrich-xi'] ? false : true;
   const today = new Date().toISOString().slice(0, 10);
-  console.log(`\ndetect: fuentes AS + Sport + Olympics  dry=${DRY_RUN}  fecha=${today}\n`);
+  const sourceNames = PRIMARY_PARSERS.map((p) => p.SOURCE_NAME).join(' + ');
+  console.log(`\ndetect: fuentes ${sourceNames}  dry=${DRY_RUN}  fecha=${today}\n`);
 
-  const settled = await Promise.allSettled([
-    parserAS.fetchAndParse({ verbose: VERBOSE }),
-    parserSport.fetchAndParse({ verbose: VERBOSE }),
-    parserOlympics.fetchAndParse({ verbose: VERBOSE }),
-  ]);
+  const settled = await Promise.allSettled(
+    PRIMARY_PARSERS.map((p) => p.fetchAndParse({ verbose: VERBOSE }))
+  );
 
   const parseResults = [];
-  for (const [i, src] of [parserAS, parserSport, parserOlympics].entries()) {
+  for (const [i, src] of PRIMARY_PARSERS.entries()) {
     const r = settled[i];
     if (r.status === 'fulfilled') {
       const count = Object.keys(r.value.byIso3 || {}).length;
-      console.log(`  fuente ${src.SOURCE_NAME.padEnd(8)} → ${count} iso3 parseados`);
+      console.log(`  fuente ${src.SOURCE_NAME.padEnd(10)} → ${count} iso3 parseados`);
       parseResults.push(r.value);
     } else {
-      console.warn(`  fuente ${src.SOURCE_NAME.padEnd(8)} → FALLO: ${r.reason?.message || r.reason}`);
+      console.warn(`  fuente ${src.SOURCE_NAME.padEnd(10)} → FALLO: ${r.reason?.message || r.reason}`);
     }
   }
   if (parseResults.length === 0) {
@@ -333,7 +336,8 @@ async function runDetect(targetsArg) {
   }
 
   // calendar — best-effort sobre el HTML de Olympics si está disponible.
-  const olympicsResult = settled[2];
+  const olympicsIdx = PRIMARY_PARSERS.indexOf(parserOlympics);
+  const olympicsResult = settled[olympicsIdx];
   let calendarEntries = [];
   if (olympicsResult.status === 'fulfilled') {
     try {
@@ -354,9 +358,16 @@ async function runDetect(targetsArg) {
       console.warn(`  calendario: parse error — ${err.message}`);
     }
   }
-  const expectedSet = expectedByDate(calendarEntries, today);
+  // Set de iso3 con "(definitiva)" anunciada en fecha FUTURA — solo estos se
+  // degradan a 'low' aunque 2+ fuentes coincidan (posible lista provisional).
+  const pendingSet = pendingDefinitiveByDate(calendarEntries, today);
 
-  const validated = crossValidate(parseResults, { minPlayers: 22, jaccardThr: 0.7, calendar: expectedSet.size > 0 ? expectedSet : null });
+  const validated = crossValidate(parseResults, {
+    minPlayers: 22,
+    maxPlayers: 30,
+    jaccardThr: 0.7,
+    calendar: pendingSet.size > 0 ? pendingSet : null,
+  });
 
   console.log('\n  iso3 | conf  | sources         | n   | reason');
   console.log('  -----+-------+-----------------+-----+-------');

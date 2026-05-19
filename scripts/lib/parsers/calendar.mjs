@@ -35,9 +35,12 @@ function normalizeCountryKey(s) {
  *
  * Heurística:
  *  1. Buscar líneas del tipo "<dd> de <mes>" (con o sin año explícito).
- *  2. La línea siguiente al match suele contener los países separados por coma o "y".
- *  3. Mapear cada país a iso3 vía country-map.json (la importa el llamador y lo
- *     pasa como `countryMap` para evitar I/O acoplado a parseo).
+ *  2. Coger el segmento de texto hasta la siguiente fecha.
+ *  3. Hacer greedy longest-match contra `countryMap` con ventanas de 1-3 tokens
+ *     (necesario porque Olympics serializa cada país en un `<li>` distinto y
+ *     `stripTags` los une con espacios → "Alemania Marruecos Noruega" se
+ *     convertiría en un solo token si solo splitáramos por comas/"y").
+ *  4. Strippear sufijos editoriales tipo "(definitiva)" o "(provisional)".
  *
  * @param {string} html
  * @param {Record<string,string>} countryMap  Mapa de nombre normalizado → iso3.
@@ -63,37 +66,58 @@ export function parseCalendar(html, countryMap, opts = {}) {
     const date = `${year}-${month}-${day}`;
 
     const tail = text.slice(dateRe.lastIndex, dateRe.lastIndex + 240);
-    const stop = tail.search(/\b\d{1,2}\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/i);
+    // Stop al próximo "dd de mes" (otra fecha de calendario) o al rango del
+    // torneo "dd mes - dd mes" (sin "de", marca fin del bloque calendario).
+    const stop = tail.search(/\b\d{1,2}\s+(?:de\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/i);
     const segment = stop > -1 ? tail.slice(0, stop) : tail;
 
-    const countries = segment
-      .split(/[,•\n]|(?:\s+y\s+)/i)
-      .map((s) => s.replace(/[:;.\-—–]/g, ' ').trim())
-      .map((s) => s.replace(/^(y|e)\s+/i, '').trim())
-      .filter((s) => s.length >= 3 && s.length <= 30 && /^[A-Za-zÁÉÍÓÚÑáéíóúñ. \-]+$/.test(s));
-
-    const iso3s = [];
-    const matchedCountries = [];
-    for (const c of countries) {
-      const key = normalizeCountryKey(c);
-      const iso3 = countryMap[key];
-      if (iso3 && !iso3s.includes(iso3)) {
-        iso3s.push(iso3);
-        matchedCountries.push(c);
-      }
-    }
+    const { iso3s, matched } = extractCountries(segment, countryMap);
     if (iso3s.length === 0) continue;
 
-    const dedupeKey = `${date}|${iso3s.sort().join(',')}`;
+    const dedupeKey = `${date}|${iso3s.slice().sort().join(',')}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
     entries.push({ date, iso3s });
-    raw.push({ date, countries: matchedCountries });
+    raw.push({ date, countries: matched });
   }
 
   entries.sort((a, b) => a.date.localeCompare(b.date));
   return { entries, raw };
+}
+
+// Greedy longest-match: walk tokens, intenta ventana de 3 → 2 → 1, consume.
+// Strippea sufijos editoriales "(definitiva)", "(provisional)", paréntesis sueltos.
+function extractCountries(segment, countryMap) {
+  const cleaned = segment
+    .replace(/\([^)]*\)/g, ' ')           // strip "(definitiva)", "(provisional)", etc.
+    .replace(/[,•\n:;.\-—–]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const tokens = cleaned.split(/\s+/).filter((t) => /^[A-Za-zÁÉÍÓÚÑáéíóúñ.\-]+$/.test(t));
+
+  const iso3s = [];
+  const matched = [];
+  let i = 0;
+  while (i < tokens.length) {
+    let consumed = 0;
+    for (let win = Math.min(3, tokens.length - i); win >= 1 && consumed === 0; win--) {
+      const candidate = tokens.slice(i, i + win).join(' ');
+      // Filtrar conectores que no son países válidos por sí solos
+      if (win === 1 && /^(y|e|o|u|de|del|la|el|los|las)$/i.test(candidate)) continue;
+      const key = normalizeCountryKey(candidate);
+      const iso3 = countryMap[key];
+      if (iso3) {
+        if (!iso3s.includes(iso3)) {
+          iso3s.push(iso3);
+          matched.push(candidate);
+        }
+        consumed = win;
+      }
+    }
+    i += consumed > 0 ? consumed : 1;
+  }
+  return { iso3s, matched };
 }
 
 function stripTags(html) {
@@ -106,7 +130,24 @@ function stripTags(html) {
 
 /**
  * Helper para el orquestador: dado el calendario y la fecha de hoy (ISO),
- * devuelve los iso3 que se esperan publicar HOY o ya están vencidos.
+ * devuelve los iso3 cuya FECHA "(definitiva)" del calendario es ESTRICTAMENTE
+ * FUTURA. El cross-validate los degrada a 'low' aunque 2+ fuentes coincidan,
+ * porque la lista actual probablemente sea provisional y Olympics anuncia que
+ * la definitiva llega más tarde.
+ *
+ * iso3 ausentes del calendario o ya vencidos (date ≤ today) → NO degraden.
+ */
+export function pendingDefinitiveByDate(entries, todayIso) {
+  const out = new Set();
+  for (const e of entries) {
+    if (e.date > todayIso) for (const i of e.iso3s) out.add(i);
+  }
+  return out;
+}
+
+/**
+ * @deprecated Mantén compatibilidad con tests/llamadores antiguos. Devuelve los
+ * iso3 con fecha ≤ today (lo opuesto al uso actual de cross-validate).
  */
 export function expectedByDate(entries, todayIso) {
   const out = new Set();

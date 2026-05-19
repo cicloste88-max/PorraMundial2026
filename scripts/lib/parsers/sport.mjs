@@ -1,14 +1,30 @@
 // Parser fuente Sport.es — listas de convocados Mundial 2026.
 // URL: https://www.sport.es/es/noticias/mundial-futbol/listas-convocados-mundial-2026-...
 //
-// Mismo grupo editorial que AS — el parser puede ser muy similar pero NO idéntico
-// (HTML wrappers, clases CSS y orden de secciones difieren). Implementar como módulo
-// propio mantiene la independencia de cross-validate y permite que una fuente caiga
-// sin afectar a la otra.
+// Estructura HTML (validada 19-may):
+//   <h2>Grupo A</h2>
+//   <div>
+//     <p class="ft-text"><strong>México</strong></p>
+//     <p class="ft-text">Lista por confirmar</p>
+//     <p class="ft-text"><strong>Bélgica</strong></p>
+//     <ul class="ft-list ft-list--primary">
+//       <li class="ft-list__item"><strong>Porteros</strong>: Courtois (Real Madrid), ...</li>
+//       <li class="ft-list__item"><strong>Defensas</strong>: ...</li>
+//       <li class="ft-list__item"><strong>Centrocampistas</strong>: ...</li>
+//       <li class="ft-list__item"><strong>Delanteros</strong>: ...</li>
+//     </ul>
+//
+// Diferencia vs AS:
+//   - País SIN bullet `•` (AS usa `<h3>• País</h3>`, Sport usa `<strong>País</strong>`).
+//   - Grupos en `<h2>Grupo X</h2>` (AS también).
+//   - "Lista por confirmar" para países sin plantilla → el parser abre el iso3
+//     pero queda con players=[].
+//
+// Reusamos `parseHtml` de as.mjs pasando `requireBullet: false`.
 //
 // Contrato y reglas: scripts/lib/parsers/README.md.
 
-import { decode } from 'html-entities';
+import { parseHtml as parseHtmlAS } from './as.mjs';
 
 export const SOURCE_NAME = 'sport';
 export const SOURCE_URL =
@@ -35,14 +51,7 @@ export async function fetchAndParse({ verbose = false, html = null } = {}) {
   return { ...parsed, source: SOURCE_NAME, fetchedAt: new Date().toISOString(), _html: body };
 }
 
-/**
- * parseHtml — STUB. San implementa el parser real sobre samples de 18-may.
- */
 export function parseHtml(html) {
-  // TODO(San): implementar parser Sport.es. Si el HTML acaba siendo casi idéntico
-  // a AS, considerar extraer la lógica común a un helper compartido en este mismo
-  // módulo (NO importar desde as.mjs — mantener independencia de fallo).
-  void decode;
-  void html;
-  return { source: SOURCE_NAME, byIso3: {} };
+  const out = parseHtmlAS(html, { requireBullet: false });
+  return { ...out, source: SOURCE_NAME };
 }

@@ -1,12 +1,16 @@
-// Cross-validation 2-of-3 + Jaccard nombres ≥ 0.7.
+// Cross-validation 2-of-N + Jaccard nombres ≥ 0.7.
 //
 // Inputs:
-//   parseResults: Array<ParseResult>  (uno por fuente: AS, Sport, Olympics)
+//   parseResults: Array<ParseResult>  (una por fuente: AS, Sport, Olympics, Eurosport)
 //   opts:
-//     minPlayers   default 22  — umbral mínimo de jugadores para contar como "FINAL".
+//     minPlayers   default 22 — umbral mínimo de jugadores para contar como "FINAL".
+//     maxPlayers   default 30 — techo: descarta pre-listas largas (40-55 jugadores)
+//                               típicas de ARG/MEX/COL/CZE pre-cierre oficial.
 //     jaccardThr   default 0.7 — umbral de solape nombres normalizados entre 2 fuentes.
-//     calendar     Set<iso3>   — iso3 esperados según el calendario Olympics (opcional).
-//                                Si calendar no contiene iso3 pero 2 fuentes sí → degrade a 'low'.
+//     calendar     Set<iso3>  — iso3 con "(definitiva)" futura. Si presente y 2+ fuentes
+//                               coinciden, degrade a 'low' con reason="calendario Olympics
+//                               marca definitiva pendiente — verificar manualmente".
+//                               Si no se pasa o el iso3 no está en el set, NO degrade.
 //
 // Output: Map<iso3, ValidationResult>
 //   ValidationResult = {
@@ -27,10 +31,10 @@
 
 import { normalize } from './name-matcher.mjs';
 
-const DEFAULT_OPTS = { minPlayers: 22, jaccardThr: 0.7, calendar: null };
+const DEFAULT_OPTS = { minPlayers: 22, maxPlayers: 30, jaccardThr: 0.7, calendar: null };
 
 export function crossValidate(parseResults, opts = {}) {
-  const { minPlayers, jaccardThr, calendar } = { ...DEFAULT_OPTS, ...opts };
+  const { minPlayers, maxPlayers, jaccardThr, calendar } = { ...DEFAULT_OPTS, ...opts };
 
   const allIso3 = new Set();
   const bySource = new Map();
@@ -51,8 +55,13 @@ export function crossValidate(parseResults, opts = {}) {
       }
     }
 
-    const eligible = presence.filter((p) => p.entry.players.length >= minPlayers);
+    // Solo cuentan como elegibles las fuentes con roster en [minPlayers, maxPlayers].
+    // Por encima de maxPlayers es pre-lista (40-55 jugadores) — no marcable como FINAL.
+    const eligible = presence.filter(
+      (p) => p.entry.players.length >= minPlayers && p.entry.players.length <= maxPlayers
+    );
     const sourceCount = eligible.length;
+    const hasPreList = presence.some((p) => p.entry.players.length > maxPlayers);
 
     const perPairJaccard = {};
     const sizes = {};
@@ -78,7 +87,10 @@ export function crossValidate(parseResults, opts = {}) {
       }
     } else if (sourceCount === 1) {
       confidence = 'low';
-      reason = `solo 1 fuente con ≥${minPlayers} jugadores (${eligible[0].source})`;
+      reason = `solo 1 fuente con ${minPlayers}-${maxPlayers} jugadores (${eligible[0].source})`;
+    } else if (hasPreList) {
+      confidence = 'reject';
+      reason = `pre-lista detectada (>${maxPlayers} jugadores) — esperar cierre oficial`;
     } else if (presence.length > 0) {
       confidence = 'reject';
       reason = `${presence.length} fuente(s) con roster < ${minPlayers} — no marcable como FINAL`;
@@ -86,9 +98,9 @@ export function crossValidate(parseResults, opts = {}) {
       continue;
     }
 
-    if (confidence === 'high' && calendar instanceof Set && !calendar.has(iso3)) {
+    if (confidence === 'high' && calendar instanceof Set && calendar.has(iso3)) {
       confidence = 'low';
-      reason = `2 fuentes coincidentes pero el calendario Olympics no la lista ≤ hoy — posible stale data`;
+      reason = `calendario Olympics marca "(definitiva)" pendiente — verificar manualmente`;
     }
 
     const canonical = pickCanonical(eligible.length > 0 ? eligible : presence);
@@ -110,7 +122,9 @@ export function crossValidate(parseResults, opts = {}) {
 function pickCanonical(presence) {
   const ordered = [...presence].sort((a, b) => b.entry.players.length - a.entry.players.length);
   const base = ordered[0].entry;
-  const priority = ['olympics', 'as', 'sport'];
+  // Prioridad para campos coach/group: olympics y as son los más fiables; marca
+  // tiene errores conocidos en grupos (e.g. CRO=K cuando es L) → último lugar.
+  const priority = ['olympics', 'as', 'sport', 'eurosport', 'marca'];
   const coach = priority.map((s) => presence.find((p) => p.source === s)?.entry.coach).find(Boolean);
   const group = priority.map((s) => presence.find((p) => p.source === s)?.entry.group).find(Boolean);
   return { players: base.players, coach, group };
