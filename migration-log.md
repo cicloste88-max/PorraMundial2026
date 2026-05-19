@@ -2102,3 +2102,15 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [18:06] MERGE: PR #69 (`b5fb89c` squash) — feat(v3) Sprint Completion Flow F1 picker goleador KO + F3 gate refinado redirect 1-a-1 al primer grupo incompleto. Branch `claude/diagnose-esc-listener-bug-L23SC` rebase sobre `origin/main` (post-PR #68 `dff1166`). 2 commits originales (`a60f529` F1 + `6ec8ad4` F3) colapsados en squash. +284 −5 en 3 ficheros (`eliminatoria-v3.js`, `eliminatoria-v3.css`, `ko.js`). Sin migración SQL. `ko_predictions.scorer` ya existía en schema.
 
 [18:35] DOCS: este PR (post-pr68-pr69) — `CHANGELOG.md` 2 entradas (PR #68 + PR #69) + `errores_conocidos_porra.md` ERR-57 (HF-BUG-05-bis cerrado) + `CLAUDE.md` estado actual a `b5fb89c` (5 PRs cerrados hoy) + Backlog reorganizado (HF-BUG-05-bis cerrado, quedan HF-BUG-09-bis + HF-BUG-13 con nota explícita de que F1 ya evita replicar el patrón). Sin cambios de código. `CLAUDE.md` 10103 bytes (margen 137B sobre límite 10240).
+
+## 2026-05-19 — Polish v1 + Fix Packs 1, 2 + Fix DB RLS (PR #71)
+
+[10:53] OPEN: PR #71 `claude/polish-v1-grouped-blocks-BbqRH` → main. 13 commits temáticos (B1+B2+B3+B4 Polish v1 base + Fix Pack 1 con 4 fixes + Fix Pack 2 con 3 fixes + Fix DB RLS final).
+
+[10:57] MERGE: PR #71 (`bd6e977` squash) — Polish v1 + Fix Packs 1, 2 + Fix DB. 15 ficheros · +1247 −244. Sin DDL fuera de la migración RLS final. Branch auto-deleted post-merge.
+
+[11:05] MIGRATION: `20260519103959_fix_rls_ia_elo_fifa_select_authenticated.sql` aplicada en BD remota via `execute_sql` MCP el 19-may (durante desarrollo de Fix Pack 2 — `getAwardCandidates` BD-driven devolvía 0 filas por tabla RLS-enabled sin policy SELECT). Posteriormente versionada en commit `ff070c7` (incluido en squash PR #71) con `DROP POLICY IF EXISTS` antes de `CREATE` para idempotencia. Verificada policy creada con name `ia_elo_fifa_select_authenticated`, role `authenticated`, USING `true`. Tablas hermanas `ia_h2h` y `ia_last5_results` siguen sin policy SELECT — apuntadas a sprint hardening post-launch (no consumidas por frontend actualmente).
+
+[11:10] CRON ACTIVO: `cerrar-porras-mundial-2026` (jobid 23, schedule `'59 21 10 6 *'`, active true) ya programado desde PR #71 base. Disparará `UPDATE league_members SET porra_cerrada=true WHERE porra_cerrada=false` el 10-jun 21:59 UTC = 23:59 Madrid CEST.
+
+[11:20] DOCS: este commit cierre — `CHANGELOG.md` entrada Polish v1+Fix Packs+Fix DB con secciones por bloque + entradas viejas movidas a `CHANGELOG-archive-202605.md` (F3-I1.x + F2.9 + 2026-05-14 Redesign v3 F2) para mantener bajo 30KB. `errores_conocidos_porra.md` ERR-58 (RLS enabled sin policy SELECT). `CLAUDE.md` estado actual a `bd6e977` + Top-3 reordenado (Reglamento FIFA / squads-sources-refactor PR / pre-launch operativo) + nueva regla CRÍTICA sobre migrations RLS idempotentes. `docs/db-schema.md` policy `ia_elo_fifa_select_authenticated` documentada + nota explícita sobre `ia_h2h`/`ia_last5_results` pendientes hardening. `docs/REGLAMENTO_FIFA_2026.md` placeholder vacío (sprint próximo).
