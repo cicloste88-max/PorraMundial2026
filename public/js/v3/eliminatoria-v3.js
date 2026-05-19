@@ -781,7 +781,17 @@ function v3RenderIABlock(matchKeyOrMatch) {
     }
   }
 
-  if (!pred || pred.p_home == null || pred.p_away == null) return '';
+  // F-05: si no hay predicción IA, igualmente renderizar la cabecera con
+  // label + botón "?" (tooltip generico de cómo funciona la IA). El bloque
+  // de probabilidades queda oculto hasta que llegue la data.
+  if (!pred || pred.p_home == null || pred.p_away == null) {
+    return '<div class="v3-zoom-ia v3-zoom-ia--empty">'
+      + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+      +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+      + '</div>'
+      + '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>'
+      + '</div>';
+  }
 
   var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
   var pHome = pcts[0], pDraw = pcts[1], pAway = pcts[2];
@@ -799,7 +809,9 @@ function v3RenderIABlock(matchKeyOrMatch) {
   }
 
   return '<div class="v3-zoom-ia">'
-    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE</div>'
+    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+    +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+    + '</div>'
     + '<div class="v3-zoom-ia__bar">'
     +   seg(pHome, 'v3-zoom-ia__seg--home')
     +   seg(pDraw, 'v3-zoom-ia__seg--draw')

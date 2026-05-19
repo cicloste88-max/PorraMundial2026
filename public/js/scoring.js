@@ -1588,6 +1588,27 @@ function closePicker() {
 }
 window.openPicker = openPicker;
 window.closePicker = closePicker;
+
+// F-02 hardening (QA round 2): delegate global a nivel document para clicks
+// en .aw-slot. El handler delegado de ko.js renderAwardsBox4Legacy se
+// registra solo si !awSaved && !window._porraCerrada y vive ligado al
+// elemento #aw-grid-v3 (se pierde si box4.innerHTML se re-renderiza desde
+// fuera). Este delegate one-time captura el click venga de donde venga.
+if (!window._awardSlotDelegateBound) {
+  window._awardSlotDelegateBound = true;
+  document.addEventListener('click', function (e) {
+    var slot = e.target && e.target.closest && e.target.closest('.aw-slot');
+    if (!slot) return;
+    var award = slot.getAttribute('data-award');
+    if (!award) return;
+    // No abrir si porra cerrada o picks guardados/locked (pointer-events:none
+    // ya bloquea visualmente, pero blindamos el handler también).
+    if (window._porraCerrada) return;
+    if (window._awPicksSaved) return;
+    console.log('[awards] aw-slot click delegate →', award);
+    openPicker(award);
+  }, true);
+}
 function overlayClick(e){if(e.target===document.getElementById('aw-overlay'))closePicker();}
 // Polish v1 Fix-Pack-2 Fix-3+4: selectAward usa _awardCandidatesCache
 // (poblado por openPicker async) en lugar de AW_PLAYERS/YOUNG_PLAYERS_NXGN

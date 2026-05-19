@@ -1341,3 +1341,15 @@ tr.eliminated .gc-stat.pts{color:#6b7280}
 }
 .ia-info-tooltip__text:last-child { margin-bottom: 0; }
 .ia-info-tooltip__text b { color: #fff; font-weight: 700; }
+
+/* F-05 (round 2): placeholder vacío del v3-zoom-ia cuando no hay datos IA. */
+.v3-zoom-ia__empty {
+  padding: 6px 10px 8px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+.v3-zoom-ia__label .ia-info-btn {
+  margin-left: 6px;
+  vertical-align: middle;
+}
