@@ -382,8 +382,8 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  max-height: calc(100vh - 24px); /* fallback navegadores sin dvh */
-  max-height: calc(100dvh - 24px);
+  max-height: calc(100vh - 80px); /* fallback navegadores sin dvh */
+  max-height: calc(100dvh - 80px);
 }
 .v3-zoom-overlay.is-open ~ .v3-zoom-panel .v3-zoom-panel__inner {
   opacity: 1;
