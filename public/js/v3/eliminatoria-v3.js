@@ -129,6 +129,19 @@ window.v3ElimMount = function () {
   `;
   mount.appendChild(actions);
 
+  // Polish v1 B4 Items 12+13: bloque cerrar porra v3 — botón principal +
+  // bind a v3FinalizarPorra. Outside del .v3-actions data-v3-actions
+  // (que se oculta T-24h pre-kickoff por HF-Deadline). Cierre puede
+  // dispararse hasta el deadline manual o el cron 10-jun 21:59 UTC.
+  var cerrarWrap = document.createElement('div');
+  cerrarWrap.className = 'v3-actions v3-actions--cerrar';
+  cerrarWrap.innerHTML = `
+    <button class="v3-btn v3-btn--gold v3-btn--cerrar" data-v3-finalizar>
+      ✅ Cerrar y enviar mi porra
+    </button>
+  `;
+  mount.appendChild(cerrarWrap);
+
   // Bind event listeners
   v3BindButtonsAndSwitcher();
 
@@ -536,6 +549,14 @@ function v3RenderFinalBlock() {
   } catch (e) {
     console.warn('[HF-CdH] error rendering Cuadro de Honor:', e);
   }
+
+  // Polish v1 B4 Item 10: Awards Card v3 bajo el Cuadro de Honor.
+  try {
+    var awards = v3RenderAwardsCard();
+    if (awards) board.appendChild(awards);
+  } catch (e) {
+    console.warn('[Awards-v3] error rendering:', e);
+  }
 }
 
 function v3RenderFinalCard(match, meta, kind) {
@@ -694,6 +715,109 @@ function v3CloseZoomKO() {
   v3RenderAll();
 }
 
+// Polish v1 B3: bloque "IA PREDICE" reutilizable (modal KO + modal Grupos).
+// matchKey: para grupos es getMatchKey(match) = "A_México_Sudáfrica".
+// Para KO es match.id (M81…), que normalmente no tendrá entry en
+// iaPredictions (loadIAPredictions solo reindexa partidos con `group`).
+// Defensa: retorna '' si no hay datos — no rompe el render.
+// Quip SIEMPRE visible si existe (sin badge dudoso; San: consistencia).
+// Polish v1 Fix-2 sub-1: largest remainder method (Hamilton). Garantiza
+// que pHome+pDraw+pAway sume exactamente 100 (antes 3x Math.round daban
+// 99 o 101 por rounding error).
+function _v3DistributeTo100(probs) {
+  var raw = probs.map(function (p) { return (p || 0) * 100; });
+  var floors = raw.map(function (r) { return Math.floor(r); });
+  var sum = floors.reduce(function (a, b) { return a + b; }, 0);
+  var diff = 100 - sum;
+  if (diff <= 0) return floors;
+  var remainders = raw.map(function (r, i) { return { idx: i, dec: r - Math.floor(r) }; });
+  remainders.sort(function (a, b) { return b.dec - a.dec; });
+  for (var i = 0; i < diff; i++) {
+    floors[remainders[i % remainders.length].idx]++;
+  }
+  return floors;
+}
+
+// Polish v1 Fix-3: helper para obtener ISO3 de un slot (KO).
+// Reusa v3ResolveSlotCode (ya implementa la cadena resolvedSlots→EQUIPOS→
+// team.code||team.flag) para devolver el código FIFA 3 letras.
+function v3GetMatchTeamIso3(match, side) {
+  if (!match) return null;
+  var slot = (side === 'home') ? match.home : match.away;
+  if (typeof v3ResolveSlotCode === 'function') {
+    return v3ResolveSlotCode(slot);
+  }
+  if (typeof resolvedSlots !== 'undefined' && resolvedSlots[slot] && typeof EQUIPOS !== 'undefined') {
+    var name = resolvedSlots[slot];
+    var team = EQUIPOS.find(function (e) { return e.name === name; });
+    return team ? (team.code || team.flag) : null;
+  }
+  return null;
+}
+window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
+
+// Polish v1 Fix-3: acepta string key (grupos: "A_México_Sudáfrica") o
+// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_2" desde
+// slots resueltos). BD ia_predictions.match_id formato confirmado:
+// 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
+// probamos ambos órdenes.
+function v3RenderIABlock(matchKeyOrMatch) {
+  if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
+  var pred = null;
+
+  if (typeof matchKeyOrMatch === 'string') {
+    pred = iaPredictions[matchKeyOrMatch];
+  } else if (typeof matchKeyOrMatch === 'object' && matchKeyOrMatch !== null) {
+    var match = matchKeyOrMatch;
+    if (match.group && typeof getMatchKey === 'function') {
+      pred = iaPredictions[getMatchKey(match)];
+    } else {
+      var homeIso3 = v3GetMatchTeamIso3(match, 'home');
+      var awayIso3 = v3GetMatchTeamIso3(match, 'away');
+      if (homeIso3 && awayIso3) {
+        pred = iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+            || iaPredictions['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+      }
+    }
+  }
+
+  if (!pred || pred.p_home == null || pred.p_away == null) return '';
+
+  var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
+  var pHome = pcts[0], pDraw = pcts[1], pAway = pcts[2];
+  var quip = pred.quip || '';
+  var quipSafe = (typeof escapeHtml === 'function')
+    ? escapeHtml(quip)
+    : String(quip).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+
+  // Ocultar % en segmentos demasiado finos (< 10%) — texto desbordaría.
+  function seg(pct, cls) {
+    var label = pct >= 10 ? ('<span class="v3-zoom-ia__pct">' + pct + '%</span>') : '';
+    return '<div class="v3-zoom-ia__seg ' + cls + '" style="width:' + pct + '%">' + label + '</div>';
+  }
+
+  return '<div class="v3-zoom-ia">'
+    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE</div>'
+    + '<div class="v3-zoom-ia__bar">'
+    +   seg(pHome, 'v3-zoom-ia__seg--home')
+    +   seg(pDraw, 'v3-zoom-ia__seg--draw')
+    +   seg(pAway, 'v3-zoom-ia__seg--away')
+    + '</div>'
+    // Polish v1 Fix-2 sub-2: labels con width = % del segmento (antes 3 spans
+    // con justify-content space-between los ponía en extremos del contenedor;
+    // "Empate" caía fuera cuando draw <15%).
+    + '<div class="v3-zoom-ia__teams">'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pHome + '%">Local</div>'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pDraw + '%">Empate</div>'
+    +   '<div class="v3-zoom-ia__team" style="width:' + pAway + '%">Visitante</div>'
+    + '</div>'
+    + (quip ? '<div class="v3-zoom-ia__quip">"' + quipSafe + '"</div>' : '')
+    + '</div>';
+}
+window.v3RenderIABlock = v3RenderIABlock;
+
 function v3RenderZoomKO() {
   var match = v3CurrentMatch;
   var meta = v3CurrentRoundObj;
@@ -805,6 +929,7 @@ function v3RenderZoomKO() {
       </div>
       ${penaltyHtml}
       ${goleadorHtml}
+      ${v3RenderIABlock(match)}
       ${summaryHtml}
     </div>
   `;
@@ -841,6 +966,7 @@ function v3RenderZoomKO() {
 
 function v3AdjustScoreKO(matchId, side, delta) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
 
   if (!koPredictions[matchId]) koPredictions[matchId] = {};
   var p = koPredictions[matchId];
@@ -869,6 +995,7 @@ function v3AdjustScoreKO(matchId, side, delta) {
 
 function v3SetPenaltyWinner(matchId, side) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
   if (!koPredictions[matchId]) return;
 
   var p = koPredictions[matchId];
@@ -973,6 +1100,7 @@ function v3CloseGoleadorPickerKO() {
 // puntúa solo goleador en scoring (+2 si acierta), sin signo/exact fantasma.
 function v3SaveGoleadorKO(matchId, playerKey) {
   if (typeof koPredictions === 'undefined') return;
+  if (v3IsPorraCerrada()) return;  // Polish v1 B4: lock tras cerrar porra
   if (!koPredictions[matchId]) {
     koPredictions[matchId] = { l: null, v: null, classifier: null, gol: null, saved: false };
     koPredictions[String(matchId)] = koPredictions[matchId];
@@ -983,6 +1111,141 @@ function v3SaveGoleadorKO(matchId, playerKey) {
   v3CloseGoleadorPickerKO();
   v3RenderZoomKO();
 }
+
+// ─── Polish v1 B4 Item 10 + Fix-4 — Awards Card v3 ──────────
+// Reutiliza diseño legacy renderBox4 (ko.js): imágenes de fondo
+// Maradona/Ronaldo/Casillas/Mejor sub21, header Premios Individuales +
+// Copa Mundial 2026, footer progress dots + botón guardar/deshacer.
+// Cambio Fix-4: NO replicamos la card en JS+CSS v3, sino que
+// invocamos window.renderAwardsBox4Legacy (factory expuesto en
+// ko.js que crea una instancia INDEPENDIENTE del box4 legacy con
+// su propio closure renderBox4). CSS reutilizado de base.css/admin.css
+// (.aw-slot, .aw-grid, .aw-header, etc.). Persistencia + suggestion
+// + lock _porraCerrada los maneja el motor legacy.
+function v3RenderAwardsCard() {
+  if (typeof window.renderAwardsBox4Legacy !== 'function') {
+    console.warn('[Awards-v3] renderAwardsBox4Legacy no disponible');
+    return null;
+  }
+  var wrap = document.createElement('div');
+  wrap.className = 'v3-awards-wrap';
+  var box = window.renderAwardsBox4Legacy();
+  if (box) wrap.appendChild(box);
+  return wrap;
+}
+window.v3RenderAwardsCard = v3RenderAwardsCard;
+
+// Polish v1 B4 + Fix-Pack-2 Fix-3+4: deducción automática para Bota de Oro.
+// Cuenta scorers en predictions (grupos) + koPredictions, filtra por
+// _awardCandidatesCache.golden_boot (Centrocampistas + Delanteros top 30
+// Elo, BD-driven). Tiebreak: alfabético por playerKey. Retorna null si
+// cache vacío (BD aún no precargada) — el picker se abrirá sin sugerencia.
+function _v3SuggestGoldenBoot() {
+  if (typeof predictions !== 'object' || typeof koPredictions !== 'object') return null;
+  var counts = {};
+  function tally(predictionsMap) {
+    Object.values(predictionsMap || {}).forEach(function (p) {
+      var key = p && (p.gol || p.scorer);
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+  }
+  tally(predictions);
+  tally(koPredictions);
+
+  var cache = window._awardCandidatesCache && window._awardCandidatesCache.golden_boot;
+  if (!cache || !cache.length) return null;
+  var validKeys = new Set(cache.map(function (p) { return p.key; }));
+
+  var topKey = null, topCount = 0;
+  Object.entries(counts).forEach(function (entry) {
+    if (!validKeys.has(entry[0])) return;
+    if (entry[1] > topCount) { topKey = entry[0]; topCount = entry[1]; }
+    else if (entry[1] === topCount && topKey && entry[0] < topKey) { topKey = entry[0]; }
+  });
+  return topKey ? { key: topKey, count: topCount } : null;
+}
+window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
+
+// ─── Polish v1 B4 Items 12+13 — Cerrar porra v3 (sin email) ──
+// Equivalente self-contained a finalizarPorra legacy (close-porra.js)
+// pero sin dependencias DOM (`finalizar-btn`, etc.). Comprueba grupos+KO+
+// awards en BD, confirma, UPDATE league_members.porra_cerrada, set
+// window._porraCerrada, re-render. Email queda fuera (Resend pendiente).
+async function v3FinalizarPorra() {
+  if (typeof db === 'undefined' || typeof currentUser === 'undefined' || !currentUser) {
+    alert('Sesión no activa');
+    return;
+  }
+  var leagueId = (typeof getActiveLeagueId === 'function') ? getActiveLeagueId() : null;
+  if (!leagueId) {
+    alert('No hay liga activa');
+    return;
+  }
+  if (window._porraCerrada) {
+    alert('La porra ya está cerrada.');
+    return;
+  }
+
+  // Chequeo BD (en paralelo) — mismo criterio que checkFinalizarReady legacy:
+  // 72 grupos + 32 KO + 4 awards. (Boost queda fuera en v3 — no expuesto aún).
+  try {
+    var responses = await Promise.all([
+      db.from('predictions').select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id).eq('league_id', leagueId),
+      db.from('ko_predictions').select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id).eq('league_id', leagueId),
+      db.from('award_picks').select('golden_ball,golden_boot,golden_glove,young_player')
+        .eq('user_id', currentUser.id).eq('league_id', leagueId).maybeSingle()
+    ]);
+    var gF = responses[0].count || 0;
+    var kF = responses[1].count || 0;
+    var aD = responses[2].data;
+    var aF = (aD && aD.golden_ball && aD.golden_boot && aD.golden_glove && aD.young_player) ? 4 : 0;
+
+    var missing = [];
+    if (gF < 72) missing.push((72 - gF) + ' partidos de grupos');
+    if (kF < 32) missing.push((32 - kF) + ' partidos de eliminatorias');
+    if (aF < 4)  missing.push('premios individuales');
+
+    if (missing.length > 0) {
+      alert('Aún no puedes cerrar la porra.\n\nFalta:\n• ' + missing.join('\n• '));
+      return;
+    }
+  } catch (e) {
+    console.error('[v3FinalizarPorra] check error:', e);
+    alert('Error verificando pronósticos. Reintenta.');
+    return;
+  }
+
+  if (!confirm(
+    '¿Cerrar pronósticos definitivamente?\n\n' +
+    'Una vez cerrada la porra no podrás modificar ningún pronóstico.\n\n' +
+    'Pulsa Aceptar para confirmar.'
+  )) return;
+
+  try {
+    var result = await db.from('league_members')
+      .update({ porra_cerrada: true, cerrada_at: new Date().toISOString() })
+      .eq('user_id', currentUser.id).eq('league_id', leagueId);
+    if (result.error) console.warn('[v3FinalizarPorra] update warning:', result.error);
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] update exception:', e);
+  }
+
+  // Marcar cerrada y refrescar UI independiente del resultado del UPDATE.
+  window._porraCerrada = true;
+  alert('¡Pronósticos cerrados! Mucha suerte 🍀');
+  if (typeof v3RenderAll === 'function') v3RenderAll();
+}
+window.v3FinalizarPorra = v3FinalizarPorra;
+
+// Polish v1 B4: helper de lock state.
+// Llamado al inicio de las mutaciones v3 (adjustScore, save goleador, etc.)
+// para bloquear edición tras cerrar la porra (manual o cron 10-jun 21:59 UTC).
+function v3IsPorraCerrada() {
+  return window._porraCerrada === true;
+}
+window.v3IsPorraCerrada = v3IsPorraCerrada;
 
 function _v3GetRoundMetaForMatch(matchId) {
   if (typeof BRACKET === 'undefined') return null;
@@ -1052,6 +1315,15 @@ function v3BindButtonsAndSwitcher() {
     // muestra su propio confirm con texto más informativo.
     diceBtn.onclick = function () {
       v3SimulateDice();
+    };
+  }
+
+  // Polish v1 B4 Items 12+13: bind cerrar porra v3.
+  var cerrarBtn = document.querySelector('[data-v3-finalizar]');
+  if (cerrarBtn) {
+    cerrarBtn.onclick = function (e) {
+      e.preventDefault();
+      v3FinalizarPorra();
     };
   }
 

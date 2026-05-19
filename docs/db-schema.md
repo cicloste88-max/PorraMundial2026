@@ -162,10 +162,14 @@ CREATE TABLE squads (
 
 ## Row-Level Security
 
-Las cuatro tablas `ia_*` tienen RLS habilitado.
+Las cinco tablas `ia_*` tienen RLS habilitado.
 
-- **Política pública**: `ia_predictions_public_read` — cualquier `authenticated` puede SELECT en `ia_predictions`. El frontend la consume directamente.
-- **Acceso restringido**: `ia_elo_fifa`, `ia_last5_results`, `ia_h2h`, `ia_snapshots` solo accesibles por service role (las EFs del pipeline).
+- **`ia_predictions`**: policy `ia_predictions_public_read` — cualquier `authenticated` puede SELECT. El frontend la consume directamente.
+- **`ia_elo_fifa`**: policy `ia_elo_fifa_select_authenticated` (creada 19-may en migración `20260519103959_fix_rls_ia_elo_fifa_select_authenticated.sql`, idempotente con `DROP POLICY IF EXISTS`). Necesaria para que `getAwardCandidates` (scoring.js BD-driven Polish v1 Fix Pack 2) lea el ranking Elo. Service role bypassea RLS — las EFs del pipeline no requieren policy.
+- **`ia_h2h` y `ia_last5_results`**: **sin policy SELECT actualmente**. No consumidas por frontend (datos derivados llegan via `ia_predictions.breakdown` JSONB). **Pendiente sprint hardening security post-Mundial**: añadir policy SELECT authenticated si en algún momento se consumen directamente desde frontend, o policy explícita deny-all si se quiere reafirmar el acceso restricto a service_role.
+- **`ia_snapshots`**: solo accesible por service role (las EFs del pipeline IA Predictor).
+
+**Patrón ERR-58**: tabla con RLS enabled SIN policy SELECT devuelve `[]` silenciosamente para `authenticated` (no es error 403, es filtrado RLS deny-all por defecto). Smoke post-migración: query desde JWT `authenticated`, no `service_role` (bypasea RLS).
 
 ## Funciones helper
 

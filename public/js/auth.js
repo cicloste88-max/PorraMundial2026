@@ -110,9 +110,10 @@ async function loadIAPredictions() {
 
 /* ── Escucha cambios de sesión ── */
 async function loadUserData(userId) {
-  const AW_P   = window.AW_PLAYERS        || [];
-  const YOUNG_P = window.YOUNG_PLAYERS_NXGN || [];
-  const allPlayers = [...AW_P, ...YOUNG_P];
+  // Polish v1 Fix-Pack-2 Fix-3+4: arrays AW_PLAYERS y YOUNG_PLAYERS_NXGN
+  // eliminados de scoring.js. La resolución de awPicks desde BD ahora se
+  // hace via getAwardCandidates (cache _awardCandidatesCache) en el
+  // bloque if (awData) más abajo.
   const leagueId = getActiveLeagueId();
   const [{ data: preds }, { data: koPreds }, { data: awData }, { data: lmData, error: lmErr }, iaMap] = await Promise.all([
     leagueId
@@ -169,9 +170,35 @@ async function loadUserData(userId) {
     try { localStorage.setItem('porra_ko_predictions', JSON.stringify(koPredictions)); } catch(e) {}
   }
   if (awData) {
-    ['golden_ball','golden_boot','golden_glove','young_player'].forEach(award => {
-      if (awData[award]) { const p = allPlayers.find(p=>p.key===awData[award]); if(p) awPicks[award]=p; }
-    });
+    // Polish v1 Fix-Pack-2 Fix-3+4: resolver keys guardados via
+    // getAwardCandidates (BD-driven). Las 4 listas se cachean en
+    // window._awardCandidatesCache (también usado por openPicker y
+    // _v3SuggestGoldenBoot). Si BD no disponible, awPicks queda en
+    // {key} placeholder con name=key como fallback visual mínimo.
+    if (typeof window.getAwardCandidates === 'function') {
+      try {
+        const candLists = await Promise.all([
+          window.getAwardCandidates('golden_ball'),
+          window.getAwardCandidates('golden_boot'),
+          window.getAwardCandidates('golden_glove'),
+          window.getAwardCandidates('young_player'),
+        ]);
+        const byAward = {
+          golden_ball: candLists[0],
+          golden_boot: candLists[1],
+          golden_glove: candLists[2],
+          young_player: candLists[3],
+        };
+        ['golden_ball','golden_boot','golden_glove','young_player'].forEach(award => {
+          if (awData[award]) {
+            const p = byAward[award].find(p => p.key === awData[award]);
+            if (p) awPicks[award] = p;
+          }
+        });
+      } catch (e) {
+        console.warn('[awards] resolve picks desde BD falló:', e);
+      }
+    }
     try { localStorage.setItem('porra_aw_picks', JSON.stringify(awPicks)); } catch(e) {}
     // Marcar como guardado y refrescar UI
     window._awPicksSaved = true;

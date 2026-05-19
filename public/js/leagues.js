@@ -52,6 +52,14 @@ async function leagueLoadMyLeagues() {
     });
 
     console.debug('[leagues] Ligas cargadas:', _myLeagues.length, _myLeagues.map(l => l.nombre));
+
+    // Polish v1 B1: notificar al shell v3 para que refresque chips
+    // (dynamic left chip "nombre liga" + right chip "Cambiar liga/Logout"
+    // dependen de _myLeagues.length).
+    window.dispatchEvent(new CustomEvent('mundial:leagues-loaded', {
+      detail: { count: _myLeagues.length }
+    }));
+
     return _myLeagues;
   })();
   try { return await _loadInFlight; }

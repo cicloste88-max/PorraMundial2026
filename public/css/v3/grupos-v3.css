@@ -424,6 +424,68 @@
 
 .v3-zoom-progress { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
+/* Polish v1 B2 Item 5: panel "IA PREDICE" en footer del tab Clasificación.
+   Reemplaza la barra "Pronósticos guardados" (siempre 100%). Muestra el
+   orden previsto por IA (top-4 banderitas + iso3) en una sola fila. */
+.v3-zoom-ia-prediction {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.v3-zoom-ia-prediction__label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--ink-300);
+  text-transform: uppercase;
+}
+.v3-zoom-ia-prediction__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.v3-zoom-ia-prediction__row--empty {
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink-500);
+  justify-content: flex-start;
+}
+.v3-zoom-ia-prediction__team {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-100);
+}
+.v3-zoom-ia-prediction__pos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.10);
+  font-size: 9px;
+  color: var(--ink-300);
+}
+.v3-zoom-ia-prediction__team img {
+  width: 18px;
+  height: 13px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+.v3-zoom-ia-prediction__iso {
+  letter-spacing: 0.04em;
+}
+
 .v3-zoom-progress__label {
   font-family: var(--font-display);
   font-size: 10px;

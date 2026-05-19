@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `b5fb89c` (PR #69 Sprint Completion Flow mergeado squash, 17-may 18:06 UTC). **5 PRs cerrados hoy** pre-launch: PR #65 (`8c98e8a`) Cuadro Honor v3 + RLS; PR #66 (`855b6c4`) Hotfix Pack 5 HFs; PR #67 (`cff8080`) docs post-PR66; PR #68 (`dff1166`) HF-BUG-05-bis null guard signo; PR #69 (`b5fb89c`) F1 picker goleador KO + F3 gate refinado (redirect 1-a-1 al primer grupo incompleto). Detalle ERR-52..57 + entradas en `CHANGELOG.md`. Sprints previos sync-squads + F3-I1.6.x mergeados. **10/48 squads operativas** (5 FINAL + 5 pre-lista). **Bug P2 (no bloqueante):** auto-restore `_activeLeague` no dispara en INITIAL_SESSION por race con bootstrap auth.
+Main HEAD `bd6e977` (PR #71 Polish v1 + Fix Packs 1, 2 + Fix DB RLS, 19-may 10:57 UTC, squash). B1-B4 Polish + 4 fixes pack1 (leyenda 3º, IA % Hamilton, lookup IA KO, awards legacy) + 3 fixes pack2 (modal flotante, paleta slate/blue, listas BD-driven) + RLS `ia_elo_fifa`. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC). Polish v3 cerrado a nivel código. **10/48 squads operativas**. ERR-58 (RLS sin policy SELECT). Branch `feat/squads-sources-refactor` con 5 fuentes 2-of-N pushada, PR pendiente.
 
 ## Top-3 pendientes inmediatos
 
-1. **Audit v3 vs legacy funcionalidades**: el redesign v3 es SOLO estético (2 pantallas reemplazadas Grupos + Fase Final + 2 más con redesign interno). Asegurar que ninguna funcionalidad legacy se pierde + recolocar reminiscencias en el nuevo layout. Referencia: `docs/v3-vs-legacy.md` (inventario por pantalla) + `docs/AUDIT_LEGACY_VS_V3.md` (audit previo I1-I9).
-2. **Boost mechanic v3** (decisión San, ALTA prioridad pre-11jun) + IA Predictor wiring v3 (tooltip + frase + score IA) + cards prioritarias: IA tooltip / EN VIVO pill / Pizarra long-press / CEST kickoff display.
-3. **pg_cron `update-results` activate 11-jun**: bloqueador operacional. Verificar JSON `_results.ko_results` con update-results real, IDs SofaScore KO (~28 jun post fase grupos), email confirmación cierre porra.
+1. **Sprint Reglamento FIFA** (3 commits): aplicar Art13 head-to-head + Art16 a scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md` reservado; brief específico cuando San active.
+2. **PR `feat/squads-sources-refactor`**: 4 commits sobre `bd6e977`. 5 fuentes primarias (AS+Sport+Olympics+Eurosport+Marca) cross-validate 2-of-N + maxPlayers=30. ERR-59. San abre PR.
+3. **Operacional pre-launch 11-jun**: activar `pg_cron update-results`, squads 38/48 via sync-squads, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked).
 
 ## Pendientes — Bugs UI
 
@@ -55,6 +55,7 @@ Vault/EF + Turnstile DESACTIVADO 30abr2026: ver `docs/secrets.md`.
 - **Badge-with-flag-fallback** patrón permanente para imágenes de equipo.
 - **NO `addEventListener('DOMContentLoaded')`** en classic scripts cargados via `loadScript` (ERR-01 + `.claude/rules/frontend-js.md`).
 - **Actor Azzouzana `VzKtdb1t0Qnc07X8V`** tiene caché CDN — NO usar para datos live.
+- **Migrations RLS idempotentes** — `DROP POLICY IF EXISTS` ANTES de `CREATE POLICY` (db push/reset). Tabla con RLS habilitado SIN policy → queries 0 filas silenciosamente para `authenticated` (ERR-58). Smoke desde JWT authenticated, no service_role.
 
 ## Comandos útiles
 
@@ -101,7 +102,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..50: detalle completo (síntoma/causa/fix/patrón) en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle (01-02), Vite/CSS (03,06,18-22), Auth/Secrets (04,07,11-17,23-28,33), Live scoring (05,29), Edge functions (33-34), UI mobile (08-10,19-21,30-32,35-41), KO/Globo (38,42), Overlay v3 (43), simuladores KO (44-45), sync-squads (46-50).
+ERR-01..58: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, simuladores, sync-squads, RLS (51,58), HF Pack v3 (52-57).
 
 ### Otros ficheros de contexto
 

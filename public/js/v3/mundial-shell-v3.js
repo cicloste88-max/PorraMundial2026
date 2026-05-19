@@ -87,7 +87,7 @@
       +     '<span class="v3-qualified-cta__flag v3-qualified-cta__flag--more">+44</span>'
       +   '</div>'
       +   '<div class="v3-qualified-cta__body">'
-      +     '<div class="v3-qualified-cta__eyebrow">QUALIFIED</div>'
+      +     '<div class="v3-qualified-cta__eyebrow">CLASIFICADAS</div>'
       +     '<div class="v3-qualified-cta__title">Conoce a las 48 selecciones</div>'
       +   '</div>'
       +   '<div class="v3-qualified-cta__arrow" aria-hidden="true">›</div>'
@@ -191,58 +191,111 @@
 
   function stageLabelForPage(pageId) {
     switch (pageId) {
-      case 'grupos':    return '● GROUP STAGE';
+      case 'grupos':    return '● FASE DE GRUPOS';
       case 'jornada':   return '● JORNADA';
       case 'directo':   return '● EN DIRECTO';
-      case 'elim':      return '● KNOCKOUT';
+      case 'elim':      return '● FASE FINAL';
       default:          return '● MUNDIAL';
     }
   }
 
-  // F3-I1.6: wrap stage pill con chips ADMIN + logout
+  // F3-I1.6 + Polish v1 B1: wrap stage pill con chips dinámicos
+  // (left: ADMIN o nombre liga / right: logout o cambiar liga).
+  // Contenido + onclick + aria-label se asignan en refreshShellUserChips
+  // según currentUser.is_admin + window._myLeagues.length.
   function stagePillRowHTML(label) {
     return '' +
       '<div class="v3-stage-row">' +
-        // F3-I1.6.4: admin chip primero (grid-column: 1, justify-self: start).
-        '<button class="v3-shell-chip v3-shell-chip--admin" ' +
-          'data-v3-admin-chip ' +
-          'onclick="if(typeof showPage===\'function\')showPage(\'admin\')" ' +
-          'aria-label="Panel admin">⚙ ADMIN</button>' +
-        // Pill al centro (grid-column: 2, justify-self: center). Siempre presente.
+        '<button class="v3-shell-chip v3-shell-chip--admin" data-v3-admin-chip>⚙ ADMIN</button>' +
         stagePillHTML(label) +
-        // Logout chip a la derecha (grid-column: 3, justify-self: end).
-        '<button class="v3-shell-chip v3-shell-chip--logout do-logout" ' +
-          'data-v3-logout-chip ' +
-          'aria-label="Cerrar sesión">↩</button>' +
+        '<button class="v3-shell-chip v3-shell-chip--logout" data-v3-logout-chip>↩</button>' +
       '</div>';
   }
 
-  // F3-I1.6: refresca visibilidad de chips según currentUser global.
-  // Idempotente; safe si chips no existen. Llamado por ensureShellMount
-  // y expuesto a window para invocación externa (ui-nav, auth, etc.).
+  // F3-I1.6 + Polish v1 B1: refresca contenido + comportamiento de chips.
+  // - Left chip: admin → "⚙ ADMIN" (→admin); non-admin → nombre liga
+  //   (>1 liga → welcome / 1 liga → disabled).
+  // - Right chip: >1 liga → "Cambiar liga" (→welcome) / 1 liga → logout.
+  // _myLeagues vive en leagues.js y se publica a window._myLeagues + dispara
+  // 'mundial:leagues-loaded' tras leagueLoadMyLeagues. Defensivo: si _myLeagues
+  // aún no carga, asume 1 liga (caso seguro).
   function refreshShellUserChips(mount) {
     if (!mount) return;
-    var adminChip  = mount.querySelector('[data-v3-admin-chip]');
+    var leftChip   = mount.querySelector('[data-v3-admin-chip]');
     var logoutChip = mount.querySelector('[data-v3-logout-chip]');
-    // F3-I1.6.3: currentUser está declarado como `let` en auth.js (file-scope
-    // global porque auth.js se carga como <script> regular, no module). NO se
-    // expone a window.currentUser — la asignación es plain `currentUser = {...}`.
-    // typeof guard defensivo por si shell-v3 carga antes que auth.js declare
-    // (aunque main-entry garantiza orden).
     var hasUser = (typeof currentUser !== 'undefined') && !!currentUser;
-    var isLogged = hasUser;
-    var isAdmin  = hasUser && !!currentUser.is_admin;
-    if (adminChip)  adminChip.style.display  = isAdmin  ? 'inline-flex' : 'none';
-    if (logoutChip) logoutChip.style.display = isLogged ? 'inline-flex' : 'none';
-    // F3-I1.6.4: refuerzo defensivo — ocultar wc-auth-bar legacy
-    // en SHELL_PAGES (independiente de body.fc-shell-active CSS).
-    // Screenshot de San con ronaldo_n11 mostraba wc-auth-bar visible;
-    // este toggle JS garantiza estado correcto incluso si CSS falla
-    // por cache/timing/race.
+    var isAdmin = hasUser && !!currentUser.is_admin;
+    var leagues = (window._myLeagues && window._myLeagues.length) || 0;
+    var leagueName = (window._activeLeague && window._activeLeague.nombre) || '';
+
+    if (leftChip) {
+      if (!hasUser) {
+        leftChip.style.display = 'none';
+      } else if (isAdmin) {
+        leftChip.style.display = 'inline-flex';
+        leftChip.textContent = '⚙ ADMIN';
+        leftChip.setAttribute('aria-label', 'Panel admin');
+        leftChip.style.opacity = '';
+        leftChip.style.cursor = '';
+        leftChip.classList.add('v3-shell-chip--admin');
+        leftChip.classList.remove('v3-shell-chip--league');
+        leftChip.onclick = function () {
+          if (typeof showPage === 'function') showPage('admin');
+        };
+      } else if (leagueName) {
+        leftChip.style.display = 'inline-flex';
+        leftChip.textContent = leagueName;
+        leftChip.classList.remove('v3-shell-chip--admin');
+        leftChip.classList.add('v3-shell-chip--league');
+        if (leagues > 1) {
+          leftChip.setAttribute('aria-label', 'Cambiar de liga');
+          leftChip.style.opacity = '';
+          leftChip.style.cursor = '';
+          leftChip.onclick = function () {
+            if (typeof showPage === 'function') showPage('welcome');
+          };
+        } else {
+          leftChip.setAttribute('aria-label', leagueName);
+          leftChip.style.opacity = '0.5';
+          leftChip.style.cursor = 'default';
+          leftChip.onclick = null;
+        }
+      } else {
+        leftChip.style.display = 'none';
+      }
+    }
+
+    if (logoutChip) {
+      if (!hasUser) {
+        logoutChip.style.display = 'none';
+      } else {
+        logoutChip.style.display = 'inline-flex';
+        logoutChip.textContent = '↩';
+        if (leagues > 1) {
+          logoutChip.setAttribute('aria-label', 'Cambiar de liga');
+          logoutChip.onclick = function () {
+            if (typeof showPage === 'function') showPage('welcome');
+          };
+        } else {
+          logoutChip.setAttribute('aria-label', 'Cerrar sesión');
+          logoutChip.onclick = function () {
+            if (typeof doLogout === 'function') doLogout();
+          };
+        }
+      }
+    }
+
+    // F3-I1.6.4: refuerzo defensivo — ocultar wc-auth-bar legacy.
     var authBar = document.getElementById('wc-auth-bar');
     if (authBar) authBar.style.display = 'none';
   }
   window.refreshShellUserChips = refreshShellUserChips;
+
+  // Polish v1 B1: re-render chips cuando _myLeagues carga (post-login o tras
+  // navegar a welcome). leagues.js dispara este event tras leagueLoadMyLeagues.
+  window.addEventListener('mundial:leagues-loaded', function () {
+    document.querySelectorAll('[data-v3-shell-mount]').forEach(refreshShellUserChips);
+  });
 
   function ensureZoomOverlay() {
     // F2.6: alinear con design source — 2 nodos siblings direct body children

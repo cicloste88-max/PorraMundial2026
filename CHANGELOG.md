@@ -2,7 +2,45 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
-## 2026-05-18 — sync-squads: refactor fuentes primarias + cross-validate (PR feat/squads-sources-refactor)
+## 2026-05-19 — Polish v1 + Fix Packs 1, 2 + Fix DB (PR #71)
+
+**Branch:** `claude/polish-v1-grouped-blocks-BbqRH` mergeada a main (`bd6e977`, squash de 13 commits, 10:57 UTC). Base rebase: `6038882` (post-PR #70). Sin migración SQL fuera del fix RLS final (`20260519103959_fix_rls_ia_elo_fifa_select_authenticated.sql`, idempotente, ya aplicada en BD).
+
+Sesión grande de polish v3 post-Completion Flow. 4 bloques temáticos + 2 fix packs reactivos a QA visual + 1 fix DB crítico. +1247 −244 en 15 ficheros.
+
+### Polish v1 base (4 commits)
+
+- **B1 textos + chips dinámicos** (`mundial-shell-v3.js`, `leagues.js`, `mundial-shell-v3.css`): stage pill `GROUP STAGE → FASE DE GRUPOS`, `KNOCKOUT → FASE FINAL`. CTA eyebrow `QUALIFIED → CLASIFICADAS`. Chip izquierda dinámico según `is_admin` (mantiene `⚙ ADMIN`) vs nombre liga activa (>1 liga → navega selector; 1 sola → disabled). Chip derecha dual: `>1 liga` → cambiar liga, `1 sola` → logout. Nuevo event `mundial:leagues-loaded` que dispara `leagueLoadMyLeagues` para refresco de chips.
+- **B2 panel IA en Clasificación + Cuadro Honor compacto** (`grupos-v3.js`, `grupos-v3.css`, `eliminatoria-v3.css`): sustitución de barra `Pronósticos guardados` (100% inane) por panel `🤖 IA PREDICE` con top-4 banderitas + iso3 según ranking sign-based. Nueva `v3ComputeIAStandings(letter)` + `v3RenderIAPredictionPanel`. Cuadro Honor `gap 14→10, margin-top 24→16, divider padding 4→2` (~30% más compacto).
+- **B3 IA Predictor visual en modales** (`eliminatoria-v3.js`, `grupos-v3.js`, `eliminatoria-v3.css`): nueva `v3RenderIABlock(matchKey)` reusable. Microbarra 3 segmentos (home/draw/away) con % visibles + labels + quip cursiva. Insertado en `v3RenderZoomKO` y en cada match-card del modal Grupos (`v3RenderMatchesList`).
+- **B4 Awards card v3 + Cerrar porra v3 + pg_cron 10-jun** (`eliminatoria-v3.js`, `scoring.js`, `ui-nav.js`, `eliminatoria-v3.css`, migración cron): nueva `v3RenderAwardsCard` (sustituida después en Fix Pack 1 por wrapper legacy), `_v3SuggestGoldenBoot` (cuenta scorers en predictions + KO, filtra rol≠gk), `renderPickerList` retrocompatible con `suggestion` opcional + badge `💡 Sugerido`. Botón v3 "Cerrar y enviar mi porra" + `v3FinalizarPorra` self-contained (chequea 72+32+4 en BD, sin DOM legacy). Helper `v3IsPorraCerrada` + lock al inicio de mutaciones v3. Migración `cerrar-porras-mundial-2026` schedule `'59 21 10 6 *'` (10-jun 21:59 UTC = 23:59 Madrid CEST) — `UPDATE league_members SET porra_cerrada=true WHERE porra_cerrada=false`.
+
+### Fix Pack 1 (4 fixes QA visual)
+
+- **Fix-1 leyenda dinámica 3º** (`grupos-v3.js`): texto pie tab Clasificación adapta a si el 3º está en `_v3BestThirdsCache` (Top 2 + 3º vs Top 2). Reusa lógica HF-BUG-12 (PR #66).
+- **Fix-2 IA % suma 100 + labels alineados + paleta integrada** (`eliminatoria-v3.js`, `eliminatoria-v3.css`): nuevo helper `_v3DistributeTo100` con largest remainder method (Hamilton) — antes 39+31+29=99 por rounding. Labels Local/Empate/Visitante con `width:N%` proporcional (antes `justify-content space-between` ponía Empate fuera del centro cuando draw<15%). Paleta gradientes azul-medio/slate/rojo-profundo (antes saturados `#60a5fa/#6b7280/#ef4444`). Wrap `rgba(0,0,0,.25)` + bordes sutiles.
+- **Fix-3 lookup IA correcto en modal KO** (`eliminatoria-v3.js`): `v3RenderIABlock` acepta string (grupos) o objeto match (KO). Para KO resuelve iso3 home/away via nuevo `v3GetMatchTeamIso3` y construye key `ondemand_{ISO3_A}_{ISO3_B}_2`. Prueba ambos órdenes porque BD no tiene simetría garantizada. Confirmado vía `execute_sql`: 218 filas ondemand en `ia_predictions` con breakdown completo.
+- **Fix-4 awards card legacy con imágenes Maradona/Ronaldo/Casillas** (`ko.js`, `eliminatoria-v3.js`, `eliminatoria-v3.css`): San prefiere el diseño legacy `renderBox4` (`ko.js:944`). Nuevo `window.renderAwardsBox4Legacy()` factory standalone que crea instancia independiente del box4 con su propio closure `renderBox4Local`. IDs distintos (`#awards-box4-v3`, `#aw-grid-v3`, etc.) para no colisionar con legacy. `v3RenderAwardsCard` simplificada a wrapper 5-líneas. CSS `.v3-aw-slot` v3 eliminado (88 LOC); reutiliza `.aw-slot/.aw-grid/.aw-header/.aw-footer/.aw-player-bg` de `base.css`.
+
+### Fix Pack 2 (3 fixes QA visual)
+
+- **Fix-1 picker awards modal flotante** (`base.css`, `admin.css`): de bottom-sheet (`flex-end + translateY 100%`) a modal centrado (`align-items center + scale .96→1 + opacity`). `z-index 10000` (tabbar v3 = `--fc-z-tabbar: 300`). `padding-bottom: 100px` (deja respiro para tabbar). `border-radius: 20px` en todos los corners. `max-height: calc(100vh - 140px)`. `box-shadow` para flotación. base.css tenía 2 copias duplicadas del bloque (líneas 473 y 919) — replace_all aplicó ambas.
+- **Fix-2 paleta v3 picker awards** (`base.css`): reescritura completa del bloque `.aw-picker-header → .aw-pts-possible` con tokens v3 alineados a Fix Pack 1. Slate-900 fondo, slate-100/400/500 texto, blue-400 `#60a5fa` accent. Eliminados: amarillo (`#fbbf24`/`rgba(250,204,21,...)`), verde (`#4ade80/#052e16/#166534`), `'Noto Sans' weight 900` (ahora `font-family: inherit` + `font-weight: 700`). Replace_all aplicado a ambas copias.
+- **Fix-3+4 listas dinámicas BD-driven** (`scoring.js`, `auth.js`, `ko.js`, `eliminatoria-v3.js`): arrays hardcoded `AW_PLAYERS` (22) y `YOUNG_PLAYERS_NXGN` (50) ELIMINADOS. Nueva `getAwardCandidates(award)` async + cache `_awardCandidatesCache`. Matriz: Balón top 20 Elo cualquier rol; Bota top 30 + bucket IN (Centrocampista, Delantero); Guante top 30 + bucket = Portero; Joven top 30 + edad ≤21 (Transfermarkt enrich-tm). Consulta paralela `ia_elo_fifa` + `squads.jugadores`. `_bucketToRole` helper. `openPicker` async con indicador "Cargando jugadores…" + empty state si BD 0 candidatos. `selectAward` y `_v3SuggestGoldenBoot` usan cache. `auth.js loadUserData` resuelve picks guardados via `getAwardCandidates` (las arrays ya no existen). Precarga 4 listas en background al render. Schema BD `award_picks` (TEXT keys) sin cambios — claves nuevas con formato `Lamine_Yamal` (vs legacy `Yamal`); picks legacy huérfanos esperados, aceptable pre-launch.
+
+### Fix DB (1 commit, idempotente)
+
+- **Fix RLS `ia_elo_fifa` SELECT authenticated** (`20260519103959_fix_rls_ia_elo_fifa_select_authenticated.sql`, commit `ff070c7`): tabla con RLS habilitado SIN policy SELECT bloqueaba `getAwardCandidates` (`db.from('ia_elo_fifa')…` devolvía 0 filas silenciosamente para todos los roles). Policy nueva `ia_elo_fifa_select_authenticated FOR SELECT TO authenticated USING (true)`. Migración idempotente (`DROP POLICY IF EXISTS` antes `CREATE`). Aplicada via `execute_sql` MCP el 19-may + versionada en commit `ff070c7` antes del merge para que `db push`/`db reset` reproduzcan estado consistente. **Pendiente sprint hardening post-launch**: `ia_h2h` y `ia_last5_results` siguen sin policy SELECT (no consumidas por frontend actualmente).
+
+### Stats consolidados
+
+15 ficheros · +1247 −244. CSS dominante (paleta + reescrituras): `base.css` +132 −80, `eliminatoria-v3.css` +192 −41, `grupos-v3.css` +51, `mundial-shell-v3.css` +19, `admin.css` +14 −10. JS: `eliminatoria-v3.js` +268, `grupos-v3.js` +83 −3, `mundial-shell-v3.js` +117 −32, `scoring.js` +200 −41, `ko.js` +137, `ui-nav.js` +14 −3, `auth.js` +39 −10, `leagues.js` +22, `v3/eliminatoria-v3.js` +268. SQL: 1 migración nueva pg_cron + 1 fix RLS.
+
+### Bugs resueltos
+
+- **ERR-58** — detalle completo en `errores_conocidos_porra.md`.
+
+## 2026-05-19 — sync-squads: refactor fuentes primarias 5-of-N + parsers reales (PR feat/squads-sources-refactor)
 
 **Branch:** `feat/squads-sources-refactor` (pendiente de merge a main). Sin migración SQL.
 
@@ -13,50 +51,55 @@ Resuelve el bug del 18-may en `--mode=scrape --all-missing`: 3 falsos positivos
 ### Cambios
 
 - **Nuevo `--mode=detect`** (default del cron desde este PR): fetch en paralelo
-  de 3 fuentes primarias — AS / Sport.es / Olympics.com — y cross-validation
-  2-of-3 + Jaccard ≥ 0.7 sobre nombres normalizados. Solo se marca FINAL si al
-  menos 2 fuentes coinciden con roster ≥ 22 jugadores y solape ≥ 0.7. Calendario
-  de anuncios de Olympics se parsea aparte y se usa como filtro de plausibilidad
-  (downgrade a `low` confidence si 2 fuentes dicen FINAL pero el calendario
-  Olympics no la lista ≤ hoy — caso CRO: AS+Sport decían FINAL, Olympics decía 1-jun).
+  de **5 fuentes primarias** — AS / Sport.es / Olympics.com / Eurosport / Marca —
+  y cross-validation 2-of-N + Jaccard ≥ 0.7 sobre nombres normalizados. Solo se
+  marca FINAL si al menos 2 fuentes coinciden con roster en `[22, 30]` jugadores
+  y solape ≥ 0.7. Calendario Olympics se parsea aparte y degrade `high → low`
+  solo si Olympics anuncia "(definitiva)" en fecha FUTURA (semánticamente
+  invertido vs versión inicial del PR).
+- **Parsers reales** (no stub): `olympics.mjs` con orphan continuation
+  (fix BEL 23→26, CUW 28→26), `sport.mjs` con bullet opcional (antes 0 iso3
+  → ahora 48), AS parametrizado para `requireBullet`, calendar greedy
+  longest-match (4 fechas → 8 fechas, 12 iso3s únicos).
 - **FF degradada a fuente secundaria**: ya no se usa para *detectar* nuevas listas,
   solo para enriquecer XI titular de selecciones ya confirmadas FINAL por las
-  primarias. Esto cierra estructuralmente el vector de ERR-58 (noticias FF de
-  Eurocopa 2024 con IDs 115xxx mezcladas con Mundial 2026 con IDs 143xxx).
+  primarias. Esto cierra estructuralmente el vector de ERR-59.
+- **`maxPlayers=30`** en cross-validate: pre-listas largas (ARG/COL/MEX/CZE/QAT
+  con 33-55 jugadores) van a `reject` con razón "pre-lista detectada — esperar
+  cierre oficial".
 - **Workflow YAML v2**: cron 6h ahora ejecuta `--mode=detect` + `--mode=enrich-tm`
   en serial. Se elimina el conflicto mutuamente excluyente `--refresh-final` vs
   `--all-missing`. Artifact incluye `cache/squads-calendar.json`.
 - **`--mode=scrape` y `--mode=enrich-tm` conservados** para dispatch manual.
+- **Marca aporta IRN** (Irán) como única fuente publicada para esa selección.
 
 ### Archivos
 
 ```
-scripts/lib/parsers/README.md           contrato I/O parsers fuente
-scripts/lib/parsers/as.mjs              stub fuente AS
-scripts/lib/parsers/sport.mjs           stub fuente Sport.es
-scripts/lib/parsers/olympics.mjs        stub fuente Olympics
-scripts/lib/parsers/calendar.mjs        parser calendario anuncios Olympics
-scripts/lib/parsers/country-map.json    nombre país → iso3
-scripts/lib/cross-validate.mjs          Jaccard + 2-of-3 + filtro calendario
-scripts/sync-squads.mjs                 orquestador runDetect()
-tests/parsers/calendar.test.mjs         3 tests
-tests/parsers/cross-validate.test.mjs   6 tests
-.github/workflows/sync-squads.yml       cron detect→enrich-tm en serial
+scripts/lib/parsers/_util.mjs           helpers compartidos (htmlToLines, etc.)
+scripts/lib/parsers/as.mjs              parser AS (requireBullet param)
+scripts/lib/parsers/sport.mjs           parser Sport.es
+scripts/lib/parsers/olympics.mjs        parser Olympics + orphan continuation
+scripts/lib/parsers/eurosport.mjs       parser Eurosport (nuevo)
+scripts/lib/parsers/marca.mjs           parser Marca (nuevo)
+scripts/lib/parsers/calendar.mjs        calendar greedy longest-match
+scripts/lib/parsers/country-map.json    nombre país → iso3 (expandido)
+scripts/lib/cross-validate.mjs          Jaccard + 2-of-N + maxPlayers + calendar invertido
+scripts/sync-squads.mjs                 orquestador 5 fuentes
+scripts/lib/parsers/__tests__/          util.test.mjs + sources.test.mjs (28 tests)
+tests/fixtures/squads/                  as.html + sport.html + olympics.html
+.github/workflows/sync-squads.yml       cron detect→enrich-tm en serial v2
 ```
 
-### Pendiente sobre esta rama antes de mergear
+### Dry-run validado
 
-Los 3 parsers de fuente primaria (`as.mjs` / `sport.mjs` / `olympics.mjs`) están
-en estado **stub** — contrato I/O definido, `parseHtml()` devuelve `byIso3: {}`.
-San aporta los parsers reales en commit aparte sobre esta misma rama tras
-consolidar HTML samples del 18-may. Mientras `parseHtml()` devuelve vacío,
-`runDetect` completa sin escribir nada (todos los iso3 caen a "0 fuentes
-parseadas"), por lo que mergear el scaffolding antes de los parsers reales no
-rompe el cron (solo lo deja sin efecto observable).
+19-may con 5 fuentes: `as=48 sport=48 olympics=21 eurosport=47 marca=47`.
+22 iso3 procesables → 17 dry-run (16 high con 4-5 fuentes, 1 low CRO por
+calendario "(definitiva): 1 jun"), 5 rejected pre-lista.
 
-### Detalle ERR-58 + caveats
+### Detalle ERR-59 + caveats
 
-Ver `errores_conocidos_porra.md` ERR-58 y `.claude/rules/sync-squads.md` §8.
+Ver `errores_conocidos_porra.md` ERR-59 y `.claude/rules/sync-squads.md` §0/§9/§10.
 
 ## 2026-05-17 — Sprint Completion Flow F1 + F3 (PR #69)
 
@@ -276,78 +319,6 @@ confirmada). Sin pérdida ni cambio espurio.
 - Cuando un bug visual persiste pese a defensas, buscar TODOS los mount points relacionados (HF-13: el sospechoso obvio `#wc-auth-bar` no era el verdadero — había un mount nuevo en el shell v3 que `renderAuthBar` interceptaba).
 - Estampar CSS literal del prototipo del autor es a veces el camino más limpio (HF-11: -119 LOC vs iterar overrides).
 
-## F3-I1.x — Fundamentos integración v3 ↔ legacy SPA (15 may 2026 PM)
+<!-- 2026-05-19: entradas F3-I1.x + F2.9 + 2026-05-14 movidas a CHANGELOG-archive-202605.md (CHANGELOG.md superaba 30KB hook límite). -->
 
-**Branch**: `claude/port-world-cup-design-FvZpD` HEAD `e048815` (NO mergeado a main). Detalle: `docs/AUDIT_LEGACY_VS_V3.md` tabla transversales (I1+I1.5+I1.6+I2 marcados ✅ DONE).
-
-**4 commits (post F2.9 HF-cierre `18cb8bb`):**
-- **`f509a82`** `fix(docs)` — corregir nomenclatura canónica audit (`v3RenderGroup`→`v3GruposMount` 2×, `v3RenderKO`→`v3ElimMount` 1×). Mismatch introducido en HF-cierre F2.9; helpers internos (`v3RenderKoCard`, `v3RenderZoomKO`, etc.) intactos.
-- **`d6bae7c`** `feat(ui-nav): F3-I1` — `showPage` invoca `window.v3GruposMount()` / `window.v3ElimMount()` con guard `typeof === 'function'` (legacy `initGrupos`/`_gruposInitPromise`/`koInit`/`renderElimShell`/`elimShellResetAction` eliminados); dispatch `CustomEvent('mundial:page-changed')` + fallback síncrono `ensurePageShellV3(page)` antes de `fcShellApply`. Conservado tabbar inferior F7.4-C + `closeMobileFocus`. ~80 LOC neto.
-- **`e1de51f`** `fix(spa): F3-I1.5 retroactivo` — F2.x estaba **sandbox-only** (`/sandbox/v3-pages-smoke.html` + `v3-shell-smoke.html`); scripts/CSS v3 nunca incluidos en SPA → I1 era `console.warn` no-op. Fix: 3 `<link rel="stylesheet">` en `index.html` tras último CSS legacy + 4 `loadScript('/js/v3/...')` en `js/main-entry.js` entre `ui-pred-shell.js` y safety net (orden replicado del sandbox: next-match-resolver → mundial-shell → grupos → eliminatoria).
-- **`e048815`** `feat(spa): F3-I1.6` — cleanup `#page-grupos` legacy (`<div class="container">` entero eliminado, -61 LOC; conservado `<a id="top">`) + chips ADMIN/logout en shell v3. Nuevas funciones `stagePillRowHTML()` (wrap del stage pill con 2 chips) + `refreshShellUserChips()` (toggle visibilidad según `currentUser`/`is_admin`); expuesto `window.refreshShellUserChips`. CSS append `.v3-stage-row` + `.v3-shell-chip` con variantes admin/logout. Chips visibles automáticamente en las 4 `SHELL_PAGES`.
-
-**Smoke OK**: grupos+elim v3 renderizan donde deben tras estos 4 commits.
-
-**Bugs UX detectados (próxima sesión)**:
-1. Hueco demasiado grande stage pill ↔ v3-board (CSS spacing).
-2. Post-simulación grupos: "Clasificación" en cada bracket rompe estética.
-3. Eliminatorias post-simulación: sin banderas / formato amigable.
-4. **F3-I1.6.2** — chip logout no funciona (class `do-logout` no captura listener legacy). Fix ~5 LOC.
-5. **F3-I1.6.1** — posible null-deref `scoring.js:1239` (`total-points`) y `:1315` (`groups-container`) tras cleanup. Verificar TypeError en consola; fix `if(el)` guards ~5 LOC.
-
-**Diferido a F3-I1.7**: cleanup análogo `#page-elim` (legacy F7.X.4 mounts + view-cinematic/bracket/stadium + finalizar-section + modal — requiere análisis previo de referencias vivas tipo `#total-ko-pts` que `updateKOPts` en `ui-nav.js` sigue invocando).
-
-**Lección persistida (audit doc + CLAUDE.md)**: F2.x cerrado en sandbox aislado ≠ integrado al SPA. Verificar SIEMPRE que scripts/CSS estén incluidos en `index.html` + `main-entry.js` antes de asumir wiring funcional.
-
-## F2.9 — Eliminatoria smoke visual cerrado + HF-cierre doc (15 may 2026)
-
-**Branch**: `claude/port-world-cup-design-FvZpD` (NO mergeado a main). HEAD del HF-cierre: `<sha_post_commit>`. 14 commits HF pusheados 14-may + 1 commit HF-cierre doc 15-may.
-
-**HOTFIX visuales (4)**:
-- **HOTFIX-01** — shell min-height para evitar layout shift al montar zoom-overlay.
-- **HOTFIX-02** — modal inner querySelector roto en `eliminatoria-v3.js` (selector tras refactor namespace).
-- **HOTFIX-03** — ERR-43 redux: pointer-events gating en sub-overlays goleador picker (replicado en KO).
-- **HOTFIX-04** — sandbox `showPage` bypass para localhost sin auth.
-
-**HF tematizados**:
-- **HF-05** — quita botón EDITAR (redundante con tap directo) + overflow nombres largos + stub confirm doble + textos penaltis ("Penaltis" en vez de "P.").
-- **HF-06** — trofeo intermedio entre cards finales + URL prototipo + overflow F + alineación al prototipo + simetría + box-sizing border-box. **6 iteraciones (a/bis/ter/quater/quinto/sexto)** por improvisar fix sin leer prototipo standalone primero — **lección persistida**: coherencia con prototipo > recomendación propia.
-- **HF-09** — motor de puntuación: regla +2 goleador sin filtros por marcador ni equipo. `realScorers` parámetro nuevo en `calcMatchPoints` + `calcKOMatchPoints`. Fallback `_hf09FallbackScorers` placeholder hasta hidratación pipeline real. **7/7 tests pasan**. Backwards compatible. Doc `scoring-engine.md` añade sección "Regla del +2 goleador (F2.9 HF-09)".
-- **HF-10-bis** — winner como header static dentro del card final (revierte HF-10 erróneo). Posicionamiento absolute → static, margin compensa padding, fondo dorado sutil + border-bottom + integración chip→header. Eyebrow GRAN FINAL visible debajo (línea 1 winner + línea 2 eyebrow + línea 3 match). **Lección persistida**: solapamiento visual ≠ ocultar un elemento; pedir referencia visual antes de proponer fix.
-
-**HF-cierre doc-only (15 may, este entry)**:
-- `git mv docs/AUDIT_CARDS_LEGACY_VS_V3.md docs/AUDIT_LEGACY_VS_V3.md`.
-- Audit doc **+ sección "Funcionalidades transversales"** con 9 puntos integración v3↔legacy (I1-I9) — reframe scope v3 = 2 screens (Grupos+Fase final), no rewrite completo. Decisión I2: shell v3 en 4 pages (todas menos predictor).
-- Audit doc **+ sección "Backlog F3"** con HF-08 detallado en 5 bloques A-E (simulación E2E + propagación grupos→KO + render nombres reales).
-- Update CLAUDE.md (estado F2.9 cerrada + Top-3 reordenado priorizando fundamentos F3 I1-I4 + mapa doc actualizado).
-- NO toca código.
-
-**Pendientes inmediatos post-F2.9**:
-- F3 fundamentos: I2 (3 LOC) → I1 (~80 LOC) → I3 (~60 LOC) → I4 (~50 LOC) [bloqueador 11 jun].
-- HF-08 (3-5h estimadas).
-- F3 UX: I5+I6+I7 (~340 LOC).
-- F3 refinamiento: I8+I9.
-
-## 2026-05-14 — Redesign v3 (F2 base estable Grupos) — rama `claude/port-world-cup-design-FvZpD`
-
-HEAD `5b87645`. **NO mergeado a main** — F3 wiring SPA pendiente. Cierre sesión Code↔San tras validación visual completa Grupos. 6 commits F2.5 → F2.8.2.
-
-**4 colisiones namespace v3 resueltas** (lección: classic-scripts last-write-wins. Solución: sufijo `Grupos`/`KO` + scope CSS bajo ancestor):
-
-- **F2.3** `4a27043` — `.v3-trophy-col { display: none }` global elim ocultaba trofeo Grupos. Scope a `.v3-bracket-board:not(.v3-ko-board--F)`.
-- **F2.4** `9a52346` — `@keyframes v3-trophy-float` duplicada. Rename elim a `v3-trophy-float-final`.
-- **F2.5** `7f7d8fc` — skeleton modal duplicado en grupos+elim. Movido a `mundial-shell-v3.css` (Opción A San). -162 LOC.
-- **F2.7** `97ff372` — `v3RenderZoom/CloseZoom/AdjustScore` declaradas en ambos (signature distinta). Hoisting global → grupos ejecutaba versión KO → modal "transparente". Rename `Grupos`/`KO` + 17 callers via `sed -i \b...\b`.
-
-**F2.6** `3725ce0` — defensive shell init (removido wrapper `[data-v3-zoom-host]`) + diag logging Chrome MCP.
-
-**F2.8** `c303ee9` — Goleadores tab + chips puntuación. 3 tabs (Marcadores/Goleadores/Clasificación). Chips 3 estados (pre-kickoff/0 pts/N pts stack+total). +636 LOC. Bug pre-existente: `saved: true` (antes `false` → impedía scoring).
-
-**F2.8.1** `d77e02d` — Goleador picker unificado. 2 picks → 1. Sub-overlay con secciones home+away. Save infiere side via lookup.
-
-**F2.8.2** `5b87645` — Fix CRÍTICO bloqueo página. `.v3-squad-picker-panel__inner` con `pointer-events: auto` sin gating `.is-open` capturaba clicks invisibles tras 1ª apertura. Fix: gating sibling + JS defensive `innerHTML = ''` al cerrar.
-
-**ERR-43 + E14** documentados. **`docs/AUDIT_CARDS_LEGACY_VS_V3.md`** 15 features (3 ALTA: IA tooltip, EN VIVO, Boost UX). Referencia F3.
-
-**Próximos**: F2.9 smoke Eliminatoria + F3 wiring SPA + squads reales EF `get-squad` v6.
 

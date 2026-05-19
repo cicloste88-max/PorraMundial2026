@@ -1010,8 +1010,11 @@ body.fc-shell-active #page-elim > #modal {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 24px;
+  /* Polish v1 B2 Item 7: bloque ~30% más compacto.
+     gap 14 -> 10, margin-top 24 -> 16, divider padding 4 -> 2.
+     Acerca el podium al bracket sin perder respiración visual. */
+  gap: 10px;
+  margin-top: 16px;
   padding: 0 4px;
   width: 100%;
   box-sizing: border-box;
@@ -1022,7 +1025,7 @@ body.fc-shell-active #page-elim > #modal {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .v3-podium-divider__line {
@@ -1367,4 +1370,163 @@ body.fc-shell-active #page-elim > #modal {
   border: 1px solid var(--ink-700, #334155);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   Polish v1 B3 — Bloque IA PREDICE (modal KO + modal Grupos)
+   Microbarra 3 segmentos (home/draw/away) con % visibles +
+   labels Local/Empate/Visitante + quip en cursiva opcional.
+   Compartido entre v3RenderZoomKO (eliminatoria-v3.js) y
+   v3RenderMatchesList (grupos-v3.js, 1 por match-card).
+   ============================================================ */
+/* Polish v1 Fix-2 sub-3: paleta integrada con fondo oscuro del modal.
+   Wrap más oscuro, gradientes verticales por segmento, bordes sutiles,
+   label/quip en tonos slate. */
+.v3-zoom-ia {
+  margin: 12px 0;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+.v3-zoom-ia__label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  opacity: .8;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.v3-zoom-ia__bar {
+  display: flex;
+  height: 22px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+}
+.v3-zoom-ia__seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.3s ease;
+  min-width: 0;
+  overflow: hidden;
+}
+.v3-zoom-ia__seg--home { background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); }
+.v3-zoom-ia__seg--draw { background: linear-gradient(180deg, #475569 0%, #334155 100%); }
+.v3-zoom-ia__seg--away { background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); }
+.v3-zoom-ia__seg + .v3-zoom-ia__seg { border-left: 1px solid rgba(0, 0, 0, 0.2); }
+.v3-zoom-ia__pct {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+/* Polish v1 Fix-2 sub-2: 3 divs con width proporcional al segmento. */
+.v3-zoom-ia__teams {
+  display: flex;
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-400);
+  opacity: .6;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.v3-zoom-ia__team {
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.v3-zoom-ia__quip {
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-style: italic;
+  opacity: .75;
+  color: #cbd5e1;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Polish v1 B4 Item 10 + Fix-4 — Wrapper awards card v3
+   Solo necesitamos el wrap externo: el box4 interior lo render
+   window.renderAwardsBox4Legacy (ko.js) con CSS legacy .aw-slot/
+   .aw-grid/.aw-header/.aw-footer/.aw-player-bg de base.css.
+   Reglas .v3-awards-wrap/.v3-aw-* anteriores eliminadas en Fix-4.
+   ============================================================ */
+.v3-awards-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 0 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   Polish v1 B4 Items 12+13 — Cerrar porra v3
+   Botón principal en pie de eliminatorias. Reusa v3-btn + variante
+   gold + cerrar (más prominente). Lock visual cuando _porraCerrada.
+   ============================================================ */
+.v3-actions--cerrar {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+.v3-btn--gold {
+  background: linear-gradient(180deg, rgba(201,169,97,.18), rgba(201,169,97,.08));
+  border-color: var(--fifa-gold-deep);
+  color: var(--fifa-gold);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.v3-btn--gold:hover {
+  background: linear-gradient(180deg, rgba(201,169,97,.28), rgba(201,169,97,.14));
+}
+.v3-btn--cerrar {
+  padding: 12px 20px;
+  font-size: 13px;
+}
+
+/* Estado bloqueado tras cierre de porra: visualmente atenuado, pointer-events
+   off pero el cerrar/X/back del modal sigue siendo clickable (ver excepción
+   de .v3-zoom-close abajo). */
+.v3-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.v3-disabled .v3-zoom-close {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* ============================================================
+   Polish v1 B4 — Badge sugerencia Bota de Oro
+   Aplicado en .aw-player-row.is-suggested via renderPickerList
+   cuando openPicker('golden_boot') recibe sugerencia.
+   ============================================================ */
+.aw-suggestion-badge {
+  display: inline-block;
+  background: rgba(96, 165, 250, 0.18);
+  color: #60a5fa;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.aw-player-row.is-suggested {
+  background: rgba(96, 165, 250, 0.06);
+  border-left: 2px solid #60a5fa;
 }

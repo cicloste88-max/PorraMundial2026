@@ -5,19 +5,21 @@
 Al editar `scripts/sync-squads.mjs`, ficheros bajo `scripts/lib/**`, o el workflow
 `.github/workflows/sync-squads.yml`.
 
-## 0 · Jerarquía de fuentes (refactor 18-may-2026)
+## 0 · Jerarquía de fuentes (refactor 18-19 may 2026)
 
-Desde el refactor del 18-may (rama `feat/squads-sources-refactor`, ver ERR-58),
+Desde el refactor del 18-19 may (rama `feat/squads-sources-refactor`, ver ERR-59),
 la detección de listas FINAL **no usa FF**. La jerarquía es:
 
-**Primarias** (cross-validate 2-of-3 + Jaccard ≥ 0.7, `--mode=detect`):
+**Primarias** (cross-validate 2-of-N + Jaccard ≥ 0.7, `--mode=detect`):
 - AS: `https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-...`
 - Sport.es: `https://www.sport.es/.../listas-convocados-mundial-2026-...`
 - Olympics: `https://www.olympics.com/es/noticias/mundial-2026-listas-48-selecciones`
+- Eurosport: `https://www.eurosport.es/futbol/mundial/2026/convocatorias-selecciones-...`
+- Marca: `https://www.marca.com/futbol/mundial/2026/05/16/convocatorias-oficiales-...`
 
 **Secundaria solo para XI titular**:
 - futbolfantasy.com: invocada únicamente sobre selecciones ya marcadas FINAL por
-  ≥ 2 primarias. Esto cierra el vector de ERR-58 (noticias FF de Eurocopa 2024
+  ≥ 2 primarias. Esto cierra el vector de ERR-59 (noticias FF de Eurocopa 2024
   IDs 115xxx mezcladas con Mundial 2026 IDs 143xxx).
 
 **Enriquecimiento** (`--mode=enrich-tm`):
