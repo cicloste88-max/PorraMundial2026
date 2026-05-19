@@ -26,8 +26,13 @@
 .fc-pizarra-modal {
   position: relative;
   width: min(380px, 92vw);
+  /* F-07: dvh descuenta barras de Safari iOS (URL/gestos) que en 92vh
+     ocultaban portero + stats inferiores. Fallback 92vh para navegadores
+     sin soporte (Safari ≥15.4 / Chrome Android lo soportan). */
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: #1f2937;
   border-radius: 18px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
@@ -170,6 +175,11 @@
   position: relative;
   margin: 10px 12px 0;
   aspect-ratio: 2 / 3;       /* 0.666… vertical */
+  /* F-07: cap altura para no desbordar el modal en viewports cortos
+     (Safari iPhone con barras URL+gestos). Con max-height el ancho
+     queda libre dentro del modal pero la altura no excede el espacio
+     disponible (~modal 92dvh menos header+stats ≈ 200px). */
+  max-height: calc(92dvh - 220px);
   background-size: cover;
   background-position: center;
   border-radius: 10px;
@@ -372,4 +382,28 @@
   outline: 2px solid #2563eb;
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* F-08: tercera línea bajo la pastilla con apellido (max 10 chars + …).
+   Sólo se renderiza si hay datos en squads.jugadores. Sin nombre → no
+   aparece nada y la pastilla queda como antes (dorsal + posición). */
+.fc-pizarra-token-surname {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 18px);
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  pointer-events: none;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
 }

@@ -646,6 +646,22 @@
   display: none;
 }
 
+/* F-09: chevron que rota 90° al expandir, señalizando que las secciones
+   "Sobre el equipo" y "Análisis táctico" son colapsables. */
+.fc-globo-detail__bio-toggle::after {
+  content: '›';
+  margin-left: auto;
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(232, 184, 48, 0.6);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+.fc-globo-detail__bio[open] .fc-globo-detail__bio-toggle::after {
+  transform: rotate(90deg);
+  color: #e8b830;
+}
+
 .fc-globo-detail__bio[open] .fc-globo-detail__bio-toggle {
   background: rgba(232, 184, 48, 0.10);
   color: #e8b830;
@@ -683,4 +699,125 @@
 .fc-globo-detail__btn-plantilla:hover {
   background: rgba(232, 184, 48, 0.2);
   border-color: rgba(232, 184, 48, 0.6);
+}
+
+/* F-10b — Botón secundario "Plantilla" + modal roster con scroll horizontal. */
+.fc-globo-detail__btn-roster {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 10px 16px;
+  background: rgba(96, 165, 250, 0.10);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 8px;
+  color: #93c5fd;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.fc-globo-detail__btn-roster:hover {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.fc-roster-modal {
+  position: fixed; inset: 0; z-index: 10060;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 16px;
+}
+.fc-roster-modal.is-open { display: flex; }
+.fc-roster-modal__inner {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex; flex-direction: column;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+.fc-roster-modal__head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.85);
+}
+.fc-roster-modal__flag {
+  width: 28px; height: 20px; object-fit: cover; border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+.fc-roster-modal__title {
+  flex: 1; min-width: 0;
+  font-size: 14px; font-weight: 700; color: #f1f5f9;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fc-roster-modal__close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.fc-roster-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 12px 16px;
+}
+.fc-roster-section { margin: 10px 0; }
+.fc-roster-section-title {
+  padding: 6px 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 6px 6px 0 0;
+}
+.fc-roster-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+}
+.fc-roster-table {
+  width: 100%;
+  min-width: 340px;
+  border-collapse: collapse;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+.fc-roster-table th,
+.fc-roster-table td {
+  padding: 7px 10px;
+  text-align: left;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  white-space: nowrap;
+}
+.fc-roster-table th {
+  font-size: 10px; font-weight: 700;
+  color: #64748b; text-transform: uppercase; letter-spacing: 0.06em;
+  background: rgba(30, 41, 59, 0.7);
+  border-top: 0;
+}
+.fc-roster-table td:nth-child(2),
+.fc-roster-table td:nth-child(3) { color: #cbd5e1; }
+.fc-roster-table td:nth-child(4) { color: #f8fafc; font-weight: 600; }
+.fc-roster-name { display: flex; flex-direction: column; gap: 1px; }
+.fc-roster-club {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 400;
+}
+.fc-roster-loading,
+.fc-roster-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
 }

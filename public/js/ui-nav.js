@@ -670,10 +670,24 @@ function initWelcome() {
 function renderPickerList(list, selected, suggestion) {
   const scroll = document.getElementById('picker-scroll');
   const byTeam = {};
-  list.forEach(p => { if(!byTeam[p.teamName]) byTeam[p.teamName]=[]; byTeam[p.teamName].push(p); });
+  const flagByTeam = {};
+  list.forEach(p => {
+    if (!byTeam[p.teamName]) byTeam[p.teamName] = [];
+    byTeam[p.teamName].push(p);
+    if (!flagByTeam[p.teamName]) flagByTeam[p.teamName] = p.flag;
+  });
+  // F-03: secciones colapsables selección→jugadores. Si hay pick previo o
+  // sugerencia en una selección, esa queda expandida por defecto; el resto
+  // colapsado.
+  const selectedTeam = selected ? selected.teamName : null;
+  const suggestionTeam = suggestion
+    ? (list.find(p => p.key === suggestion.key) || {}).teamName
+    : null;
   scroll.innerHTML = Object.entries(byTeam).map(([teamName, players]) => {
+    const expanded = (teamName === selectedTeam) || (teamName === suggestionTeam);
+    const flag = flagByTeam[teamName];
     const rows = players.map(p => {
-      const isActive = selected?.key === p.key ? 'active' : '';
+      const isActive = selected && selected.key === p.key ? 'active' : '';
       const isSuggested = suggestion && suggestion.key === p.key;
       const badge = isSuggested
         ? `<span class="aw-suggestion-badge">💡 Sugerido — ${suggestion.count} goles previstos</span>`
@@ -682,16 +696,29 @@ function renderPickerList(list, selected, suggestion) {
         <div class="aw-player-info">
           <div class="aw-player-pname">${p.name}${badge}</div>
           <div class="aw-player-team">
-            <div class="aw-player-tf"><img src="${SB}/flags/${p.flag}.png" alt=""/></div>
+            <div class="aw-player-tf"><img src="${SB}/flags/${flag}.png" alt=""/></div>
             ${teamName}
           </div>
         </div>
         <div class="aw-player-check">✓</div>
       </div>`;
     }).join('');
-    return `<div class="aw-picker-group">${teamName}</div>${rows}`;
+    return `<div class="aw-picker-section ${expanded ? 'is-open' : ''}" data-team="${teamName.replace(/"/g, '&quot;')}">
+      <button type="button" class="aw-picker-group aw-picker-group--toggle" onclick="toggleAwardGroup(this)">
+        <span class="aw-picker-group__flag"><img src="${SB}/flags/${flag}.png" alt=""/></span>
+        <span class="aw-picker-group__name">${teamName}</span>
+        <span class="aw-picker-group__count">${players.length}</span>
+        <span class="aw-picker-group__chevron" aria-hidden="true">›</span>
+      </button>
+      <div class="aw-picker-section__body">${rows}</div>
+    </div>`;
   }).join('');
 }
+function toggleAwardGroup(btn) {
+  const section = btn && btn.closest && btn.closest('.aw-picker-section');
+  if (section) section.classList.toggle('is-open');
+}
+window.toggleAwardGroup = toggleAwardGroup;
 function updateAwardsFooter() {
   const filled = Object.values(awPicks).filter(Boolean).length;
   // Actualizar dots y label en tarjeta estática de grupos (si existe)

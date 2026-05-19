@@ -53,78 +53,78 @@
   // x=0 izquierda, x=100 derecha (desde nuestra perspectiva atacando hacia arriba).
   const FORMATION_COORDS = {
     '4-3-3': [
-      [50, 92], // PO
+      [50, 86], // PO
       [82, 75], [62, 76], [38, 76], [18, 75], // 4 def
       [68, 56], [50, 54], [32, 56],            // 3 mc
       [78, 28], [50, 18], [22, 28],            // 3 del (ED, DC, EI)
     ],
     '4-4-2': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [82, 50], [62, 52], [38, 52], [18, 50],
       [60, 22], [40, 22],
     ],
     '4-2-3-1': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [62, 60], [38, 60],                       // doble pivote
       [78, 38], [50, 36], [22, 38],             // 3 mco
       [50, 18],                                 // dc único
     ],
     '3-5-2': [
-      [50, 92],
+      [50, 86],
       [70, 76], [50, 78], [30, 76],             // 3 cb
       [88, 56], [62, 54], [50, 60], [38, 54], [12, 56], // 5 mp
       [60, 22], [40, 22],
     ],
     '5-3-2': [
-      [50, 92],
+      [50, 86],
       [82, 78], [62, 76], [50, 80], [38, 76], [18, 78], // 5 def
       [68, 56], [50, 54], [32, 56],
       [60, 22], [40, 22],
     ],
     '4-1-4-1': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [50, 64],                                 // pivote
       [82, 46], [60, 44], [40, 44], [18, 46],
       [50, 22],
     ],
     '4-3-2-1': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [70, 58], [50, 56], [30, 58],
       [62, 38], [38, 38],
       [50, 18],
     ],
     '3-4-3': [
-      [50, 92],
+      [50, 86],
       [70, 76], [50, 78], [30, 76],
       [82, 56], [62, 54], [38, 54], [18, 56],
       [78, 28], [50, 18], [22, 28],
     ],
     '5-4-1': [
-      [50, 92],
+      [50, 86],
       [82, 78], [62, 76], [50, 80], [38, 76], [18, 78],
       [82, 52], [62, 50], [38, 50], [18, 52],
       [50, 22],
     ],
     '4-4-1-1': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [82, 50], [62, 52], [38, 52], [18, 50],
       [50, 32],                                 // mediapunta
       [50, 18],
     ],
     '3-4-2-1': [
-      [50, 92],
+      [50, 86],
       [70, 76], [50, 78], [30, 76],
       [82, 56], [62, 54], [38, 54], [18, 56],
       [62, 36], [38, 36],
       [50, 18],
     ],
     '4-1-3-2': [
-      [50, 92],
+      [50, 86],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [50, 64],
       [70, 44], [50, 42], [30, 44],
@@ -259,10 +259,15 @@
       const isGK = j.posicion === 'PO';
       const bg = isGK ? fichaPo : ficha;
       const textColor = (isLight && !isGK) ? '#111827' : '#ffffff';
-      const isPlaceholder = j.nombre === '—' || j.nombre === '\u2014';
-      const apellido = isPlaceholder
-        ? j.posicion
-        : j.nombre.split(' ').slice(-1)[0];
+      const isPlaceholder = !j.nombre || j.nombre === '—' || j.nombre === '\u2014';
+      // F-08: pastilla = dorsal + posicion + apellido (3a linea solo cuando
+      // hay nombre). Apellido = ultimo token, truncado a 10 chars con ellipsis.
+      let apellidoHtml = '';
+      if (!isPlaceholder) {
+        let surname = j.nombre.split(' ').slice(-1)[0];
+        if (surname.length > 10) surname = surname.slice(0, 10) + '…';
+        apellidoHtml = '<span class="fc-pizarra-token-surname">' + surname + '</span>';
+      }
 
       tokensHtml +=
         '<div class="fc-pizarra-token" ' +
@@ -270,7 +275,8 @@
                  'background:' + bg + ';color:' + textColor + ';' +
                  'border-color:' + borderColor + '">' +
           '<span class="fc-pizarra-token-num">' + j.dorsal + '</span>' +
-          '<span class="fc-pizarra-token-name">' + apellido + '</span>' +
+          '<span class="fc-pizarra-token-name">' + j.posicion + '</span>' +
+          apellidoHtml +
         '</div>';
     });
 

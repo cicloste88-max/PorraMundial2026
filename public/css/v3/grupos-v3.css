@@ -1088,3 +1088,63 @@
   border: 1px dashed var(--ink-700);
   border-radius: 8px;
 }
+
+/* F-04 — Pie de página fase de grupos: reglas Art.13 (desempate H2H) y
+   criterio 8 mejores terceros (Art.16). Bloques colapsables; en móvil
+   ambos arrancan cerrados (default <details>). */
+.grupos-footer-info {
+  margin: 18px 12px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grupos-footer-info__block {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.grupos-footer-info__title {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.grupos-footer-info__title::-webkit-details-marker { display: none; }
+.grupos-footer-info__title::after {
+  content: '›';
+  margin-left: auto;
+  font-size: 16px;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+.grupos-footer-info__block[open] .grupos-footer-info__title::after {
+  transform: rotate(90deg);
+  color: #93c5fd;
+}
+.grupos-footer-info__block[open] .grupos-footer-info__title {
+  background: rgba(59, 130, 246, 0.08);
+  color: #e2e8f0;
+}
+.grupos-footer-info__body {
+  padding: 4px 14px 12px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.8);
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+.grupos-footer-info__body p { margin: 8px 0 6px; }
+.grupos-footer-info__body ol {
+  margin: 0; padding-left: 18px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.grupos-footer-info__body b { color: #f1f5f9; }
+@media (min-width: 768px) {
+  .grupos-footer-info { max-width: 520px; margin: 22px auto 36px; }
+}

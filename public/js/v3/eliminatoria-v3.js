@@ -762,26 +762,39 @@ window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
 // 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
 // probamos ambos órdenes.
 function v3RenderIABlock(matchKeyOrMatch) {
-  if (typeof iaPredictions !== 'object' || !iaPredictions) return '';
+  // F-05 (round 3): NO devolver '' aunque iaPredictions no esté disponible.
+  // Renderizar siempre al menos la cabecera label + '?' para que el tooltip
+  // explicativo esté accesible en TODAS las cards (grupos + KO QF/SF/F).
+  var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
   var pred = null;
 
   if (typeof matchKeyOrMatch === 'string') {
-    pred = iaPredictions[matchKeyOrMatch];
+    pred = iaMap[matchKeyOrMatch];
   } else if (typeof matchKeyOrMatch === 'object' && matchKeyOrMatch !== null) {
     var match = matchKeyOrMatch;
     if (match.group && typeof getMatchKey === 'function') {
-      pred = iaPredictions[getMatchKey(match)];
+      pred = iaMap[getMatchKey(match)];
     } else {
       var homeIso3 = v3GetMatchTeamIso3(match, 'home');
       var awayIso3 = v3GetMatchTeamIso3(match, 'away');
       if (homeIso3 && awayIso3) {
-        pred = iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
-            || iaPredictions['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+            || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
       }
     }
   }
 
-  if (!pred || pred.p_home == null || pred.p_away == null) return '';
+  // F-05: si no hay predicción IA, igualmente renderizar la cabecera con
+  // label + botón "?" (tooltip generico de cómo funciona la IA). El bloque
+  // de probabilidades queda oculto hasta que llegue la data.
+  if (!pred || pred.p_home == null || pred.p_away == null) {
+    return '<div class="v3-zoom-ia v3-zoom-ia--empty">'
+      + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+      +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+      + '</div>'
+      + '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>'
+      + '</div>';
+  }
 
   var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
   var pHome = pcts[0], pDraw = pcts[1], pAway = pcts[2];
@@ -799,7 +812,9 @@ function v3RenderIABlock(matchKeyOrMatch) {
   }
 
   return '<div class="v3-zoom-ia">'
-    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE</div>'
+    + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+    +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+    + '</div>'
     + '<div class="v3-zoom-ia__bar">'
     +   seg(pHome, 'v3-zoom-ia__seg--home')
     +   seg(pDraw, 'v3-zoom-ia__seg--draw')

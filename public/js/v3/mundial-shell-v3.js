@@ -285,9 +285,17 @@
       }
     }
 
-    // F3-I1.6.4: refuerzo defensivo — ocultar wc-auth-bar legacy.
+    // F3-I1.6.4: refuerzo defensivo — ocultar wc-auth-bar legacy en
+    // shell pages. F-01 (19-may): NO ocultar cuando la welcome (selector
+    // de liga) está visible — su botón "Cerrar sesión" vive en wc-auth-bar
+    // y este refresh se dispara por mundial:leagues-loaded justo después
+    // de mostrar el panel, escondiéndolo a los segundos del login.
     var authBar = document.getElementById('wc-auth-bar');
-    if (authBar) authBar.style.display = 'none';
+    if (authBar) {
+      var welcomeEl = document.getElementById('page-welcome');
+      var welcomeVisible = welcomeEl && welcomeEl.style.display !== 'none';
+      if (!welcomeVisible) authBar.style.display = 'none';
+    }
   }
   window.refreshShellUserChips = refreshShellUserChips;
 
