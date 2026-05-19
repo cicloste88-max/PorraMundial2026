@@ -1091,6 +1091,43 @@ window.v3GruposMount = function() {
     hint.textContent = 'Toca un grupo para pronosticar sus 6 partidos · ESC para cerrar';
     mount.appendChild(hint);
 
+    // F-04: pie de página con reglas de desempate (Art.13 FIFA) y criterio
+    // de los 8 mejores terceros (Art.16). Colapsado por defecto en móvil.
+    var footer = document.createElement('div');
+    footer.className = 'grupos-footer-info';
+    footer.innerHTML =
+      '<details class="grupos-footer-info__block">' +
+        '<summary class="grupos-footer-info__title">⚖️ Desempate dentro de un grupo</summary>' +
+        '<div class="grupos-footer-info__body">' +
+          '<p>Si dos o más equipos terminan empatados a puntos en un grupo, ' +
+          'la FIFA aplica este orden (Reglamento 2026, Art. 13):</p>' +
+          '<ol>' +
+            '<li>Puntos en los partidos directos (head-to-head).</li>' +
+            '<li>Diferencia de goles en los partidos directos.</li>' +
+            '<li>Goles a favor en los partidos directos.</li>' +
+            '<li>Diferencia de goles en todos los partidos del grupo.</li>' +
+            '<li>Goles a favor en todos los partidos del grupo.</li>' +
+            '<li>Puntos de fair play (amarillas/rojas).</li>' +
+            '<li>Sorteo de la FIFA.</li>' +
+          '</ol>' +
+        '</div>' +
+      '</details>' +
+      '<details class="grupos-footer-info__block">' +
+        '<summary class="grupos-footer-info__title">🥉 Cómo pasan los mejores terceros</summary>' +
+        '<div class="grupos-footer-info__body">' +
+          '<p>Pasan a dieciseisavos los <b>8 mejores terceros</b> de los 12 grupos. ' +
+          'En caso de empate, se ordenan por:</p>' +
+          '<ol>' +
+            '<li>Puntos conseguidos.</li>' +
+            '<li>Diferencia de goles.</li>' +
+            '<li>Goles a favor.</li>' +
+            '<li>Puntos de fair play.</li>' +
+            '<li>Sorteo de la FIFA.</li>' +
+          '</ol>' +
+        '</div>' +
+      '</details>';
+    mount.appendChild(footer);
+
     // F2.1 fix #5: NO crear .v3-zoom-overlay / .v3-zoom-panel propios. El shell
     // mundial-shell-v3.js ya monta un singleton en body via ensureZoomOverlay().
     // v3OpenZoomGrupos/v3RenderZoomGrupos encuentran ese singleton y operan sobre él.
