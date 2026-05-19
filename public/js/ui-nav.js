@@ -663,16 +663,24 @@ function initWelcome() {
 // DOMContentLoaded movido al bloque de auth (después del CDN)
 
 
-function renderPickerList(list, selected) {
+// Polish v1 B4: parámetro opcional `suggestion` ({ key, count }) para destacar
+// un jugador con badge "💡 Sugerido — N goles previstos" (usado por openPicker
+// para golden_boot via _v3SuggestGoldenBoot). Sin sugerencia, comportamiento
+// idéntico al previo (compatible).
+function renderPickerList(list, selected, suggestion) {
   const scroll = document.getElementById('picker-scroll');
   const byTeam = {};
   list.forEach(p => { if(!byTeam[p.teamName]) byTeam[p.teamName]=[]; byTeam[p.teamName].push(p); });
   scroll.innerHTML = Object.entries(byTeam).map(([teamName, players]) => {
     const rows = players.map(p => {
       const isActive = selected?.key === p.key ? 'active' : '';
-      return `<div class="aw-player-row ${isActive}" onclick="selectAward('${p.key}')">
+      const isSuggested = suggestion && suggestion.key === p.key;
+      const badge = isSuggested
+        ? `<span class="aw-suggestion-badge">💡 Sugerido — ${suggestion.count} goles previstos</span>`
+        : '';
+      return `<div class="aw-player-row ${isActive} ${isSuggested ? 'is-suggested' : ''}" onclick="selectAward('${p.key}')">
         <div class="aw-player-info">
-          <div class="aw-player-pname">${p.name}</div>
+          <div class="aw-player-pname">${p.name}${badge}</div>
           <div class="aw-player-team">
             <div class="aw-player-tf"><img src="${SB}/flags/${p.flag}.png" alt=""/></div>
             ${teamName}

@@ -1392,129 +1392,166 @@ const CLASSIFICATION_PTS = {
   fourth:     {label:'Cuarto clasificado',  pts:10},
 };
 
-// NXGN 2026 — Top 50 mejores jóvenes promesas
-const YOUNG_PLAYERS_NXGN = [
-  {key:'Lamine_Yamal', name:'Lamine Yamal', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Estevao', name:'Estevao', team:'Brasil', teamName:'Brasil', flag:'BRA', role:'fw', young:true},
-  {key:'Pau_Cubarsi', name:'Pau Cubarsí', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Franco_Mastantuono', name:'Franco Mastantuono', team:'Argentina', teamName:'Argentina', flag:'ARG', role:'fw', young:true},
-  {key:'Lennart_Karl', name:'Lennart Karl', team:'Alemania', teamName:'Alemania', flag:'GER', role:'fw', young:true},
-  {key:'Max_Dowman', name:'Max Dowman', team:'Inglaterra', teamName:'Inglaterra', flag:'ENG', role:'fw', young:true},
-  {key:'Luka_Vuskovic', name:'Luka Vuskovic', team:'Croacia', teamName:'Croacia', flag:'CRO', role:'fw', young:true},
-  {key:'Ayyoub_Bouaddi', name:'Ayyoub Bouaddi', team:'Marruecos', teamName:'Marruecos', flag:'MAR', role:'fw', young:true},
-  {key:'Geovany_Quenda', name:'Geovany Quenda', team:'Portugal', teamName:'Portugal', flag:'POR', role:'fw', young:true},
-  {key:'Ethan_Nwaneri', name:'Ethan Nwaneri', team:'Inglaterra', teamName:'Inglaterra', flag:'ENG', role:'fw', young:true},
-  {key:'Rodrigo_Mora', name:'Rodrigo Mora', team:'Portugal', teamName:'Portugal', flag:'POR', role:'fw', young:true},
-  {key:'Honest_Ahanor', name:'Honest Ahanor', team:'Nigeria', teamName:'Nigeria', flag:'NIG', role:'fw', young:true},
-  {key:'Ibrahim_Mbaye', name:'Ibrahim Mbaye', team:'Senegal', teamName:'Senegal', flag:'SEN', role:'fw', young:true},
-  {key:'Konstantinos_Karetsas', name:'Konstantinos Karetsas', team:'Bélgica', teamName:'Bélgica', flag:'BEL', role:'fw', young:true},
-  {key:'Rio_Ngumoha', name:'Rio Ngumoha', team:'Inglaterra', teamName:'Inglaterra', flag:'ENG', role:'fw', young:true},
-  {key:'Gilberto_Mora', name:'Gilberto Mora', team:'México', teamName:'México', flag:'MEX', role:'fw', young:true},
-  {key:'Marc_Bernal', name:'Marc Bernal', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Dro_Fernandez', name:'Dro Fernández', team:'Argentina', teamName:'Argentina', flag:'ARG', role:'fw', young:true},
-  {key:'Mohamed_Kader_Meite', name:'Mohamed Kader Meite', team:'Costa de Marfil', teamName:'Costa de Marfil', flag:'CIV', role:'fw', young:true},
-  {key:'Kendry_Paez', name:'Kendry Páez', team:'Ecuador', teamName:'Ecuador', flag:'ECU', role:'fw', young:true},
-  {key:'Jorthy_Mokio', name:'Jorthy Mokio', team:'Bélgica', teamName:'Bélgica', flag:'BEL', role:'fw', young:true},
-  {key:'Francesco_Camarda', name:'Francesco Camarda', team:'Italia', teamName:'Italia', flag:'ITA', role:'fw', young:true},
-  {key:'Robinio_Vaz', name:'Robinio Vaz', team:'Países Bajos', teamName:'Países Bajos', flag:'NED', role:'fw', young:true},
-  {key:'Josh_King', name:'Josh King', team:'EE.UU.', teamName:'EE.UU.', flag:'USA', role:'fw', young:true},
-  {key:'Charalampos_Kostoulas', name:'Charalampos Kostoulas', team:'Grecia', teamName:'Grecia', flag:'GRE', role:'fw', young:true},
-  {key:'Mikey_Moore', name:'Mikey Moore', team:'Inglaterra', teamName:'Inglaterra', flag:'ENG', role:'fw', young:true},
-  {key:'Kennet_Eichhorn', name:'Kennet Eichhorn', team:'Alemania', teamName:'Alemania', flag:'GER', role:'fw', young:true},
-  {key:'Tylel_Tati', name:'Tylel Tati', team:'Francia', teamName:'Francia', flag:'FRA', role:'fw', young:true},
-  {key:'Nathan_De_Cat', name:'Nathan De Cat', team:'Bélgica', teamName:'Bélgica', flag:'BEL', role:'fw', young:true},
-  {key:'Mateus_Mane', name:'Mateus Mane', team:'Portugal', teamName:'Portugal', flag:'POR', role:'fw', young:true},
-  {key:'Andrija_Maksimovic', name:'Andrija Maksimovic', team:'Serbia', teamName:'Serbia', flag:'SRB', role:'fw', young:true},
-  {key:'Sean_Steur', name:'Sean Steur', team:'Países Bajos', teamName:'Países Bajos', flag:'NED', role:'fw', young:true},
-  {key:'Kerim_Alajbegovic', name:'Kerim Alajbegovic', team:'Bosnia-Herz.', teamName:'Bosnia-Herz.', flag:'BIH', role:'fw', young:true},
-  {key:'Vasilije_Kostov', name:'Vasilije Kostov', team:'Serbia', teamName:'Serbia', flag:'SRB', role:'fw', young:true},
-  {key:'Quentin_Ndjantou', name:'Quentin Ndjantou', team:'Camerún', teamName:'Camerún', flag:'CMR', role:'fw', young:true},
-  {key:'Ian_Subiabre', name:'Ian Subiabre', team:'Chile', teamName:'Chile', flag:'CHI', role:'fw', young:true},
-  {key:'Chris_Rigg', name:'Chris Rigg', team:'Inglaterra', teamName:'Inglaterra', flag:'ENG', role:'fw', young:true},
-  {key:'Karim_Coulibaly', name:'Karim Coulibaly', team:'Mali', teamName:'Mali', flag:'MLI', role:'fw', young:true},
-  {key:'Cavan_Sullivan', name:'Cavan Sullivan', team:'EE.UU.', teamName:'EE.UU.', flag:'USA', role:'fw', young:true},
-  {key:'Thiago_Pitarch', name:'Thiago Pitarch', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Viktor_Dadason', name:'Viktor Dadason', team:'Islandia', teamName:'Islandia', flag:'ISL', role:'fw', young:true},
-  {key:'Álvaro_Montoro', name:'Álvaro Montoro', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Dastan_Satpaev', name:'Dastan Satpaev', team:'Kazajistán', teamName:'Kazajistán', flag:'KAZ', role:'fw', young:true},
-  {key:'Samuele_Inacio', name:'Samuele Inacio', team:'Portugal', teamName:'Portugal', flag:'POR', role:'fw', young:true},
-  {key:'Oskar_Pietuszewski', name:'Oskar Pietuszewski', team:'Polonia', teamName:'Polonia', flag:'POL', role:'fw', young:true},
-  {key:'Jeremy_Monga', name:'Jeremy Monga', team:'R.D. Congo', teamName:'R.D. Congo', flag:'COD', role:'fw', young:true},
-  {key:'Joan_Martinez', name:'Joan Martinez', team:'España', teamName:'España', flag:'ESP', role:'fw', young:true},
-  {key:'Anisio_Cabral', name:'Anisio Cabral', team:'Guinea-Bissau', teamName:'Guinea-Bissau', flag:'GNB', role:'fw', young:true},
-  {key:'João_Simões', name:'João Simões', team:'Portugal', teamName:'Portugal', flag:'POR', role:'fw', young:true},
-  {key:'JJ_Gabriel', name:'JJ Gabriel', team:'Sudáfrica', teamName:'Sudáfrica', flag:'RSA', role:'fw', young:true}
-];
+// Polish v1 Fix-Pack-2 Fix-3+4: arrays hardcoded AW_PLAYERS (22) y
+// YOUNG_PLAYERS_NXGN (50) ELIMINADOS. Candidatos ahora se computan
+// dinámicamente desde BD: ia_elo_fifa (rank por selección) + squads
+// (jugadores JSONB con nombre, posicion_bucket, edad, club). Ver
+// getAwardCandidates(award) abajo. window.AW_PLAYERS y
+// window.YOUNG_PLAYERS_NXGN ya NO se exponen — auth.js loadUserData
+// resuelve via getAwardCandidates.
 
-const AW_PLAYERS=[
-  {key:'Messi',name:'Leo Messi',teamName:'Argentina',flag:'ARG',sticker:'Argentina/Leo_Messi',role:'fw',young:false},
-  {key:'Alvarez',name:'Julián Álvarez',teamName:'Argentina',flag:'ARG',sticker:'Argentina/Julian_Alvarez',role:'fw',young:false},
-  {key:'Dibu',name:'E. Martínez',teamName:'Argentina',flag:'ARG',sticker:'Argentina/Emiliano_Martinez',role:'gk',young:false},
-  {key:'Mbappe',name:'Kylian Mbappé',teamName:'Francia',flag:'FRA',sticker:'France/Mbappe-PNG-France-Football-Render-370x389',role:'fw',young:false},
-  {key:'Yamal',name:'Lamine Yamal',teamName:'España',flag:'ESP',sticker:'Spain/Lamine_Yamal_Spain_2',role:'fw',young:true},
-  {key:'Nico',name:'Nico Williams',teamName:'España',flag:'ESP',sticker:'Spain/Nico_Williams',role:'fw',young:true},
-  {key:'Morata',name:'Álvaro Morata',teamName:'España',flag:'ESP',sticker:'Spain/Alvaro_Morata_Spain_png',role:'fw',young:false},
-  {key:'Rodri',name:'Rodri',teamName:'España',flag:'ESP',sticker:'Spain/Rodri-PNG-Spain-Football-Render-370x389',role:'mf',young:false},
-  {key:'Bellingham',name:'Jude Bellingham',teamName:'Inglaterra',flag:'ENG',sticker:'England/Jude_Bellingham',role:'mf',young:true},
-  {key:'Kane',name:'Harry Kane',teamName:'Inglaterra',flag:'ENG',sticker:'England/Harry-Kane-PNG-England-Football-Render-1-370x389',role:'fw',young:false},
-  {key:'Saka',name:'Bukayo Saka',teamName:'Inglaterra',flag:'ENG',sticker:'England/Bukayo_Saka',role:'fw',young:true},
-  {key:'Vinicius',name:'Vinícius Jr.',teamName:'Brasil',flag:'BRA',sticker:'Brazil/Vinicius-JR-Brazil-PNG-Football-Render-370x389',role:'fw',young:false},
-  {key:'Endrick',name:'Endrick',teamName:'Brasil',flag:'BRA',sticker:'Brazil/Endrick-Brazil-PNG-Football-Render--370x389',role:'fw',young:true},
-  {key:'Ronaldo',name:'C. Ronaldo',teamName:'Portugal',flag:'POR',sticker:'Portugal/Cristiano_Ronaldo',role:'fw',young:false},
-  {key:'Bruno',name:'Bruno Fernandes',teamName:'Portugal',flag:'POR',sticker:'Portugal/Bruno_Fernandes',role:'mf',young:false},
-  {key:'Musiala',name:'Jamal Musiala',teamName:'Alemania',flag:'GER',sticker:'Germany/Musiala-PNG-Germany-Football-Render-370x389',role:'mf',young:true},
-  {key:'Wirtz',name:'Florian Wirtz',teamName:'Alemania',flag:'GER',sticker:'Germany/Wirtz-PNG-Germany-Football-Render-370x389',role:'mf',young:true},
-  {key:'VanDijk',name:'Virgil van Dijk',teamName:'P. Bajos',flag:'NED',sticker:'Netherlands/Virgil_van_Dijk',role:'df',young:false},
-  {key:'Nunez',name:'Darwin Núñez',teamName:'Uruguay',flag:'URU',sticker:'Uruguay/Darwin_Nunez',role:'fw',young:false},
-  {key:'Modric',name:'Luka Modrić',teamName:'Croacia',flag:'CRO',sticker:'croatia/Luka_Modric',role:'mf',young:false},
-  {key:'DeBruyne',name:'Kevin De Bruyne',teamName:'Bélgica',flag:'BEL',sticker:'belgium/Kevin_De_Bruyne',role:'mf',young:false},
-  {key:'Haaland',name:'Erling Haaland',teamName:'Noruega',flag:'NOR',sticker:'norway/Norway_Render',role:'fw',young:false},
-];
-// Exponer arrays como globales para acceso desde el bloque de auth (script separado)
-window.AW_PLAYERS         = AW_PLAYERS;
-window.YOUNG_PLAYERS_NXGN = YOUNG_PLAYERS_NXGN;
 window.AWARDS_CFG         = AWARDS_CFG;
+
+// Polish v1 Fix-Pack-2 Fix-3+4: cache de candidatos por award.
+// Llave 'golden_ball' | 'golden_boot' | 'golden_glove' | 'young_player'.
+// Pre-cargada en background al render de awards card (setTimeout 100ms);
+// usada por openPicker async + selectAward + _v3SuggestGoldenBoot +
+// auth.js loadUserData.
+let _awardCandidatesCache = {};
+window._awardCandidatesCache = _awardCandidatesCache;
+
+function _bucketToRole(bucket) {
+  switch (bucket) {
+    case 'Portero':        return 'gk';
+    case 'Defensa':        return 'df';
+    case 'Centrocampista': return 'mf';
+    case 'Delantero':      return 'fw';
+    default: return null;
+  }
+}
+
+// Criterios por award (matriz acordada con San):
+// - golden_ball:  top 20 selecciones Elo, cualquier rol.
+// - golden_boot:  top 30 Elo, bucket IN (Centrocampista, Delantero).
+// - golden_glove: top 30 Elo, bucket = Portero.
+// - young_player: top 30 Elo, edad ≤ 21 (Transfermarkt enrich-tm).
+// Ordenado por (rank Elo asc, name asc). Cacheado por award.
+async function getAwardCandidates(award) {
+  if (_awardCandidatesCache[award]) return _awardCandidatesCache[award];
+  if (typeof db === 'undefined' || !db) {
+    console.warn('[awards] BD no disponible');
+    return [];
+  }
+  const topN = (award === 'golden_ball') ? 20 : 30;
+  const { data: topTeams, error: eloErr } = await db
+    .from('ia_elo_fifa')
+    .select('team_code, team_name, rank_position')
+    .order('rank_position', { ascending: true })
+    .limit(topN);
+  if (eloErr || !topTeams) { console.warn('[awards] error Elo:', eloErr); return []; }
+  const topCodes = topTeams.map(t => t.team_code);
+  const teamNameByCode = {};
+  const rankByCode = {};
+  topTeams.forEach(t => {
+    teamNameByCode[t.team_code] = t.team_name;
+    rankByCode[t.team_code] = t.rank_position;
+  });
+  const { data: squadsData, error: sqErr } = await db
+    .from('squads')
+    .select('iso3, jugadores')
+    .in('iso3', topCodes);
+  if (sqErr || !squadsData) { console.warn('[awards] error squads:', sqErr); return []; }
+
+  const players = [];
+  squadsData.forEach(squad => {
+    const arr = Array.isArray(squad.jugadores) ? squad.jugadores : [];
+    arr.forEach(j => {
+      players.push({
+        key: (j.nombre || '').replace(/\s+/g, '_'),
+        name: j.nombre,
+        teamName: teamNameByCode[squad.iso3] || squad.iso3,
+        flag: squad.iso3,
+        role: _bucketToRole(j.posicion_bucket),
+        bucket: j.posicion_bucket,
+        edad: (typeof j.edad === 'number') ? j.edad : (j.edad ? Number(j.edad) : null),
+        club: j.club,
+        rank: rankByCode[squad.iso3] || 999,
+      });
+    });
+  });
+
+  let filtered;
+  switch (award) {
+    case 'golden_ball':  filtered = players; break;
+    case 'golden_boot':  filtered = players.filter(p => p.bucket === 'Centrocampista' || p.bucket === 'Delantero'); break;
+    case 'golden_glove': filtered = players.filter(p => p.bucket === 'Portero'); break;
+    case 'young_player': filtered = players.filter(p => typeof p.edad === 'number' && p.edad <= 21); break;
+    default: filtered = [];
+  }
+  filtered.sort((a, b) => {
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  _awardCandidatesCache[award] = filtered;
+  return filtered;
+}
+window.getAwardCandidates = getAwardCandidates;
 const awPicks={golden_ball:null,golden_boot:null,golden_glove:null,young_player:null};
 let currentAward=null;
-function openPicker(award) {
+// Polish v1 Fix-Pack-2 Fix-3+4: openPicker ahora es async porque
+// getAwardCandidates consulta BD (ia_elo_fifa + squads). Muestra
+// indicador "Cargando jugadores…" hasta que llegan los datos.
+// Cache _awardCandidatesCache evita re-fetch tras primera apertura.
+async function openPicker(award) {
   currentAward = award;
-  const sets = {
-    golden_ball:  { title:'🏆 Balón de Oro — MVP',            list: AW_PLAYERS },
-    golden_boot:  { title:'👟 Bota de Oro — Máx. goleador',   list: AW_PLAYERS.filter(p=>p.role!=='gk') },
-    golden_glove: { title:'🧤 Guante de Oro — Mejor portero', list: AW_PLAYERS.filter(p=>p.role==='gk') },
-    young_player: { title:'⭐ Mejor Joven ≤21',                list: YOUNG_PLAYERS_NXGN },
-  };
-  const cfg = sets[award];
+  const cfg = {
+    golden_ball:  { title: '🏆 Balón de Oro — MVP' },
+    golden_boot:  { title: '👟 Bota de Oro — Máx. goleador' },
+    golden_glove: { title: '🧤 Guante de Oro — Mejor portero' },
+    young_player: { title: '⭐ Mejor Joven ≤21' },
+  }[award];
+  if (!cfg) return;
   document.getElementById('picker-title').textContent = cfg.title;
-  renderPickerList(cfg.list, awPicks[award]);
   document.getElementById('aw-overlay').classList.add('open');
+  const scroll = document.getElementById('picker-scroll');
+  if (scroll) scroll.innerHTML = '<div style="padding:24px 18px;color:#94a3b8;font-size:13px">Cargando jugadores…</div>';
+  const candidates = await getAwardCandidates(award);
+  // Si el usuario cambió de award antes de que llegara la BD, abortar.
+  if (currentAward !== award) return;
+  // Para Bota de Oro sin pick previo, pasar sugerencia automática
+  // (_v3SuggestGoldenBoot cuenta scorers en predictions + KO). NO
+  // preselecciona — solo destaca con badge "💡 Sugerido".
+  let suggestion = null;
+  if (award === 'golden_boot' && awPicks.golden_boot === null
+      && typeof _v3SuggestGoldenBoot === 'function') {
+    suggestion = _v3SuggestGoldenBoot();
+  }
+  if (!candidates.length) {
+    if (scroll) scroll.innerHTML = '<div style="padding:24px 18px;color:#94a3b8;font-size:13px;font-style:italic">No hay candidatos disponibles. Las convocatorias se completarán hasta el 2 de junio.</div>';
+    return;
+  }
+  renderPickerList(candidates, awPicks[award], suggestion);
 }
 function closePicker() {
   document.getElementById('aw-overlay').classList.remove('open');
   currentAward = null;
 }
 function overlayClick(e){if(e.target===document.getElementById('aw-overlay'))closePicker();}
+// Polish v1 Fix-Pack-2 Fix-3+4: selectAward usa _awardCandidatesCache
+// (poblado por openPicker async) en lugar de AW_PLAYERS/YOUNG_PLAYERS_NXGN
+// arrays eliminados. Cache garantizado porque selectAward solo se invoca
+// desde click en row del picker, que solo se renderiza tras openPicker.
 function selectAward(playerKey) {
-  if(!currentAward) return;
-  const player = AW_PLAYERS.find(p => p.key === playerKey)
-              || YOUNG_PLAYERS_NXGN.find(p => p.key === playerKey);
-  if(!player) return;
+  if (!currentAward) return;
+  const list = _awardCandidatesCache[currentAward] || [];
+  const player = list.find(p => p.key === playerKey);
+  if (!player) { console.warn('[awards] player no encontrado en cache:', playerKey); return; }
   awPicks[currentAward] = player;
   window._awPicksSaved = false; // requiere guardar de nuevo
   // Actualizar slot visual
   const slot = document.querySelector('[data-award="' + currentAward + '"]');
-  if(slot) {
+  if (slot) {
     slot.classList.add('selected');
     const nameEl = document.getElementById('sel-name-' + currentAward);
     const teamEl = document.getElementById('sel-team-' + currentAward);
     const flagEl = document.getElementById('sel-flag-' + currentAward);
-    if(nameEl) nameEl.textContent = player.name;
-    if(teamEl) teamEl.textContent = player.teamName || '';
-    if(flagEl) flagEl.src = SB + '/flags/' + player.flag + '.png';
+    if (nameEl) nameEl.textContent = player.name;
+    if (teamEl) teamEl.textContent = player.teamName || '';
+    if (flagEl) flagEl.src = SB + '/flags/' + player.flag + '.png';
   }
   updateAwardsFooter();
   closePicker();
-  if(typeof saveAwPicks==='function') saveAwPicks();
+  if (typeof saveAwPicks === 'function') saveAwPicks();
 }
 function renderAwardsCard(){
   const container=document.getElementById('awards-container');
@@ -1588,6 +1625,13 @@ function renderAwardsCard(){
       <div class="aw-pts-possible" id="aw-pts-badge">+0 pts</div>
     </div>
   `;
+  // Polish v1 Fix-Pack-2 Fix-3+4: precarga de las 4 listas de candidatos
+  // (BD-driven). setTimeout para no bloquear el render inicial.
+  setTimeout(() => {
+    ['golden_ball', 'golden_boot', 'golden_glove', 'young_player'].forEach(a => {
+      getAwardCandidates(a).catch(e => console.warn('[awards] precarga', a, e));
+    });
+  }, 100);
 }
 
 // HF-CdH-01: exposición global de FINAL_CLASSIFICATION_PTS para que el render

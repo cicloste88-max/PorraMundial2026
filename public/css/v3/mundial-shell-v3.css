@@ -515,6 +515,25 @@
   background: rgba(41, 32, 16, 0.95);
 }
 
+/* Polish v1 B1: variante para usuario no-admin — chip izquierda muestra
+   nombre de la liga activa. Sin icono. Click → selector de ligas (si >1)
+   o estado disabled (si 1 sola). Truncado largo via max-width + ellipsis
+   para nombres de liga largos en mobile estrecho. */
+.v3-shell-chip--league {
+  color: var(--ink-200, #e4e4e7);
+  border-color: var(--ink-700, #3f3f46);
+  background: rgba(24, 24, 27, 0.85);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+.v3-shell-chip--league:hover {
+  border-color: var(--ink-500, #71717a);
+  background: rgba(39, 39, 42, 0.95);
+}
+
 .v3-shell-chip--logout {
   color: #f87171;
   border-color: #7f1d1d;
