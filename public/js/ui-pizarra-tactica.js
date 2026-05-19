@@ -259,10 +259,15 @@
       const isGK = j.posicion === 'PO';
       const bg = isGK ? fichaPo : ficha;
       const textColor = (isLight && !isGK) ? '#111827' : '#ffffff';
-      const isPlaceholder = j.nombre === '—' || j.nombre === '\u2014';
-      const apellido = isPlaceholder
-        ? j.posicion
-        : j.nombre.split(' ').slice(-1)[0];
+      const isPlaceholder = !j.nombre || j.nombre === '—' || j.nombre === '\u2014';
+      // F-08: pastilla = dorsal + posicion + apellido (3a linea solo cuando
+      // hay nombre). Apellido = ultimo token, truncado a 10 chars con ellipsis.
+      let apellidoHtml = '';
+      if (!isPlaceholder) {
+        let surname = j.nombre.split(' ').slice(-1)[0];
+        if (surname.length > 10) surname = surname.slice(0, 10) + '…';
+        apellidoHtml = '<span class="fc-pizarra-token-surname">' + surname + '</span>';
+      }
 
       tokensHtml +=
         '<div class="fc-pizarra-token" ' +
@@ -270,7 +275,8 @@
                  'background:' + bg + ';color:' + textColor + ';' +
                  'border-color:' + borderColor + '">' +
           '<span class="fc-pizarra-token-num">' + j.dorsal + '</span>' +
-          '<span class="fc-pizarra-token-name">' + apellido + '</span>' +
+          '<span class="fc-pizarra-token-name">' + j.posicion + '</span>' +
+          apellidoHtml +
         '</div>';
     });
 

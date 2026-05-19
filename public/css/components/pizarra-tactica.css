@@ -378,3 +378,27 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* F-08: tercera línea bajo la pastilla con apellido (max 10 chars + …).
+   Sólo se renderiza si hay datos en squads.jugadores. Sin nombre → no
+   aparece nada y la pastilla queda como antes (dorsal + posición). */
+.fc-pizarra-token-surname {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 18px);
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  pointer-events: none;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+}
