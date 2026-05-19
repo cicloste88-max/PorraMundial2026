@@ -355,6 +355,11 @@
   z-index: 110;
   pointer-events: none;
   overflow-y: auto;
+  /* iOS Safari: momentum scroll + contener el scroll dentro del panel para
+     que el touch-drag se propague al padre scrollable cuando el inner
+     desborda en altura (regla anti chained-scroll bloqueado). */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .v3-zoom-panel__inner {
   background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
@@ -374,7 +379,11 @@
      inner (fullscreen via flex centering del panel) capturaba clicks invisibles
      hasta reload page. Mismo patrón que .v3-squad-picker-panel__inner (F2.8.2). */
   pointer-events: none;
-  overflow: hidden;
+  /* iOS Safari scroll hotfix (19-may): overflow:hidden bloqueaba la
+     propagación touch al padre .v3-zoom-panel cuando el inner es más alto
+     que el viewport. Con `visible` el touch-drag sube por el árbol hasta
+     el scroller del panel. No afecta a desktop (mouse-wheel sí propaga). */
+  overflow: visible;
 }
 .v3-zoom-overlay.is-open ~ .v3-zoom-panel .v3-zoom-panel__inner {
   opacity: 1;
