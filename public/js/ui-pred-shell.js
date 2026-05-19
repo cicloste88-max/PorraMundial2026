@@ -978,7 +978,15 @@
         var ctx = {
           porraAbierta: !window._porraCerrada,
           league: leagueObj,
-          onChangeAward: null,  // C5/futuro flow award_picks
+          onChangeAward: function (awardKey) {
+            var modalEl = document.getElementById('modal');
+            if (modalEl) modalEl.classList.remove('open');
+            if (typeof window.openPicker === 'function') {
+              window.openPicker(awardKey);
+            } else if (typeof openPicker === 'function') {
+              openPicker(awardKey);
+            }
+          },
           onClose: null
         };
         _openTrophyModal({
