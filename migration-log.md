@@ -2140,3 +2140,9 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [18:30] DOCS: CHANGELOG entrada `2026-05-20 — Sprint Pre-Launch + Hotfixes iOS scroll`, ERR-65 + ERR-66 en `errores_conocidos_porra.md`, `CLAUDE.md` HEAD bumped a `0e49612`, este migration-log. Archivado entries 17-may + 16-may a `CHANGELOG-archive-202605.md` (CHANGELOG > 30KB tras añadir el nuevo bloque).
 
 [18:35] HALLAZGO PARALELO: `GITHUB_TOKEN` del vault devuelve 404 — token expirado o sin scope `repo`. Regenerar en GitHub Settings + actualizar vía `vault.update_secret(...)`. MCPs pg_net→GitHub API no funcionan; Chrome MCP sigue operativo. Acción para San.
+
+[14:00] PR #84 mergeado: `name-matcher.mjs` normalize order-invariant para nombres coreanos. KOR ahora matchea 26/26 (Pieza B applyEnrich) frente a 1/26. Sort tokens + strip hyphens (joiners). Tests 24 nuevos + 30 existentes = 82/82 pasan.
+
+[14:30] PR #86 abierto: fix CSS pizarra-tactica F-09 (layout mobile iPhone). `.fc-pizarra-field` width:100% explícito + margin lateral 0 + max-height calc(92dvh - 225px). Header/stats/footnote compactados. QA Playwright 12 casos (FRA/BRA/NZL × 4 viewports) todos OK: field full-width, sin scroll vertical, gap stats↔field 8px. Branch `fix/pizarra-tactica-layout-mobile`.
+
+[14:45] PENDIENTE post-merge PR #86: San reporta en iPhone real que los apellidos `.fc-pizarra-token-surname` siguen sin verse pese al fix. El QA headless con Chromium mobile sí los renderizaba dentro del field. Apuntado en CLAUDE.md "Bugs UI #5" para próxima sesión. Hipótesis a investigar: (a) contraste text-shadow black sobre verde campo en pantalla retina, (b) font-size 10px demasiado pequeño en 3x, (c) clip por borde inferior del field cuando aspect-ratio se aplana, (d) `team.jugadores[].nombre` viene vacío/placeholder desde EF get-squad v7.1.

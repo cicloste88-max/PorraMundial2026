@@ -15,7 +15,7 @@ Main HEAD `0e49612` (PR #78 hotfix iOS modal grupos, 20-may). Tres PRs hoy: #75 
 
 ## Pendientes — Bugs UI
 
-1. Cinta tabs ronda incompleta móvil. 2. Hora CEST en píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA para pronóstico signo. Detalle: Top-3 #3 + `CHANGELOG.md`.
+1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra — apellidos `.fc-pizarra-token-surname` invisibles en iPhone real tras PR #86 (QA Playwright sí los renderizó). Investigar: contraste text-shadow / font-size 10px en 3x / clip por field aplanado / `nombre` vacío en EF v7.1.** Detalle: Top-3 #3 + `CHANGELOG.md`.
 
 ## Pendientes — Antes del 11 junio 2026
 
