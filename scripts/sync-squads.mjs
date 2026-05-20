@@ -391,17 +391,19 @@ async function runDetect(targetsArg) {
 
     try {
       const existing = await getSquadRow(iso3);
-      const preserved = preserveEnrichment(existing?.jugadores, v.players);
       const fuente = sources;
-      const up = await upsertSquad(iso3, preserved.players, {
+      // upsertSquad hace mergeJugadores internamente — preserva enrichment
+      // (tm_player_id, foto_url, edad, valor_eur, dorsal, dob, posicion_tm)
+      // por nombre normalizado. No hace falta pre-merge aquí.
+      const up = await upsertSquad(iso3, v.players, {
         isFinal: true,
         fuente: existing?.jugadores_fuente?.includes('tm') ? `${fuente}+tm` : fuente,
         dryRun: DRY_RUN,
         force: FORCE,
       });
       const status = up.noop ? 'no-op' : DRY_RUN ? 'dry-run' : 'updated';
-      console.log(`  ${iso3.padEnd(4)} | ${v.confidence.padEnd(5)} | ${sources.padEnd(15)} | ${String(preserved.players.length).padEnd(3)} | ${status}${v.reason ? ` (${v.reason})` : ''}`);
-      results.push({ iso3, status, confidence: v.confidence, n: preserved.players.length });
+      console.log(`  ${iso3.padEnd(4)} | ${v.confidence.padEnd(5)} | ${sources.padEnd(15)} | ${String(v.players.length).padEnd(3)} | ${status}${v.reason ? ` (${v.reason})` : ''}`);
+      results.push({ iso3, status, confidence: v.confidence, n: v.players.length });
     } catch (err) {
       console.log(`  ${iso3.padEnd(4)} | error | ${sources.padEnd(15)} | -   | ${err.message.slice(0, 60)}`);
       results.push({ iso3, status: 'error', error: err.message });
@@ -440,34 +442,6 @@ async function runDetect(targetsArg) {
   }
 
   return results;
-}
-
-// Preserva enrichment TM (edad, dob, valor, foto, club, jugadores_fuente '+tm') del
-// roster existente cuando coincide por nombre normalizado con un jugador de la lista
-// nueva. Conserva el orden de la lista nueva (lo que llega de las fuentes primarias).
-function preserveEnrichment(existing, fresh) {
-  if (!Array.isArray(existing) || existing.length === 0) return { players: fresh, kept: 0 };
-  const byKey = new Map();
-  for (const p of existing) {
-    const k = (p?.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-    if (k) byKey.set(k, p);
-  }
-  let kept = 0;
-  const out = fresh.map((p) => {
-    const k = (p?.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-    const prev = byKey.get(k);
-    if (!prev) return p;
-    kept++;
-    return {
-      ...p,
-      edad: prev.edad ?? p.edad ?? null,
-      dob: prev.dob ?? p.dob ?? null,
-      valor: prev.valor ?? p.valor ?? null,
-      foto: prev.foto ?? p.foto ?? null,
-      club: p.club || prev.club || null,
-    };
-  });
-  return { players: out, kept };
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────
