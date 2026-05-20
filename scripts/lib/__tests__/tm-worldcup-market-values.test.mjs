@@ -61,3 +61,43 @@ test('parseRow sin perfil devuelve null', () => {
   const noProfile = `<tr class="odd"><td>nada relevante</td></tr>`;
   assert.equal(parseRow(noProfile), null);
 });
+
+// ─── Fixes regex foto multi-formato (Claude.ai 20-may, validados con HTML real) ───
+
+test('parseRow: foto eager-load con src= directo (porteros TOP)', () => {
+  // HTML real validado: porteros TOP del mundo (Joan García, Verbruggen, etc.) salen
+  // con src=URL directa, sin data-src y sin placeholder gif. Si el regex solo acepta
+  // data-src=, perdemos foto para los 5 TOP. Validado contra page 1 FIWC real 20-may.
+  const eagerLoad = NUNO_FIXTURE.replace(
+    /<img src="data:image\/gif[^"]+" data-src="([^"]+)"/,
+    '<img src="$1"'
+  );
+  const p = parseRow(eagerLoad);
+  assert.ok(p);
+  assert.equal(
+    p.photo_url_tm,
+    'https://img.a.transfermarkt.technology/portrait/medium/616341-1749417164.jpg'
+  );
+});
+
+test('parseRow: foto portrait/small/ (formato porteros)', () => {
+  // HTML real validado: porteros usan portrait/small/ no portrait/medium/
+  const smallSize = NUNO_FIXTURE.replace('/portrait/medium/', '/portrait/small/');
+  const p = parseRow(smallSize);
+  assert.ok(p);
+  assert.equal(
+    p.photo_url_tm,
+    'https://img.a.transfermarkt.technology/portrait/small/616341-1749417164.jpg'
+  );
+});
+
+test('parseRow: foto .PNG mayúsculas (algunos jugadores)', () => {
+  // HTML real validado: TM usa .JPG y .PNG en mayúsculas en algunos jugadores
+  const upperPng = NUNO_FIXTURE.replace('616341-1749417164.jpg', '616341-1749417164.PNG');
+  const p = parseRow(upperPng);
+  assert.ok(p);
+  assert.equal(
+    p.photo_url_tm,
+    'https://img.a.transfermarkt.technology/portrait/medium/616341-1749417164.PNG'
+  );
+});

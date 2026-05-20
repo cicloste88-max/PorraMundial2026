@@ -89,9 +89,12 @@ export function parseKaderTable(html) {
     const dorsalMatch = rowHtml.match(/<div\s+class=rn_nummer[^>]*>(\d+)<\/div>/);
     const dorsal = dorsalMatch ? parseInt(dorsalMatch[1], 10) : null;
 
-    // Foto desde data-src (lazy-load). src es el placeholder gif.
+    // Foto: TM mezcla lazy-load (data-src=URL real, src=gif placeholder) y eager-load
+    // (src=URL directa, sobre todo en porteros TOP). Aceptamos ambos. El filtro por
+    // portrait/(small|medium|big) y .(jpg|png) descarta el placeholder. Case-insensitive
+    // porque TM usa .jpg/.JPG/.png/.PNG indistintamente.
     const photoMatch = rowHtml.match(
-      /data-src="(https:\/\/img\.a\.transfermarkt\.technology\/portrait\/medium\/\d+-\d+\.jpg[^"]*)"/
+      /(?:data-src|src)="(https:\/\/img\.a\.transfermarkt\.technology\/portrait\/(?:small|medium|big)\/\d+-\d+\.(?:jpg|png)[^"]*)"/i
     );
     const foto_url_tm = photoMatch ? stripTmImageQuery(photoMatch[1]) : null;
 

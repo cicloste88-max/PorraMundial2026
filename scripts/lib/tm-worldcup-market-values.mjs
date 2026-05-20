@@ -45,9 +45,14 @@ export function parseRow(rowHtml) {
   const profile = extractProfileLink(rowHtml);
   if (!profile) return null;
 
-  // Foto: data-src (NO src — eso es el placeholder gif lazy)
+  // Foto: TM mezcla 2 patrones de carga:
+  //   - lazy-load: src="data:image/gif..." + data-src="https://img..." (mayoría)
+  //   - eager-load: src="https://img..." (porteros TOP y algunos jugadores recientes)
+  // Aceptamos ambos. El filtro por portrait/(small|medium|big) y .(jpg|png) descarta el
+  // placeholder gif (no encaja con el patrón). Case-insensitive porque TM usa tanto .jpg
+  // como .JPG y .png/.PNG en distintos jugadores.
   const photoMatch = rowHtml.match(
-    /data-src="(https:\/\/img\.a\.transfermarkt\.technology\/portrait\/medium\/\d+-\d+\.jpg[^"]*)"/
+    /(?:data-src|src)="(https:\/\/img\.a\.transfermarkt\.technology\/portrait\/(?:small|medium|big)\/\d+-\d+\.(?:jpg|png)[^"]*)"/i
   );
   const photo_url_tm = photoMatch ? stripTmImageQuery(photoMatch[1]) : null;
 
