@@ -30,6 +30,8 @@ import { fileURLToPath } from 'node:url';
 
 import { scrapeCountry } from './lib/ff-scraper.mjs';
 import { fetchTmKader, enrichRosterWithTm } from './lib/tm-scraper.mjs';
+import { fetchAllPages } from './lib/tm-worldcup-market-values.mjs';
+import { applyEnrich } from './lib/enrich-merge.mjs';
 import { uploadPlayerPhoto } from './lib/storage-upload.mjs';
 import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
@@ -82,7 +84,7 @@ const SKIP = new Set(
 );
 
 if (!MODE) {
-  console.error('Error: falta --mode=detect | --mode=scrape | --mode=enrich-tm');
+  console.error('Error: falta --mode=detect | --mode=scrape | --mode=enrich-tm | --mode=enrich-tm-mw');
   printUsage();
   process.exit(1);
 }
@@ -95,10 +97,13 @@ Uso:
   node scripts/sync-squads.mjs --mode=detect --no-enrich-xi
   node scripts/sync-squads.mjs --mode=scrape --iso3=FRA      [LEGACY]
   node scripts/sync-squads.mjs --mode=scrape --refresh-final [LEGACY]
-  node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA
-  node scripts/sync-squads.mjs --mode=enrich-tm --all
+  node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA   [LEGACY 1-país]
+  node scripts/sync-squads.mjs --mode=enrich-tm --all        [LEGACY]
+  node scripts/sync-squads.mjs --mode=enrich-tm-mw                   (recomendado)
+  node scripts/sync-squads.mjs --mode=enrich-tm-mw --iso3=FRA,QAT
+  node scripts/sync-squads.mjs --mode=enrich-tm-mw --full           (forzar fase B siempre)
 
-Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi
+Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full
 `);
 }
 
@@ -475,6 +480,191 @@ async function runDetect(targetsArg) {
   return results;
 }
 
+// ─── modo enrich-tm-mw ────────────────────────────────────────────────────
+// Pipeline orquestador:
+//   Fase 1 — fetchAllPages (Pieza A): 40 páginas FIWC marktwertaenderungen,
+//     map masivo byTmId/byNation. Auto-fill tm-ids.json con verein_id
+//     descubiertos (no escribe en dry-run).
+//   Fase 2 — por país:
+//     2a. applyEnrich(roster, byTmId, {iso3,source:'A'}) — fill-missing.
+//     2b. Si --full OR coverageA<0.5 OR missingDobDorsal>30% → fetchTmKader
+//         + applyEnrich(roster, kaderMap, {iso3,source:'B'}) para añadir
+//         dorsal+dob (Pieza A no los expone).
+//     2c. Upload fotos TM CDN → Supabase Storage (idempotente).
+//     2d. upsertSquad (mergeJugadores ya interno desde PR #81).
+//     2e. Report multi-campo por país.
+async function maybeUpdateTmIds(byNation, { dryRun, verbose }) {
+  const fp = path.join(__dirname, 'lib', 'tm-ids.json');
+  const current = JSON.parse(await fs.readFile(fp, 'utf8'));
+  const newEntries = [];
+  for (const [iso3, vereinId] of byNation) {
+    if (current[iso3] == null) {
+      newEntries.push([iso3, vereinId]);
+      current[iso3] = vereinId;
+    }
+  }
+  if (newEntries.length === 0) {
+    if (verbose) console.log('  tm-ids.json: sin nuevas entradas');
+    return;
+  }
+  if (dryRun) {
+    console.log(`  [dry-run] would add ${newEntries.length} entries to tm-ids.json:`);
+    for (const [iso3, id] of newEntries) console.log(`    ${iso3} = ${id}`);
+    return;
+  }
+  await fs.writeFile(fp, JSON.stringify(current, null, 2) + '\n');
+  console.log(`  tm-ids.json updated: +${newEntries.length} entries`);
+}
+
+async function runEnrichTmMw({ iso3Filter, full }) {
+  // ───── FASE 1 ─────
+  console.log('\nFase 1/2: TM marktwert masivo (40 páginas FIWC)...\n');
+  const { byTmId, byNation, unmappedNations, duplicates } = await fetchAllPages({
+    verbose: VERBOSE,
+  });
+  console.log(
+    `  ${byTmId.size} jugadores, ${byNation.size} selecciones, ${duplicates.length} duplicados, ${unmappedNations.size} sin iso3\n`
+  );
+
+  await maybeUpdateTmIds(byNation, { dryRun: DRY_RUN, verbose: VERBOSE });
+
+  // ───── FASE 2 ─────
+  console.log('\nFase 2/2: enrich por país (A primero, B fallback)\n');
+  console.log('  iso3 | tm  | val | foto| club| logo| dob | dor | A   | B  ');
+  console.log('  -----+-----+-----+-----+-----+-----+-----+-----+-----+----');
+
+  const allSquads = await listAllSquads();
+  const targetSet = iso3Filter ? new Set(iso3Filter) : null;
+  const reportRows = [];
+  const results = [];
+
+  for (const squad of allSquads) {
+    if (targetSet && !targetSet.has(squad.iso3)) continue;
+    if (SKIP.has(squad.iso3)) {
+      results.push({ iso3: squad.iso3, status: 'skipped' });
+      continue;
+    }
+    if (!Array.isArray(squad.jugadores) || squad.jugadores.length === 0) {
+      results.push({ iso3: squad.iso3, status: 'no-roster' });
+      continue;
+    }
+
+    let roster = squad.jugadores.map((p) => ({ ...p }));
+    const totalRoster = roster.length;
+
+    // ── 2a: Pieza A applyEnrich ──
+    const aResult = applyEnrich(roster, byTmId, { iso3: squad.iso3, sourceLabel: 'A' });
+    roster = aResult.roster;
+    const fromA = aResult.stats.matched;
+
+    // ── 2b: Pieza B fallback si A baja cobertura o faltan dob/dorsal ──
+    const coverageA = fromA / totalRoster;
+    const missingDobDorsal = roster.filter((p) => p.dob == null || p.dorsal == null).length;
+    const shouldRunB = full || coverageA < 0.5 || missingDobDorsal > totalRoster * 0.3;
+
+    let fromB = 0;
+    if (shouldRunB && byNation.has(squad.iso3)) {
+      const vereinId = byNation.get(squad.iso3);
+      const slug = ISO3_TO_SLUG[squad.iso3] || 'team';
+      if (VERBOSE) {
+        console.log(
+          `  ${squad.iso3}: fase B (coverageA=${(coverageA * 100).toFixed(0)}%, missing dob/dorsal=${missingDobDorsal})`
+        );
+      }
+      try {
+        const tmKaderPlayers = await fetchTmKader(vereinId, slug, { verbose: VERBOSE });
+        const tmKaderMap = new Map(
+          tmKaderPlayers.map((p) => [p.tm_player_id, { ...p, iso3: squad.iso3 }])
+        );
+        const bResult = applyEnrich(roster, tmKaderMap, {
+          iso3: squad.iso3,
+          sourceLabel: 'B',
+        });
+        roster = bResult.roster;
+        fromB = bResult.stats.matched;
+      } catch (e) {
+        if (VERBOSE) console.warn(`  ${squad.iso3} kader fetch failed: ${e.message}`);
+      }
+    }
+
+    // ── 2c: upload fotos TM CDN → Supabase Storage (sólo real run) ──
+    if (!DRY_RUN) {
+      for (let i = 0; i < roster.length; i++) {
+        const p = roster[i];
+        if (p.foto_url_tm && p.tm_player_id && !p.foto_url) {
+          try {
+            roster[i].foto_url = await uploadPlayerPhoto(
+              squad.iso3,
+              p.tm_player_id,
+              p.foto_url_tm
+            );
+          } catch (e) {
+            if (VERBOSE) {
+              console.warn(`  upload ${p.nombre} (${p.tm_player_id}): ${e.message}`);
+            }
+          }
+          await sleep(200);
+        }
+        delete roster[i].foto_url_tm;
+      }
+    } else {
+      for (const p of roster) delete p.foto_url_tm;
+    }
+
+    // ── 2d: persist via upsertSquad (mergeJugadores interno ya desde PR #81) ──
+    const fuente = (squad.jugadores_fuente || '').includes('tm-mw')
+      ? squad.jugadores_fuente
+      : `${squad.jugadores_fuente || ''}+tm-mw`.replace(/^\+/, '');
+    try {
+      await upsertSquad(squad.iso3, roster, {
+        isFinal: !!squad.jugadores_is_final,
+        fuente,
+        dryRun: DRY_RUN,
+        force: FORCE,
+      });
+    } catch (e) {
+      console.warn(`  ${squad.iso3} upsert error: ${e.message.slice(0, 60)}`);
+      results.push({ iso3: squad.iso3, status: 'error', error: e.message });
+      continue;
+    }
+
+    const stats = {
+      total: totalRoster,
+      with_tm_id: roster.filter((p) => p.tm_player_id != null).length,
+      with_value: roster.filter((p) => p.valor_eur != null).length,
+      with_photo: roster.filter((p) => p.foto_url != null).length,
+      with_club: roster.filter((p) => p.club != null).length,
+      with_logo: roster.filter((p) => p.club_logo_url != null).length,
+      with_dob: roster.filter((p) => p.dob != null).length,
+      with_dorsal: roster.filter((p) => p.dorsal != null).length,
+      fromA,
+      fromB,
+    };
+    reportRows.push({ iso3: squad.iso3, ...stats });
+
+    const pad = (n, w) => String(n).padStart(w);
+    console.log(
+      `  ${squad.iso3.padEnd(4)} | ${pad(stats.with_tm_id, 3)} | ${pad(stats.with_value, 3)} | ${pad(stats.with_photo, 3)} | ${pad(stats.with_club, 3)} | ${pad(stats.with_logo, 3)} | ${pad(stats.with_dob, 3)} | ${pad(stats.with_dorsal, 3)} | ${pad(fromA, 3)} | ${pad(fromB, 3)}`
+    );
+
+    results.push({ iso3: squad.iso3, status: DRY_RUN ? 'dry-run' : 'updated', ...stats });
+  }
+
+  console.log('\n=== REPORT FINAL ===');
+  for (const r of reportRows.sort((a, b) => a.iso3.localeCompare(b.iso3))) {
+    console.log(
+      `${r.iso3}: tm ${r.with_tm_id}/${r.total} | value ${r.with_value} | photo ${r.with_photo} | club ${r.with_club} | logo ${r.with_logo} | dob ${r.with_dob} | dorsal ${r.with_dorsal} | A=${r.fromA} B=${r.fromB}`
+    );
+  }
+  if (unmappedNations.size > 0) {
+    console.log(
+      `\n${unmappedNations.size} selección(es) sin mapping en tm-nation-map.json: ${[...unmappedNations].join(', ')}`
+    );
+  }
+
+  return results;
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────
 async function main() {
   let results;
@@ -498,6 +688,14 @@ async function main() {
       process.exit(0);
     }
     results = await runEnrichTm(targets);
+  } else if (MODE === 'enrich-tm-mw') {
+    const iso3Filter = argv.iso3
+      ? String(argv.iso3)
+          .split(',')
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean)
+      : null;
+    results = await runEnrichTmMw({ iso3Filter, full: !!argv.full });
   } else {
     console.error(`Modo desconocido: ${MODE}`);
     printUsage();
