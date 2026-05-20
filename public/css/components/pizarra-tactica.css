@@ -93,7 +93,7 @@
 /* Banda superior con bandera + degradado destination-out */
 .fc-pizarra-flag-band {
   position: relative;
-  height: 130px;
+  height: 96px;             /* F-09: reducido (was 130) para liberar verticales */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -108,16 +108,16 @@
 .fc-pizarra-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  margin-top: -50px;        /* solapado sobre zona aún coloreada de la banda */
+  gap: 10px;                /* F-09: 12 → 10 */
+  padding: 0 12px;          /* F-09: 16 → 12 */
+  margin-top: -36px;        /* F-09: -50 → -36 (proporcional a flag más bajo) */
   position: relative;
   z-index: 2;
 }
 
 .fc-pizarra-badge {
-  width: 80px;
-  height: 80px;
+  width: 64px;              /* F-09: 80 → 64 */
+  height: 64px;
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
   flex-shrink: 0;
@@ -130,7 +130,7 @@
   background: #f3f4f6;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 24px;
+  font-size: 20px;          /* F-09: 24 → 20 (badge más pequeño) */
   color: #4b5563;
   border: 2px solid #e5e7eb;
 }
@@ -141,7 +141,7 @@
 }
 
 .fc-pizarra-title {
-  font-size: 26px;
+  font-size: 22px;          /* F-09: 26 → 22 */
   font-weight: 900;
   margin: 0;
   color: #fff;
@@ -151,8 +151,8 @@
 }
 
 .fc-pizarra-coach {
-  margin: 4px 0 0;
-  font-size: 13px;
+  margin: 3px 0 0;          /* F-09: 4 → 3 */
+  font-size: 12px;          /* F-09: 13 → 12 */
   font-style: italic;
   color: #cbd5e1;
 }
@@ -173,13 +173,19 @@
 /* ─── Campo de fútbol ────────────────────────────────────────────────── */
 .fc-pizarra-field {
   position: relative;
-  margin: 10px 12px 0;
-  aspect-ratio: 2 / 3;       /* 0.666… vertical */
-  /* F-07: cap altura para no desbordar el modal en viewports cortos
-     (Safari iPhone con barras URL+gestos). Con max-height el ancho
-     queda libre dentro del modal pero la altura no excede el espacio
-     disponible (~modal 92dvh menos header+stats ≈ 200px). */
-  max-height: calc(92dvh - 220px);
+  margin: 6px 0 0;           /* F-09: 10px 12px 0 → 6px 0 0 (ancho completo) */
+  width: 100%;               /* F-09: fuerza ancho 100% del modal — sin esto,
+                                aspect-ratio + max-height en flex-item hacían
+                                que Safari derivara width = height × 2/3 y el
+                                campo quedara encogido y alineado a la izquierda
+                                cuando dvh se reducía con la URL bar visible. */
+  aspect-ratio: 2 / 3;       /* 0.666… vertical — guía cuando max-height no clip */
+  /* F-09: max-height ajustada al overhead real medido empíricamente con
+     Playwright en iPhone 14 (390×764 visual con URL bar visible): overhead
+     header+stats+footnote+safe-area ≈ 225px. Cuando aspect-ratio×width
+     supera max-height, el campo se queda con width=100% y se aplana hacia
+     ratio ~7:10 (aceptable; los tokens en % siguen dentro del field). */
+  max-height: calc(92dvh - 225px);
   background-size: cover;
   background-position: center;
   border-radius: 10px;
@@ -236,8 +242,8 @@
 .fc-pizarra-stats {
   display: flex;
   align-items: stretch;
-  margin: 12px 12px 0;
-  padding: 10px 0;
+  margin: 8px 8px 0;        /* F-09: 12 → 8 lateral y vertical */
+  padding: 8px 0;           /* F-09: 10 → 8 */
   background: rgba(255, 255, 255, 0.06);
   border-radius: 10px;
 }
@@ -271,7 +277,7 @@
 }
 
 .fc-pizarra-stat-val {
-  font-size: 16px;
+  font-size: 14px;          /* F-09: 16 → 14 */
   font-weight: 700;
   color: #fff;
   font-variant-numeric: tabular-nums;
@@ -351,8 +357,8 @@
 
 /* ─── Footnote ───────────────────────────────────────────────────────── */
 .fc-pizarra-footnote {
-  margin: 10px 16px 14px;
-  font-size: 10px;
+  margin: 6px 12px 10px;    /* F-09: 10 16 14 → 6 12 10 */
+  font-size: 9px;           /* F-09: 10 → 9 */
   color: #64748b;
   text-align: center;
   font-style: italic;
