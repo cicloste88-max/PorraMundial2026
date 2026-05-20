@@ -173,5 +173,13 @@ ERR relacionados: **ERR-39** (regex non-greedy frases), **ERR-40** (espacios fal
 
 ## Pendientes
 
-- **PR4 (post-merge)**: screen plantilla con campo de fútbol + 11 titular + convocatoria + entrenador, cuando salgan squads reales (~junio 2026). El stub `window._globoNavPlantilla` ya está en `ui-globo-equipos.js` esperando ser sobreescrito por el módulo real.
+- **Plantilla / Pizarra Táctica**: integración cubierta por `ui-pizarra-tactica.js`
+  (modal con campo + XI + convocatoria + entrenador), alimentada por la tabla
+  `squads` vía EF `get-squad`. Sprint sync-squads en curso — cobertura
+  10/48 (20-may-2026), objetivo 38/48 para 11-jun. Ver `docs/sync-squads.md`
+  y `docs/db-schema.md` § `squads`.
+- **Hotfix iOS scroll modal (PR#77+#78, 20-may)**: `.v3-zoom-panel__inner` con
+  scroll en el hijo + `max-height: calc(100dvh - 80px)` descontando tabbar
+  56px + margins 24px (ERR-65/66). Patrón documentado en
+  `.claude/rules/frontend-css.md` § iOS Safari.
 - **Limpieza dead code**: `getFlagEmoji` + `ISO3_TO_FLAG` quedaron sin uso tras migrar al bucket Supabase. Candidato a limpieza en sprint de housekeeping si el bucket cubre con confianza los 48 ISO3.

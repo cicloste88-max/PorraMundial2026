@@ -166,6 +166,28 @@ Orden sugerido según prioridad de `docs/AUDIT_LEGACY_VS_V3.md` + integraciones 
 
 ---
 
+## Cierre Sprint Pre-Launch (20-may-2026)
+
+Sprint cerrado con tres PRs mergeadas que cubren 11 fixes pre-launch + 2
+hotfixes iOS:
+
+- **PR#75 (`72e3b75`)** — F-01..F-10b: paquete pre-launch (11 fixes). Incluye
+  cierre de gaps de integración v3↔legacy enumerados arriba en
+  "Reminiscencias legacy NO presentes". Repasar AUDIT_LEGACY_VS_V3 contra el
+  diff de esta PR para marcar cada gap I3-I8 efectivamente cubierto.
+- **PR#77 (`7d8b706`)** — F-10b hotfix iOS: scroll trasladado de
+  `.v3-zoom-panel` (con `pointer-events:none`) a `.v3-zoom-panel__inner`
+  (con `pointer-events:auto`). Causa raíz: iOS Safari bloquea touch en
+  elementos sin pointer events incluso si tienen `overflow-y:auto`
+  (ERR-65). Patrón promovido a regla en `.claude/rules/frontend-css.md`.
+- **PR#78 (`0e49612`)** — F-10b hotfix max-height: `calc(100dvh - 80px)`
+  descontando `.fc-tabbar` 56px + 24px de margins. Sin descuento, el inner
+  desbordaba bajo la tabbar fija (ERR-66).
+
+**TODO post-cierre**: actualizar tabla "Inventario por pantalla" marcando
+los gaps I3-I8 efectivamente cubiertos en PR#75 con SHA específico + screen
+afectada.
+
 ## Cómo usar este doc
 
 - **Al portar una feature legacy a v3:** consultar primero esta tabla por pantalla, identificar si es "gap reminiscencia" o "feature transversal" (audit doc), y wiring sugerido. Si la feature toca >1 screen (ej. EN VIVO), planear ambos cards Grupos + Elim en el mismo PR.

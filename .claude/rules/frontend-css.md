@@ -93,3 +93,35 @@ Carousels con `scroll-snap-type: x mandatory` y slots ≥80vw NO deben anidarse 
 - Hidden source elements (e.g. tarjetas editables que un modal extrae) pueden vivir dentro del header via `display: none !important` scoped.
 
 Referencia: ERR-37 + Sprint B Grupos redesign (commits `05f5dd4` + `2d8aec8`).
+
+## iOS Safari — scroll en hijo cuando padre tiene `pointer-events:none`
+
+Cuando un patrón overlay+inner aplica `pointer-events:none` al padre (típico
+para que el backdrop deje pasar el click de cierre — ver ERR-43), iOS Safari
+**no scrollea ese padre con touch** aunque tenga `overflow-y:auto`. El touch
+event nunca alcanza al elemento. Chrome desktop con mouse-wheel sí propaga
+porque el wheel se procesa a nivel de viewport.
+
+**Patrón correcto**: el scroller debe ser el hijo más interno que SÍ recibe
+pointer events (típicamente con `.is-open` o equivalente que activa
+`pointer-events:auto`). Aplicar al hijo:
+
+```css
+.modal-inner {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;     /* momentum iOS */
+  overscroll-behavior: contain;           /* no chained-scroll al body */
+  max-height: calc(100vh - <fijos>);      /* fallback */
+  max-height: calc(100dvh - <fijos>);     /* descontar tabbar + margins */
+}
+```
+
+`<fijos>` debe sumar TODOS los elementos `position:fixed` que cubren parte
+del viewport: tabbar (`.fc-tabbar` 56px), headers fijos, FABs, etc.
+
+Caso de referencia: `.v3-zoom-panel__inner` (`mundial-shell-v3.css`) tras
+PR#77 + PR#78. `max-height: calc(100dvh - 80px)` = 24px margins (12+12) +
+56px tabbar.
+
+Referencias: ERR-65 (touch bloqueado en `pointer-events:none`), ERR-66
+(max-height debe descontar elementos fixed).

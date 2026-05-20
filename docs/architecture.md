@@ -9,11 +9,15 @@ js/
 public/js/
   data.js              datos torneo, estado global, boostPicks, PHRASES_GRUPO
   scoring.js           motor puntos, tarjetas, premios
-  ui-groups.js         grupos, vista Jornada completa
-  ui-groups-mobile.js  rediseño móvil fase grupos (acordeón, focus layer, slide 7)
-  ko.js                bracket KO, IA pronósticos
+  ui-groups.js         grupos legacy (coexiste, no se monta cuando v3 toma control)
+  ui-groups-mobile.js  rediseño móvil fase grupos legacy (acordeón, focus layer)
+  ko.js                bracket KO legacy + lógica BRACKET reusada por v3
   ui-nav.js            SPA nav, modal, welcome
   ui-directo.js        vista Directo, sección simulacros admin
+  ui-elim-shell.js     shell legacy F7.X (convive con v3, candidato a deprecar post-Mundial)
+  ui-pred-shell.js     Predictor (fuera de SHELL_PAGES, shell propio)
+  ui-pizarra-tactica.js modal Pizarra Táctica (feature transversal)
+  ui-globo-equipos.js  Globo 3D (cinta + overlay + panel detalle)
   live-sync.js         realtime live_scores (postgres_changes, simulacros)
   auth.js              auth Supabase, bootstrap (predictions/ko/awards/groups_saved)
   leagues.js           ligas, selección de porra
@@ -22,16 +26,40 @@ public/js/
   close-porra.js       cierre de pronósticos
   admin.js             panel admin, dados, simulador (dice.js integrado)
   bracket-results.js   vista resultados reales bracket KO
+  v3/
+    mundial-shell-v3.js     shell global (fifa-bar + countdown + qualified-cta + stage-pill)
+    grupos-v3.js            board Grupos v3 (sustituye legacy en #page-grupos)
+    eliminatoria-v3.js      bracket KO v3 (sustituye legacy en #page-elim)
+    next-match-resolver-v3.js helper resolver próximo partido para shell
+  data/
+    wiki-bio.js             48 selecciones (apodo/formación/frase/bio/bio_espn)
+    wiki-data-globo.js      45 selecciones + 16 sedes (datos enriquecidos)
 
 public/css/
-  base.css             reset, layout, match-cards, header, ligas, rediseño móvil @media 640px
+  base.css             reset, layout, match-cards, header, ligas
   welcome.css
-  ko.css               bracket KO, modal, awards
+  ko.css               bracket KO, modal, awards, .container legacy wrapper
   admin.css            panel admin, dado, responsive
   boost.css
   bracket-results.css
   directo.css          vista Directo, tarjetas simulacro admin
+  v3/
+    mundial-shell-v3.css    shell global v3
+    grupos-v3.css           pantalla Grupos v3
+    eliminatoria-v3.css     pantalla Eliminatorias v3
+  components/
+    app-header.css          header global cross-page
+    bottom-tab.css          tabbar inferior fija (56px)
+    tokens.css              design tokens
+    elim-shell.css          shell antiguo F7.X (convive con v3)
+    grupos-shell.css        shell previo a v3 (convive)
+    jornada-v2.css          redesign interno Jornada (sin rewrite JS)
+    directo-v2.css          redesign interno Directo (sin rewrite JS)
+    predictor-shell.css     shell del Predictor (fuera de v3)
+    globo-equipos.css       Globo 3D namespace `fc-globo-*`
 ```
+
+Detalle screen-by-screen del split v3 vs legacy: `docs/v3-vs-legacy.md`.
 
 Regla crítica: todo asset servido bajo `/xxx` debe vivir en `public/xxx/` o importarse desde el bundle JS. Vite ignora archivos en raíz del repo durante build (ver ERR-18).
 
@@ -212,5 +240,12 @@ Failure modes:
 | 2026-04-21 | Sanity check 20 abr (13 hallazgos), IA Predictor Fases A–E mergeadas (EFs v6 → v9 ACTIVE) | c5029ac → 8d8b667 |
 | 2026-04-23 | IA Predictor Fase F (wiring frontend, F.1–F.4 + post-F.1/2/3) — breakdown enriquecido + tooltip explainer | 31f4dbb → 6e46d2b |
 | 2026-04-24 | Merge Fase F a main (PR #17 squash) | a24001a |
+| 2026-04-30 | Turnstile desactivado (ver `docs/secrets.md`) + audit Postgres 28abr cerrado (PR#36-40) | — |
+| 2026-05-06/08 | Globo Mundial PR #54 + enrichment `feature/globo-pr2-pr3` (banderas Supabase, sedes scrollables, panel detalle país/sede, WIKI_BIO v3) | 8e6681c → 533ec15 |
+| 2026-05-12/14 | Sprint v3 shell + Grupos v3 + Eliminatoria v3 (`SHELL_PAGES`, `v3GruposMount`, `v3ElimMount`, HF-08..HF-15 propagación grupos→KO) | … → eb9c9d1 |
+| 2026-05-13 | Tabla `squads` v6 (jugadores_is_final + jugadores_fuente + jugadores_synced_at) | MCP, sin migration file |
+| 2026-05-16 | sync-squads sprint inicial CLI + workflow CI 6h (FF primaria + TM enrich) | — |
+| 2026-05-18/19 | Refactor `feat/squads-sources-refactor`: 5 fuentes primarias 2-of-N + FF degradado a secundaria XI titular (ERR-59, PR#72) | — |
+| 2026-05-20 | Sprint Pre-Launch cerrado: PR#75 F-01..F-10b (11 fixes) + PR#77 iOS scroll inner + PR#78 max-height vs tabbar (ERR-65/66, hotfix iOS modal grupos) | 72e3b75 → 0e49612 |
 
 Detalle commit-by-commit en `CHANGELOG.md`.

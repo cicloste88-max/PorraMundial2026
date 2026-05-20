@@ -15,9 +15,9 @@ App de pronósticos para el Mundial 2026 (Canadá · México · Estados Unidos).
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions) |
 | Deploy | Vercel (autodeploy desde `main`) |
 | Live scoring | Apify actor propio (Playwright + proxy residencial Webshare) |
-| Notificaciones | Twilio WhatsApp |
+| Notificaciones | Twilio WhatsApp (sandbox; migración Meta Business pre-11-jun) |
 | Agentes | Claude Haiku via Anthropic API + `porra-orchestrator` EF |
-| Seguridad | Cloudflare Turnstile (CAPTCHA login, Managed mode) |
+| Seguridad | Vault EF secrets + RLS Supabase (Turnstile desactivado 30-abr-2026) |
 
 ---
 
@@ -30,13 +30,10 @@ porra-mundial-2026/
 ├── vite.config.js                      ← Config Vite
 ├── package.json
 │
-├── css/                                ← Estilos
-│   ├── base.css                        · Reset, variables, layout principal
-│   ├── welcome.css                     · Welcome screen + auth modal
-│   ├── ko.css                          · Bracket KO + modal partido + awards
-│   ├── admin.css                       · Panel admin + dado
-│   ├── boost.css                       · Boost x2 (llamas, ticker)
-│   └── bracket-results.css             · Vista resultados KO
+├── public/css/                         ← Estilos (Vite copia public/ a dist/)
+│   ├── base.css / welcome.css / ko.css / admin.css / boost.css / directo.css / bracket-results.css
+│   ├── v3/                             · mundial-shell-v3 + grupos-v3 + eliminatoria-v3
+│   └── components/                     · app-header, bottom-tab, tokens, jornada-v2, directo-v2, predictor-shell, elim-shell, grupos-shell, globo-equipos
 │
 ├── js/                                 ← Entry point Vite
 │   └── main-entry.js                   · ESM entry, expone Supabase y carga la chain
@@ -45,10 +42,13 @@ porra-mundial-2026/
 │   ├── shell.js                        · Bootstrap de la app (carga chain de scripts)
 │   ├── data.js                         · PARTIDOS, EQUIPOS, GRUPOS, BRACKET, predictions
 │   ├── scoring.js                      · Motor de puntos + tarjetas + premios
-│   ├── ui-groups.js                    · Vista Grupos + Vista Jornada
-│   ├── ui-groups-mobile.js             · Vista móvil grupos (acordeón + focus layer + carrusel)
+│   ├── ui-groups.js / ui-groups-mobile.js · Vista Grupos legacy (sustituida por v3/)
 │   ├── ui-directo.js                   · Vista Directo (live scores + simulacros admin)
-│   ├── ko.js                           · Bracket KO + predicciones IA
+│   ├── ko.js                           · Bracket KO legacy + lógica BRACKET reusada por v3
+│   ├── ui-elim-shell.js                · Shell legacy F7.X (convive con v3)
+│   ├── ui-pred-shell.js                · Predictor (shell propio, fuera de v3)
+│   ├── ui-pizarra-tactica.js           · Modal Pizarra Táctica (XI + convocatoria)
+│   ├── ui-globo-equipos.js             · Globo 3D (cinta + overlay + panel detalle)
 │   ├── ui-nav.js                       · SPA nav + modal + welcome
 │   ├── auth.js                         · Autenticación Supabase
 │   ├── leagues.js                      · Sistema de ligas (crear/unirse/seleccionar)
@@ -57,7 +57,9 @@ porra-mundial-2026/
 │   ├── admin.js                        · Panel admin + dado + simulador
 │   ├── bracket-results.js              · Vista resultados reales del bracket KO
 │   ├── live-sync.js                    · Sincronización en tiempo real (Supabase Realtime)
-│   └── misc.js                         · Utilidades UI
+│   ├── misc.js                         · Utilidades UI
+│   ├── v3/                             · Shell global v3 + Grupos v3 + Eliminatoria v3
+│   └── data/                           · wiki-bio.js (48 fichas) + wiki-data-globo.js
 │
 ├── apify-actors/                       ← Actores Apify custom
 │   └── sofascore-webshare-proxy/       · Actor principal (producción)
@@ -95,7 +97,9 @@ porra-mundial-2026/
 | `live_scores` | Estado partidos en vivo (status, score, events, sofascore_event_id). Columna `is_historic BOOLEAN DEFAULT false`: `true` = trial runs / pruebas, conservado como referencia consultiva de formatos/estados. **No usar en scoring** (filtrar `WHERE is_historic = false`). |
 | `whatsapp_subscribers` | Teléfonos activos para notificaciones |
 | `ia_snapshots` | Snapshots del predictor IA (ELO, H2H, form) por fecha |
-| `ia_predictions` | Predicciones IA por partido (signo, probabilidades) |
+| `ia_predictions` | Predicciones IA por partido (signo, probabilidades + breakdown raw context) |
+| `ia_elo_fifa` / `ia_h2h` / `ia_last5_results` | Señales del motor IA (ELO/H2H/form). RLS select-authenticated en `ia_elo_fifa` (PR `20260519103959`) |
+| `squads` | Plantillas 48 selecciones (XI + roster + entrenador + stats). Sync vía CLI `scripts/sync-squads.mjs`. Cobertura 10/48 (20-may-2026) |
 
 RLS habilitado en todas las tablas. Audit de seguridad completo aplicado 28-29abr2026 (PR#36-38).
 
@@ -116,6 +120,9 @@ RLS habilitado en todas las tablas. Audit de seguridad completo aplicado 28-29ab
 | `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
 | `create-league` | v2 | Crear liga (cualquier usuario, max 3 no-admin). verify_jwt=false |
 | `porra-ia-compute` | v10 | Motor IA Predictor (ELO+H2H+form+host). Genera ia_snapshots + ia_predictions |
+| `get-squad` | v* | Sirve datos de `squads` (XI + roster + entrenador) a la Pizarra Táctica |
+
+Versiones canónicas en `docs/architecture.md` § Edge Functions.
 
 ---
 
@@ -233,7 +240,8 @@ pg_cron (durante partido)
 
 ### CAPTCHA
 
-Login protegido con Cloudflare Turnstile (Managed mode). En localhost se usa el test sitekey `1x00000000000000000000AA` (always-passes, banner rojo "Solo para pruebas" esperado). En producción se usa el sitekey real `0x4AAAAAADFzAxFI4isPOuJx`. Detección vía `window.location.hostname` en script inline. Secret en Supabase Auth → Attack Protection.
+Cloudflare Turnstile **desactivado el 30-abr-2026**. Login protegido por
+Supabase Auth + rate-limits + Attack Protection. Detalle: `docs/secrets.md`.
 
 ### Audit Postgres (28-29 abr 2026)
 
@@ -252,11 +260,18 @@ Auditoría completa de seguridad y rendimiento aplicada (PR#36-40):
 
 | Fichero | Propósito |
 |---------|-----------|
-| `CLAUDE.md` | Contexto de trabajo para Claude Code (sesiones). |
-| `errores_conocidos_porra.md` | Histórico de bugs resueltos y patrones críticos (ERR-01 a ERR-33). |
-| `migration-log.md` | Bitácora cronológica de etapas del proyecto. |
-| `CONTEXTO_PORRA_2026.md` | Contexto maestro del proyecto. |
-| `docs/db/audit_28abr_section26_rls_planning.md` | Planning 19 RLS rewrites pendientes |
+| `CLAUDE.md` | Contexto de trabajo para Claude Code (sesiones). Incluye top-3 prioridades y reglas críticas. |
+| `errores_conocidos_porra.md` | Catálogo bugs resueltos y patrones críticos (ERR-01 a ERR-66). Consultar antes de debuggear. |
+| `migration-log.md` | Bitácora cronológica append-only de etapas del proyecto. |
+| `CHANGELOG.md` | Histórico bugs resueltos y limpiezas (retención 90d). |
+| `docs/architecture.md` | Estructura JS, EFs, stack, tooling, historial dev. |
+| `docs/db-schema.md` | Schemas SQL + RLS + helpers `schedule_match_crons`. |
+| `docs/ia-predictor.md` | Motor IA + 4 fuentes datos + mapping WC2026_TEAMS. |
+| `docs/live-scoring.md` | Pipeline async+webhook + actores Apify + IDs SofaScore. |
+| `docs/scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA. |
+| `docs/sync-squads.md` + `docs/globo-mundial.md` + `docs/v3-vs-legacy.md` + `docs/simulacros.md` + `docs/whatsapp.md` + `docs/secrets.md` | Referencias de dominio. |
+| `docs/AUDIT_LEGACY_VS_V3.md` | Audit features legacy vs redesign v3 + 9 puntos integración I1-I9. |
+| `.claude/rules/*.md` | Reglas path-scoped auto-cargadas al editar áreas específicas (CSS, JS, EFs, sync-squads, multi-agent-sync, apify-actor). |
 
 ---
 
@@ -321,17 +336,22 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Rediseño móvil de fase de grupos (acordeón por grupo + focus layer pantalla completa + carrusel 6 partidos + slide clasificación + botón Guardar/Deshacer con persistencia en BD)
 - IA Predictor integrado (Fases A-F cerradas): motor ELO+H2H+form+host, snapshots en BD, 72 predicciones de grupos, tooltip explicativo +1pt bonus vs IA
 - Audit Postgres seguridad completo (PR#36-40, 28-29abr2026): RLS, grants, índices FK, CAPTCHA Turnstile
+- Globo Mundial 3D (PR#54 + enrichment): cinta + overlay full-screen globe.gl, 48 banderas Supabase, 16 sedes, panel detalle país/sede con bio sport.es + ESPN (WIKI_BIO v3)
+- Redesign v3: shell global (fifa-bar + countdown + qualified-cta + stage-pill) + Grupos v3 (`v3GruposMount`) + Eliminatoria v3 (`v3ElimMount` con propagación grupos→KO HF-08..HF-15)
+- CLI sync-squads + workflow CI 6h (5 fuentes primarias 2-of-N + FF secundaria XI titular + enrich Transfermarkt). Pizarra Táctica modal alimentada por tabla `squads`
+- Sprint Pre-Launch cerrado (20-may-2026): PR#75 F-01..F-10b (11 fixes) + PR#77/#78 hotfix iOS scroll modal grupos (ERR-65/66)
 
 ### Antes del 11 de junio de 2026
 
-- [ ] Migrar WhatsApp sandbox → Meta Business producción
-- [ ] Activar pg_cron para `update-results`
-- [ ] Cargar convocatorias reales (`EQUIPOS[].players`)
-- [ ] Email de confirmación al cerrar porra **con copia de pronósticos al usuario** (Resend + EF)
-- [ ] Desactivar signup público cuando entren todos los amigos
-- [ ] Verificar estructura JSON `_results.ko_results` con `update-results` real
-- [ ] Auto-completar Pichichi del torneo sumando goleadores seleccionados en pronósticos (ayuda lógica al usuario)
-- [ ] Enganche final de frases IA para pronóstico signo de partido (lógica ya incorporada, falta wiring)
+- [ ] Migrar WhatsApp sandbox → Meta Business producción (error 63016 parked)
+- [ ] Activar pg_cron `update-results` el 11 jun
+- [ ] Sprint Reglamento FIFA: Art13 head-to-head + Art16 al scoring engine + `v3ComputeStandings`
+- [ ] Cobertura sync-squads 38/48 (snapshot oficial FIFA 2-jun)
+- [ ] Convocatorias reales `EQUIPOS[].players` + action `update_ia_scorers` de `porra-ia-compute` para rellenar `predictions.scorer`/`ko_predictions.scorer` del bot IA Zayu
+- [ ] Email confirmación cierre porra **con copia de pronósticos** (Resend + EF)
+- [ ] Verificar JSON `_results.ko_results` con `update-results` real
+- [ ] IDs SofaScore de KO (~28 jun, post fase grupos)
+- [ ] Auto-completar Pichichi torneo + wiring frases IA pronóstico signo v3
 
 ### Post-torneo
 
