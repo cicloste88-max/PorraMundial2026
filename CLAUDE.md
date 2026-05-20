@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `bd6e977` (PR #71 Polish v1 + Fix Packs 1, 2 + Fix DB RLS, 19-may 10:57 UTC, squash). B1-B4 Polish + 4 fixes pack1 (leyenda 3º, IA % Hamilton, lookup IA KO, awards legacy) + 3 fixes pack2 (modal flotante, paleta slate/blue, listas BD-driven) + RLS `ia_elo_fifa`. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC). Polish v3 cerrado a nivel código. **10/48 squads operativas**. ERR-58 (RLS sin policy SELECT). Branch `feat/squads-sources-refactor` con 5 fuentes 2-of-N pushada, PR pendiente.
+Main HEAD `0e49612` (PR #78 hotfix iOS modal grupos, 20-may). Tres PRs hoy: #75 fix pre-launch 11 fixes F-01..F-10b (`72e3b75`), #77 iOS scroll → inner (`7d8b706`), #78 max-height descuenta tabbar (`0e49612`). Sprint Pre-Launch cerrado. **10/48 squads operativas**. ERR-65 (iOS scroll en `pointer-events:none`) + ERR-66 (max-height vs `.fc-tabbar` fija) registrados. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
 
 ## Top-3 pendientes inmediatos
 

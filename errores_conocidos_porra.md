@@ -866,3 +866,59 @@ legacy si la clave no aparece o `ANNEX_C` está vacío (boot inicial).
 **Patrón:** Cuando FIFA define una tabla de lookup oficial, implementarla
 directamente — no intentar derivarla algorítmicamente. Mantener el fallback
 secuencial es defensa contra dataset incompleto o regresiones en la generación.
+
+
+## ERR-65 — iOS Safari: scroll touch bloqueado en hijo `overflow:auto` cuando padre tiene `pointer-events:none`
+
+**Síntoma:** Modal con scroll vertical funciona en Chrome desktop (mouse wheel) pero NO en iPhone Safari con gestos touch.
+
+**Caso de referencia:** `.v3-zoom-panel` + `.v3-zoom-panel__inner` (modal "Pronostica el Grupo X") en producción iPhone Safari, 20-may-2026. Tab Marcadores no scrolleaba hasta JORNADA 3 aunque el contenido desbordaba con creces el viewport.
+
+**Causa:** Patrón anti-iOS específico. Cuando un contenedor scrollable
+(`overflow-y:auto`) tiene `pointer-events:none` (común en patrones de
+modal-con-backdrop para que clicks pasen al overlay de cierre — ERR-43
+redux, F2.9 HOTFIX-03), iOS Safari bloquea la entrega del touch event a
+ese contenedor. Chrome desktop con mouse wheel funciona porque el wheel
+se procesa a nivel de viewport y propaga, pero touch no.
+
+**Fix:** Mover el `overflow-y:auto` al contenedor hijo más interno que SÍ
+recibe pointer events (`pointer-events:auto` aplicado vía `.is-open`).
+Añadir:
+- `-webkit-overflow-scrolling: touch` para momentum scroll iOS.
+- `overscroll-behavior: contain` para aislar el scroll del body (evita
+  chained scroll que desplaza la página detrás).
+- `max-height` calculado en `dvh` con fallback `vh` para limitar la altura
+  del scroller a viewport menos elementos fijos.
+
+**Patrón:** Si un modal tiene `pointer-events:none` en su panel exterior
+(para clicks de cierre vía backdrop), el scroll DEBE ir al children, nunca
+al panel. Aplica a cualquier patrón overlay+inner que use el truco del
+backdrop transparente.
+
+**Validación:** PR #76 (squash `f1f55d4`) probó la solución incorrecta
+(scroll en el panel); PR #77 (squash `7d8b706`) lo corrigió moviendo el
+scroll al inner. QA iPhone Safari real validó el fix.
+
+
+## ERR-66 — `.v3-zoom-panel__inner` cubierto por `.fc-tabbar` fija sin descuento en `max-height`
+
+**Síntoma:** Tras arreglar el scroll iOS (ERR-65), el contorno verde del
+modal termina parcialmente tapado por la bottom tabbar fija de la app.
+Footer del modal "6 DE 6 MARCADORES · CLASIFICACIÓN →" solapado.
+
+**Causa:** `max-height: calc(100dvh - 24px)` solo descuenta los margins
+del modal (12 top + 12 bottom) pero no la `.fc-tabbar`
+(`position:fixed; bottom:0`, 56px de alto). El modal extiende su contorno
+hasta debajo de la tabbar, donde queda visualmente cortado.
+
+**Fix:** `max-height: calc(100dvh - 80px)` con fallback `calc(100vh - 80px)`.
+80px = 24px de margins + 56px de tabbar. No añadir buffer adicional para
+`safe-area-inset-bottom` porque ya se aplica a la tabbar por separado.
+
+**Patrón:** Cualquier modal o overlay que usa `100dvh` (o `100vh`) debe
+descontar TODOS los elementos `position:fixed` que cubren parte del
+viewport (tabbars, headers fijos, FABs persistentes, etc.). Auditar
+cualquier max-height sobre dvh contra el inventario de elementos fixed.
+
+**Validación:** PR #78 (squash `0e49612`). QA iPhone Safari real con
+screenshot aprobado por San.
