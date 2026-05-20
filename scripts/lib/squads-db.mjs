@@ -3,6 +3,51 @@
 // (Node 22+ soporta --env-file=.env si quieres autoload sin código extra).
 
 import { createClient } from '@supabase/supabase-js';
+import { normalize as normalizeName } from './name-matcher.mjs';
+
+// Campos enrich que se preservan al hacer merge contra la fila previa.
+// Si el array nuevo no aporta valor (null/undefined) para uno de estos, se
+// hereda del jugador previo con mismo nombre normalizado. Si lo aporta,
+// el nuevo gana. Cierra la regresión 19-may donde `--mode=detect` pisaba
+// el enrich TM (fotos Storage, tm_player_id, edad, valor_eur, dorsal).
+const ENRICH_FIELDS = [
+  'tm_player_id',
+  'foto_url',
+  'edad',
+  'valor_eur',
+  'dorsal',
+  'dob',
+  'posicion_tm',
+];
+
+/**
+ * Merge de jugadores nuevos vs previos:
+ *  - Para cada jugador nuevo, busca match por nombre normalizado en el array previo.
+ *  - Si hay match, preserva campos enrich del previo cuando el nuevo no los aporta.
+ *  - Jugadores nuevos sin match en previo entran tal cual.
+ *  - Jugadores previos sin match en nuevos DESAPARECEN (correcto: convocatoria cambió).
+ */
+export function mergeJugadores(beforePlayers, newPlayers) {
+  if (!Array.isArray(beforePlayers) || beforePlayers.length === 0) return newPlayers;
+  if (!Array.isArray(newPlayers)) return newPlayers;
+
+  const beforeByName = new Map();
+  for (const p of beforePlayers) {
+    if (p?.nombre) beforeByName.set(normalizeName(p.nombre), p);
+  }
+
+  return newPlayers.map((np) => {
+    const prev = beforeByName.get(normalizeName(np?.nombre || ''));
+    if (!prev) return np;
+    const merged = { ...np };
+    for (const field of ENRICH_FIELDS) {
+      if (merged[field] == null && prev[field] != null) {
+        merged[field] = prev[field];
+      }
+    }
+    return merged;
+  });
+}
 
 const URL = process.env.SUPABASE_URL || 'https://cmyfyswystjgzdwbqyyb.supabase.co';
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -70,9 +115,10 @@ export async function upsertSquad(iso3, players, { isFinal, fuente, dryRun = fal
   const supa = getClient();
   const before = await getSquadRow(iso3);
   const beforeJugadores = before?.jugadores || [];
+  const mergedPlayers = mergeJugadores(beforeJugadores, players);
 
   const same =
-    deepEqualPlayers(beforeJugadores, players) &&
+    deepEqualPlayers(beforeJugadores, mergedPlayers) &&
     (before?.jugadores_is_final ?? false) === !!isFinal &&
     (before?.jugadores_fuente ?? null) === fuente;
 
@@ -86,7 +132,7 @@ export async function upsertSquad(iso3, players, { isFinal, fuente, dryRun = fal
       before,
       after: {
         ...before,
-        jugadores: players,
+        jugadores: mergedPlayers,
         jugadores_is_final: isFinal,
         jugadores_fuente: fuente,
         jugadores_synced_at: new Date().toISOString(),
@@ -99,7 +145,7 @@ export async function upsertSquad(iso3, players, { isFinal, fuente, dryRun = fal
   const { data, error } = await supa
     .from('squads')
     .update({
-      jugadores: players,
+      jugadores: mergedPlayers,
       jugadores_is_final: isFinal,
       jugadores_fuente: fuente,
       jugadores_synced_at: nowIso,

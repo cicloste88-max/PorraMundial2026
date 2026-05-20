@@ -96,14 +96,14 @@ function parseKaderTable(html) {
     const bucket = posicionRaw && POSICION_TM_TO_BUCKET[posicionRaw] ? POSICION_TM_TO_BUCKET[posicionRaw] : null;
 
     players.push({
-      tm_id: nameMatch[1],
+      tm_player_id: parseInt(nameMatch[1], 10),
       nombre,
       foto_url: photoMatch ? photoMatch[1] : null,
       dob: dobMatch ? dobMatch[1] : null,
       edad: ageMatch ? parseInt(ageMatch[1], 10) : null,
-      valor: valorMatch ? parseValor(valorMatch[1], valorMatch[2]) : null,
-      posicion: posicionRaw,
-      posicion_bucket: bucket,
+      valor_eur: valorMatch ? parseValor(valorMatch[1], valorMatch[2]) : null,
+      posicion_tm: posicionRaw,
+      posicion: bucket,
       dorsal: dorsalMatch ? parseInt(dorsalMatch[1], 10) : null,
     });
   }
@@ -150,12 +150,16 @@ export function enrichRosterWithTm(roster, tmPlayers) {
     const i = roster.findIndex((p) => p.nombre === candidate);
     if (i < 0) continue;
     const tm = match;
+    if (tm.tm_player_id != null) roster[i].tm_player_id = tm.tm_player_id;
     if (tm.edad != null) roster[i].edad = tm.edad;
     if (tm.dob) roster[i].dob = tm.dob;
-    if (tm.valor != null) roster[i].valor = tm.valor;
-    if (tm.foto_url) roster[i].foto_url = tm.foto_url;
+    if (tm.valor_eur != null) roster[i].valor_eur = tm.valor_eur;
+    // Guardamos URL TM CDN aparte; el flow de upload la reemplazará por la URL
+    // pública de Supabase Storage antes de persistir (ver storage-upload.mjs).
+    if (tm.foto_url) roster[i].foto_url_tm = tm.foto_url;
     if (tm.dorsal != null) roster[i].dorsal = tm.dorsal;
-    if (tm.posicion) roster[i].posicion = tm.posicion;
+    if (tm.posicion_tm) roster[i].posicion_tm = tm.posicion_tm;
+    // posicion (bucket) NO la sobrescribe TM: la fuente primaria manda.
     enriched++;
   }
   return { enriched, unmatched: roster.length - enriched };

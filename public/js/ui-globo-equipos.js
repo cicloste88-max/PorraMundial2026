@@ -908,9 +908,10 @@
   function buildRosterHTML(iso3, pais, jugadores) {
     var grupos = { Portero: [], Defensa: [], Centrocampista: [], Delantero: [] };
     (jugadores || []).forEach(function (j) {
-      // Bucket prioritario: posicion_bucket si existe (ESP/ARG/MEX), si no
-      // posicion (FRA/BRA/SWE/BIH ya tienen el bucket en este campo).
-      var raw = j.posicion_bucket || j.posicion || '';
+      // Schema canónico (19-may): j.posicion siempre es el bucket
+      // (Portero/Defensa/Centrocampista/Delantero); j.posicion_tm guarda la
+      // posición específica TM (Centre-Back, Right Winger, etc.).
+      var raw = j.posicion || j.posicion_tm || '';
       var b = null;
       if (/portero/i.test(raw) || /^PO\b/i.test(raw)) b = 'Portero';
       else if (/defensa/i.test(raw) || /^(DFC|LD|LI|CB|DF)\b/i.test(raw)) b = 'Defensa';
@@ -926,9 +927,9 @@
           '<td class="fc-roster-name">' + escHtml(j.nombre || '—') +
             (j.club ? '<span class="fc-roster-club">' + escHtml(j.club) + '</span>' : '') +
           '</td>' +
-          '<td>' + escHtml(j.posicion || '—') + '</td>' +
+          '<td>' + escHtml(j.posicion_tm || j.posicion || '—') + '</td>' +
           '<td>' + (j.edad != null && j.edad !== '' ? escHtml(j.edad) : '—') + '</td>' +
-          '<td>' + escHtml(fmtValor(j.valor != null ? j.valor : j.valor_mercado)) + '</td>' +
+          '<td>' + escHtml(fmtValor(j.valor_eur != null ? j.valor_eur : j.valor_mercado)) + '</td>' +
         '</tr>';
       }).join('');
       return '<div class="fc-roster-section">' +
