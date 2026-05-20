@@ -64,3 +64,27 @@ Mantener este patrón en todos los contextos donde se renderizan equipos: tablas
 ## dice.js dentro de admin.js
 
 `dice.js` no debe separarse en archivo independiente. Permanece integrado dentro de `admin.js` como utilidad interna. Si la funcionalidad de dados crece, expandir dentro del mismo archivo. NO anticipar refactor.
+
+## Event delegation a nivel `document` para handlers dinámicos
+
+Cuando un handler debe atender clicks sobre elementos generados dinámicamente
+(modales lazy, cards re-renderizadas, items inyectados por v3), **registrar el
+listener en `document` con guard `closest()` + flag de idempotencia**:
+
+```js
+if (!document._foo_delegated) {
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('.fc-foo-trigger');
+    if (target) handleFoo(target);
+  });
+  document._foo_delegated = true;
+}
+```
+
+Evita perder eventos cuando el shell v3 reemplaza el DOM al cambiar de page
+(mounts/unmounts destruyen listeners scoped al contenedor) y cubre elementos
+que aún no existen en el momento del registro.
+
+Caso de referencia: F-02 PR#75 — handler abrir Pizarra Táctica desde flags v3
+en cards Grupos. Registro previo dentro del scope del módulo fallaba tras
+unmount/remount del board v3.

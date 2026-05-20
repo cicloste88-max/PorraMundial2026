@@ -2126,3 +2126,17 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [19:00] DRY-RUN: validado con 5 fuentes — 17 procesables (16 high con 4-5 fuentes coincidentes, 1 low CRO por calendario "(definitiva): 1 jun"), 5 rejected pre-lista. IRN aparece solo en Marca (señal nueva).
 
 [19:15] DOCS: ERR-59 añadido a `errores_conocidos_porra.md` (ERR-58 quedó asignado al RLS bug del PR #71), entrada CHANGELOG entrada `2026-05-19 — sync-squads refactor 5-of-N`, `.claude/rules/sync-squads.md` §0/§9/§10 actualizada con jerarquía 5 fuentes + workflow serial. PR pendiente de creación contra `main` (`bd6e977`).
+
+## 2026-05-20 — Sprint Pre-Launch + Hotfixes iOS modal grupos
+
+[14:00] PR #75 mergeado a main como squash `72e3b75`. 11 fixes F-01..F-10b sobre brief Claude.ai 19-may. Ramas: `claude/pre-launch-fixes-oLhZ0`. Múltiples rondas QA (r1..r4) para F-02/03 (awards combo) + F-05 (tooltip ?) + F-07 (pizarra dvh) + F-10b (columna `equipo` no `nombre_pais`).
+
+[16:30] PR #76 mergeado a main como squash `f1f55d4`. Hotfix iOS scroll modal grupos v1: `overflow:hidden → visible` en `.v3-zoom-panel__inner` + `overflow-y:auto` en panel. **NO funcionó en iPhone Safari real** porque el panel tiene `pointer-events:none`. Rama `hotfix/ios-scroll-grupos` desde main.
+
+[17:15] PR #77 mergeado a main como squash `7d8b706`. Hotfix r2: mover scroll a `.v3-zoom-panel__inner` (overflow-y:auto + -webkit-overflow-scrolling:touch + overscroll-behavior:contain + max-height calc(100dvh - 24px)). Causa raíz documentada en ERR-65. QA iPhone real validó.
+
+[18:00] PR #78 mergeado a main como squash `0e49612`. Hotfix r3: `max-height: calc(100dvh - 80px)` (era 24px). Descontar `.fc-tabbar` 56px + margins 24px. ERR-66 registrado. QA iPhone real con screenshot aprobado por San.
+
+[18:30] DOCS: CHANGELOG entrada `2026-05-20 — Sprint Pre-Launch + Hotfixes iOS scroll`, ERR-65 + ERR-66 en `errores_conocidos_porra.md`, `CLAUDE.md` HEAD bumped a `0e49612`, este migration-log. Archivado entries 17-may + 16-may a `CHANGELOG-archive-202605.md` (CHANGELOG > 30KB tras añadir el nuevo bloque).
+
+[18:35] HALLAZGO PARALELO: `GITHUB_TOKEN` del vault devuelve 404 — token expirado o sin scope `repo`. Regenerar en GitHub Settings + actualizar vía `vault.update_secret(...)`. MCPs pg_net→GitHub API no funcionan; Chrome MCP sigue operativo. Acción para San.

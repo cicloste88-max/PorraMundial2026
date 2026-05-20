@@ -1,7 +1,8 @@
 # sync-squads — automatización de plantillas Mundial 2026
 
-> CLI Node 22 + workflow GitHub Actions para sincronizar `squads.jugadores` desde
-> futbolfantasy.com y enriquecer con Transfermarkt.
+> CLI Node 22 + workflow GitHub Actions para sincronizar `squads.jugadores`
+> mediante cross-validation 2-of-N sobre 5 fuentes primarias + enrich
+> Transfermarkt.
 
 ## Visión general
 
@@ -12,24 +13,43 @@ y mantiene la tabla `squads` de Supabase actualizada. Diseñado para:
 - Snapshot FIFA: ejecución completa el 2-jun.
 - Mundial: detectar bajas de última hora.
 
-**Fuentes**:
-- **futbolfantasy.com** (primaria) — roster + XI titular extraído del HTML SSR.
-- **transfermarkt.com** (enrich opcional) — edad, dob, valor de mercado, foto, posición específica.
+**Fuentes** (post-refactor `feat/squads-sources-refactor`, PR#72, 18-19 may
+2026 — ver ERR-59 + `.claude/rules/sync-squads.md`):
 
-**Cobertura actual (16-may-2026)**: 10/48 selecciones con datos. 5 FINAL (FRA, JPN, BEL,
-BIH, SWE), 5 pre-lista (ARG, BRA, ESP, MEX, QAT). 38 restantes pendientes de anuncio.
+- **Primarias** (`--mode=detect`): AS, Sport.es, Olympics, Eurosport, Marca.
+  Parsers homogéneos en `scripts/lib/parsers/<fuente>.mjs`. `crossValidate`
+  exige ≥ 2 fuentes con roster ≥ 22 y Jaccard ≥ 0.7 sobre nombres
+  normalizados para marcar `is_final=true`.
+- **Secundaria FF (`scripts/lib/ff-scraper.mjs`)**: invocada únicamente sobre
+  selecciones ya marcadas FINAL por ≥ 2 primarias, **solo para XI titular**.
+  FF NO se usa como fuente de detección por el riesgo de cruzar noticias de
+  Eurocopa 2024 con Mundial 2026 (ERR-59).
+- **Enriquecimiento Transfermarkt** (`--mode=enrich-tm`): edad, dob, valor,
+  foto, posición específica, dorsal. Cache local 24h.
+
+**Cobertura actual (20-may-2026)**: 10/48 selecciones operativas. Objetivo
+38/48 para el snapshot oficial FIFA del 2-jun y arranque del torneo 11-jun.
 
 ## Estructura
 
 ```
 scripts/
-  sync-squads.mjs               # CLI principal (modes scrape | enrich-tm)
+  sync-squads.mjs               # CLI principal (modes detect | scrape | enrich-tm)
   lib/
-    ff-scraper.mjs              # futbolfantasy: detect → roster → XI
+    parsers/
+      as.mjs                    # AS — convocatorias oficiales
+      sport.mjs                 # Sport.es — listas convocados
+      olympics.mjs              # Olympics — 48 selecciones tracking
+      eurosport.mjs             # Eurosport — convocatorias selecciones
+      marca.mjs                 # Marca — convocatorias oficiales
+      calendar.mjs              # parseCalendar() Olympics → fechas anuncio
+      country-map.json          # nombres país por fuente → iso3 canónico
+    cross-validate.mjs          # 2-of-N + Jaccard ≥ 0.7 + minPlayers=22
+    ff-scraper.mjs              # futbolfantasy (secundaria, solo XI titular)
     tm-scraper.mjs              # Transfermarkt: kader con cache 24h
     name-matcher.mjs            # normalize + Levenshtein + scoring
     squads-db.mjs               # Supabase client + upsert idempotente
-    iso3-slugs.json             # 48 mapeos iso3 → ff-slug
+    iso3-slugs.json             # 48 mapeos iso3 → ff-slug (legacy XI fetch)
     tm-ids.json                 # iso3 → TM canonical id (6 conocidos)
 .github/workflows/
   sync-squads.yml               # CI: schedule cron 6h + workflow_dispatch
@@ -40,7 +60,17 @@ docs/
 
 ## Modos y flags
 
-### `--mode=scrape`
+### `--mode=detect` (recomendado en cron)
+
+Cross-validate 2-of-N sobre AS/Sport.es/Olympics/Eurosport/Marca via
+`Promise.allSettled` (tolera fallo hasta 1 fuente). Resultados:
+`confidence='high'` (2+ fuentes con Jaccard ≥ 0.7), `'low'` (1 fuente o
+degrade por calendario), `'reject'` (rosters < 22). Upsert con
+`preserveEnrichment()` para no perder edad/valor/foto TM previa. Para cada
+iso3 actualizada FINAL hace paso XI titular vía FF en serie (skippable con
+`--no-enrich-xi`). Detalle: `.claude/rules/sync-squads.md` § 9.
+
+### `--mode=scrape` (legacy / dispatch manual)
 
 Scrapea desde futbolfantasy.
 

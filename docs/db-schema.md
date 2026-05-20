@@ -152,13 +152,22 @@ CREATE TABLE squads (
   -- ── Columnas nuevas v6 (aplicadas 13 may 2026 vía MCP, sin migration file) ──
   jugadores_is_final BOOLEAN NOT NULL DEFAULT false,  -- true cuando la plantilla es la prelista/lista FINAL FIFA (no provisional)
   jugadores_fuente TEXT,                              -- fuente concreta del array jugadores: 'ff' | 'as' | '365' | 'infobae' | 'fifa-official'
-  jugadores_synced_at TIMESTAMPTZ                     -- timestamp del último sync del array jugadores (distinto de updated_at general)
+  jugadores_synced_at TIMESTAMPTZ,                    -- timestamp del último sync del array jugadores (distinto de updated_at general)
+  tm_id INT                                           -- Transfermarkt verein id (canónico) — usado por enrich-tm. NULL para 42/48 hasta descubrirse
 );
 ```
 
+**Nombre del equipo en castellano**: columna `equipo` (NO `nombre_pais` ni
+`team_name_es`). Cualquier consulta desde el frontend o EFs debe usar `equipo`.
+
 **Estrategia de carga ratificada (13 may 2026)**: prioridad `FutbolFantasy` (primaria, info más fresca en castellano) → `AS` (backup) → `Transfermarkt` (enriquecimiento edad/valor) → `FIFA.com` snapshot final 2 jun (dorsales + fotos vía Chrome MCP).
 
-**Estado actual (13 may 2026)**: 7 de 48 selecciones con plantilla cargada (ARG 55 prov ff con clubs, BIH 26 FINAL as, BRA 51 prov 365, ESP 53 prov ff sin clubs, MEX 55 prov 365, QAT 33 prov infobae sin clubs, SWE 26 FINAL ff). UZB descartado este ciclo (ninguna fuente accesible publica los 40 nombres parseables).
+**Estado actual (20 may 2026)**: 10/48 selecciones operativas tras el sprint
+`feat/squads-sources-refactor` (PR#72 mergeada). Detect cross-validate 2-of-N
+sobre 5 fuentes primarias (AS + Sport.es + Olympics + Eurosport + Marca);
+FF queda como secundaria solo para XI titular sobre selecciones ya marcadas
+FINAL. Enriquecimiento TM en step 2 del cron. Detalle: `docs/sync-squads.md`
++ `.claude/rules/sync-squads.md`.
 
 ## Row-Level Security
 
