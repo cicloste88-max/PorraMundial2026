@@ -1,17 +1,24 @@
-// supabase/functions/get-squad/index.ts — v7
+// supabase/functions/get-squad/index.ts — v7.1
 // Cambios v6 → v7 (Pieza D del sprint 20-may, schema canónico squads.jugadores):
 //   1. PlantillaPlayer alineado al schema canónico: posicion (bucket) +
 //      posicion_tm (específica TM, ej. 'Lateral derecho') + valor_eur
 //      (int) + tm_player_id + club_logo_url.
-//   2. renderXIRow prefiere posicion_tm sobre posicion (bucket) sobre
-//      posicion-de-formación, así la pizarra muestra
-//      "Lateral derecho / Defensa central / Lateral izquierdo" en lugar
-//      de "Defensa / Defensa / Defensa".
-//   3. `fuente` per-player eliminado del schema canónico (la fuente vive
+//   2. `fuente` per-player eliminado del schema canónico (la fuente vive
 //      en `squads.jugadores_fuente`); el EF ya no lo expone.
-//   4. Compat: `posicion_bucket` se expone como alias de `posicion` por si
+//   3. Compat: `posicion_bucket` se expone como alias de `posicion` por si
 //      algún consumidor cacheado todavía lo lee. Retirar en v8 si confirmado
 //      sin uso (frontend actual ya migrado en PR #81 Frente 4).
+//
+// Cambios v7 → v7.1 (fix pizarra, 20-may):
+//   v7 puso `posicion_tm` (texto largo tipo 'Lateral derecho') en el campo
+//   `posicion` del XI, rompiendo el frontend en ui-pizarra-tactica.js que:
+//     a) hace `isGK === 'PO'` para detectar porteros (fallaba para enrichados)
+//     b) usa j.posicion como label corto (2-3 chars) en la pastilla del jugador
+//   v7.1 separa los dos campos en XIPlayer:
+//     - `posicion`: SIEMPRE código corto de formación (PO/LD/DFC/MCD/...)
+//     - `posicion_label`: específica TM o bucket como info adicional opcional
+//   PlantillaPlayer NO afectado: sigue exponiendo `posicion` (bucket) +
+//   `posicion_tm` (específica) sin cambios.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -39,7 +46,16 @@ const BADGE_SLUGS: Record<string, string | null> = {
   TUR: 'turkey', URU: 'uruguay', USA: 'united-states', UZB: 'uzbekistan',
 }
 
-type XIPlayer = { dorsal: number; nombre: string; posicion: string }
+// v7.1 (20-may): `posicion` mantiene código corto de formación (PO/LD/DFC/MCD/...)
+// para compatibilidad con frontend que espera ese formato (isGK === 'PO' check,
+// labels cortos en pastilla del jugador). La específica TM se expone aparte en
+// `posicion_label` para que el frontend pueda usarla opcionalmente sin romper layout.
+type XIPlayer = {
+  dorsal: number
+  nombre: string
+  posicion: string            // código corto de formación (PO/LD/DFC/...)
+  posicion_label: string | null  // específica TM ('Lateral derecho') si disponible, null si no
+}
 type PlantillaPlayer = {
   nombre: string
   club: string | null
@@ -73,15 +89,21 @@ const POS_BY_FORMATION: Record<string, string[]> = {
 
 function emptyXI(formacion: string): XIPlayer[] {
   const positions = POS_BY_FORMATION[formacion] || POS_BY_FORMATION['4-3-3']
-  return positions.map((pos, i) => ({ dorsal: i + 1, nombre: '—', posicion: pos }))
+  return positions.map((pos, i) => ({ dorsal: i + 1, nombre: '—', posicion: pos, posicion_label: null }))
 }
 
 /**
- * Renderiza la posición visible del XI con prioridad:
- *   posicion_tm (TM específica) → posicion (bucket) → posicion-de-formación.
+ * Renderiza la posición visible del XI:
+ *   - `posicion`: SIEMPRE el código corto de formación (PO/LD/DFC/...). El frontend
+ *     espera este formato para `isGK === 'PO'` y para la pastilla del jugador en la
+ *     pizarra (texto corto, 2-3 chars). NO usar valores largos aquí o se rompe el
+ *     layout y los checks de portero.
+ *   - `posicion_label`: específica TM ('Lateral derecho') si disponible, null si no.
+ *     El frontend puede usar este campo OPCIONALMENTE para mostrar la posición
+ *     específica en tooltip, modal de plantilla, etc.
  *
- * La específica TM ('Lateral derecho') aporta más info que el bucket ('Defensa')
- * que a su vez es preferible al token de formación ('LD').
+ * v7.0 (20-may inicial) puso posicion_tm en `posicion` rompiendo la pizarra.
+ * v7.1 (20-may fix) separa los dos campos.
  */
 function renderXIRow(
   j: Record<string, unknown>,
@@ -93,7 +115,8 @@ function renderXIRow(
   return {
     dorsal: typeof j.dorsal === 'number' ? j.dorsal : (i + 1),
     nombre: typeof j.nombre === 'string' && j.nombre.length > 0 ? j.nombre : '—',
-    posicion: posTm || posBucket || fallbackPos,
+    posicion: fallbackPos,                    // SIEMPRE código corto (PO/LD/DFC/...)
+    posicion_label: posTm || posBucket || null, // específica TM o bucket como info adicional
   }
 }
 
