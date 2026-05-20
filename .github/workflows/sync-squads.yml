@@ -14,7 +14,8 @@ on:
         options:
           - detect
           - scrape
-          - enrich-tm
+          - enrich-tm        # LEGACY 1-país, mantener una semana, después borrar
+          - enrich-tm-mw     # NUEVO 20-may: FIWC masivo (A) + kader fallback (B)
         default: detect
       iso3_filter:
         description: 'iso3 a procesar (vacío = todos). CSV ej "FRA,JPN"'
@@ -30,6 +31,10 @@ on:
         default: true
       refresh_final:
         description: '[scrape only, LEGACY] aplicar --refresh-final'
+        type: boolean
+        default: false
+      full:
+        description: '[enrich-tm-mw] forzar fase B siempre (rellena dob+dorsal incluso en países con buena cobertura A)'
         type: boolean
         default: false
 
@@ -75,6 +80,7 @@ jobs:
           VERBOSE: ${{ inputs.verbose }}
           ENRICH_XI: ${{ inputs.enrich_xi }}
           REFRESH_FINAL: ${{ inputs.refresh_final }}
+          FULL: ${{ inputs.full }}
         run: |
           # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
           # solo cuando está unset/empty, preservando "false" explícito de UI.
@@ -83,6 +89,7 @@ jobs:
           VERBOSE="${VERBOSE:-true}"
           ENRICH_XI="${ENRICH_XI:-true}"
           REFRESH_FINAL="${REFRESH_FINAL:-false}"
+          FULL="${FULL:-false}"
 
           # Sanity check del input libre.
           if [ -n "${ISO3_FILTER}" ] && ! printf '%s' "${ISO3_FILTER}" | grep -qE '^[A-Z]{3}(,[A-Z]{3})*$'; then
@@ -93,11 +100,13 @@ jobs:
           DETECT_FLAGS="--mode=detect"
           SCRAPE_FLAGS="--mode=scrape"
           TM_FLAGS="--mode=enrich-tm"
+          TMMW_FLAGS="--mode=enrich-tm-mw"
 
           if [ -n "${ISO3_FILTER}" ]; then
             DETECT_FLAGS="${DETECT_FLAGS} --iso3=${ISO3_FILTER}"
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --iso3=${ISO3_FILTER}"
             TM_FLAGS="${TM_FLAGS} --iso3=${ISO3_FILTER}"
+            TMMW_FLAGS="${TMMW_FLAGS} --iso3=${ISO3_FILTER}"
           else
             TM_FLAGS="${TM_FLAGS} --all"
           fi
@@ -110,10 +119,14 @@ jobs:
           elif [ -z "${ISO3_FILTER}" ]; then
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --all-missing"
           fi
+          if [ "${FULL}" = "true" ]; then
+            TMMW_FLAGS="${TMMW_FLAGS} --full"
+          fi
           if [ "${VERBOSE}" = "true" ]; then
             DETECT_FLAGS="${DETECT_FLAGS} --verbose"
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --verbose"
             TM_FLAGS="${TM_FLAGS} --verbose"
+            TMMW_FLAGS="${TMMW_FLAGS} --verbose"
           fi
 
           {
@@ -121,11 +134,13 @@ jobs:
             echo "detect=${DETECT_FLAGS}"
             echo "scrape=${SCRAPE_FLAGS}"
             echo "tm=${TM_FLAGS}"
+            echo "tmmw=${TMMW_FLAGS}"
           } >> "$GITHUB_OUTPUT"
           echo "Resolved mode: ${MODE}"
           echo "  detect flags: ${DETECT_FLAGS}"
           echo "  scrape flags: ${SCRAPE_FLAGS}"
           echo "  tm flags:     ${TM_FLAGS}"
+          echo "  tm-mw flags:  ${TMMW_FLAGS}"
 
       # Step principal del cron: detect primero, enrich-tm a continuación.
       # En workflow_dispatch con mode != detect, el primer step se salta.
@@ -139,9 +154,14 @@ jobs:
 
       - name: Run enrich-tm
         # Cron: corre tras detect. Manual mode=enrich-tm: corre directamente.
-        # Manual mode=scrape: NO corre (San lo invocará a mano si lo necesita).
+        # Manual mode=scrape | enrich-tm-mw: NO corre (otro step lo hace).
         if: ${{ steps.flags.outputs.mode == 'detect' || steps.flags.outputs.mode == 'enrich-tm' }}
         run: npm run sync-squads -- ${{ steps.flags.outputs.tm }} 2>&1 | tee -a sync-squads.log
+
+      - name: Run enrich-tm-mw
+        # Sólo en workflow_dispatch con mode=enrich-tm-mw.
+        if: ${{ steps.flags.outputs.mode == 'enrich-tm-mw' }}
+        run: npm run sync-squads -- ${{ steps.flags.outputs.tmmw }} 2>&1 | tee -a sync-squads.log
 
       - name: Upload log + calendar artifact
         if: always()

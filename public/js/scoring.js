@@ -1438,7 +1438,7 @@ const CLASSIFICATION_PTS = {
 // Polish v1 Fix-Pack-2 Fix-3+4: arrays hardcoded AW_PLAYERS (22) y
 // YOUNG_PLAYERS_NXGN (50) ELIMINADOS. Candidatos ahora se computan
 // dinámicamente desde BD: ia_elo_fifa (rank por selección) + squads
-// (jugadores JSONB con nombre, posicion_bucket, edad, club). Ver
+// (jugadores JSONB con nombre, posicion bucket, edad, club). Ver
 // getAwardCandidates(award) abajo. window.AW_PLAYERS y
 // window.YOUNG_PLAYERS_NXGN ya NO se exponen — auth.js loadUserData
 // resuelve via getAwardCandidates.

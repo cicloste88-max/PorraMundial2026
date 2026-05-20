@@ -1,12 +1,17 @@
-// supabase/functions/get-squad/index.ts — v6
-// Cambios v5 → v6:
-//   1. Schema squads ahora tiene 3 columnas nuevas: jugadores_is_final, jugadores_fuente, jugadores_synced_at.
-//   2. El array `jugadores` puede contener PLANTILLA COMPLETA (23-55 jugadores) con flag es_titular,
-//      en vez de exactamente los 11 titulares del XI.
-//   3. Retrocompatibilidad: si el array tiene exactamente 11 elementos SIN flag es_titular,
-//      se interpreta como formato v5 antiguo (XI directo).
-//   4. Respuesta enriquecida con `plantilla` (array completo) + `plantilla_meta`.
-//      Mantiene `jugadores` (11 elementos, XI titular) para no romper Pizarra Táctica actual.
+// supabase/functions/get-squad/index.ts — v7
+// Cambios v6 → v7 (Pieza D del sprint 20-may, schema canónico squads.jugadores):
+//   1. PlantillaPlayer alineado al schema canónico: posicion (bucket) +
+//      posicion_tm (específica TM, ej. 'Lateral derecho') + valor_eur
+//      (int) + tm_player_id + club_logo_url.
+//   2. renderXIRow prefiere posicion_tm sobre posicion (bucket) sobre
+//      posicion-de-formación, así la pizarra muestra
+//      "Lateral derecho / Defensa central / Lateral izquierdo" en lugar
+//      de "Defensa / Defensa / Defensa".
+//   3. `fuente` per-player eliminado del schema canónico (la fuente vive
+//      en `squads.jugadores_fuente`); el EF ya no lo expone.
+//   4. Compat: `posicion_bucket` se expone como alias de `posicion` por si
+//      algún consumidor cacheado todavía lo lee. Retirar en v8 si confirmado
+//      sin uso (frontend actual ya migrado en PR #81 Frente 4).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -19,7 +24,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 }
 
-// Mapping ISO3 → slug del badge en storage (5 selecciones sin badge: BIH, COD, CZE, IRQ, SWE)
 const BADGE_SLUGS: Record<string, string | null> = {
   ALG: 'algeria', ARG: 'argentina', AUS: 'australia', AUT: 'austria',
   BEL: 'belgium', BIH: null, BRA: 'brazil', CAN: 'canada',
@@ -38,14 +42,18 @@ const BADGE_SLUGS: Record<string, string | null> = {
 type XIPlayer = { dorsal: number; nombre: string; posicion: string }
 type PlantillaPlayer = {
   nombre: string
-  club: string
-  posicion_bucket: string
+  club: string | null
+  club_logo_url: string | null
+  posicion: string                  // bucket (Portero|Defensa|Centrocampista|Delantero)
+  posicion_tm: string | null        // específica TM ('Lateral derecho'...)
+  posicion_bucket: string           // alias retrocompat — eliminar en v8
   es_titular: boolean
-  posicion: string | null
-  dorsal: number | null
-  foto_url: string | null
   dob: string | null
-  fuente: string
+  edad: number | null
+  valor_eur: number | null
+  dorsal: number | null
+  tm_player_id: number | null
+  foto_url: string | null
 }
 
 const POS_BY_FORMATION: Record<string, string[]> = {
@@ -69,11 +77,30 @@ function emptyXI(formacion: string): XIPlayer[] {
 }
 
 /**
- * Devuelve los 11 titulares (XI) a partir del array `jugadores` de la BBDD.
+ * Renderiza la posición visible del XI con prioridad:
+ *   posicion_tm (TM específica) → posicion (bucket) → posicion-de-formación.
  *
- * Lógica:
- *   - Si el array tiene flag `es_titular` en al menos un elemento → filtrar es_titular=true.
- *   - Si el array tiene exactamente 11 elementos SIN flag → formato v5 antiguo, usar tal cual.
+ * La específica TM ('Lateral derecho') aporta más info que el bucket ('Defensa')
+ * que a su vez es preferible al token de formación ('LD').
+ */
+function renderXIRow(
+  j: Record<string, unknown>,
+  fallbackPos: string,
+  i: number,
+): XIPlayer {
+  const posTm = typeof j.posicion_tm === 'string' && j.posicion_tm.length > 0 ? j.posicion_tm : null
+  const posBucket = typeof j.posicion === 'string' && j.posicion.length > 0 ? j.posicion : null
+  return {
+    dorsal: typeof j.dorsal === 'number' ? j.dorsal : (i + 1),
+    nombre: typeof j.nombre === 'string' && j.nombre.length > 0 ? j.nombre : '—',
+    posicion: posTm || posBucket || fallbackPos,
+  }
+}
+
+/**
+ * Devuelve los 11 titulares (XI) a partir del array `jugadores` de la BBDD.
+ *   - Si hay flag `es_titular` en al menos un elemento → filtrar es_titular=true.
+ *   - Si el array tiene exactamente 11 elementos SIN flag → formato v5 antiguo.
  *   - Caso contrario → placeholders desde formación.
  */
 function extractXI(jugadores: unknown, formacion: string): XIPlayer[] {
@@ -101,33 +128,31 @@ function extractXI(jugadores: unknown, formacion: string): XIPlayer[] {
   }
 
   const positions = POS_BY_FORMATION[formacion] || POS_BY_FORMATION['4-3-3']
-  return candidatos.map((j, i) => ({
-    dorsal: typeof j.dorsal === 'number' ? j.dorsal : (i + 1),
-    nombre: typeof j.nombre === 'string' && j.nombre.length > 0 ? j.nombre : '—',
-    posicion: typeof j.posicion === 'string' && j.posicion.length > 0
-      ? j.posicion
-      : (positions[i] || 'MC'),
-  }))
+  return candidatos.map((j, i) => renderXIRow(j, positions[i] || 'MC', i))
 }
 
 /**
- * Normaliza cada elemento del array jugadores (plantilla completa) al schema PlantillaPlayer.
- * Acepta tanto el formato nuevo (con bucket, club, etc.) como el formato v5 antiguo (solo XI).
+ * Normaliza cada elemento del array jugadores al schema canónico PlantillaPlayer.
  */
 function buildPlantilla(jugadores: unknown): PlantillaPlayer[] {
   if (!Array.isArray(jugadores)) return []
   return jugadores.map((j) => {
     const r = (j ?? {}) as Record<string, unknown>
+    const posicion = typeof r.posicion === 'string' ? r.posicion : ''
     return {
       nombre: typeof r.nombre === 'string' ? r.nombre : '',
-      club: typeof r.club === 'string' ? r.club : '',
-      posicion_bucket: typeof r.posicion_bucket === 'string' ? r.posicion_bucket : '',
+      club: typeof r.club === 'string' ? r.club : null,
+      club_logo_url: typeof r.club_logo_url === 'string' ? r.club_logo_url : null,
+      posicion,
+      posicion_tm: typeof r.posicion_tm === 'string' ? r.posicion_tm : null,
+      posicion_bucket: posicion,
       es_titular: r.es_titular === true,
-      posicion: typeof r.posicion === 'string' && r.posicion.length > 0 ? r.posicion : null,
-      dorsal: typeof r.dorsal === 'number' ? r.dorsal : null,
-      foto_url: typeof r.foto_url === 'string' ? r.foto_url : null,
       dob: typeof r.dob === 'string' ? r.dob : null,
-      fuente: typeof r.fuente === 'string' ? r.fuente : '',
+      edad: typeof r.edad === 'number' ? r.edad : null,
+      valor_eur: typeof r.valor_eur === 'number' ? r.valor_eur : null,
+      dorsal: typeof r.dorsal === 'number' ? r.dorsal : null,
+      tm_player_id: typeof r.tm_player_id === 'number' ? r.tm_player_id : null,
+      foto_url: typeof r.foto_url === 'string' ? r.foto_url : null,
     }
   })
 }
@@ -189,15 +214,15 @@ Deno.serve(async (req) => {
         goles_periodo: 'desde Mundial Qatar 2022',
       },
       jugadores: xi,                                          // XI titular (11)
-      plantilla_completa: xi.some((j) => j.nombre !== '—'),   // bool legacy
+      plantilla_completa: xi.some((j) => j.nombre !== '—'),
       fuente: data.fuente,
       updated_at: data.updated_at,
 
-      // === Campos nuevos v6 ===
-      plantilla,                                              // array completo
+      // === Campos v6+ ===
+      plantilla,
       plantilla_meta: {
         n: plantilla.length,
-        fuente: data.jugadores_fuente,                        // 'ff' | 'as' | 'fifa-official' | null
+        fuente: data.jugadores_fuente,
         is_final: !!data.jugadores_is_final,
         synced_at: data.jugadores_synced_at,
       },
