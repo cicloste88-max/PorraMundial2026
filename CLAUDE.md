@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `0e49612` (PR #78 hotfix iOS modal grupos, 20-may). Tres PRs hoy: #75 fix pre-launch 11 fixes F-01..F-10b (`72e3b75`), #77 iOS scroll → inner (`7d8b706`), #78 max-height descuenta tabbar (`0e49612`). Sprint Pre-Launch cerrado. **10/48 squads operativas**. ERR-65 (iOS scroll en `pointer-events:none`) + ERR-66 (max-height vs `.fc-tabbar` fija) registrados. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
+Main HEAD `0be357c` (PR #81, 20-may). Schema canónico squads en main: `upsertSquad` mergea por nombre normalizado preservando enrich (tm_player_id, foto_url Storage, edad, valor_eur, dorsal, dob, posicion_tm). tm-scraper alineado; `storage-upload.mjs` sube fotos TM CDN → `player-photos/{iso3}/{tm_player_id}.jpg`. Frontend canónico. **Branch `feat/tm-worldcup-market-values`** con 7 commits sobre `0be357c` (Piezas 0/A/B/C-merge/D/C-orquestador/E): scraper FIWC 40 páginas, `applyEnrich` ID-first, get-squad EF v7, `--mode=enrich-tm-mw`, workflow choice. **PR pendiente sin squash**. **10/48 squads operativas**. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
 
 ## Top-3 pendientes inmediatos
 
-1. **Sprint Reglamento FIFA** (3 commits): aplicar Art13 head-to-head + Art16 a scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md` reservado; brief específico cuando San active.
-2. **PR `feat/squads-sources-refactor`**: 4 commits sobre `bd6e977`. 5 fuentes primarias (AS+Sport+Olympics+Eurosport+Marca) cross-validate 2-of-N + maxPlayers=30. ERR-59. San abre PR.
-3. **Operacional pre-launch 11-jun**: activar `pg_cron update-results`, squads 38/48 via sync-squads, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked).
+1. **PR `feat/tm-worldcup-market-values`** sobre `0be357c`. 7 commits independientes, no squash. Tras merge: dispatch `--mode=enrich-tm-mw`, validar cobertura ≥80% × 48 iso3 + visual pizarra (posicion_tm).
+2. **Sprint Reglamento FIFA** (3 commits): Art13 H2H + Art16 en scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md`; brief cuando San active.
+3. **Operacional pre-launch 11-jun**: `pg_cron update-results`, squads 38/48 (enrich-tm-mw cubre fotos/valor/dob/dorsal), Resend email cierre, IDs SofaScore KO (~28-jun), WhatsApp Meta Business (63016 parked).
 
 ## Pendientes — Bugs UI
 
@@ -102,7 +102,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..58: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, simuladores, sync-squads, RLS (51,58), HF Pack v3 (52-57).
+ERR-01..66: detalle en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), iOS modal scroll (65-66).
 
 ### Otros ficheros de contexto
 
