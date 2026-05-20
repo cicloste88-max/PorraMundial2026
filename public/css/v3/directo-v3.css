@@ -1,0 +1,521 @@
+/* ============================================================
+   DIRECTO v3 — Reskin sobre directo-v2.css
+   ────────────────────────────────────────────────────────────
+   Adapta la Vista Directo al lenguaje visual v3 (mundial-2026 +
+   eliminatorias-2026 prototipos): Saira display, ink-* scale,
+   fifa-red para EN VIVO, fifa-gold para próximos/aciertos.
+
+   IMPORTANTE: NO toca el JS. renderVistaDirecto() y
+   _buildDExpanded() en ui-directo.js siguen emitiendo HTML
+   con clases .dv2-*. Este CSS solo re-skin visual.
+
+   Integración:
+     1. Copiar este archivo a:
+        PorraMundial2026/public/css/v3/directo-v3.css
+     2. En index.html, AFTER de directo-v2.css:
+        <link rel="stylesheet" href="/css/v3/directo-v3.css">
+     3. Verificar build: npm run build && grep -l "dv2-mini" dist/css/*.css
+   ============================================================ */
+
+/* ── Wrapper móvil (cinch al ancho del .phone v3) ─────────── */
+/* Producción NO inserta .container dentro de #page-directo — el wrapper
+   se aplica directamente a la página. Mantengo ambos selectores para que
+   el mockup standalone (con .container) también funcione. */
+#page-directo,
+#page-directo > .container {
+  max-width: 420px;
+  padding: 0 12px 80px;
+  margin: 0 auto;
+}
+
+/* Botones "flag" (Pizarra Táctica) — la prod emite <button class="dv2-…-flag-btn">.
+   Reset visual para que el botón herede el círculo de la bandera. */
+.dv2-mini-flag.dv2-mini-flag-btn,
+.dv2-exp-flag.dv2-exp-flag-btn {
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.dv2-mini-flag.dv2-mini-flag-btn:focus-visible,
+.dv2-exp-flag.dv2-exp-flag-btn:focus-visible {
+  outline: 2px solid var(--fifa-gold);
+  outline-offset: 2px;
+}
+
+/* ── Section labels ───────────────────────────────────────── */
+.dv2-section-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--ink-500);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  padding: 14px 4px 8px;
+}
+
+/* ── Lista mini ───────────────────────────────────────────── */
+.dv2-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* ── Card mini (modo lista compacta) ──────────────────────── */
+.dv2-mini {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .12s;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.02),
+    0 2px 8px rgba(0,0,0,.35);
+}
+.dv2-mini:hover  { border-color: var(--ink-600); }
+.dv2-mini:active { transform: scale(.99); }
+
+/* Estado: EN VIVO — borde rojo FIFA + glow rojo pulsante */
+.dv2-mini.is-live {
+  border-color: var(--fifa-red);
+  background: linear-gradient(180deg, rgba(227,6,19,.07) 0%, var(--ink-800) 35%, var(--ink-900) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(227,6,19,.2),
+    0 0 22px rgba(227,6,19,.25),
+    0 4px 12px rgba(0,0,0,.5);
+  animation: dv3LivePulse 2.4s ease-in-out infinite;
+}
+@keyframes dv3LivePulse {
+  0%,100% { box-shadow: inset 0 0 0 1px rgba(227,6,19,.2), 0 0 22px rgba(227,6,19,.20), 0 4px 12px rgba(0,0,0,.5); }
+  50%     { box-shadow: inset 0 0 0 1px rgba(227,6,19,.3), 0 0 30px rgba(227,6,19,.35), 0 4px 12px rgba(0,0,0,.5); }
+}
+
+/* Estado: FINAL — atenuado */
+.dv2-mini.is-final {
+  opacity: .65;
+  background: var(--ink-900);
+}
+.dv2-mini.is-final .dv2-mini-score-num { color: var(--ink-300); }
+
+/* Equipo (bandera + código) */
+.dv2-mini-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dv2-mini-team.right { justify-content: flex-end; }
+
+.dv2-mini-flag {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  border: 1.5px solid var(--ink-600);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+.dv2-mini.is-live .dv2-mini-flag {
+  border-color: rgba(227,6,19,.6);
+}
+.dv2-mini-flag img {
+  width: 130%; height: 130%;
+  object-fit: cover;
+  display: block;
+  position: relative;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.dv2-mini-code {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-200);
+  letter-spacing: .08em;
+}
+
+/* Marcador mini */
+.dv2-mini-score {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--ink-100);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.dv2-mini-score-sep {
+  color: var(--ink-500);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Bloque derecha (status / hora / live dot) */
+.dv2-mini-right {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-align: right;
+  flex-shrink: 0;
+}
+.dv2-mini-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fifa-red);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.dv2-mini-live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--fifa-red);
+  box-shadow: 0 0 8px rgba(227,6,19,.7);
+  animation: dv3LiveDot 1s ease-in-out infinite;
+}
+@keyframes dv3LiveDot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%     { opacity: .4; transform: scale(.7); }
+}
+
+.dv2-mini-status {
+  color: var(--ink-400);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.dv2-mini-status.final {
+  color: var(--ink-500);
+}
+
+/* ── Card expandida (partido principal) ───────────────────── */
+.dv2-expanded-wrap { margin-bottom: 14px; }
+
+.dv2-exp {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1.5px solid var(--ink-700);
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.03),
+    0 8px 22px rgba(0,0,0,.5);
+  position: relative;
+  overflow: hidden;
+}
+/* Halo sutil decorativo */
+.dv2-exp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(201,169,97,.06), transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Header (LIVE / FINAL / PRÓXIMO) ──────────────────────── */
+.dv2-exp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+.dv2-exp-header.live {
+  color: var(--fifa-red);
+  text-shadow: 0 0 8px rgba(227,6,19,.35);
+}
+.dv2-exp-header.final {
+  color: var(--ink-400);
+}
+.dv2-exp-header.upcoming {
+  color: var(--fifa-gold);
+}
+.dv2-exp-live-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--fifa-red);
+  box-shadow: 0 0 10px rgba(227,6,19,.75);
+  animation: dv3LiveDot 1s ease-in-out infinite;
+}
+.dv2-exp-live-min {
+  color: var(--ink-400);
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+/* ── Meta (grupo + estadio) ───────────────────────────────── */
+.dv2-exp-meta {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--ink-500);
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  margin: 6px 0 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Mid: bandera · score · bandera ───────────────────────── */
+.dv2-exp-mid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 8px;
+  position: relative;
+  z-index: 1;
+}
+.dv2-exp-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dv2-exp-flag {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  border: 2px solid var(--ink-600);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+}
+.dv2-exp-flag img {
+  width: 130%; height: 130%;
+  object-fit: cover;
+  display: block;
+  position: relative;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.dv2-exp-team-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  text-align: center;
+  max-width: 110px;
+  line-height: 1.15;
+}
+
+.dv2-exp-score {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--ink-100);
+  letter-spacing: -.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+.dv2-exp-score-sep {
+  color: var(--ink-600);
+  font-weight: 700;
+  font-size: 32px;
+}
+
+.dv2-exp-period {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  text-align: center;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ink-700);
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Goleadores ───────────────────────────────────────────── */
+.dv2-exp-scorers {
+  margin-top: 12px;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--ink-700);
+  position: relative;
+  z-index: 1;
+}
+.dv2-exp-scorers-title {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-400);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.dv2-exp-scorers-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.dv2-exp-scorers-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dv2-exp-scorers-col.right { text-align: right; align-items: flex-end; }
+
+.dv2-exp-ev {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-200);
+  background: rgba(0,0,0,.3);
+  border: 1px solid var(--ink-700);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-weight: 600;
+}
+.dv2-exp-ev.red-card {
+  color: #f87171;
+  background: rgba(248,113,113,.08);
+  border-color: rgba(248,113,113,.3);
+}
+.dv2-exp-ev-icon { font-size: 12px; line-height: 1; }
+.dv2-exp-ev-min {
+  color: var(--ink-400);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  min-width: 26px;
+}
+.dv2-exp-ev-player {
+  font-weight: 700;
+  color: var(--ink-100);
+}
+.dv2-exp-ev-extra {
+  font-size: 9px;
+  color: var(--ink-500);
+}
+.dv2-exp-ev-empty {
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-600);
+  font-style: italic;
+}
+
+/* ── Predicción del usuario ───────────────────────────────── */
+.dv2-exp-pred {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ink-700);
+  border-radius: 12px;
+  background: rgba(0,0,0,.3);
+  position: relative;
+  z-index: 1;
+}
+.dv2-exp-pred-title {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-400);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.dv2-exp-pred-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dv2-exp-pred-score {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--ink-100);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.dv2-exp-pred-gol {
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-300);
+}
+.dv2-exp-pred-status {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-400);
+}
+.dv2-exp-pred-status.win {
+  color: #4ade80;
+  background: rgba(0,131,74,.15);
+  border-color: rgba(0,131,74,.4);
+}
+.dv2-exp-pred-status.zero {
+  color: var(--ink-500);
+}
+
+/* ── Botón colapsar ───────────────────────────────────────── */
+.dv2-exp-collapse {
+  margin: 14px auto 2px;
+  padding: 6px 14px;
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-300);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  border-radius: 999px;
+  cursor: pointer;
+  display: block;
+  text-transform: uppercase;
+  transition: all .15s;
+  position: relative;
+  z-index: 1;
+}
+.dv2-exp-collapse:hover {
+  border-color: var(--fifa-gold);
+  color: var(--fifa-gold);
+  background: rgba(201,169,97,.08);
+}
+
+/* ── Responsive (móvil pequeño) ───────────────────────────── */
+@media (max-width: 380px) {
+  .dv2-exp-score { font-size: 36px; }
+  .dv2-exp-score-sep { font-size: 26px; }
+  .dv2-exp-flag { width: 42px; height: 42px; }
+  .dv2-exp-team-name { font-size: 10px; max-width: 90px; }
+  .dv2-mini { padding: 9px 10px; }
+  .dv2-mini-score { font-size: 16px; }
+  .dv2-mini-flag { width: 26px; height: 26px; }
+}

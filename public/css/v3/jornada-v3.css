@@ -1,0 +1,359 @@
+/* ============================================================
+   JORNADA v3 — Reskin sobre jornada-v2.css
+   ────────────────────────────────────────────────────────────
+   Adapta la Vista Jornada al lenguaje visual v3 (mundial-2026 +
+   eliminatorias-2026 prototipos): Saira display, ink-* scale,
+   fifa-gold accent, cards con gradient sutil + glow boost.
+
+   IMPORTANTE: NO toca el JS. La función renderVistaJornada() y
+   _buildJCard() en ui-groups.js siguen emitiendo HTML con clases
+   .jv2-*. Este CSS solo re-skin visual.
+
+   La funcionalidad BOOST (pastilla activa por jornada, ticker,
+   1 partido por día) queda 100% operativa — solo cambia el look.
+
+   Integración:
+     1. Copiar este archivo a:
+        PorraMundial2026/public/css/v3/jornada-v3.css
+     2. En index.html, dentro del <head>, AFTER de jornada-v2.css:
+        <link rel="stylesheet" href="/css/v3/jornada-v3.css">
+     3. Verificar build: npm run build && grep -l "jv2-card" dist/css/*.css
+   ============================================================ */
+
+/* ── Wrapper móvil (cinch al ancho del .phone v3) ─────────── */
+/* Producción NO inserta .container dentro de #page-jornada — el wrapper
+   se aplica directamente a la página. Mantengo ambos selectores para que
+   el mockup standalone (con .container) también funcione. */
+#page-jornada,
+#page-jornada > .container {
+  max-width: 420px;
+  padding: 0 12px 80px;
+  margin: 0 auto;
+}
+
+/* ── Section: jornada wrapper ─────────────────────────────── */
+.jv2-section {
+  margin-bottom: 24px;
+}
+
+/* ── Header de jornada (rediseño v3) ──────────────────────── */
+.jv2-jornada-header {
+  background: linear-gradient(135deg, rgba(201,169,97,.08) 0%, rgba(40,81,225,.06) 100%);
+  border: 1px solid rgba(201,169,97,.25);
+  border-radius: 12px;
+  padding: 12px 14px 10px;
+  margin-bottom: 14px;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.jv2-jornada-header::before {
+  content: '';
+  position: absolute;
+  top: -40%; right: -10%;
+  width: 50%; height: 180%;
+  background: radial-gradient(circle, rgba(201,169,97,.12), transparent 65%);
+  pointer-events: none;
+}
+
+.jv2-nav-arrow {
+  width: 30px; height: 30px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-300);
+  font-family: var(--font-display);
+  flex: 0 0 30px;
+  position: relative;
+  z-index: 1;
+}
+.jv2-nav-arrow:not([disabled]):hover {
+  color: var(--fifa-gold);
+  border-color: var(--fifa-gold);
+  background: rgba(201,169,97,.1);
+}
+
+.jv2-jornada-title { position: relative; z-index: 1; }
+.jv2-jornada-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .22em;
+  color: var(--fifa-gold);
+  line-height: 1.2;
+  text-shadow: 0 1px 6px rgba(201,169,97,.3);
+}
+.jv2-jornada-date {
+  font-family: var(--font-text);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-400);
+  margin-top: 4px;
+  letter-spacing: .04em;
+}
+
+/* ── Bloque "Resultados · subtítulo" ──────────────────────── */
+.jv2-results-block {
+  padding: 0 4px 12px;
+}
+.jv2-results-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink-100);
+  letter-spacing: -.02em;
+}
+.jv2-results-sub {
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--ink-400);
+  margin-top: 3px;
+}
+
+/* ── Section labels (FINALIZADOS / POR JUGAR) ─────────────── */
+.jv2-section-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--ink-500);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  padding: 12px 4px 6px;
+}
+
+/* ── Card v3 ──────────────────────────────────────────────── */
+.jv2-card {
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  margin-bottom: 10px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.02),
+    0 4px 12px rgba(0,0,0,.4);
+  transition: border-color .15s, box-shadow .15s, transform .12s;
+}
+.jv2-card:hover  { border-color: var(--ink-600); }
+.jv2-card:active { transform: scale(.99); }
+
+/* Card finalizada (producción añade .is-finished tras kickoff) */
+.jv2-card.is-finished {
+  opacity: .85;
+}
+.jv2-card.is-finished .jv2-card-when {
+  color: var(--ink-500);
+}
+
+/* Boost activo — borde dorado + glow (mantiene 100% la fn boost) */
+.jv2-card.is-boost {
+  border-color: var(--fifa-gold);
+  background: linear-gradient(180deg, rgba(201,169,97,.07) 0%, var(--ink-800) 35%, var(--ink-900) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(201,169,97,.18),
+    0 0 22px rgba(201,169,97,.25),
+    0 6px 18px rgba(0,0,0,.55);
+}
+.jv2-card.is-boost::before {
+  content: '🔥 BOOST';
+  position: absolute;
+  top: -8px; right: 14px;
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(201,169,97,.5);
+}
+.jv2-card { position: relative; }
+
+/* Top: stadium + día/hora */
+.jv2-card-top {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  color: var(--ink-400);
+}
+.jv2-card-stadium { color: var(--ink-500); }
+.jv2-card-when {
+  color: var(--fifa-gold);
+  font-weight: 700;
+}
+
+/* Mid: bandera · score · bandera */
+.jv2-card-mid {
+  padding: 8px 4px;
+  gap: 12px;
+}
+.jv2-flag {
+  width: 40px; height: 40px;
+  background: var(--ink-700);
+  border: 1.5px solid var(--ink-600);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.jv2-card.is-boost .jv2-flag {
+  border-color: rgba(201,169,97,.55);
+}
+.jv2-team-code {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-200);
+  letter-spacing: .08em;
+}
+
+.jv2-score {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ink-100);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.jv2-score-sep {
+  color: var(--ink-500);
+  font-weight: 700;
+}
+
+/* ── Chips de acierto (1X2 / Exacto / Goleador / vs IA) ───── */
+.jv2-chips {
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--ink-700);
+  gap: 5px;
+}
+.jv2-chip {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.3);
+  border: 1px solid var(--ink-700);
+  color: var(--ink-300);
+  text-transform: uppercase;
+}
+/* Producción emite .jv2-chip--ok / --ko / --gold (BEM).
+   El mockup standalone usa .is-ok / .is-miss / .is-gold.
+   Ambos válidos. */
+.jv2-chip.is-ok,
+.jv2-chip.jv2-chip--ok {
+  background: rgba(0,131,74,.15);
+  border-color: rgba(0,131,74,.4);
+  color: #4ade80;
+}
+.jv2-chip.is-miss,
+.jv2-chip.jv2-chip--ko {
+  background: rgba(227,6,19,.1);
+  border-color: rgba(227,6,19,.3);
+  color: #ef4444;
+  opacity: .65;
+}
+.jv2-chip.is-gold,
+.jv2-chip.jv2-chip--gold,
+.jv2-chip-pts {
+  background: var(--fifa-gold);
+  color: var(--ink-900);
+  border-color: var(--fifa-gold);
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(201,169,97,.4);
+}
+
+/* ── Boost row al pie de la card ──────────────────────────── */
+/* Compatibilidad doble:
+     · .jv2-boost-row   ← markup del mockup v3 standalone.
+     · .jv2-boost       ← markup que YA emite producción (ui-groups.js).
+   Ambos selectores reciben el mismo skin. */
+.jv2-boost-row,
+.jv2-boost {
+  margin-top: 8px;
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--ink-700);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: .04em;
+  color: var(--ink-300);
+}
+.jv2-boost-row label,
+.jv2-boost-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--ink-300);
+  transition: color .15s;
+}
+.jv2-boost-row label:hover,
+.jv2-boost:hover .jv2-boost-label { color: var(--fifa-gold); }
+.jv2-boost-row input[type="checkbox"],
+.jv2-boost-check {
+  accent-color: var(--fifa-gold);
+  width: 16px; height: 16px;
+  cursor: pointer;
+}
+.jv2-card.is-boost .jv2-boost-row,
+.jv2-card.is-boost .jv2-boost {
+  color: var(--fifa-gold);
+  font-weight: 700;
+}
+.jv2-boost-label.active {
+  color: var(--fifa-gold);
+  font-weight: 700;
+}
+
+/* Botón "🔍 Ver tarjeta" al pie de la card (producción emite .jv2-card-link) */
+.jv2-card-link {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  background: rgba(0,0,0,.3);
+  border: 1px solid var(--ink-700);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.jv2-card-link:hover {
+  color: var(--fifa-gold);
+  border-color: var(--fifa-gold);
+  background: rgba(201,169,97,.08);
+}
+
+/* ── Boost ticker superior (pastillas) — paleta v3 ───────── */
+#boost-ticker {
+  background: linear-gradient(135deg, rgba(201,169,97,.12) 0%, rgba(40,81,225,.08) 100%) !important;
+  border: 1px solid rgba(201,169,97,.30) !important;
+  border-radius: 12px !important;
+  margin-bottom: 12px !important;
+}
+#boost-ticker > span:first-child {
+  color: var(--fifa-gold) !important;
+  font-family: var(--font-display) !important;
+  letter-spacing: .14em !important;
+}
+
+/* ── Layout: jornada-wrap / sidebar stacked en móvil ─────── */
+@media (max-width: 900px) {
+  .jornada-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .jornada-sidebar { order: 2; }
+  .jornada-main    { order: 1; }
+}
+
+/* Cinta usuario móvil */
+#jornada-user-strip {
+  margin-bottom: 10px;
+}
