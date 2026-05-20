@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { scrapeCountry } from './lib/ff-scraper.mjs';
 import { fetchTmKader, enrichRosterWithTm } from './lib/tm-scraper.mjs';
+import { uploadPlayerPhoto } from './lib/storage-upload.mjs';
 import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
@@ -269,6 +270,36 @@ async function runEnrichTm(targets) {
       });
       const players = row.jugadores.map((p) => ({ ...p }));
       const { enriched } = enrichRosterWithTm(players, tmPlayers);
+
+      // Upload de foto TM CDN → Supabase Storage. enrichRosterWithTm dejó la URL
+      // de TM en `foto_url_tm` (temporal). Aquí la subimos al bucket
+      // player-photos/{iso3}/{tm_player_id}.jpg y reemplazamos `foto_url`
+      // con la URL pública. Idempotente: skip si ya existe en bucket.
+      if (!DRY_RUN) {
+        for (const player of players) {
+          if (player.foto_url_tm && player.tm_player_id && !player.foto_url) {
+            try {
+              player.foto_url = await uploadPlayerPhoto(
+                iso3,
+                player.tm_player_id,
+                player.foto_url_tm
+              );
+            } catch (e) {
+              if (VERBOSE) {
+                console.warn(
+                  `  foto upload ${player.nombre} (${player.tm_player_id}): ${e.message}`
+                );
+              }
+            }
+            await sleep(200);
+          }
+          delete player.foto_url_tm;
+        }
+      } else {
+        // Dry-run: limpiar el campo temporal pero no subir
+        for (const player of players) delete player.foto_url_tm;
+      }
+
       const fuente =
         row.jugadores_fuente && row.jugadores_fuente.includes('tm')
           ? row.jugadores_fuente
