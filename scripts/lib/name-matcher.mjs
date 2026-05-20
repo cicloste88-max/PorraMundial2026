@@ -1,25 +1,55 @@
 // Fuzzy matching de nombres: normalización + Levenshtein + scoring por apellido.
 // Usado para emparejar nombres del XI titular (futbolfantasy /equipos/<slug>) con la
 // lista completa scraped del cuerpo de la noticia, y también para enrich-tm.
+//
+// 20-may-2026 — normalize() canónica: strip diacríticos/apóstrofes/guiones (uni
+// + ascii) + tokens ordenados alfabéticamente. Hace la clave order-invariant
+// para que 'Son Heung-min' (DB, orden coreano) y 'Heung-min Son' (TM, orden
+// occidental) colisionen en la misma clave del Map de applyEnrich. Los guiones
+// se ELIMINAN (joiners), no se reemplazan por espacio: 'Kang-in' → 'kangin'
+// como token único. Esto evita la colisión 'Lee Kang-in' ↔ 'Kang Lee'.
+//
+// tokens()/lastToken() mantienen orden ORIGINAL — scorePair sigue usando "último
+// token = apellido" para evitar falsos positivos tipo 'João Félix' vs 'João
+// Cancelo'. La sort es solo en normalize() (la salida del hash).
 
-export function normalize(s) {
-  if (!s) return '';
+// Hyphens (ascii + unicode): ELIMINADOS para tratar compuestos como un token único.
+const HYPHENS_RE = /[-‐‑‒–—―−]/g;
+// Apostrofes (ascii + unicode + acentos sueltos): ELIMINADOS.
+const APOSTROPHES_RE = /['‘’ʼ`´]/g;
+// Combining diacritical marks (NFD).
+const DIACRITICS_RE = /[̀-ͯ]/g;
+
+function rawTokens(s) {
+  if (!s) return [];
   return String(s)
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(DIACRITICS_RE, '')
     .toLowerCase()
-    .replace(/['‘’`´]/g, '')
+    .replace(APOSTROPHES_RE, '')
+    .replace(HYPHENS_RE, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .split(' ')
+    .filter(Boolean);
 }
 
+// Salida canónica: tokens ordenados alfabéticamente, joined con espacio.
+// Order-invariant: 'Son Heung-min' y 'Heung-min Son' producen 'heungmin son'.
+export function normalize(s) {
+  const toks = rawTokens(s);
+  if (toks.length === 0) return '';
+  return [...toks].sort().join(' ');
+}
+
+// Tokens en orden ORIGINAL — preserva semántica "último token = apellido".
 export function tokens(name) {
-  return normalize(name).split(' ').filter(Boolean);
+  return rawTokens(name);
 }
 
 export function lastToken(name) {
-  const t = tokens(name);
+  const t = rawTokens(name);
   return t.length ? t[t.length - 1] : '';
 }
 
@@ -42,9 +72,11 @@ function levenshtein(a, b) {
 }
 
 // Score 0..100 (mayor = mejor match). Considera:
-//  - igualdad exacta normalizada → 100
-//  - último apellido coincide → 80 + bonus si más tokens encajan
-//  - cualquier token contiene/contenido → 60 + Levenshtein adjust
+//  - igualdad normalizada (canónica, order-invariant) → 100
+//  - último apellido coincide (orden original) → 80 + bonus por overlap
+//  - subset 1-token (un nombre es un único token presente en el otro) → 75
+//  - token-set parcial (≥2 tokens significativos solapan) → 78-92
+//  - Levenshtein del último apellido (typos) → 60-80
 function scorePair(a, b) {
   const na = normalize(a);
   const nb = normalize(b);
@@ -65,7 +97,27 @@ function scorePair(a, b) {
   if (ta.length === 1 && tb.includes(ta[0])) return 75;
   if (tb.length === 1 && ta.includes(tb[0])) return 75;
 
-  // Sustring fuzzy: Levenshtein del último apellido
+  // Token-set fallback: cubre nombres de 2+ tokens donde el "último token"
+  // diverge pero hay solape significativo en otras posiciones (ej. nombres
+  // con orden mixto que no son swap exacto, segundo apellido extra, etc.).
+  // Requiere ≥2 tokens en intersección para evitar emparejar 'Lee Kang-in'
+  // con 'Kang Lee' (overlap=1 'lee' tras strip-hyphen no basta).
+  if (ta.length >= 2 && tb.length >= 2) {
+    const setA = new Set(ta);
+    const setB = new Set(tb);
+    let overlap = 0;
+    for (const t of setA) if (setB.has(t)) overlap++;
+    if (overlap >= 2) {
+      const maxSize = Math.max(setA.size, setB.size);
+      const minSize = Math.min(setA.size, setB.size);
+      if (overlap === maxSize) return 92; // todos los tokens del mayor matchean
+      if (overlap === minSize) return 85; // el menor es subset estricto del mayor
+      // Parcial 2-de-3 según spec: 'A B C' vs 'A B D' → overlap=2, max=min=3.
+      if (overlap * 3 >= maxSize * 2) return 78;
+    }
+  }
+
+  // Sustring fuzzy: Levenshtein del último apellido (con orden original).
   if (la && lb) {
     const dist = levenshtein(la, lb);
     const maxLen = Math.max(la.length, lb.length);
