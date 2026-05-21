@@ -35,6 +35,11 @@ export function htmlToLines(html) {
   s = s.replace(/<[^>]+>/g, ' ');
   // Decode entidades HTML
   s = decode(s);
+  // Strip zero-width / invisible chars que sobreviven a NFD + trim y rompen
+  // lookups en country-map (visto en Marca 21-may con "​Nueva Zelanda" U+200B
+  // antes del nombre — currentIso3 se quedaba en IRN y absorbía el roster NZL).
+  // Cubre: ZWSP, ZWNJ, ZWJ, WJ (word joiner), BOM/ZWNBSP, narrow no-break.
+  s = s.replace(/[​-‍⁠﻿]/g, '');
   // Normalize whitespace por línea
   return s
     .split('\n')

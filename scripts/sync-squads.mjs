@@ -431,8 +431,13 @@ async function runDetect(targetsArg) {
       // upsertSquad hace mergeJugadores internamente — preserva enrichment
       // (tm_player_id, foto_url, edad, valor_eur, dorsal, dob, posicion_tm)
       // por nombre normalizado. No hace falta pre-merge aquí.
+      // Bug A fix: solo confidence='high' marca jugadores_is_final=true.
+      // 'low' (1 sola fuente, o 2 sin Jaccard ≥ 0.7, o calendario "(definitiva)"
+      // pendiente) guarda el roster como referencia pero NO marca FINAL.
+      // Sin este gate, una sola fuente con bug editorial (e.g. Marca IRN con
+      // roster NZL, 21-may) escribía a producción como FINAL.
       const up = await upsertSquad(iso3, v.players, {
-        isFinal: true,
+        isFinal: v.confidence === 'high',
         fuente: existing?.jugadores_fuente?.includes('tm') ? `${fuente}+tm` : fuente,
         dryRun: DRY_RUN,
         force: FORCE,
@@ -450,6 +455,9 @@ async function runDetect(targetsArg) {
     console.log('\n  Paso 2 — enrich XI titular vía FF (solo FINAL recién escritas)\n');
     for (const r of results) {
       if (!['updated', 'no-op'].includes(r.status)) continue;
+      // Solo enriquecer XI sobre FINAL real (confidence='high'). Si 'low' pasó
+      // por upsert con isFinal=false, no re-promocionarla aquí.
+      if (r.confidence !== 'high') continue;
       const slug = ISO3_TO_SLUG[r.iso3];
       if (!slug) continue;
       try {
