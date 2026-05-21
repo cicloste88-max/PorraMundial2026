@@ -36,10 +36,10 @@ const FINAL_CLASSIFICATION_PTS = {
 
 // ── Puntos por partido (grupos y KO) ──────────────────────
 // +1 signo correcto (1·X·2)
-// +3 marcador exacto (incluye el signo, no acumula con +1)
+// +3 marcador exacto (APILA sobre el +1 del signo)
 // +2 goleador correcto
 // +1 bonus vs IA (tu signo difiere de la IA y aciertas)  ← Fase F.4
-// Máximo: 7 pts por partido (antes del boost ×2).
+// Máximo: 1+3+2+1 = 7 pts por partido (antes del boost ×2).
 //
 // Casos F.4 (ver iaBonusWillApply en data.js para la predicate):
 //   A) user 2-0 (signo 1), ia=1, real 1-0 (signo 1) → 1 signo + 0 bonus = 1
@@ -54,13 +54,14 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
 
   const isExact = pred.l === realL && pred.v === realR;
 
-  // Signo y exacto
-  if(isExact) {
-    pts += 3; // exacto (ya incluye el punto de signo)
-  } else if(pred.l !== null && pred.v !== null &&
-            Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
-    pts += 1; // solo signo
+  // Signo: +1 si el sentido del marcador es correcto
+  if(pred.l !== null && pred.v !== null &&
+     Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
+    pts += 1;
   }
+
+  // Exacto: +3 ADICIONALES si además el marcador es exacto
+  if(isExact) pts += 3;
 
   // F2.9 HF-09 — Goleador: +2 si pred.gol acierta a CUALQUIER goleador real
   // del partido. Independiente del marcador (incluido 0-0 si se registra

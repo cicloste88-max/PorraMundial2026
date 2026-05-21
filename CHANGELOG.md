@@ -2,6 +2,19 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [21-may-2026] fix/scoring-exacto-apila-sobre-signo
+
+**⚠️ CAMBIO DE COMPORTAMIENTO** (no regresión, no bug fix puro):
+
+- `scoring.js` L58-63: `else if` → 2 `if` separados. Acertar el exacto ahora apila el +1 del signo (regla canónica confirmada por San 21-may).
+- Pts máximo por partido: ANTES 6 efectivo (cap `Math.min(pts, 7)` nunca disparaba). AHORA 7 efectivo (1+3+2+1).
+- Boost ×2 sin cambio en lógica pero techo sube de 12 a 14 (7×2).
+- Comentario L39 corregido (ya no dice "no acumula").
+- `docs/scoring-engine.md` tabla actualizada ("apila sobre el +1 del signo").
+- Predicciones ya guardadas en BD que tengan exacto + (goleador o IA bonus) reciben +1 pt más automáticamente en próxima carga (cálculo no cacheado en BD).
+- Smoke tests añadidos en `tests/scoring.test.mjs` — 4 casos canónicos (solo signo, exacto solo, exacto+goleador, exacto+goleador+IA). Slice de las primeras 104 líneas de `scoring.js` para aislar `calcMatchPoints` del código browser-específico.
+- Registrado como ERR-67.
+
 ## 2026-05-20 — Sprint Pre-Launch + Hotfixes iOS scroll (PR #75 + #77 + #78)
 
 Tres PRs en cascada mergeados hoy. **main HEAD `0e49612`**.

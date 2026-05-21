@@ -922,3 +922,30 @@ cualquier max-height sobre dvh contra el inventario de elementos fixed.
 
 **Validación:** PR #78 (squash `0e49612`). QA iPhone Safari real con
 screenshot aprobado por San.
+
+
+## ERR-67 — `calcMatchPoints` `else if` impedía apilar +1 signo sobre +3 exacto
+
+**Síntoma:** predicciones con exacto + (goleador o bonus IA) devolvían 1 pt
+menos del esperado. Máximo efectivo por partido era 6 (3+2+1), no 7. El cap
+`Math.min(pts, 7)` en L79 nunca se disparaba — pista de que la lógica
+upstream estaba mal o el cap era vestigial.
+
+**Causa:** `scoring.js` L58-63 usaba `if(isExact){...} else if(<signo>){...}`.
+El `else if` cortocircuitaba el branch del signo cuando ya habías entrado al
+del exacto. Resultado: exacto daba SOLO +3, no +1+3=+4. Comentario L39
+("incluye el signo, no acumula con +1") describía esta ramificación pero
+contradice L42 ("Máximo: 7 pts") y la regla canónica.
+
+**Fix:** rama `fix/scoring-exacto-apila-sobre-signo` — `else if` partido en
+dos `if` independientes: signo siempre evalúa primero, exacto suma +3
+ADICIONALES si además acierta. Comentario L39 corregido, `docs/scoring-engine.md`
+tabla actualizada. Smoke tests en `tests/scoring.test.mjs` cubren los 4 casos
+canónicos. Detectado por Claude.ai auditando código para implementar chips de
+aciertos en card expandida del Directo (item 6 del feedback PR#88), 21-may-2026.
+
+**Patrón:** cuando un cap (`Math.min(pts, 7)`) parece nunca dispararse con
+la lógica que tienes upstream, sospecha que la lógica está mal o el cap es
+vestigial. Comentarios contradictorios sobre la misma regla (L39 "no acumula"
+vs L42 "Máximo 7") son síntoma clásico — la suma simple de los componentes
+debe igualar el techo declarado, si no, una de las dos afirmaciones miente.
