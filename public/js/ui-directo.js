@@ -327,6 +327,16 @@
   // ─────────────────────────────────────────────────────────────
   // _buildDExpanded — card grande con todos los detalles del partido.
   // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // _buildDExpanded — v3 con kit hero (port legacy ko-card)
+  // Cambios sobre v1:
+  //   · Hero kit camiseta (.dv2-exp-kits con 2 halves) reemplaza .dv2-exp-mid
+  //   · header + score + period flotan dentro como .dv2-exp-center
+  //   · .dv2-exp recibe modificador .dv2-exp--kits
+  //   · meta + scorers + pred + collapse SIN cambios
+  // Compat: id="dcard-N", data-match-key, data-match-idx, .dv2-exp-flag-btn,
+  //         data-iso2, data-collapse → todo preservado, wiring intacto
+  // ─────────────────────────────────────────────────────────────
   function _buildDExpanded(m, idx) {
     const ctx = _getMatchCtx(m);
     const hTeam = EQUIPOS.find(e => e.name === m.home);
@@ -334,13 +344,23 @@
     const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
     const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
 
+    // ⭐ NUEVO: kit URLs (mismo helper que usa ko.js / ui-nav.js).
+    // Si por alguna razón kitUrl no está disponible (carga parcial),
+    // fallback a path directo. Ambas rutas resuelven el mismo destino.
+    const hKit = hTeam
+      ? (typeof kitUrl === 'function' ? kitUrl(hTeam.slug, 'home') : SB + '/kits/' + hTeam.slug + '/home.jpg')
+      : '';
+    const aKit = aTeam
+      ? (typeof kitUrl === 'function' ? kitUrl(aTeam.slug, 'away') : SB + '/kits/' + aTeam.slug + '/away.jpg')
+      : '';
+
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
     const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
     const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const dayShort = new Date(m.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-    // Header: badge de estado
+    // ── Header: badge de estado (igual que v1) ──
     let headerHtml;
     if (ctx.isLive) {
       headerHtml = '<div class="dv2-exp-header live">' +
@@ -357,7 +377,7 @@
         '</div>';
     }
 
-    // Tiempo de juego (verde) si live
+    // Período (1T/2T/DESCANSO) si LIVE
     let periodHtml = '';
     if (ctx.isLive && ctx.minuteStr) {
       const period = ctx.status === 'halftime' ? 'DESCANSO'
@@ -365,7 +385,7 @@
       periodHtml = '<div class="dv2-exp-period">' + period + '</div>';
     }
 
-    // Goleadores: dos columnas (local | visitante).
+    // Goleadores (igual que v1)
     let scorersHtml = '';
     if (ctx.events && ctx.events.length > 0) {
       const homeEv = ctx.events.filter(e => e.team === m.home);
@@ -389,14 +409,13 @@
         '</div>';
     }
 
-    // Tu predicción
+    // Tu predicción (igual que v1)
     let predHtml = '';
     if (ctx.matchKey) {
       const pred = ctx.pred;
       const predScoreTxt = ctx.hasPred ? (pred.l + ':' + pred.v) : '—:—';
       const golLabel = pred.gol ? '⚽ ' + pred.gol : '—';
 
-      // Estado: VAS GANANDO / 0 PTS / pre-match (sin estado)
       let predStatusHtml = '';
       const live = _getLivePts(ctx, m);
       if (live && (ctx.isLive || ctx.isFinal)) {
@@ -418,26 +437,44 @@
         '</div>';
     }
 
+    // ⭐ NUEVO: helper para construir cada media-card (kit + vignette + flag pin + nombre)
+    const buildHalf = (side, kitUrl, flagUrl, isoCode, teamName) => {
+      const flagBtn = isoCode
+        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso2="' + isoCode + '" aria-label="Ver plantilla ' + (teamName || '') + '">' +
+            (flagUrl ? '<img src="' + flagUrl + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+          '</button>'
+        : '';
+      return '<div class="dv2-exp-half ' + side + '">' +
+        '<div class="dv2-exp-kit-color"></div>' +
+        '<div class="dv2-exp-kit-bg" style="background-image:url(\'' + kitUrl + '\')"></div>' +
+        '<div class="dv2-exp-kit-vign"></div>' +
+        '<div class="dv2-exp-half-name">' +
+          flagBtn +
+          '<div class="dv2-exp-team-name">' + teamName + '</div>' +
+        '</div>' +
+      '</div>';
+    };
+
     return (
-      '<div class="dv2-exp" id="dcard-' + idx + '" data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
-        headerHtml +
-        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
-        '<div class="dv2-exp-mid">' +
-          '<div class="dv2-exp-team">' +
-            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (hTeam ? hTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-            '<div class="dv2-exp-team-name">' + m.home + '</div>' +
-          '</div>' +
-          '<div class="dv2-exp-score">' +
-            '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
-            '<span class="dv2-exp-score-sep">:</span>' +
-            '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
-          '</div>' +
-          '<div class="dv2-exp-team">' +
-            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (aTeam ? aTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-            '<div class="dv2-exp-team-name">' + m.away + '</div>' +
+      '<div class="dv2-exp dv2-exp--kits" id="dcard-' + idx + '" data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
+
+        // ⭐ HERO con camisetas
+        '<div class="dv2-exp-kits">' +
+          buildHalf('left',  hKit, hFlag, hTeam ? hTeam.flag : '', m.home) +
+          buildHalf('right', aKit, aFlag, aTeam ? aTeam.flag : '', m.away) +
+          '<div class="dv2-exp-center">' +
+            headerHtml +
+            '<div class="dv2-exp-score">' +
+              '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
+              '<span class="dv2-exp-score-sep">:</span>' +
+              '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
+            '</div>' +
+            periodHtml +
           '</div>' +
         '</div>' +
-        periodHtml +
+
+        // Resto IGUAL que v1
+        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
         scorersHtml +
         predHtml +
         '<button class="dv2-exp-collapse" type="button" data-collapse="1" aria-label="Contraer tarjeta">▲ Contraer</button>' +
