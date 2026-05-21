@@ -9,7 +9,7 @@ El motor de puntuación calcula automáticamente la puntuación de cada particip
 | Criterio | Puntos |
 |----------|--------|
 | Signo correcto (1/X/2) | +1 |
-| Resultado exacto | +3 (no acumula con signo) |
+| Resultado exacto | +3 (apila sobre el +1 del signo) |
 | Goleador correcto | +2 |
 | Bonus vs IA (opuesto a IA y aciertas) | +1 |
 | **Máximo por partido** | **7** |
