@@ -304,7 +304,7 @@
     const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
 
     return (
-      '<button class="' + classes + '" type="button" id="dcard-' + idx + '" ' +
+      '<div class="' + classes + '" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<span class="dv2-mini-team">' +
           '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
@@ -320,7 +320,7 @@
           '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
         '</span>' +
         '<span class="dv2-mini-right">' + rightHtml + '</span>' +
-      '</button>'
+      '</div>'
     );
   }
 
@@ -718,12 +718,19 @@
     // Wire click handler delegado (asignación directa para no acumular listeners
     // en sucesivos render — sustituye el handler anterior si existía).
     container.onclick = _onDirectoClick;
+    container.onkeydown = _onDirectoClick;
   }
   window.renderVistaDirecto = renderVistaDirecto;
 
   // Click delegado: alterna expandido al pulsar mini-row;
   // pulsar Contraer (botón en la expanded) la cierra.
+  // También soporta keydown (Space/Enter) en las mini-rows (role=button).
   function _onDirectoClick(e) {
+    // Si viene de keydown, solo respondemos a Space/Enter
+    if (e.type === 'keydown') {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+    }
     const collapseBtn = e.target.closest('[data-collapse]');
     if (collapseBtn) {
       _expandedKey = null;
