@@ -444,13 +444,16 @@
             (flagUrl ? '<img src="' + flagUrl + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
           '</button>'
         : '';
+      // Auto-shrink del nombre según longitud (cubre los 48 nombres del Mundial 2026)
+      const nameLen = (teamName || '').length;
+      const nameFs = nameLen <= 7 ? 17 : nameLen <= 9 ? 15 : nameLen <= 11 ? 13 : nameLen <= 13 ? 11 : 9;
       return '<div class="dv2-exp-half ' + side + '">' +
         '<div class="dv2-exp-kit-color"></div>' +
         '<div class="dv2-exp-kit-bg" style="background-image:url(\'' + kitUrl + '\')"></div>' +
         '<div class="dv2-exp-kit-vign"></div>' +
         '<div class="dv2-exp-half-name">' +
           flagBtn +
-          '<div class="dv2-exp-team-name">' + teamName + '</div>' +
+          '<div class="dv2-exp-team-name" style="font-size:' + nameFs + 'px">' + teamName + '</div>' +
         '</div>' +
       '</div>';
     };
