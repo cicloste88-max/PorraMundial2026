@@ -37,8 +37,8 @@ import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
 import * as parserOlympics from './lib/parsers/olympics.mjs';
-import * as parserEurosport from './lib/parsers/eurosport.mjs';
 import * as parserMarca from './lib/parsers/marca.mjs';
+import * as parserESPN from './lib/parsers/espn.mjs';
 import { parseCalendar, pendingDefinitiveByDate } from './lib/parsers/calendar.mjs';
 import { crossValidate } from './lib/cross-validate.mjs';
 import { matchAgainstRoster } from './lib/name-matcher.mjs';
@@ -343,7 +343,7 @@ async function runEnrichTm(targets) {
 //     que la noticia detectada sea de Mundial — ver ERR-58).
 //  6. Tras el paso XI: dejar el enrich-tm para una pasada posterior (step 2 del
 //     workflow), no encadenarlo aquí para simplificar logs.
-const PRIMARY_PARSERS = [parserAS, parserSport, parserOlympics, parserEurosport, parserMarca];
+const PRIMARY_PARSERS = [parserAS, parserSport, parserOlympics, parserMarca, parserESPN];
 
 async function runDetect(targetsArg) {
   const enrichXi = argv['no-enrich-xi'] ? false : true;
