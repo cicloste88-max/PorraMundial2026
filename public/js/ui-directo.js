@@ -304,7 +304,7 @@
     const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
 
     return (
-      '<button class="' + classes + '" type="button" id="dcard-' + idx + '" ' +
+      '<div class="' + classes + '" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<span class="dv2-mini-team">' +
           '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
@@ -320,12 +320,22 @@
           '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
         '</span>' +
         '<span class="dv2-mini-right">' + rightHtml + '</span>' +
-      '</button>'
+      '</div>'
     );
   }
 
   // ─────────────────────────────────────────────────────────────
   // _buildDExpanded — card grande con todos los detalles del partido.
+  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // _buildDExpanded — v3 con kit hero (port legacy ko-card)
+  // Cambios sobre v1:
+  //   · Hero kit camiseta (.dv2-exp-kits con 2 halves) reemplaza .dv2-exp-mid
+  //   · header + score + period flotan dentro como .dv2-exp-center
+  //   · .dv2-exp recibe modificador .dv2-exp--kits
+  //   · meta + scorers + pred + collapse SIN cambios
+  // Compat: id="dcard-N", data-match-key, data-match-idx, .dv2-exp-flag-btn,
+  //         data-iso2, data-collapse → todo preservado, wiring intacto
   // ─────────────────────────────────────────────────────────────
   function _buildDExpanded(m, idx) {
     const ctx = _getMatchCtx(m);
@@ -334,13 +344,23 @@
     const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
     const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
 
+    // ⭐ NUEVO: kit URLs (mismo helper que usa ko.js / ui-nav.js).
+    // Si por alguna razón kitUrl no está disponible (carga parcial),
+    // fallback a path directo. Ambas rutas resuelven el mismo destino.
+    const hKit = hTeam
+      ? (typeof kitUrl === 'function' ? kitUrl(hTeam.slug, 'home') : SB + '/kits/' + hTeam.slug + '/home.jpg')
+      : '';
+    const aKit = aTeam
+      ? (typeof kitUrl === 'function' ? kitUrl(aTeam.slug, 'away') : SB + '/kits/' + aTeam.slug + '/away.jpg')
+      : '';
+
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
     const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
     const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const dayShort = new Date(m.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-    // Header: badge de estado
+    // ── Header: badge de estado (igual que v1) ──
     let headerHtml;
     if (ctx.isLive) {
       headerHtml = '<div class="dv2-exp-header live">' +
@@ -357,7 +377,7 @@
         '</div>';
     }
 
-    // Tiempo de juego (verde) si live
+    // Período (1T/2T/DESCANSO) si LIVE
     let periodHtml = '';
     if (ctx.isLive && ctx.minuteStr) {
       const period = ctx.status === 'halftime' ? 'DESCANSO'
@@ -365,7 +385,7 @@
       periodHtml = '<div class="dv2-exp-period">' + period + '</div>';
     }
 
-    // Goleadores: dos columnas (local | visitante).
+    // Goleadores (igual que v1)
     let scorersHtml = '';
     if (ctx.events && ctx.events.length > 0) {
       const homeEv = ctx.events.filter(e => e.team === m.home);
@@ -389,14 +409,13 @@
         '</div>';
     }
 
-    // Tu predicción
+    // Tu predicción (igual que v1)
     let predHtml = '';
     if (ctx.matchKey) {
       const pred = ctx.pred;
       const predScoreTxt = ctx.hasPred ? (pred.l + ':' + pred.v) : '—:—';
       const golLabel = pred.gol ? '⚽ ' + pred.gol : '—';
 
-      // Estado: VAS GANANDO / 0 PTS / pre-match (sin estado)
       let predStatusHtml = '';
       const live = _getLivePts(ctx, m);
       if (live && (ctx.isLive || ctx.isFinal)) {
@@ -418,26 +437,47 @@
         '</div>';
     }
 
+    // ⭐ NUEVO: helper para construir cada media-card (kit + vignette + flag pin + nombre)
+    const buildHalf = (side, kitUrl, flagUrl, isoCode, teamName) => {
+      const flagBtn = isoCode
+        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso2="' + isoCode + '" aria-label="Ver plantilla ' + (teamName || '') + '">' +
+            (flagUrl ? '<img src="' + flagUrl + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+          '</button>'
+        : '';
+      // Auto-shrink del nombre según longitud (cubre los 48 nombres del Mundial 2026)
+      const nameLen = (teamName || '').length;
+      const nameFs = nameLen <= 7 ? 17 : nameLen <= 9 ? 15 : nameLen <= 11 ? 13 : nameLen <= 13 ? 11 : 9;
+      return '<div class="dv2-exp-half ' + side + '">' +
+        '<div class="dv2-exp-kit-color"></div>' +
+        '<div class="dv2-exp-kit-bg" style="background-image:url(\'' + kitUrl + '\')"></div>' +
+        '<div class="dv2-exp-kit-vign"></div>' +
+        '<div class="dv2-exp-half-name">' +
+          flagBtn +
+          '<div class="dv2-exp-team-name" style="font-size:' + nameFs + 'px">' + teamName + '</div>' +
+        '</div>' +
+      '</div>';
+    };
+
     return (
-      '<div class="dv2-exp" id="dcard-' + idx + '" data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
-        headerHtml +
-        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
-        '<div class="dv2-exp-mid">' +
-          '<div class="dv2-exp-team">' +
-            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (hTeam ? hTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-            '<div class="dv2-exp-team-name">' + m.home + '</div>' +
-          '</div>' +
-          '<div class="dv2-exp-score">' +
-            '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
-            '<span class="dv2-exp-score-sep">:</span>' +
-            '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
-          '</div>' +
-          '<div class="dv2-exp-team">' +
-            '<button type="button" class="dv2-exp-flag dv2-exp-flag-btn" data-iso2="' + (aTeam ? aTeam.flag : '') + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-            '<div class="dv2-exp-team-name">' + m.away + '</div>' +
+      '<div class="dv2-exp dv2-exp--kits" id="dcard-' + idx + '" data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
+
+        // ⭐ HERO con camisetas
+        '<div class="dv2-exp-kits">' +
+          buildHalf('left',  hKit, hFlag, hTeam ? hTeam.flag : '', m.home) +
+          buildHalf('right', aKit, aFlag, aTeam ? aTeam.flag : '', m.away) +
+          '<div class="dv2-exp-center">' +
+            headerHtml +
+            '<div class="dv2-exp-score">' +
+              '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
+              '<span class="dv2-exp-score-sep">:</span>' +
+              '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
+            '</div>' +
+            periodHtml +
           '</div>' +
         '</div>' +
-        periodHtml +
+
+        // Resto IGUAL que v1
+        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
         scorersHtml +
         predHtml +
         '<button class="dv2-exp-collapse" type="button" data-collapse="1" aria-label="Contraer tarjeta">▲ Contraer</button>' +
@@ -681,12 +721,19 @@
     // Wire click handler delegado (asignación directa para no acumular listeners
     // en sucesivos render — sustituye el handler anterior si existía).
     container.onclick = _onDirectoClick;
+    container.onkeydown = _onDirectoClick;
   }
   window.renderVistaDirecto = renderVistaDirecto;
 
   // Click delegado: alterna expandido al pulsar mini-row;
   // pulsar Contraer (botón en la expanded) la cierra.
+  // También soporta keydown (Space/Enter) en las mini-rows (role=button).
   function _onDirectoClick(e) {
+    // Si viene de keydown, solo respondemos a Space/Enter
+    if (e.type === 'keydown') {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+    }
     const collapseBtn = e.target.closest('[data-collapse]');
     if (collapseBtn) {
       _expandedKey = null;
