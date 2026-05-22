@@ -1,5 +1,6 @@
 // scripts/lib/parsers/_util.mjs
-// Helpers compartidos por los parsers as.mjs / sport.mjs / olympics.mjs.
+// Helpers compartidos por los parsers as.mjs / sport.mjs / olympics.mjs /
+// marca.mjs / espn.mjs.
 //
 // Sigue el patrón de `calendar.mjs`: regex + stripTags + decode() de
 // html-entities. Sin cheerio (mantener bundle ligero).
@@ -9,8 +10,46 @@
 // desde allí. De momento duplicar es aceptable (zero dependency between
 // parsers y calendar).
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { decode } from 'html-entities';
 import countryMap from './country-map.json' with { type: 'json' };
+
+// ───────────────────────────────────────────────────────────────────────
+// Cache loader — Scrapling (Python) pre-fetcha el HTML al directorio
+// cache/sources/<source>.html. Los parsers leen de aquí en lugar de hacer
+// fetch() directo (bloqueado por Cloudflare/Akamai desde IPs de GH Actions
+// — ver ERR-XX en errores_conocidos_porra.md).
+// ───────────────────────────────────────────────────────────────────────
+
+const CACHE_DIR = 'cache/sources';
+const MIN_HTML_BYTES = 1000;
+
+/**
+ * Lee el HTML cacheado de una fuente. Path relativo a cwd (asume process.cwd()
+ * es el root del repo, igual que el resto del pipeline).
+ *
+ * @returns string HTML (>=1KB)
+ * @throws  Error si el cache no existe, está vacío, o es muy pequeño (sentinel
+ *          de fallo de fetch_sources.py). El caller (parser → runDetect en
+ *          sync-squads.mjs) lo cataloga como fuente fallida y sigue con las
+ *          demás vía Promise.allSettled.
+ */
+export function loadCachedHtml(sourceName) {
+  const cachePath = path.join(CACHE_DIR, `${sourceName}.html`);
+  if (!fs.existsSync(cachePath)) {
+    throw new Error(
+      `[${sourceName}] cache miss: ${cachePath} (ejecuta scripts/scraping/fetch_sources.py primero)`
+    );
+  }
+  const html = fs.readFileSync(cachePath, 'utf-8');
+  if (!html || html.length < MIN_HTML_BYTES) {
+    throw new Error(
+      `[${sourceName}] cache vacío o demasiado pequeño (${html.length} bytes < ${MIN_HTML_BYTES}); fetch_sources.py marcó esta fuente como fallida`
+    );
+  }
+  return html;
+}
 
 // ───────────────────────────────────────────────────────────────────────
 // Strip tags + insert newlines en cierres/aperturas de tags block-level
