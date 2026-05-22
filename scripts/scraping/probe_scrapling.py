@@ -1,26 +1,25 @@
 """
-Mini-probe v3: focused tests for AS n-3 direct + Eurosport geoblock validation.
+Mini-probe v4: ESPN Deportes as Eurosport replacement candidate.
 
-Goal: confirm whether
-1. AS n-3 (the final URL after 301) works with fetcher_plain or fetcher_impersonate
-   (avoiding the slow StealthyFetcher detour for the most blocked source)
-2. Eurosport returns real content or hits geoblocking with any Scrapling method
+Test the 3 standard methods + verify content markers indicate the real
+convocados page (not a paywall, geoblock, or empty placeholder).
 """
 import time
 import json
 from scrapling.fetchers import Fetcher, StealthyFetcher
 
-URL_AS_N3 = "https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-selecciones-y-todos-los-jugadores-que-estaran-en-la-copa-del-mundo-f202605-n-3/"
-URL_EUROSPORT = "https://www.eurosport.es/futbol/mundial/2026/convocatorias-selecciones-nacionales-todas-listas-jugadores-mundial-2026_sto23300837/story.shtml"
+URL_ESPN = "https://espndeportes.espn.com/futbol/mundial/nota/_/id/16715015/mundial-2026-convocatorias-de-selecciones-todas-las-listas-de-jugadores"
 
 CONTENT_MARKERS = [
     "deschamps", "ancelotti", "yakin", "barbarez", "nagelsmann",
     "francia", "alemania", "espa", "brasil", "argentina",
     "convocatoria", "convocados", "selecci", "mundial 2026",
+    "lista de convocados", "jugadores",
 ]
 GEOBLOCK_MARKERS = [
     "geoblocking", "geoblock", "not available in your region",
     "access denied", "no disponible en tu", "no disponible en su",
+    "this content is not available", "paywall",
 ]
 
 
@@ -102,11 +101,6 @@ def run_test(name, url, method):
                 url, headless=True, network_idle=True, timeout=45000,
                 solve_cloudflare=False, google_search=False,
             )
-        elif method == "stealthy_google":
-            page = StealthyFetcher.fetch(
-                url, headless=True, network_idle=True, timeout=45000,
-                solve_cloudflare=False, google_search=True,
-            )
         else:
             raise ValueError("unknown method: " + method)
         html = extract_html(page)
@@ -119,27 +113,23 @@ def run_test(name, url, method):
 
 def main():
     tests = [
-        ("as_n3_plain",          URL_AS_N3,     "plain"),
-        ("as_n3_impersonate",    URL_AS_N3,     "impersonate"),
-        ("as_n3_stealthy",       URL_AS_N3,     "stealthy"),
-        ("eurosport_plain",      URL_EUROSPORT, "plain"),
-        ("eurosport_impersonate",URL_EUROSPORT, "impersonate"),
-        ("eurosport_stealthy",   URL_EUROSPORT, "stealthy"),
-        ("eurosport_stealthy_google", URL_EUROSPORT, "stealthy_google"),
+        ("espn_plain",       URL_ESPN, "plain"),
+        ("espn_impersonate", URL_ESPN, "impersonate"),
+        ("espn_stealthy",    URL_ESPN, "stealthy"),
     ]
 
     results = []
-    print("\n=== Mini-probe v3 ===")
+    print("\n=== Mini-probe v4 - ESPN Deportes ===")
     for name, url, method in tests:
         r = run_test(name, url, method)
         results.append(r)
         v = verdict(r)
-        print("  " + r["test"].ljust(30) +
+        print("  " + r["test"].ljust(20) +
               " status=" + str(r.get("status", 0)).rjust(3) +
               " bytes=" + str(r.get("bytes", 0)).rjust(7) +
               " elapsed=" + str(r.get("elapsed_ms", 0)).rjust(5) + "ms verdict=" + v)
         if r.get("markers_found"):
-            print("    markers: " + ",".join(r["markers_found"][:6]))
+            print("    markers: " + ",".join(r["markers_found"][:8]))
         if r.get("geoblock_found"):
             print("    GEOBLOCK: " + ",".join(r["geoblock_found"]))
         if r.get("final_url") and r["final_url"] != url:
@@ -151,16 +141,9 @@ def main():
         json.dump(results, f, indent=2)
 
     print("\n=== Summary ===")
-    by_target = {"as_n3": [], "eurosport": []}
-    for r in results:
-        if r["test"].startswith("as_n3"):
-            by_target["as_n3"].append(r)
-        else:
-            by_target["eurosport"].append(r)
-    for tgt, runs in by_target.items():
-        oks = [r for r in runs if verdict(r) == "OK_REAL"]
-        winners = [(r["test"], r["bytes"], r["elapsed_ms"]) for r in oks]
-        print("  " + tgt.ljust(10) + " winners: " + str(winners or []))
+    oks = [r for r in results if verdict(r) == "OK_REAL"]
+    winners = [(r["test"], r["bytes"], r["elapsed_ms"]) for r in oks]
+    print("  espn winners: " + str(winners or "NONE"))
 
 
 if __name__ == "__main__":
