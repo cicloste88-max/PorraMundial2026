@@ -2,6 +2,57 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [22-may-2026] feat/scrapling-integration-opt-a — Scrapling pre-fetch en sync-squads
+
+**Sprint contexto**: detect step en `sync-squads.yml` falla en 4/5 fuentes
+primarias por HTTP 403 Cloudflare/Akamai desde IPs USA de GH Actions (TLS
+fingerprint pobre de `node fetch()`). 6 runs cron consecutivos confirman el
+patrón. Eurosport además bloqueada por geoblock 307 server-side, irresoluble.
+
+**Solución**: Python/Scrapling como step previo. Métodos por fuente validados
+en 4 probes (`26279588881`, `26281337027`, `26293035353`, `26293757651`):
+
+| Fuente | Método Scrapling | Status | Latencia |
+|---|---|---|---|
+| Sport | `Fetcher.get(impersonate=chrome)` | 200 OK | 24-177ms |
+| Olympics | idem | 200 OK | 700-2000ms |
+| Marca | idem | 200 OK | 40-170ms |
+| AS | `StealthyFetcher.fetch(solve_cloudflare=False)` | 200 OK | 3.6s |
+| ESPN | idem | 200 OK | 6.8s |
+| ~~Eurosport~~ | descartada | 307 → /geoblocking.shtml | - |
+
+**Cambios**:
+- `scripts/scraping/fetch_sources.py` — pre-fetcha las 5 URLs, escribe
+  `cache/sources/<source>.html`. Sentinel empty file en fallo. exit 2 si
+  alguna falla (continue-on-error en YAML).
+- `scripts/lib/parsers/{as,sport,olympics,marca}.mjs` — refactor:
+  `fetchAndParse()` ahora llama `loadCachedHtml(SOURCE_NAME)` en vez de
+  `node fetch()`. Helper compartido en `_util.mjs`.
+- `scripts/lib/parsers/eurosport.mjs` — **eliminado**. Geoblock irresoluble.
+- `scripts/lib/parsers/espn.mjs` — **nuevo**. ESPN Deportes (Disney/Hearst)
+  como 5ª fuente. Reusa `parseHtmlAS({ requireBullet: false })` por
+  similitud asumida; primer run productivo confirmará.
+- `scripts/sync-squads.mjs` — `parserEurosport` → `parserESPN` en
+  `PRIMARY_PARSERS`.
+- `scripts/lib/cross-validate.mjs` — priority list eurosport → espn.
+- `.github/workflows/sync-squads.yml` — 3 nuevos steps (Setup Python 3.11,
+  Install Scrapling, Fetch source HTMLs) condicionados a `mode=detect`.
+  `continue-on-error: true` en el fetch para no bloquear el motor Node.
+- `.gitignore` — `cache/sources/.gitkeep` tracked, HTML regenerable
+  ignorado.
+- Tests: `sources.test.mjs` actualizado (eurosport test → espn fixture
+  AS-like). 77/77 pasan.
+- ERR-68 (HTTP 403 IPs GH Actions), ERR-69 (Eurosport geoblock), ERR-70
+  (setup-python cache:pip sin requirements.txt) registrados.
+
+**Pendiente post-merge** (San):
+- Cleanup branches probe pre-existentes (`probe/scrapling-viability`,
+  `fix/scrapling-probe-cache`, `probe/scrapling-v2`, `probe/scrapling-v3-mini`,
+  `probe/scrapling-v4-espn`).
+- Eliminar EF `gh-proxy` (creada por Claude.ai para descomprimir artifacts).
+- Eliminar `scripts/scraping/probe_scrapling.py` + `.github/workflows/scrapling-probe.yml`.
+- Validar parser ESPN con HTML real del 1er run y ajustar si difiere.
+
 ## [21-may-2026] fix/scoring-exacto-apila-sobre-signo
 
 **⚠️ CAMBIO DE COMPORTAMIENTO** (no regresión, no bug fix puro):

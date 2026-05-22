@@ -26,28 +26,24 @@ import {
   detectCountryHeader,
   detectBucketLine,
   parsePlayerList,
+  loadCachedHtml,
 } from './_util.mjs';
 
 export const SOURCE_NAME = 'as';
 export const SOURCE_URL =
   'https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-selecciones-y-todos-los-jugadores-que-estaran-en-la-copa-del-mundo-f202605-n-2/';
 
-const UA =
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
-
+/**
+ * @param {object} opts
+ * @param {boolean} [opts.verbose] log a stdout cuando se carga del cache
+ * @param {string|null} [opts.html] HTML inyectado (tests). Si null, lee del
+ *   cache/sources/as.html que escribió scripts/scraping/fetch_sources.py.
+ */
 export async function fetchAndParse({ verbose = false, html = null } = {}) {
   let body = html;
   if (!body) {
-    if (verbose) console.log(`  [${SOURCE_NAME}] GET ${SOURCE_URL}`);
-    const r = await fetch(SOURCE_URL, {
-      headers: {
-        'User-Agent': UA,
-        'Accept-Language': 'es-ES,es;q=0.9',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!r.ok) throw new Error(`[${SOURCE_NAME}] HTTP ${r.status}`);
-    body = await r.text();
+    body = loadCachedHtml(SOURCE_NAME);
+    if (verbose) console.log(`  [${SOURCE_NAME}] cache hit (${body.length} bytes)`);
   }
   const parsed = parseHtml(body);
   return { ...parsed, source: SOURCE_NAME, fetchedAt: new Date().toISOString(), _html: body };

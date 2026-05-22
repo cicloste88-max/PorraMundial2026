@@ -34,14 +34,12 @@ import {
   detectBucketLine,
   detectCoachLine,
   parsePlayerList,
+  loadCachedHtml,
 } from './_util.mjs';
 
 export const SOURCE_NAME = 'olympics';
 export const SOURCE_URL =
   'https://www.olympics.com/es/noticias/mundial-2026-listas-48-selecciones';
-
-const UA =
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
 // Detecta la frontera con el bloque de calendario. A partir de aquí, dejamos
 // de procesar (calendar.mjs se encarga).
@@ -50,16 +48,8 @@ const CALENDAR_BOUNDARY_RE = /cu[áa]ndo\s+publican.*listas|calendario.*publicac
 export async function fetchAndParse({ verbose = false, html = null } = {}) {
   let body = html;
   if (!body) {
-    if (verbose) console.log(`  [${SOURCE_NAME}] GET ${SOURCE_URL}`);
-    const r = await fetch(SOURCE_URL, {
-      headers: {
-        'User-Agent': UA,
-        'Accept-Language': 'es-ES,es;q=0.9',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!r.ok) throw new Error(`[${SOURCE_NAME}] HTTP ${r.status}`);
-    body = await r.text();
+    body = loadCachedHtml(SOURCE_NAME);
+    if (verbose) console.log(`  [${SOURCE_NAME}] cache hit (${body.length} bytes)`);
   }
   const parsed = parseHtml(body);
   return { ...parsed, source: SOURCE_NAME, fetchedAt: new Date().toISOString(), _html: body };

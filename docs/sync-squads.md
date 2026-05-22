@@ -14,12 +14,25 @@ y mantiene la tabla `squads` de Supabase actualizada. Diseñado para:
 - Mundial: detectar bajas de última hora.
 
 **Fuentes** (post-refactor `feat/squads-sources-refactor`, PR#72, 18-19 may
-2026 — ver ERR-59 + `.claude/rules/sync-squads.md`):
+2026 — ver ERR-59 + `.claude/rules/sync-squads.md`. Actualizado 22-may con
+sprint `feat/scrapling-integration-opt-a`):
 
-- **Primarias** (`--mode=detect`): AS, Sport.es, Olympics, Eurosport, Marca.
-  Parsers homogéneos en `scripts/lib/parsers/<fuente>.mjs`. `crossValidate`
-  exige ≥ 2 fuentes con roster ≥ 22 y Jaccard ≥ 0.7 sobre nombres
-  normalizados para marcar `is_final=true`.
+- **Primarias** (`--mode=detect`): AS, Sport.es, Olympics, Marca, ESPN
+  Deportes. Parsers homogéneos en `scripts/lib/parsers/<fuente>.mjs`.
+  `crossValidate` exige ≥ 2 fuentes con roster ≥ 22 y Jaccard ≥ 0.7 sobre
+  nombres normalizados para marcar `is_final=true`.
+- **Pre-fetch Python (Scrapling)** desde 22-may: el step Node fetch puro
+  recibe HTTP 403 desde IPs USA de GH Actions (Cloudflare/Akamai bloquean
+  TLS fingerprint de undici — ERR-68). Solución: step previo
+  `scripts/scraping/fetch_sources.py` que pre-fetcha las 5 URLs vía
+  Scrapling (`Fetcher.get(impersonate='chrome')` para sport/olympics/marca,
+  `StealthyFetcher.fetch()` para as/espn) y escribe a
+  `cache/sources/<source>.html`. Los parsers Node leen del cache vía
+  `loadCachedHtml()` en `_util.mjs`. Latencia añadida por cron: ~60s
+  (setup-python + install + fetch).
+- **Eurosport descartada** 22-may: geoblock 307 → `/geoblocking.shtml`
+  irresoluble desde IPs USA (ERR-69). Sustituida por ESPN Deportes
+  (Disney/Hearst, id 16715015) que añade cobertura latinoamericana.
 - **Secundaria FF (`scripts/lib/ff-scraper.mjs`)**: invocada únicamente sobre
   selecciones ya marcadas FINAL por ≥ 2 primarias, **solo para XI titular**.
   FF NO se usa como fuente de detección por el riesgo de cruzar noticias de
@@ -40,8 +53,8 @@ scripts/
       as.mjs                    # AS — convocatorias oficiales
       sport.mjs                 # Sport.es — listas convocados
       olympics.mjs              # Olympics — 48 selecciones tracking
-      eurosport.mjs             # Eurosport — convocatorias selecciones
       marca.mjs                 # Marca — convocatorias oficiales
+      espn.mjs                  # ESPN Deportes — cobertura latam (sustituye Eurosport, 22-may)
       calendar.mjs              # parseCalendar() Olympics → fechas anuncio
       country-map.json          # nombres país por fuente → iso3 canónico
     cross-validate.mjs          # 2-of-N + Jaccard ≥ 0.7 + minPlayers=22

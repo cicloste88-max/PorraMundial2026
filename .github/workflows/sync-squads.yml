@@ -62,6 +62,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ─────────────────────────────────────────────────────────────────
+      # Pre-fetch HTMLs via Scrapling (Python). Las IPs USA de GH Actions
+      # quedan bloqueadas por Cloudflare/Akamai con node fetch() puro
+      # (HTTP 403 sistemático en 4 de 5 fuentes). Scrapling usa TLS
+      # fingerprint de browser real (curl_cffi + Playwright stealth) que
+      # sí pasa el filtro. Output: cache/sources/<source>.html que leen
+      # los parsers Node vía loadCachedHtml().
+      # NO incluir cache:pip en setup-python (requiere requirements.txt
+      # que no existe en este repo — ERR-XX).
+      # ─────────────────────────────────────────────────────────────────
+      - name: Setup Python 3.11
+        # detect mode necesita pre-fetch. Los otros modes (scrape/enrich-tm/
+        # enrich-tm-mw) NO usan las 5 fuentes primarias — saltar Scrapling
+        # ahorra ~90s en cada run manual de esos modos.
+        if: ${{ inputs.mode == '' || inputs.mode == 'detect' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Scrapling
+        if: ${{ inputs.mode == '' || inputs.mode == 'detect' }}
+        run: |
+          pip install "scrapling[fetchers]"
+          scrapling install
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      - name: Fetch source HTMLs via Scrapling
+        # continue-on-error: un fallo parcial NO bloquea el motor Node;
+        # los parsers de las fuentes fallidas throw → Promise.allSettled
+        # las marca como rejected y cross-validate sigue con las demás.
+        if: ${{ inputs.mode == '' || inputs.mode == 'detect' }}
+        continue-on-error: true
+        run: python scripts/scraping/fetch_sources.py
+        env:
+          PYTHONUNBUFFERED: "1"
+
       - name: Write .env from secrets
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -171,5 +208,6 @@ jobs:
           path: |
             sync-squads.log
             cache/squads-calendar.json
+            cache/sources/fetch-summary.json
           retention-days: 14
           if-no-files-found: warn

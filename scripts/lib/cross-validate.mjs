@@ -1,7 +1,7 @@
 // Cross-validation 2-of-N + Jaccard nombres ≥ 0.7.
 //
 // Inputs:
-//   parseResults: Array<ParseResult>  (una por fuente: AS, Sport, Olympics, Eurosport)
+//   parseResults: Array<ParseResult>  (una por fuente: AS, Sport, Olympics, Marca, ESPN)
 //   opts:
 //     minPlayers   default 22 — umbral mínimo de jugadores para contar como "FINAL".
 //     maxPlayers   default 30 — techo: descarta pre-listas largas (40-55 jugadores)
@@ -124,7 +124,12 @@ function pickCanonical(presence) {
   const base = ordered[0].entry;
   // Prioridad para campos coach/group: olympics y as son los más fiables; marca
   // tiene errores conocidos en grupos (e.g. CRO=K cuando es L) → último lugar.
-  const priority = ['olympics', 'as', 'sport', 'eurosport', 'marca'];
+  // Prioridad de fuentes para campos coach/group cuando hay conflicto.
+  // Olympics+AS+Sport tienen track record fiable; Marca tiene errores
+  // conocidos en grupos (CRO=K en lugar de L 18-may) → último lugar.
+  // ESPN es la fuente nueva (22-may, post-descarte Eurosport por geoblock):
+  // posicionada antes de Marca por defecto, ajustar tras observar.
+  const priority = ['olympics', 'as', 'sport', 'espn', 'marca'];
   const coach = priority.map((s) => presence.find((p) => p.source === s)?.entry.coach).find(Boolean);
   const group = priority.map((s) => presence.find((p) => p.source === s)?.entry.group).find(Boolean);
   return { players: base.players, coach, group };

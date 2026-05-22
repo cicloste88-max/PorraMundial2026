@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 import * as asSrc from '../as.mjs';
 import * as sportSrc from '../sport.mjs';
 import * as olympicsSrc from '../olympics.mjs';
-import * as eurosportSrc from '../eurosport.mjs';
+import * as espnSrc from '../espn.mjs';
 import {
   parsePlayer,
   parsePlayerList,
@@ -300,20 +300,23 @@ test('Olympics: lastBucket se resetea al cambiar de selección (no leak)', () =>
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// Eurosport.es parser
+// ESPN Deportes parser (sustituye a Eurosport, descartado 22-may por
+// geoblock 307 → /geoblocking.shtml irresoluble desde IPs USA)
 // ───────────────────────────────────────────────────────────────────────
 
-test('Eurosport: parseHtml reusa lógica AS y devuelve source="eurosport"', () => {
-  // Fixture mínimo inline (estructura validada 19-may en eurosport.es)
+test('ESPN: parseHtml reusa lógica AS y devuelve source="espn"', () => {
+  // Fixture mínimo inline. Estructura asumida AS-like (bullet `•` + buckets
+  // en <strong>). El primer run productivo confirmará y se ajustará si
+  // ESPN usa un layout distinto.
   const html = `<article>
-    <p><b>• BÉLGICA</b></p>
-    <p><b>Porteros:</b> Courtois (Real Madrid), Lammens (Antwerp) y Mike Penders (Genk)</p>
-    <p><b>Defensas:</b> Castagne (Fulham), Debast (Sporting), De Cuyper (Brujas), De Winter (Juventus), Mechele (Brujas), Meunier (Lille), Ngoy (Hertha), Seys (Brujas) y Arthur (Sturm)</p>
-    <p><b>Centrocampistas:</b> De Bruyne (Napoles), Onana (Aston Villa), Raskin (Rangers), Tielemans (Aston Villa), Vanaken (Brujas) y Witsel (Girona)</p>
-    <p><b>Delanteros:</b> De Ketelaere (Atalanta), Doku (Man. City), Fernández Pardo (Lille), Lukaku (Napoles), Lukebakio (Sevilla), Moreira (Estrasburgo), Saelemaekers (Milan) y Trossard (Arsenal)</p>
+    <p><strong>• Bélgica</strong></p>
+    <p><strong>Porteros:</strong> Courtois (Real Madrid), Lammens (Antwerp), Mike Penders (Genk)</p>
+    <p><strong>Defensas:</strong> Castagne (Fulham), Debast (Sporting), De Cuyper (Brujas), De Winter (Juventus), Mechele (Brujas), Meunier (Lille), Ngoy (Hertha), Seys (Brujas), Arthur (Sturm)</p>
+    <p><strong>Centrocampistas:</strong> De Bruyne (Napoli), Onana (Aston Villa), Raskin (Rangers), Tielemans (Aston Villa), Vanaken (Brujas), Witsel (Girona)</p>
+    <p><strong>Delanteros:</strong> De Ketelaere (Atalanta), Doku (Man. City), Fernández Pardo (Lille), Lukaku (Napoli), Lukebakio (Sevilla), Moreira (Estrasburgo), Saelemaekers (Milan), Trossard (Arsenal)</p>
   </article>`;
-  const out = eurosportSrc.parseHtml(html);
-  assert.equal(out.source, 'eurosport');
+  const out = espnSrc.parseHtml(html);
+  assert.equal(out.source, 'espn');
   assert.ok(out.byIso3.BEL);
   assert.equal(out.byIso3.BEL.players.length, 26);
 });
