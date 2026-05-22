@@ -39,6 +39,7 @@ jobs:
           name: scrapling-probe-${{ github.run_id }}
           path: |
             probe-results.json
+            probe-results-v2.json
             probe.log
           retention-days: 14
           if-no-files-found: warn
