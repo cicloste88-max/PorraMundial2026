@@ -949,3 +949,67 @@ la lógica que tienes upstream, sospecha que la lógica está mal o el cap es
 vestigial. Comentarios contradictorios sobre la misma regla (L39 "no acumula"
 vs L42 "Máximo 7") son síntoma clásico — la suma simple de los componentes
 debe igualar el techo declarado, si no, una de las dos afirmaciones miente.
+
+
+## ERR-68 — HTTP 403 sistemático en 4/5 fuentes desde IPs USA de GH Actions
+
+**Síntoma:** workflow `sync-squads.yml` step `detect` falla en runs cron
+consecutivos. `as.com`, `olympics.com`, `marca.com`, `eurosport.es`
+devuelven HTTP 403 con `node fetch()` puro. Sport.es responde 200 OK
+fiable. Reproducible en 6 runs cron consecutivos (mayo 2026). Localmente
+(IP residencial) las mismas URLs respondían 200.
+
+**Causa:** TLS fingerprint de `node fetch()` (ja3/ja4 hash de undici) es
+identificable como bot por Cloudflare/Akamai. Las IPs de GH Actions
+(Azure US) están en listas de bloqueo agresivo. Headers + User-Agent
+realista NO bastan — Cloudflare inspecciona TLS handshake.
+
+**Fix:** Scrapling como step previo (Python). Pre-fetcha las 5 URLs a
+`cache/sources/<source>.html` y los parsers Node leen del filesystem.
+Scrapling usa `curl_cffi` (TLS fingerprint de Chrome real) para Sport/
+Olympics/Marca y `Playwright stealth` para AS/ESPN. PR
+`feat/scrapling-integration-opt-a` (22-may-2026). Validado con 4 probe
+runs concluyentes.
+
+**Patrón:** cualquier scraping desde GH Actions/Azure debe usar
+fingerprint de browser real, no `fetch()`/`undici`. Mismo problema
+aplicaría a Apify Cloud, Vercel Edge, etc. si la fuente tiene
+Cloudflare/Akamai activado.
+
+
+## ERR-69 — Eurosport geoblock 307 → /geoblocking.shtml irresoluble client-side
+
+**Síntoma:** Scrapling `Fetcher.get(impersonate=chrome)` y
+`StealthyFetcher.fetch()` retornan ambos redirect 307 a
+`/geoblocking.shtml` (5.7KB sin contenido) desde IPs USA. 4/4 métodos
+probados fallan.
+
+**Causa:** server-side IP geoblock (Eurosport bloquea acceso desde USA a
+páginas de mercado europeo). NO es Cloudflare client-fingerprint — es
+política de routing del CDN aplicada antes de servir contenido. Tampoco
+se puede bypasar con headers (Accept-Language, Referer, geolocation API).
+
+**Fix:** descartar Eurosport como fuente primaria. Sustituida por
+ESPN Deportes (Disney/Hearst, id 16715015, cobertura latinoamericana
+con HTML 200 OK ~618KB). PR `feat/scrapling-integration-opt-a`. Si se
+quisiera recuperar Eurosport en el futuro: necesitaría proxy residencial
+EU (Webshare, Bright Data) — coste y complejidad >> beneficio marginal.
+
+
+## ERR-70 — `actions/setup-python@v5` con `cache: pip` exige requirements.txt
+
+**Síntoma:** workflow step `Setup Python` falla con
+`Error: No file in /home/runner/work/.../PorraMundial2026 matched to
+[**/requirements.txt or **/pyproject.toml]`.
+
+**Causa:** el repo no tiene `requirements.txt` (Python solo se usa para
+Scrapling en un step efímero — `pip install scrapling[fetchers]` se
+ejecuta inline). `cache: pip` requiere un fichero de manifests para
+calcular cache key.
+
+**Fix:** omitir la directiva `cache: pip` en `setup-python@v5`. El install
+tarda ~30s adicional por run, aceptable para un cron 6h.
+
+**Patrón:** las directivas `cache:` de las setup-* actions exigen archivos
+manifest específicos. Si el proyecto no los tiene, no añadirlas — el
+overhead es marginal.
