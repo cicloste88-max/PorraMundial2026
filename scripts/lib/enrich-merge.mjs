@@ -17,7 +17,7 @@
 // aporta dorsal+dob. Por eso el orquestador llama applyEnrich dos veces
 // (A primero — masivo, B después — kader por país si faltan dob/dorsal).
 
-import { normalize as normalizeName } from './name-matcher.mjs';
+import { normalize as normalizeName, matchAgainstRoster } from './name-matcher.mjs';
 
 export const ENRICH_FIELDS = [
   'tm_player_id',
@@ -45,16 +45,26 @@ export const ENRICH_FIELDS = [
 export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel } = {}) {
   // Lookup secundario por nombre+iso3 desde tmByIdMap.
   const tmByNameInNation = new Map();
+  const tmCandidatesInNation = []; // para fuzzy fallback
   for (const tm of tmByIdMap.values()) {
     if (tm.iso3 === iso3 || tm.iso3 == null) {
       const name = tm.name || tm.nombre || '';
-      if (name) tmByNameInNation.set(normalizeName(name), tm);
+      if (name) {
+        tmByNameInNation.set(normalizeName(name), tm);
+        tmCandidatesInNation.push({ tm, name });
+      }
     }
   }
 
-  const stats = { matched: 0, source: sourceLabel || null };
+  const stats = { matched: 0, matched_fuzzy: 0, source: sourceLabel || null };
   for (const f of ENRICH_FIELDS) stats[`with_${f}`] = 0;
 
+  // ── Pass 1: ID-first y exact name match (Map.get sobre clave normalizada) ──
+  // Track TMs ya consumidos para evitar que un fuzzy match en Pass 2 robe un
+  // TM ya asignado por exact match en Pass 1.
+  const usedTmIds = new Set();
+  const usedTmNameKeys = new Set(); // para TMs sin tm_player_id (raro pero posible)
+  const fuzzyPending = []; // {i, p} para Pass 2
   for (let i = 0; i < roster.length; i++) {
     const p = roster[i];
     let tm = null;
@@ -67,15 +77,52 @@ export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel } = {}) {
       tm = tmByNameInNation.get(normalizeName(p.nombre || ''));
     }
 
-    if (!tm) continue;
+    if (!tm) {
+      // Diferido a Pass 2 (fuzzy)
+      if (p.nombre) fuzzyPending.push({ i, p });
+      continue;
+    }
+    _assignTmToPlayer(roster, i, tm);
     stats.matched++;
+    if (tm.tm_player_id != null) usedTmIds.add(tm.tm_player_id);
+    else usedTmNameKeys.add(normalizeName(tm.name || tm.nombre || ''));
+  }
 
+  // ── Pass 2: fuzzy match de los residuales (cubre transliteraciones árabes
+  //    Yazid↔Yazeed, Fakhouri↔Fakhoury, Hashish↔Hasheesh, Abu Taha↔Mohannad
+  //    Abu Taha que sobreviven a R1+R2+R3 con string aún distinta). minScore
+  //    default 60. matchAgainstRoster ya tiene usedIdx interno → no asigna
+  //    dos DB players al mismo TM. Filtramos primero los TMs consumidos en
+  //    Pass 1 para no crear conflicto.
+  if (fuzzyPending.length > 0) {
+    const availableCandidates = tmCandidatesInNation.filter((c) => {
+      const id = c.tm.tm_player_id;
+      if (id != null && usedTmIds.has(id)) return false;
+      if (id == null && usedTmNameKeys.has(normalizeName(c.name))) return false;
+      return true;
+    });
+    if (availableCandidates.length > 0) {
+      const dbNames = fuzzyPending.map((x) => x.p.nombre);
+      const candNames = availableCandidates.map((c) => c.name);
+      const { matches } = matchAgainstRoster(dbNames, candNames);
+      for (const { candidate, matchIdx } of matches) {
+        const pendingIdx = fuzzyPending.findIndex((x) => x.p.nombre === candidate);
+        if (pendingIdx < 0) continue;
+        const { i } = fuzzyPending[pendingIdx];
+        const tm = availableCandidates[matchIdx].tm;
+        _assignTmToPlayer(roster, i, tm);
+        stats.matched++;
+        stats.matched_fuzzy++;
+      }
+    }
+  }
+
+  function _assignTmToPlayer(rosterArr, idx, tm) {
+    const p = rosterArr[idx];
     const newPlayer = { ...p };
-
     if (newPlayer.tm_player_id == null && tm.tm_player_id != null) {
       newPlayer.tm_player_id = tm.tm_player_id;
     }
-
     // Aceptar nombres de campo de A (value_eur, age, position_tm, photo_url_tm)
     // y de B (valor_eur, edad, posicion_tm, foto_url_tm). El roster persiste
     // siempre en el shape canónico (valor_eur, edad, posicion_tm, foto_url_tm).
@@ -93,8 +140,7 @@ export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel } = {}) {
     for (const [k, v] of Object.entries(tmFields)) {
       if (newPlayer[k] == null && v != null) newPlayer[k] = v;
     }
-
-    roster[i] = newPlayer;
+    rosterArr[idx] = newPlayer;
   }
 
   // Stats por campo tras el enrich (foto cuenta ambas variantes).
