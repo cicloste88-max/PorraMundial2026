@@ -20,6 +20,25 @@ const APOSTROPHES_RE = /['‘’ʼ`´]/g;
 // Combining diacritical marks (NFD).
 const DIACRITICS_RE = /[̀-ͯ]/g;
 
+// 23-may-2026 — Transliteración árabe→latín varía entre fuentes (medio español
+// vs TM). Para que `Mousa Al-Tamari` matchee `Mousa Tamari`, `Ibrahim Sadeh`
+// matchee `Ibrahim Saadeh` y `Mohammed Al-Dawoud` matchee `Mohammad Al-Dawoud`,
+// añadimos 3 normalizaciones extra:
+//   R1: strip prefijo `al-`/`el-` (con hyphen explícito) ANTES del hyphen strip
+//   R2: colapsar doble vocal (aa/ee/ii/oo/uu → vocal simple)
+//   R3: dict canónico para Mohammed/Mohammad/Muhammad → mohamed
+// Safe para europeos: ningún apellido europeo usa "Al-"/"El-" con hyphen,
+// nombres como Aaron/Aaltonen colapsan consigo mismos (la regla se aplica a
+// ambos lados del match), y R3 solo afecta a 4 spellings explícitos.
+// R2 NO toca consonantes dobles (ll, rr, nn, ss, etc) — preserva Pellegrini,
+// Hernandez, etc. intactos.
+const ARABIC_FIRSTNAME_MAP = {
+  mohammed: 'mohamed',
+  mohammad: 'mohamed',
+  muhammad: 'mohamed',
+  muhammed: 'mohamed',
+};
+
 function rawTokens(s) {
   if (!s) return [];
   return String(s)
@@ -27,12 +46,15 @@ function rawTokens(s) {
     .replace(DIACRITICS_RE, '')
     .toLowerCase()
     .replace(APOSTROPHES_RE, '')
+    .replace(/\b(?:al|el)-/g, '')          // R1: strip Al-/El- prefix
     .replace(HYPHENS_RE, '')
+    .replace(/([aeiou])\1+/g, '$1')        // R2: collapse doubled vowels
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((t) => ARABIC_FIRSTNAME_MAP[t] || t); // R3: canonical Arabic firstnames
 }
 
 // Salida canónica: tokens ordenados alfabéticamente, joined con espacio.
@@ -118,12 +140,15 @@ function scorePair(a, b) {
   }
 
   // Sustring fuzzy: Levenshtein del último apellido (con orden original).
+  // 23-may-2026 — Bajado threshold sim 0.85 → 0.75 para cubrir variantes árabes
+  // donde R1+R2+R3 dejan resto del nombre con typo aún (e.g. "hashesh" vs
+  // "hashish" sim=0.857 — match; previo a R2 era "hasheesh" vs "hashish" sim=0.75).
   if (la && lb) {
     const dist = levenshtein(la, lb);
     const maxLen = Math.max(la.length, lb.length);
     if (maxLen > 0) {
       const sim = 1 - dist / maxLen;
-      if (sim >= 0.85) return Math.round(60 + sim * 20);
+      if (sim >= 0.75) return Math.round(60 + sim * 20);
     }
   }
 
@@ -132,8 +157,11 @@ function scorePair(a, b) {
 
 // Empareja una lista de candidatos (e.g. nombres XI) contra un roster grande.
 // Devuelve { matches: [{ candidate, match, score }], unmatched: [candidates...] }.
-// minScore por defecto 65 (filtra ruido).
-export function matchAgainstRoster(candidates, roster, { minScore = 65 } = {}) {
+// 23-may-2026 — minScore por defecto bajado 65 → 60 tras añadir normalizaciones
+// árabes en rawTokens (R1+R2+R3). Filtra ruido pero permite que casos como
+// "Mohammad Abu Taha ↔ Mohannad Abu Taha" (token-set overlap 2/3 → score 78)
+// y casos Levenshtein de apellidos transliterados scoren ≥60.
+export function matchAgainstRoster(candidates, roster, { minScore = 60 } = {}) {
   const matches = [];
   const unmatched = [];
   const usedIdx = new Set();

@@ -198,3 +198,113 @@ test('matchAgainstRoster: anti-regresión europea — apellidos comunes no se co
   assert.equal(byCand['João Cancelo'], 'João Cancelo');
   assert.equal(byCand['Bernardo Silva'], 'Bernardo Silva');
 });
+
+// ─── normalizaciones árabes (R1+R2+R3) — 23-may-2026 ────────────────────────
+
+test('normalize R1: prefijo Al-/El- se elimina', () => {
+  assert.equal(normalize('Al-Tamari'), normalize('Tamari'));
+  assert.equal(normalize('Al-Fakhouri'), normalize('Fakhouri'));
+  assert.equal(normalize('El-Sayed'), normalize('Sayed'));
+  assert.equal(normalize('Mousa Al-Tamari'), normalize('Mousa Tamari'));
+});
+
+test('normalize R2: vocales dobles colapsan a vocal simple', () => {
+  assert.equal(normalize('Saadeh'), normalize('Sadeh'));
+  assert.equal(normalize('Hasheesh'), normalize('Hashesh'));
+  assert.equal(normalize('Yazeed'), 'yazed');
+  assert.equal(normalize('Aaron'), 'aron');
+  assert.equal(normalize('Boomgaarden'), 'bomgarden');
+});
+
+test('normalize R2: consonantes dobles NO colapsan (preserva Pellegrini/Hernandez)', () => {
+  assert.equal(normalize('Pellegrini'), 'pellegrini');
+  assert.equal(normalize('Hernández'), 'hernandez');
+  assert.equal(normalize('Cooper'), 'coper');  // ee NO es consonante; oo SÍ colapsa
+});
+
+test('normalize R3: Mohammed/Mohammad/Muhammad → mohamed', () => {
+  assert.equal(normalize('Mohammed'), 'mohamed');
+  assert.equal(normalize('Mohammad'), 'mohamed');
+  assert.equal(normalize('Muhammad'), 'mohamed');
+  assert.equal(normalize('Muhammed'), 'mohamed');
+  assert.equal(normalize('Mohammed Al-Dawoud'), normalize('Mohammad Al-Dawoud'));
+});
+
+// ─── JOR — 7 casos reales con bailes de letras ──────────────────────────────
+
+test('scorePair JOR: Mousa Al-Tamari ↔ Mousa Tamari (R1)', () => {
+  const s = scorePair('Mousa Al-Tamari', 'Mousa Tamari');
+  assert.ok(s >= 80, `esperado ≥80, fue ${s}`);
+});
+
+test('scorePair JOR: Ibrahim Sadeh ↔ Ibrahim Saadeh (R2)', () => {
+  const s = scorePair('Ibrahim Sadeh', 'Ibrahim Saadeh');
+  assert.ok(s >= 80, `esperado ≥80, fue ${s}`);
+});
+
+test('scorePair JOR: Mohammed Al-Dawoud ↔ Mohammad Al-Dawoud (R1+R3)', () => {
+  const s = scorePair('Mohammed Al-Dawoud', 'Mohammad Al-Dawoud');
+  assert.equal(s, 100, `esperado 100 (exact tras R1+R3), fue ${s}`);
+});
+
+test('scorePair JOR: Odeh Al-Fakhouri ↔ Odeh Fakhoury (R1 + Lev sufijo)', () => {
+  const s = scorePair('Odeh Al-Fakhouri', 'Odeh Fakhoury');
+  assert.ok(s >= 60, `esperado ≥60 (lev sufijo i↔y), fue ${s}`);
+});
+
+test('scorePair JOR: Mohammad Abu Hashish ↔ Mohammad Abu Hasheesh (R2+R3)', () => {
+  const s = scorePair('Mohammad Abu Hashish', 'Mohammad Abu Hasheesh');
+  assert.ok(s >= 60, `esperado ≥60, fue ${s}`);
+});
+
+test('scorePair JOR: Yazid Abulaila ↔ Yazeed Abulaila (R2 + last-token equal)', () => {
+  const s = scorePair('Yazid Abulaila', 'Yazeed Abulaila');
+  assert.ok(s >= 80, `esperado ≥80 (apellido idéntico), fue ${s}`);
+});
+
+test('scorePair JOR: Mohammad Abu Taha ↔ Mohannad Abu Taha (token-set 2/3)', () => {
+  const s = scorePair('Mohammad Abu Taha', 'Mohannad Abu Taha');
+  assert.ok(s >= 80, `esperado ≥80 (token overlap), fue ${s}`);
+});
+
+test('matchAgainstRoster JOR: 7 jugadores con baile transliteración matchean', () => {
+  const tmRoster = [
+    { nombre: 'Mousa Tamari' },
+    { nombre: 'Ibrahim Saadeh' },
+    { nombre: 'Mohammad Al-Dawoud' },
+    { nombre: 'Odeh Fakhoury' },
+    { nombre: 'Mohammad Abu Hasheesh' },
+    { nombre: 'Yazeed Abulaila' },
+    { nombre: 'Mohannad Abu Taha' },
+    // distractores: no deben confundirse
+    { nombre: 'Abdallah Nasib' },
+    { nombre: 'Ali Azaizeh' },
+  ];
+  const dbCandidates = [
+    'Mousa Al-Tamari',
+    'Ibrahim Sadeh',
+    'Mohammed Al-Dawoud',
+    'Odeh Al-Fakhouri',
+    'Mohammed Abu Hashish',
+    'Yazid Abulaila',
+    'Mohammad Abu Taha',
+  ];
+  const { matches, unmatched } = matchAgainstRoster(dbCandidates, tmRoster);
+  assert.equal(matches.length, 7, `esperado 7/7, actual ${matches.length}. unmatched: ${unmatched.join(', ')}`);
+});
+
+// ─── anti-regresión post-R1/R2/R3 ───────────────────────────────────────────
+
+test('scorePair anti-regresión: Pellegrini ↔ Pellegrini score 100 (R2 no toca ll)', () => {
+  assert.equal(scorePair('Lorenzo Pellegrini', 'Lorenzo Pellegrini'), 100);
+});
+
+test('scorePair anti-regresión: Lee Kang-in ↔ Kang Lee sigue NO matcheando', () => {
+  assert.ok(scorePair('Lee Kang-in', 'Kang Lee') < 60,
+    `score debe ser < minScore 60, fue: ${scorePair('Lee Kang-in', 'Kang Lee')}`);
+});
+
+test('scorePair anti-regresión: João Félix ↔ João Cancelo sigue NO matcheando', () => {
+  assert.ok(scorePair('João Félix', 'João Cancelo') < 60,
+    `score debe ser < minScore 60, fue: ${scorePair('João Félix', 'João Cancelo')}`);
+});

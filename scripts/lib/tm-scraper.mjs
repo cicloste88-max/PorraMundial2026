@@ -163,7 +163,7 @@ export function enrichRosterWithTm(roster, tmPlayers) {
     return { enriched: 0, unmatched: roster.length };
   }
   const candidates = roster.map((p) => p.nombre);
-  const { matches } = matchAgainstRoster(candidates, tmPlayers, { minScore: 70 });
+  const { matches } = matchAgainstRoster(candidates, tmPlayers, { minScore: 60 });
   let enriched = 0;
   for (const { candidate, match } of matches) {
     const i = roster.findIndex((p) => p.nombre === candidate);
