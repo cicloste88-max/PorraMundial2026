@@ -263,13 +263,9 @@
   overflow: hidden;
   border-radius: 14px 14px 0 0;
   background: #0e1220;
+  margin-bottom: 14px;
 }
 
-/* Variante kits: el hero invade el borde superior y laterales del wrapper
-   para continuidad visual con el shell (sin franja del border-top visible). */
-.dv2-exp.dv2-exp--kits > .dv2-exp-kits {
-  margin: -1.5px -1.5px 14px -1.5px;
-}
 .dv2-exp-half {
   position: relative;
   flex: 1;
@@ -286,7 +282,7 @@
   z-index: 1;
   background-repeat: no-repeat;
   background-size: 220%;
-  background-position: center 4%;
+  background-position: center 0%;
   mix-blend-mode: multiply;
   filter: brightness(1.55) contrast(1.08) saturate(1.22);
   transition: background-size .5s ease, filter .4s ease;
