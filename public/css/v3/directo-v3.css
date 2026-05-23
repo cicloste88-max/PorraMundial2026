@@ -235,8 +235,7 @@
 }
 .dv2-exp.dv2-exp--kits > .dv2-exp-meta,
 .dv2-exp.dv2-exp--kits > .dv2-exp-scorers,
-.dv2-exp.dv2-exp--kits > .dv2-exp-pred,
-.dv2-exp.dv2-exp--kits > .dv2-exp-collapse {
+.dv2-exp.dv2-exp--kits > .dv2-exp-pred {
   margin-left: 16px;
   margin-right: 16px;
 }
@@ -264,7 +263,12 @@
   overflow: hidden;
   border-radius: 14px 14px 0 0;
   background: #0e1220;
-  margin-bottom: 14px;
+}
+
+/* Variante kits: el hero invade el borde superior y laterales del wrapper
+   para continuidad visual con el shell (sin franja del border-top visible). */
+.dv2-exp.dv2-exp--kits > .dv2-exp-kits {
+  margin: -1.5px -1.5px 14px -1.5px;
 }
 .dv2-exp-half {
   position: relative;

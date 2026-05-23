@@ -337,6 +337,65 @@
   // Compat: id="dcard-N", data-match-key, data-match-idx, .dv2-exp-flag-btn,
   //         data-iso2, data-collapse → todo preservado, wiring intacto
   // ─────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
+  // Detección cromática de conflicto de kits (adaptación legacy v3).
+  // Reusa getDominantColor + colorDistance + kitUrl globales (scoring.js).
+  // Llamado con setTimeout(800) tras inyectar la card expanded para dar
+  // tiempo a que las imágenes carguen.
+  // ─────────────────────────────────────────────────────────────
+  function _checkKitConflictV3(card, hTeam, aTeam, hType, aType) {
+    if (!card || !hTeam || !aTeam) return;
+    if (typeof getDominantColor !== 'function' || typeof colorDistance !== 'function' || typeof kitUrl !== 'function') return;
+
+    const hKitEl = card.querySelector('.dv2-exp-half.left .dv2-exp-kit-bg');
+    const aKitEl = card.querySelector('.dv2-exp-half.right .dv2-exp-kit-bg');
+    if (!hKitEl || !aKitEl) return;
+
+    const extractUrl = bg => {
+      const m = (bg || '').match(/url\(['"]?([^'")\s]+)['"]?\)/);
+      return m ? m[1] : '';
+    };
+    const hUrl = extractUrl(hKitEl.style.backgroundImage);
+    const aUrl = extractUrl(aKitEl.style.backgroundImage);
+    if (!hUrl || !aUrl) return;
+
+    function analyzeKit(url, callback) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload  = () => { try { callback(getDominantColor(img)); } catch(e) { callback(null); } };
+      img.onerror = () => callback(null);
+      img.src = url;
+    }
+
+    analyzeKit(hUrl, hColor => {
+      if (!hColor) return;
+      analyzeKit(aUrl, aColor => {
+        if (!aColor) return;
+        const dist = colorDistance(hColor, aColor);
+        // Umbral 80: misma constante que checkKitConflict legacy (scoring.js L1345)
+        if (dist < 80 && dist > 0) {
+          const altType = aType === 'home' ? 'away' : 'home';
+          const altUrl = kitUrl(aTeam.slug, altType);
+          aKitEl.style.backgroundImage = "url('" + altUrl + "')";
+        }
+      });
+    });
+  }
+
+  // Helper unificado para todo lo que necesita ejecutarse tras inyectar
+  // una card expanded en el DOM (actualmente solo checkKitConflict, pero
+  // futuras hooks visuales irán aquí).
+  function _postInjectExpanded(card, m) {
+    const hTeam = EQUIPOS.find(e => e.name === m.home);
+    const aTeam = EQUIPOS.find(e => e.name === m.away);
+    if (!hTeam || !aTeam) return;
+    const FORCE_AWAY = ['Túnez','Irak','Curazao'];
+    const hType = FORCE_AWAY.includes(m.home) ? 'away' : 'home';
+    const aType = FORCE_AWAY.includes(m.away) ? 'away' : 'home';
+    setTimeout(() => _checkKitConflictV3(card, hTeam, aTeam, hType, aType), 800);
+  }
+
   function _buildDExpanded(m, idx) {
     const ctx = _getMatchCtx(m);
     const hTeam = EQUIPOS.find(e => e.name === m.home);
@@ -344,14 +403,19 @@
     const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
     const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
 
-    // ⭐ NUEVO: kit URLs (mismo helper que usa ko.js / ui-nav.js).
-    // Si por alguna razón kitUrl no está disponible (carga parcial),
-    // fallback a path directo. Ambas rutas resuelven el mismo destino.
+    // ⭐ Kit defaults: ambos equipos llevan home kit por defecto. Excepciones
+    //    legacy de equipos cuyo home kit causa problemas universales
+    //    (mismo array que en scoring.js createMatchCard L1149-1150).
+    //    La detección de colisión cromática se hace después del render
+    //    vía _checkKitConflictV3 con setTimeout(800).
+    const FORCE_AWAY = ['Túnez','Irak','Curazao'];
+    const hType = FORCE_AWAY.includes(m.home) ? 'away' : 'home';
+    const aType = FORCE_AWAY.includes(m.away) ? 'away' : 'home';
     const hKit = hTeam
-      ? (typeof kitUrl === 'function' ? kitUrl(hTeam.slug, 'home') : SB + '/kits/' + hTeam.slug + '/home.jpg')
+      ? (typeof kitUrl === 'function' ? kitUrl(hTeam.slug, hType) : SB + '/kits/' + hTeam.slug + '/' + hType + '.jpg')
       : '';
     const aKit = aTeam
-      ? (typeof kitUrl === 'function' ? kitUrl(aTeam.slug, 'away') : SB + '/kits/' + aTeam.slug + '/away.jpg')
+      ? (typeof kitUrl === 'function' ? kitUrl(aTeam.slug, aType) : SB + '/kits/' + aTeam.slug + '/' + aType + '.jpg')
       : '';
 
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
@@ -718,6 +782,15 @@
       container.innerHTML = '<div class="directo-main">' + mainHtml + '</div>';
     }
 
+    // Detectar todas las cards expanded en el render inicial y disparar
+    // el checkKitConflict para cada una.
+    container.querySelectorAll('.dv2-exp').forEach(card => {
+      const idx = parseInt(card.getAttribute('data-match-idx'), 10);
+      if (!isNaN(idx) && PARTIDOS[idx]) {
+        _postInjectExpanded(card, PARTIDOS[idx]);
+      }
+    });
+
     // Wire click handler delegado (asignación directa para no acumular listeners
     // en sucesivos render — sustituye el handler anterior si existía).
     container.onclick = _onDirectoClick;
@@ -805,7 +878,10 @@
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
     const newCard = tmp.firstElementChild;
-    if (newCard) existing.replaceWith(newCard);
+    if (newCard) {
+      existing.replaceWith(newCard);
+      if (isExpanded) _postInjectExpanded(newCard, m);
+    }
   }
   window.updateDirectoCard = updateDirectoCard;
 
