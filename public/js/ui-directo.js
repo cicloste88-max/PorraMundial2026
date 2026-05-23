@@ -396,6 +396,18 @@
     setTimeout(() => _checkKitConflictV3(card, hTeam, aTeam, hType, aType), 800);
   }
 
+  // Mapping ISO3 → ISO2 alineado con bucket miniatures/flags-sm/<ISO2>.webp.
+  // 48 entradas, una por equipo del Mundial 2026.
+  // Notas custom (no estándar ISO): ENG→EN (Inglaterra), SCO→SC (Escocia).
+  const ISO3_TO_ISO2 = {
+    MEX:'MX', RSA:'ZA', KOR:'KR', CZE:'CZ', CAN:'CA', BIH:'BA', QAT:'QA', SUI:'CH',
+    BRA:'BR', MAR:'MA', HAI:'HT', SCO:'SC', USA:'US', PAR:'PY', AUS:'AU', TUR:'TR',
+    GER:'DE', CUW:'CW', CIV:'CI', ECU:'EC', NED:'NL', JPN:'JP', SWE:'SE', TUN:'TN',
+    BEL:'BE', EGY:'EG', IRN:'IR', NZL:'NZ', ESP:'ES', CPV:'CV', KSA:'SA', URU:'UY',
+    FRA:'FR', SEN:'SN', IRQ:'IQ', NOR:'NO', ARG:'AR', ALG:'DZ', AUT:'AT', JOR:'JO',
+    POR:'PT', COD:'CD', UZB:'UZ', COL:'CO', ENG:'EN', CRO:'HR', GHA:'GH', PAN:'PA'
+  };
+
   function _buildDExpanded(m, idx) {
     const ctx = _getMatchCtx(m);
     const hTeam = EQUIPOS.find(e => e.name === m.home);
@@ -503,14 +515,25 @@
 
     // ⭐ NUEVO: helper para construir cada media-card (kit + vignette + flag pin + nombre)
     const buildHalf = (side, kitUrl, flagUrl, isoCode, teamName) => {
+      // Construir URL de flag rectangular (miniatures/flags-sm/<ISO2>.webp)
+      // a partir del mapping ISO3→ISO2. Si no hay match, no se inyecta var
+      // y el ::after queda transparente (fallback al <img> que está hidden por CSS,
+      // así que el botón será visible pero vacío — caso edge que no debería ocurrir
+      // con los 48 equipos del Mundial).
+      const iso2 = isoCode && ISO3_TO_ISO2[isoCode];
+      const flagRectUrl = iso2 ? SB + '/miniatures/flags-sm/' + iso2 + '.webp' : '';
+      const flagStyleAttr = flagRectUrl ? ' style="--flag-rect-url:url(\'' + flagRectUrl + '\')"' : '';
       const flagBtn = isoCode
-        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso2="' + isoCode + '" aria-label="Ver plantilla ' + (teamName || '') + '">' +
+        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso2="' + isoCode + '"' + flagStyleAttr + ' aria-label="Ver plantilla ' + (teamName || '') + '">' +
             (flagUrl ? '<img src="' + flagUrl + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
           '</button>'
         : '';
-      // Auto-shrink del nombre según longitud (cubre los 48 nombres del Mundial 2026)
+      // Auto-shrink agresivo del nombre según longitud (cubre los 48 nombres del Mundial 2026).
+      // Casos extremos: "Bosnia y Herzegovina" (20), "República de Corea" (18),
+      // "República Checa" (15), "Costa de Marfil" (15) — todos caben en el half
+      // sin clip gracias al floor de 7px. nowrap garantizado por CSS.
       const nameLen = (teamName || '').length;
-      const nameFs = nameLen <= 7 ? 17 : nameLen <= 9 ? 15 : nameLen <= 11 ? 13 : nameLen <= 13 ? 11 : 9;
+      const nameFs = nameLen <= 7 ? 13 : nameLen <= 9 ? 12 : nameLen <= 11 ? 10 : nameLen <= 13 ? 9 : nameLen <= 16 ? 8 : 7;
       return '<div class="dv2-exp-half ' + side + '">' +
         '<div class="dv2-exp-kit-color"></div>' +
         '<div class="dv2-exp-kit-bg" style="background-image:url(\'' + kitUrl + '\')"></div>' +
