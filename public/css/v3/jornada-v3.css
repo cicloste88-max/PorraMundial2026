@@ -365,7 +365,11 @@
     gap: 16px;
   }
   .jornada-sidebar { order: 2; }
-  .jornada-main    { order: 1; }
+  .jornada-main {
+    order: 1;
+    width: 100%;
+    flex: 1;
+  }
 }
 
 /* Cinta usuario móvil */
