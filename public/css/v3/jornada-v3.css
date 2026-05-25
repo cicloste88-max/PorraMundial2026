@@ -305,7 +305,7 @@
   transition: color .15s;
 }
 .jv2-boost-row label:hover,
-.jv2-boost:hover .jv2-boost-label { color: var(--fifa-gold); }
+.jv2-boost-label:hover { color: var(--fifa-gold); }
 .jv2-boost-row input[type="checkbox"],
 .jv2-boost-check {
   accent-color: var(--fifa-gold);

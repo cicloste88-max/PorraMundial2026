@@ -595,7 +595,14 @@ function openJcardModal(matchKey, opts) {
   opts = opts || {};
   const cardEl = document.getElementById('card-wrap-' + matchKey);
   if (!cardEl) {
-    renderAll(() => _showJcardModal(matchKey, opts));
+    // Si estamos en Grupos pero la card no está montada todavía → lazy renderAll
+    // Si estamos en Jornada (no hay groups-container) → ir directo al modal compact
+    const groupsContainer = document.getElementById('groups-container');
+    if (groupsContainer) {
+      renderAll(() => _showJcardModal(matchKey, opts));
+    } else {
+      _showJcardModal(matchKey, opts);
+    }
     return;
   }
   _showJcardModal(matchKey, opts);
@@ -609,7 +616,9 @@ function _showJcardModal(matchKey, opts) {
   if (prev) prev.remove();
 
   const initialCardEl = document.getElementById('card-wrap-' + matchKey);
-  if (!initialCardEl) return;
+  // El branch !editable (modal compact desde Jornada) NO necesita initialCardEl.
+  // El branch editable (Grupos compact card click) sí lo necesita para clonarlo.
+  if (!initialCardEl && !!opts.editable) return;
 
   const overlay = document.createElement('div');
   overlay.id = 'jcard-modal-overlay';
@@ -636,8 +645,8 @@ function _showJcardModal(matchKey, opts) {
   // READ-ONLY (Jornada Ver tarjeta) \u2014 clone path intact.
   // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (!editable) {
-    // Limpiar overlay/wrapper/closeBtn que se prepararon arriba (no se usan en compact)
-    overlay.remove();
+    // Limpiar overlay si fue insertado (defensivo - puede no estar aún en el DOM)
+    if (overlay.parentNode) overlay.remove();
 
     // Localizar el partido y la predicción del usuario
     const match = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(m => getMatchKey(m) === matchKey) : null;
