@@ -22,6 +22,21 @@
   window._liveScoresByMatchKey = window._liveScoresByMatchKey || {};
 
   // ─────────────────────────────────────────────────────────────
+  // Mapping ISO3 → ISO2 alineado con bucket miniatures/flags-sm/<ISO2>.webp.
+  // 48 entradas, una por equipo del Mundial 2026.
+  // Notas custom (no estándar ISO): ENG→EN (Inglaterra), SCO→SC (Escocia).
+  // Usado por _buildDMini y _buildDExpanded para inyectar --flag-rect-url.
+  // ─────────────────────────────────────────────────────────────
+  const ISO3_TO_ISO2 = {
+    MEX:'MX', RSA:'ZA', KOR:'KR', CZE:'CZ', CAN:'CA', BIH:'BA', QAT:'QA', SUI:'CH',
+    BRA:'BR', MAR:'MA', HAI:'HT', SCO:'SC', USA:'US', PAR:'PY', AUS:'AU', TUR:'TR',
+    GER:'DE', CUW:'CW', CIV:'CI', ECU:'EC', NED:'NL', JPN:'JP', SWE:'SE', TUN:'TN',
+    BEL:'BE', EGY:'EG', IRN:'IR', NZL:'NZ', ESP:'ES', CPV:'CV', KSA:'SA', URU:'UY',
+    FRA:'FR', SEN:'SN', IRQ:'IQ', NOR:'NO', ARG:'AR', ALG:'DZ', AUT:'AT', JOR:'JO',
+    POR:'PT', COD:'CD', UZB:'UZ', COL:'CO', ENG:'EN', CRO:'HR', GHA:'GH', PAN:'PA'
+  };
+
+  // ─────────────────────────────────────────────────────────────
   // Admin flag (cache) — para mostrar la sección "Simulacros"
   // window._isAdminCached: undefined/null = no comprobado, true/false = resultado
   //
@@ -287,6 +302,14 @@
     const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
     const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
 
+    // Rectangular flags (PR #93) — URL del bucket miniatures/flags-sm/<ISO2>.webp
+    // Se inyecta como CSS var --flag-rect-url leída por .dv2-mini-flag (CSS).
+    // El <img> legacy queda como fallback hidden por CSS (display:none).
+    const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
+    const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
+    const hFlagRectStyle = hIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + hIso2 + '.webp\')"' : '';
+    const aFlagRectStyle = aIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + aIso2 + '.webp\')"' : '';
+
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
 
@@ -307,7 +330,7 @@
       '<div class="' + classes + '" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<span class="dv2-mini-team">' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '" aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '"' + hFlagRectStyle + ' aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
           '<span class="dv2-mini-code">' + hCode + '</span>' +
         '</span>' +
         '<span class="dv2-mini-score">' +
@@ -317,7 +340,7 @@
         '</span>' +
         '<span class="dv2-mini-team right">' +
           '<span class="dv2-mini-code">' + aCode + '</span>' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '" aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '"' + aFlagRectStyle + ' aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
         '</span>' +
         '<span class="dv2-mini-right">' + rightHtml + '</span>' +
       '</div>'
@@ -395,18 +418,6 @@
     const aType = FORCE_AWAY.includes(m.away) ? 'away' : 'home';
     setTimeout(() => _checkKitConflictV3(card, hTeam, aTeam, hType, aType), 800);
   }
-
-  // Mapping ISO3 → ISO2 alineado con bucket miniatures/flags-sm/<ISO2>.webp.
-  // 48 entradas, una por equipo del Mundial 2026.
-  // Notas custom (no estándar ISO): ENG→EN (Inglaterra), SCO→SC (Escocia).
-  const ISO3_TO_ISO2 = {
-    MEX:'MX', RSA:'ZA', KOR:'KR', CZE:'CZ', CAN:'CA', BIH:'BA', QAT:'QA', SUI:'CH',
-    BRA:'BR', MAR:'MA', HAI:'HT', SCO:'SC', USA:'US', PAR:'PY', AUS:'AU', TUR:'TR',
-    GER:'DE', CUW:'CW', CIV:'CI', ECU:'EC', NED:'NL', JPN:'JP', SWE:'SE', TUN:'TN',
-    BEL:'BE', EGY:'EG', IRN:'IR', NZL:'NZ', ESP:'ES', CPV:'CV', KSA:'SA', URU:'UY',
-    FRA:'FR', SEN:'SN', IRQ:'IQ', NOR:'NO', ARG:'AR', ALG:'DZ', AUT:'AT', JOR:'JO',
-    POR:'PT', COD:'CD', UZB:'UZ', COL:'CO', ENG:'EN', CRO:'HR', GHA:'GH', PAN:'PA'
-  };
 
   function _buildDExpanded(m, idx) {
     const ctx = _getMatchCtx(m);
