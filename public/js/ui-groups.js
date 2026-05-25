@@ -595,7 +595,14 @@ function openJcardModal(matchKey, opts) {
   opts = opts || {};
   const cardEl = document.getElementById('card-wrap-' + matchKey);
   if (!cardEl) {
-    renderAll(() => _showJcardModal(matchKey, opts));
+    // Si estamos en Grupos pero la card no está montada todavía → lazy renderAll
+    // Si estamos en Jornada (no hay groups-container) → ir directo al modal compact
+    const groupsContainer = document.getElementById('groups-container');
+    if (groupsContainer) {
+      renderAll(() => _showJcardModal(matchKey, opts));
+    } else {
+      _showJcardModal(matchKey, opts);
+    }
     return;
   }
   _showJcardModal(matchKey, opts);
@@ -609,7 +616,9 @@ function _showJcardModal(matchKey, opts) {
   if (prev) prev.remove();
 
   const initialCardEl = document.getElementById('card-wrap-' + matchKey);
-  if (!initialCardEl) return;
+  // El branch !editable (modal compact desde Jornada) NO necesita initialCardEl.
+  // El branch editable (Grupos compact card click) sí lo necesita para clonarlo.
+  if (!initialCardEl && !!opts.editable) return;
 
   const overlay = document.createElement('div');
   overlay.id = 'jcard-modal-overlay';
@@ -636,33 +645,109 @@ function _showJcardModal(matchKey, opts) {
   // READ-ONLY (Jornada Ver tarjeta) \u2014 clone path intact.
   // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (!editable) {
-    const clone = initialCardEl.cloneNode(true);
-    const origSelects  = initialCardEl.querySelectorAll('select');
-    const cloneSelects = clone.querySelectorAll('select');
-    origSelects.forEach((s, i) => { if (cloneSelects[i]) cloneSelects[i].value = s.value; });
-    const origInputs  = initialCardEl.querySelectorAll('input');
-    const cloneInputs = clone.querySelectorAll('input');
-    origInputs.forEach((inp, i) => {
-      if (!cloneInputs[i]) return;
-      if (inp.type === 'checkbox' || inp.type === 'radio') cloneInputs[i].checked = inp.checked;
-      else cloneInputs[i].value = inp.value;
-    });
-    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-    clone.querySelectorAll('button,input,select').forEach(el => {
-      el.disabled = true;
-      el.style.pointerEvents = 'none';
-    });
-    clone.style.margin = '0 auto';
-    clone.style.left = '0';
-    clone.style.right = '0';
-    wrapper.appendChild(closeBtn);
-    wrapper.appendChild(clone);
-    overlay.appendChild(wrapper);
-    document.body.appendChild(overlay);
-    clone.style.width = (clone.offsetWidth - 5) + 'px';
-    clone.style.margin = '0 auto';
-    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-    closeBtn.onclick = () => overlay.remove();
+    // Limpiar overlay si fue insertado (defensivo - puede no estar aún en el DOM)
+    if (overlay.parentNode) overlay.remove();
+
+    // Localizar el partido y la predicción del usuario
+    const match = (typeof PARTIDOS !== 'undefined') ? PARTIDOS.find(m => getMatchKey(m) === matchKey) : null;
+    if (!match) return;
+
+    const pred = (typeof predictions !== 'undefined' && predictions[matchKey]) ? predictions[matchKey] : {};
+    const matchDate = match.date ? match.date.substring(0, 10) : null;
+    const isBoost = !!(matchDate && (typeof boostPicks !== 'undefined') && boostPicks[matchDate] === matchKey);
+
+    // Calcular flags rectangulares (mismo patrón que builder de cards)
+    const SB_LOCAL = (typeof SB !== 'undefined') ? SB : '';
+    const hTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(t => t.name === match.home) : null;
+    const aTeam = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(t => t.name === match.away) : null;
+    // ISO3_TO_ISO2 ya disponible en top-level (añadido en PR #95 sprint jornada-flags-rect)
+    const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
+    const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
+    const hFlagUrl = hIso2 ? (SB_LOCAL + '/miniatures/flags-sm/' + hIso2 + '.webp') : '';
+    const aFlagUrl = aIso2 ? (SB_LOCAL + '/miniatures/flags-sm/' + aIso2 + '.webp') : '';
+
+    // Formateo de día/hora
+    const stadium = match.stadium || '';
+    let whenLabel = '';
+    if (match.date) {
+      const d = new Date(match.date);
+      const dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
+      const day = d.getDate();
+      const monthShort = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      whenLabel = `${dow} · ${day} ${monthShort} · ${hh}:${mm}`;
+    }
+
+    // Score predicho (puede estar vacío si el usuario no guardó nada)
+    const hasScore = pred && pred.local !== undefined && pred.local !== null && pred.local !== '';
+    const scoreH = hasScore ? pred.local : '—';
+    const scoreA = hasScore ? pred.visitante : '—';
+
+    // Goleador (solo si está)
+    const scorer = (pred && pred.scorer) ? pred.scorer : null;
+
+    // Timestamp guardado
+    const savedAt = pred && pred.saved_at ? new Date(pred.saved_at) : null;
+    const savedLabel = savedAt
+      ? savedAt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      : 'no guardado';
+
+    // Multiplicador puntos
+    const ptsLabel = isBoost ? '×2 pts' : '×1 pts';
+
+    // ─── HTML del modal compact ───
+    const compactOverlay = document.createElement('div');
+    compactOverlay.id = 'jcard-modal-overlay';
+    compactOverlay.className = 'jcard-modal-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'jcard-compact' + (isBoost ? ' is-boost' : '');
+
+    card.innerHTML =
+      (isBoost ? '<div class="jcard-compact-badge">🔥 BOOST ACTIVO</div>' : '') +
+      '<button type="button" class="jcard-compact-close" aria-label="Cerrar">✕</button>' +
+      '<div class="jcard-compact-context">' +
+        (stadium ? '<div class="jcard-compact-stadium">🏟️ ' + stadium + '</div>' : '') +
+        (whenLabel ? '<div class="jcard-compact-when">' + whenLabel + '</div>' : '') +
+      '</div>' +
+      '<div class="jcard-compact-teams">' +
+        '<div class="jcard-compact-team">' +
+          (hFlagUrl ? '<div class="jcard-compact-flag" style="background-image:url(\'' + hFlagUrl + '\')"></div>' : '<div class="jcard-compact-flag"></div>') +
+          '<div class="jcard-compact-team-code">' + (hTeam ? (hTeam.code || hTeam.flag || match.home) : match.home) + '</div>' +
+        '</div>' +
+        '<div class="jcard-compact-score">' +
+          '<div class="jcard-compact-score-label">Tu predicción</div>' +
+          '<div class="jcard-compact-score-num">' +
+            (hasScore ? scoreH : '<span class="jcard-compact-score-empty">—</span>') +
+            '<span class="jcard-compact-score-sep">:</span>' +
+            (hasScore ? scoreA : '<span class="jcard-compact-score-empty">—</span>') +
+          '</div>' +
+        '</div>' +
+        '<div class="jcard-compact-team">' +
+          (aFlagUrl ? '<div class="jcard-compact-flag" style="background-image:url(\'' + aFlagUrl + '\')"></div>' : '<div class="jcard-compact-flag"></div>') +
+          '<div class="jcard-compact-team-code">' + (aTeam ? (aTeam.code || aTeam.flag || match.away) : match.away) + '</div>' +
+        '</div>' +
+      '</div>' +
+      (scorer ? (
+        '<div class="jcard-compact-scorer">' +
+          '<span class="jcard-compact-scorer-icon">⚽</span>' +
+          '<div class="jcard-compact-scorer-body">' +
+            '<div class="jcard-compact-scorer-label">Goleador</div>' +
+            '<div class="jcard-compact-scorer-name">' + scorer + '</div>' +
+          '</div>' +
+        '</div>'
+      ) : '') +
+      '<div class="jcard-compact-footer">' +
+        '<span class="jcard-compact-footer-saved">Guardado: ' + savedLabel + '</span>' +
+        '<span class="jcard-compact-footer-pts">' + ptsLabel + '</span>' +
+      '</div>';
+
+    compactOverlay.appendChild(card);
+    document.body.appendChild(compactOverlay);
+
+    compactOverlay.onclick = (e) => { if (e.target === compactOverlay) compactOverlay.remove(); };
+    card.querySelector('.jcard-compact-close').onclick = () => compactOverlay.remove();
     return;
   }
 
