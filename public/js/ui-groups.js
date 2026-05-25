@@ -410,6 +410,20 @@ window.renderVistaJornada = renderVistaJornada;
 //                                        + chip dorado pts ganados (con marca ×2 si boost+exacto).
 //   Boost row debajo de chips.
 // `live` es la fila de window._liveScoresByMatchKey si existe (puede ser null).
+
+// Mapping ISO3 → ISO2 alineado con bucket miniatures/flags-sm/<ISO2>.webp.
+// 48 entradas, una por equipo del Mundial 2026.
+// Notas custom (no estándar ISO): ENG→EN (Inglaterra), SCO→SC (Escocia).
+// Duplicado de ui-directo.js IIFE — mantenerlos sincronizados.
+const ISO3_TO_ISO2 = {
+  MEX:'MX', RSA:'ZA', KOR:'KR', CZE:'CZ', CAN:'CA', BIH:'BA', QAT:'QA', SUI:'CH',
+  BRA:'BR', MAR:'MA', HAI:'HT', SCO:'SC', USA:'US', PAR:'PY', AUS:'AU', TUR:'TR',
+  GER:'DE', CUW:'CW', CIV:'CI', ECU:'EC', NED:'NL', JPN:'JP', SWE:'SE', TUN:'TN',
+  BEL:'BE', EGY:'EG', IRN:'IR', NZL:'NZ', ESP:'ES', CPV:'CV', KSA:'SA', URU:'UY',
+  FRA:'FR', SEN:'SN', IRQ:'IQ', NOR:'NO', ARG:'AR', ALG:'DZ', AUT:'AT', JOR:'JO',
+  POR:'PT', COD:'CD', UZB:'UZ', COL:'CO', ENG:'EN', CRO:'HR', GHA:'GH', PAN:'PA'
+};
+
 function _buildJCard(m, idx, date, boostKey, live) {
   const matchKey = getMatchKey(m);
   const pred = predictions[matchKey] || {};
@@ -423,6 +437,14 @@ function _buildJCard(m, idx, date, boostKey, live) {
   const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
   const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
   const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
+
+  // Rectangular flags planas (sprint Jornada Flags Rect) — URL del bucket
+  // miniatures/flags-sm/<ISO2>.webp. Se inyecta como CSS var --flag-rect-url
+  // leída por .jv2-flag (CSS). El <img> legacy queda como fallback hidden por CSS.
+  const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
+  const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
+  const hFlagRectStyle = hIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + hIso2 + '.webp\')"' : '';
+  const aFlagRectStyle = aIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + aIso2 + '.webp\')"' : '';
 
   // Estado del pronóstico
   const hasPred = pred.l !== null && pred.l !== undefined && pred.v !== null && pred.v !== undefined;
@@ -496,7 +518,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
       '</div>' +
       '<div class="jv2-card-mid">' +
         '<div class="jv2-team">' +
-          '<div class="jv2-flag"><img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
+          '<div class="jv2-flag"' + hFlagRectStyle + '><img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
           '<div class="jv2-team-code">' + hCode + '</div>' +
         '</div>' +
         '<div class="jv2-score">' +
@@ -505,7 +527,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
           '<span class="jv2-score-num">' + scoreR + '</span>' +
         '</div>' +
         '<div class="jv2-team">' +
-          '<div class="jv2-flag"><img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
+          '<div class="jv2-flag"' + aFlagRectStyle + '><img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
           '<div class="jv2-team-code">' + aCode + '</div>' +
         '</div>' +
       '</div>' +

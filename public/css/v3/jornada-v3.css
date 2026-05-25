@@ -189,13 +189,28 @@
   gap: 12px;
 }
 .jv2-flag {
-  width: 40px; height: 40px;
-  background: var(--ink-700);
-  border: 1.5px solid var(--ink-600);
+  width: 40px; height: 27px;
+  border-radius: 3px;
+  background-color: var(--ink-700);
+  background-image: var(--flag-rect-url);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Border eliminado — sobre fondo card ink-800/ink-700 se veía como contorno claro.
+     La sombra externa basta para anclar visualmente el rectángulo. */
   box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+/* El <img> legacy se mantiene en el HTML como fallback semántico (alt)
+   pero NO se renderiza visualmente — el background-image del .jv2-flag toma el control. */
+.jv2-flag img {
+  display: none;
 }
 .jv2-card.is-boost .jv2-flag {
-  border-color: rgba(201,169,97,.55);
+  outline: 1px solid rgba(201,169,97,.55);
+  outline-offset: -1px;
 }
 .jv2-team-code {
   font-family: var(--font-display);
