@@ -115,38 +115,43 @@
 .dv2-mini-flag {
   width: 44px; height: 30px;
   border-radius: 4px;
-  background: var(--ink-700);
-  border: 1px solid rgba(201,169,97,.35);
+  /* Bandera rectangular plana inyectada via JS como CSS var --flag-rect-url.
+     El <img> legacy queda hidden por CSS para compat (ver regla más abajo). */
+  background-color: var(--ink-700);
+  background-image: var(--flag-rect-url);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  /* Sin border dorado (antes rgba(201,169,97,.35) — daba contorno claro sobre ink-900).
+     Sin inset blanco al .06 (antes inset 0 0 0 1px rgba(255,255,255,.06) — otro contorno sutil).
+     Mantiene solo la sombra externa para anclar visualmente el rectángulo. */
   box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.06),
     0 2px 6px rgba(0,0,0,.55),
     0 0 0 .5px rgba(0,0,0,.4);
   position: relative;
 }
-/* Reflejo sutil tipo tela (banner) */
+/* Reflejo sutil tipo tela (banner) — atenuado para no competir con la flag plana */
 .dv2-mini-flag::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,.18) 0%, transparent 35%, transparent 70%, rgba(0,0,0,.25) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, transparent 35%, transparent 70%, rgba(0,0,0,.15) 100%);
   pointer-events: none;
   z-index: 2;
 }
 .dv2-mini.is-live .dv2-mini-flag {
-  border-color: rgba(227,6,19,.7);
+  outline: 1px solid rgba(227,6,19,.7);
+  outline-offset: -1px;
   box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.06),
     0 0 10px rgba(227,6,19,.35),
     0 2px 6px rgba(0,0,0,.55);
 }
+/* El <img> legacy se mantiene en el HTML como fallback semántico (alt)
+   pero NO se renderiza visualmente — el background-image del padre toma el control. */
 .dv2-mini-flag img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  display: block;
-  position: static;
-  transform: none;
+  display: none;
 }
 
 .dv2-mini-code {
