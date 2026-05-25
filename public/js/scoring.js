@@ -1358,6 +1358,10 @@ function checkKitConflict(card, idx, homeTeam, awayTeam, hKitType, aKitType) {
   // ─────────────────────────────────────────────────────────────
 function renderAll(onComplete) {
   const container = document.getElementById('groups-container');
+  // Guard: si la vista activa no es Grupos (no hay #groups-container en el DOM),
+  // saltar el render pero respetar el callback para que el caller continúe su flujo.
+  // Evita "Cannot set properties of null" cuando se invoca desde Jornada/Directo/KO.
+  if (!container) { if (typeof onComplete === 'function') onComplete(); return; }
   container.innerHTML = '';
   // Sprint B · top chips A-L (sticky letterbar)
   if (typeof window._renderGruposLetterBar === 'function') window._renderGruposLetterBar();
