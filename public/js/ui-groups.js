@@ -63,7 +63,10 @@ function checkGroupsComplete() {
 }
 
 
-/* ── Ticker de jornadas de boost — pastillas en barra superior ── */
+/* ── Ticker de jornadas de boost — barra v3 (refactor B1, sprint Jornada UX) ──
+   Container .jv2-boost-bar con paleta v3 (dorado-azul). Chips usan CSS classes
+   en jornada-v3.css en lugar de inline styles. Funcionalidad intacta:
+   click chip → tickerExpandJornada(date). */
 function renderBoostTicker() {
   const ticker = document.getElementById('boost-ticker');
   if (!ticker) return;
@@ -90,65 +93,42 @@ function renderBoostTicker() {
     return;
   }
 
-  ticker.style.display = 'flex';
-  ticker.style.flexWrap = 'wrap';
-  ticker.style.gap = '8px';
-  ticker.style.alignItems = 'center';
-  ticker.style.padding = '8px 14px';
+  // Reset inline styles del CSS embebido viejo (por si quedó cacheado en el DOM)
+  ticker.removeAttribute('style');
+  ticker.className = 'jv2-boost-bar';
 
-  let html = '<span style="font-size:11px;font-weight:700;color:#fb923c;white-space:nowrap;letter-spacing:.04em;flex-shrink:0">🔥 BOOST</span>';
+  let html = '<span class="jv2-boost-bar-label">🔥 Boosts</span>';
 
-  // Pastilla especial "HOY" si hay partidos hoy y falta el boost
+  // Pastilla "HOY" — distinta clase según boost ya marcado o no
   if (jornadaHoy && !boostPicks[today]) {
-    html += `<button onclick="tickerExpandJornada('${today}')" style="
-      display:inline-flex;align-items:center;gap:5px;
-      padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;
-      border:1.5px solid rgb(234,88,12);
-      background:rgba(124,45,18,.5);color:rgb(251,191,36);
-      cursor:pointer;animation:boostPulse 1.5s ease-in-out infinite;
-      white-space:nowrap;
-    ">⚡ HOY — Elige tu boost</button>`;
+    html += `<button type="button" class="jv2-boost-chip is-today-pending" onclick="tickerExpandJornada('${today}')">⚡ HOY · Elige boost</button>`;
   } else if (jornadaHoy && boostPicks[today]) {
     const bMatch = PARTIDOS.find(m => getMatchKey(m) === boostPicks[today]);
     const label = bMatch ? bMatch.home.split(' ')[0] + ' vs ' + bMatch.away.split(' ')[0] : 'asignado';
-    html += `<button onclick="tickerExpandJornada('${today}')" style="
-      display:inline-flex;align-items:center;gap:5px;
-      padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;
-      border:1px solid rgba(74,222,128,.4);
-      background:rgba(22,101,52,.3);color:rgb(74,222,128);
-      cursor:pointer;white-space:nowrap;
-    ">✓ HOY: ${label}</button>`;
+    html += `<button type="button" class="jv2-boost-chip is-today-done" onclick="tickerExpandJornada('${today}')">✓ HOY: ${label}</button>`;
   }
 
   // Pastillas de jornadas pendientes (próximas, no hoy)
   const pendientesSinHoy = pendientes.filter(d => d !== today);
-  // Mostrar máx 3 jornadas pendientes para no saturar
   pendientesSinHoy.slice(0,3).forEach(d => {
     const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'short'});
     const nMatches = jornadasMap[d].length;
-    html += `<button onclick="tickerExpandJornada('${d}')" style="
-      display:inline-flex;align-items:center;gap:4px;
-      padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;
-      border:1px solid rgba(251,146,60,.25);
-      background:rgba(67,20,7,.4);color:rgba(251,146,60,.7);
-      cursor:pointer;white-space:nowrap;
-      animation:boostPulse 1.5s ease-in-out infinite;
-    ">🔥 ${dayLabel} (${nMatches})</button>`;
+    html += `<button type="button" class="jv2-boost-chip is-pending" onclick="tickerExpandJornada('${d}')">🔥 ${dayLabel} (${nMatches})</button>`;
   });
 
   // Si quedan más jornadas pendientes, mostrar contador
   if (pendientesSinHoy.length > 3) {
-    html += `<span style="font-size:10px;color:#6b7280">+${pendientesSinHoy.length - 3} más</span>`;
+    html += `<span class="jv2-boost-bar-more">+${pendientesSinHoy.length - 3} más</span>`;
   }
 
   ticker.innerHTML = html;
 
-  // Panel expandible de partidos de la jornada (se crea dinámicamente)
+  // Panel expandible de partidos de la jornada (se crea dinámicamente — mantener compat)
   let panel = document.getElementById('boost-ticker-panel');
   if (!panel) {
     panel = document.createElement('div');
     panel.id = 'boost-ticker-panel';
-    panel.style.cssText = 'display:none;width:100%;padding:8px 0 4px;border-top:1px solid rgba(124,45,18,.3);margin-top:4px;display:flex;gap:6px;flex-wrap:wrap';
+    panel.style.cssText = 'display:none;width:100%;padding:8px 0 4px;border-top:1px solid rgba(201,169,97,.15);margin-top:6px;gap:6px;flex-wrap:wrap;';
     ticker.appendChild(panel);
   }
 }
