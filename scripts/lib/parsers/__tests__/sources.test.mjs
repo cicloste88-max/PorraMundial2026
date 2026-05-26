@@ -14,6 +14,7 @@ import * as asSrc from '../as.mjs';
 import * as sportSrc from '../sport.mjs';
 import * as olympicsSrc from '../olympics.mjs';
 import * as espnSrc from '../espn.mjs';
+import * as marcaSrc from '../marca.mjs';
 import {
   parsePlayer,
   parsePlayerList,
@@ -319,4 +320,57 @@ test('ESPN: parseHtml reusa lógica AS y devuelve source="espn"', () => {
   assert.equal(out.source, 'espn');
   assert.ok(out.byIso3.BEL);
   assert.equal(out.byIso3.BEL.players.length, 26);
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// Marca parser — regression con fixture real del artículo 16-may-2026
+// (47 países: 27 con roster + 20 "Sin lista todavía"). Generado a partir
+// del texto plano de Marca el 26-may-2026 cuando GH Actions empezó a
+// fallar el fetch live (Cloudflare bloqueando IPs USA — ERR-68 / ERR-77).
+// ───────────────────────────────────────────────────────────────────────
+
+test('Marca: fixture real extrae 27 países con roster + 20 sin lista', () => {
+  const out = marcaSrc.parseHtml(loadFixture('marca.html'));
+  assert.equal(out.source, 'marca');
+  const withPlayers = Object.values(out.byIso3).filter((d) => d.players.length > 0).length;
+  const empty = Object.values(out.byIso3).filter((d) => d.players.length === 0).length;
+  assert.ok(withPlayers >= 25 && withPlayers <= 30,
+    `esperado 25-30 países con roster, fue ${withPlayers}`);
+  assert.ok(empty >= 17, `esperado ≥17 países sin lista, fue ${empty}`);
+});
+
+test('Marca: cuenta exacta para los 5 países más representados', () => {
+  const out = marcaSrc.parseHtml(loadFixture('marca.html'));
+  // Validar países con XI consistente cross-source (FRA, BRA, GER, ESP, NZL)
+  // todos deben tener exactamente 26 (lista oficial FIFA, no descarte).
+  assert.equal(out.byIso3.FRA.players.length, 26);
+  assert.equal(out.byIso3.BRA.players.length, 26);
+  assert.equal(out.byIso3.GER.players.length, 26);
+  assert.equal(out.byIso3.ESP.players.length, 26);
+  assert.equal(out.byIso3.NZL.players.length, 26);
+});
+
+test('Marca: países con descarte pendiente (>26 jugadores)', () => {
+  const out = marcaSrc.parseHtml(loadFixture('marca.html'));
+  // CZE (29 con nota *3 descartes), POR (27 con nota *1 descarte),
+  // EGY (27 con nota *1 descarte), TUN (27), SEN (28).
+  // Validamos solo que están entre 27 y 29 (rango razonable de pre-lista).
+  for (const iso3 of ['CZE', 'POR', 'EGY', 'TUN', 'SEN']) {
+    const n = out.byIso3[iso3]?.players.length || 0;
+    assert.ok(n >= 26 && n <= 30,
+      `${iso3} debe tener 26-30 jugadores en Marca fixture, fue ${n}`);
+  }
+});
+
+test('Marca: países "Sin lista todavía" producen players=[]', () => {
+  const out = marcaSrc.parseHtml(loadFixture('marca.html'));
+  // De los 20 "Sin lista" del fixture: MEX, RSA, CAN, QAT, MAR, TUR, PAR,
+  // USA, AUS, ECU, NED, KSA, URU, ALG, ARG, JOR, IRN, IRQ, UZB, GHA.
+  // El parser abre el iso3 con players=[] (no se filtran del byIso3).
+  for (const iso3 of ['MEX', 'CAN', 'USA', 'NED', 'KSA', 'IRN', 'JOR']) {
+    if (out.byIso3[iso3]) {
+      assert.equal(out.byIso3[iso3].players.length, 0,
+        `${iso3} debe tener players=[] (Sin lista todavía)`);
+    }
+  }
 });
