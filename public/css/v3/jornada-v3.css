@@ -669,14 +669,11 @@
   margin-top: 10px;
   padding-top: 12px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   font-family: var(--font-display);
   font-size: 10px;
   color: var(--ink-400, #6b7280);
-}
-.jcard-compact-footer-saved {
-  letter-spacing: .05em;
 }
 .jcard-compact-footer-pts {
   font-weight: 700;
