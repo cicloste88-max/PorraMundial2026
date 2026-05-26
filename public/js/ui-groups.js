@@ -687,12 +687,6 @@ function _showJcardModal(matchKey, opts) {
     // Goleador (solo si está)
     const scorer = (pred && pred.scorer) ? pred.scorer : null;
 
-    // Timestamp guardado
-    const savedAt = pred && pred.saved_at ? new Date(pred.saved_at) : null;
-    const savedLabel = savedAt
-      ? savedAt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-      : 'no guardado';
-
     // Multiplicador puntos
     const ptsLabel = isBoost ? '×2 pts' : '×1 pts';
 
@@ -739,7 +733,6 @@ function _showJcardModal(matchKey, opts) {
         '</div>'
       ) : '') +
       '<div class="jcard-compact-footer">' +
-        '<span class="jcard-compact-footer-saved">Guardado: ' + savedLabel + '</span>' +
         '<span class="jcard-compact-footer-pts">' + ptsLabel + '</span>' +
       '</div>';
 
