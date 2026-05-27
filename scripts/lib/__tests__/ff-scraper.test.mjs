@@ -8,7 +8,13 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { parseStartingXIFromHtml } from '../ff-scraper.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = resolve(__dirname, '../../../tests/fixtures/ff');
 
 // Fixture mínimo replicando el patrón observado por San en FF España.
 // 11 titulares (XI 4-3-3): 1 PO + 4 DEF + 3 MC + 3 DEL.
@@ -155,4 +161,68 @@ test('parseStartingXIFromHtml: filtra slots con clase supl-N si caen por error e
   const xi = parseStartingXIFromHtml(corrupted);
   assert.ok(!xi.includes('Ferran Torres'), 'slot con supl-N debe filtrarse');
   assert.equal(xi.length, 10, 'queda con 10 si se filtra el malformado');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Regresión contra HTML REAL ESP (27-may-2026, 780KB)
+// Descargado del artifact sync-squads-log-XXX tras fetch_sources.py Scrapling
+// con StealthyFetcher en GH Actions. Caso que descubrió el bug del primer
+// img siendo el escudo del club (alt="") → parser extraía "1.81 50%" en vez
+// de nombres. Fix: img[alt] filter con alt no-vacío.
+// ────────────────────────────────────────────────────────────────────────────
+
+const REAL_ESP_HTML = readFileSync(resolve(FIXTURES_DIR, 'esp.html'), 'utf-8');
+
+test('parseStartingXIFromHtml: HTML REAL ESP devuelve los 11 titulares correctos', () => {
+  const xi = parseStartingXIFromHtml(REAL_ESP_HTML);
+  assert.equal(xi.length, 11, `esperado 11, fue ${xi.length}: ${xi.join(', ')}`);
+
+  // Validado por San con DOM inspector el 27-may. El XI tipo ESP vs Cabo
+  // Verde con seleccionador actual (data-onceff-x/y disposición 4-3-3).
+  const expected = [
+    'Joan Garcia',
+    'Marc Cucurella',
+    'Aymeric Laporte',
+    'Pau Cubarsí',
+    'Marcos Llorente',
+    'Fabián Ruiz',
+    'Rodri Hernández',
+    'Pedri González',
+    'Nico Williams',
+    'Mikel Oyarzabal',
+  ];
+  for (const name of expected) {
+    assert.ok(
+      xi.includes(name),
+      `falta '${name}' en XI extraído del HTML real ESP: ${xi.join(', ')}`
+    );
+  }
+  // Ferran Torres puede venir con acento o sin (FF usa "Ferrán Torres")
+  assert.ok(
+    xi.some((n) => /^Ferr[aá]n Torres$/.test(n)),
+    'falta Ferrán Torres'
+  );
+});
+
+test('parseStartingXIFromHtml: HTML REAL ESP NO devuelve "1.81 50%" tipo widgets', () => {
+  // Regresión: el parser inicial extraía "1.81 50%" del widget de probabilidad
+  // porque el primer <img> de cada slot es el escudo del club (alt vacío) y
+  // caía al fallback de texto del <a>. El fix de img[alt] con alt no-vacío
+  // garantiza que sólo se extraen nombres reales de jugador.
+  const xi = parseStartingXIFromHtml(REAL_ESP_HTML);
+  for (const n of xi) {
+    assert.ok(!/^\d+(\.\d+)?%?$/.test(n), `'${n}' parece un número/porcentaje, no nombre`);
+    assert.ok(!/\d+\s*\d+%/.test(n), `'${n}' parece "altura X%" del widget`);
+  }
+});
+
+test('parseStartingXIFromHtml: HTML REAL ESP no incluye suplentes', () => {
+  const xi = parseStartingXIFromHtml(REAL_ESP_HTML);
+  const knownSuplentesEsp = ['Unai Simón', 'David Raya', 'Eric García', 'Pedro Porro'];
+  for (const sup of knownSuplentesEsp) {
+    assert.ok(
+      !xi.includes(sup),
+      `suplente '${sup}' NO debería estar en XI: ${xi.join(', ')}`
+    );
+  }
 });
