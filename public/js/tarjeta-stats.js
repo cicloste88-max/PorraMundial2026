@@ -342,10 +342,14 @@
   }
 
   // ── Mount / unmount ─────────────────────────────────────
+  // El paquete original asumía que las pages vivían dentro de un .phone shell
+  // y por eso hacía phone.appendChild. En este proyecto las pages
+  // (page-jornada, page-grupos, ...) son hijas DIRECTAS de <body>, y .phone
+  // es solo el header FIFA decorativo creado por mundial-shell-v3.js (109px).
+  // Montar dentro del .phone deja la pantalla invisible.
+  // Diagnóstico de San in-vivo: w:0 h:0 dentro de .phone vs w:358 h:1392 en body.
   function getMountTarget() {
-    // .phone es la clase del shell v3; fallback a body si no existe.
-    const phone = document.querySelector('.phone') || document.body;
-    return phone;
+    return document.body;
   }
 
   function hideOtherPages() {
