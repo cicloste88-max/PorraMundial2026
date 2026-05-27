@@ -209,5 +209,6 @@ jobs:
             sync-squads.log
             cache/squads-calendar.json
             cache/sources/fetch-summary.json
+            cache/sources/ff-*.html
           retention-days: 14
           if-no-files-found: warn
