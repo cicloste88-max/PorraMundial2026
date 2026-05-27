@@ -70,6 +70,12 @@ loadScript('/js/leagues.js')
   .then(() => loadScript('/js/admin.js'))
   .then(() => loadScript('/js/ui-directo.js'))
   .then(() => loadScript('/js/live-sync.js'))
+  // Tarjeta · Datos del partido (Fase 1): mock provider + render screen.
+  // Carga después de data.js + ui-groups.js + live-sync.js (lee PARTIDOS,
+  // EQUIPOS, predictions, boostPicks, _liveScoresByMatchKey, getMatchKey).
+  // match-stats DEBE preceder a tarjeta-stats (provee window.fetchMatchStats).
+  .then(() => loadScript('/js/match-stats.js'))
+  .then(() => loadScript('/js/tarjeta-stats.js'))
   // App Shell (F7.4) — inerte en F7.4-A; shell.js último por consistencia con el orquestador
   .then(() => loadScript('/js/components/icons.js'))
   .then(() => loadScript('/js/components/bottom-tab.js'))
