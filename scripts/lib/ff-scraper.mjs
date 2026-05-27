@@ -6,11 +6,19 @@
 //
 // Si el paso 1 no encuentra noticia → roster=[] e is_final=false (solo paso 3 disponible).
 // El XI titular se cruza con el roster vía matchAgainstRoster (name-matcher.mjs).
+//
+// 27-may-2026: paso 3 refactorizado a parser cheerio que extrae los 11 desde el
+// contenedor estable div[class*="jugadores-titulares-"] > div.tipo_campo (con sus
+// data-* attrs). El parser previo basado en <img alt> perdía nombres que vivían
+// como texto bajo la camiseta (PO Joan García, MC Pedri/Fabián en ESP), causando
+// el XI 8/11 sistemático en Tier A. Selector validado por San con HTML real ESP.
 
+import * as cheerio from 'cheerio';
 import { matchAgainstRoster } from './name-matcher.mjs';
+import { loadCachedHtml } from './parsers/_util.mjs';
 import { decode } from 'html-entities';
 
-const FF_BASE = 'https://www.futbolfantasy.com/world-cup';
+const FF_BASE = 'https://www.futbolfantasy.com';
 const UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
@@ -136,70 +144,103 @@ export async function parseNewsRoster(newsUrl, opts = {}) {
   return players;
 }
 
-// Paso 3 — extraer los 11 nombres del once tipo en /equipos/<slug>
+// ────────────────────────────────────────────────────────────────────────────
+// Paso 3 — XI titular vía cheerio sobre div[class*="jugadores-titulares-"]
+// ────────────────────────────────────────────────────────────────────────────
+//
+// FF estructura validada 27-may-2026 con HTML real ESP:
+//
+//   <div class="jugadores-titulares-22208 mod lesionados mb-0">
+//     <div class="jugador_7279 tipo_campo camiseta-wrapper portero"
+//          data-onceff="titular" data-equipo="ESP" ...>
+//       <a class="camiseta" href="/jugadores/joan-garcia/world-cup-2026">
+//         <img alt="Joan Garcia" src="..."/>
+//       </a>
+//       ...
+//     </div>
+//     <div class="jugador_5013 tipo_campo ..."> ... </div>  ← x10 más
+//   </div>
+//
+// Selector: hijos directos div.tipo_campo (NO supl-N), datos en data-* attrs.
+// Hay un mirror div.tipo_lista.d-none por jugador pero no aporta nada nuevo.
+
+/**
+ * Parsea el HTML completo de /equipos/<slug> de FF y devuelve los 11 nombres
+ * del XI titular. Reemplaza el parser previo basado en <img alt> que perdía
+ * nombres en texto bajo camisetas (8/11 sistemático en Tier A).
+ *
+ * @returns {string[]} array de hasta 11 nombres en orden DOM
+ */
+export function parseStartingXIFromHtml(html) {
+  if (!html || html.length < 1000) return [];
+
+  // Si FF aún no ha publicado el XI predicho, sirve la imagen de campo vacío.
+  // El texto "Alineación aún no disponible" se inyecta por JS tras hidratación
+  // cliente, no aparece en HTML servido — detectamos la imagen.
+  if (/\/alineaciones\/0\.jpg/i.test(html)) return [];
+
+  const $ = cheerio.load(html);
+  const $tit = $('div[class*="jugadores-titulares-"]').first();
+  if ($tit.length === 0) return [];
+
+  const names = [];
+  $tit.children('div.tipo_campo').each((_, el) => {
+    const $el = $(el);
+    const classes = $el.attr('class') || '';
+    // Excluir slots de suplentes que pudieran caer aquí por error de marcado.
+    if (/\bsupl-\d+\b/.test(classes)) return;
+
+    // Nombre prioritario: <img alt> dentro de <a.camiseta>.
+    const $cam = $el.children('a.camiseta').first();
+    const altName = $cam.find('img').first().attr('alt');
+    if (altName) {
+      const n = decodeHtml(altName).trim();
+      if (n) {
+        names.push(n);
+        return;
+      }
+    }
+
+    // Fallback: texto del <a> si <img alt> está vacío (raro).
+    const linkText = $cam.text().trim();
+    if (linkText) names.push(linkText);
+  });
+
+  return names.slice(0, 11);
+}
+
+/**
+ * @deprecated wrapper legacy que hace fetch + parse. Conservado por
+ * compatibilidad con tests existentes. Producción usa parseStartingXIFromHtml
+ * directamente sobre el HTML cacheado por fetch_sources.py.
+ */
 export async function parseStartingXI(slug, opts = {}) {
   const url = `${FF_BASE}/equipos/${slug}`;
   const html = await fetchText(url, opts);
-
-  // Si FF aún no ha publicado el XI predicho, sirve la imagen de campo vacío
-  // (alineaciones/0.jpg). El texto "Alineación aún no disponible" se inyecta por JS
-  // tras hidratación cliente, no aparece en HTML servido, por eso detectamos la imagen.
-  if (/\/alineaciones\/0\.jpg/i.test(html)) {
-    if (opts.verbose) console.log('  → XI placeholder (alineaciones/0.jpg) detectado, xi_names=[]');
-    return [];
-  }
-
-  // Localizar el inicio de la sección "Posible once tipo" / "Once tipo" en el HTML
-  const anchor = html.search(/Posible once tipo|Once tipo|Once probable/i);
-  const slice = anchor >= 0 ? html.slice(anchor) : html;
-
-  // Estrategia A: extraer todos los alt= de <img> dentro de la sección (los 11 primeros)
-  const altRe = /<img\b[^>]*\balt="([^"]+)"/gi;
-  const alts = [];
-  let m;
-  while ((m = altRe.exec(slice)) !== null) {
-    const alt = decodeHtml(m[1]).trim();
-    // filtrar alts genéricos (escudos, banderas, iconos, etiquetas de sección)
-    if (/escudo|bandera|flag|icon|logo|sponsor|patrocinador|^once$|^xi$|^equipo$|^alineaci[óo]n$|^formaci[óo]n$|^titulares?$|^plantilla$|^banco$|^suplent/i.test(alt)) continue;
-    if (alt.length < 3 || alt.length > 60) continue;
-    alts.push(alt);
-    if (alts.length >= 22) break; // margen para descartar duplicados/icons
-  }
-
-  // Estrategia B (fallback): regex del brief sobre markdown
-  let xi = dedupePreserveOrder(alts).slice(0, 11);
-  if (xi.length < 11) {
-    const md = htmlToMd(slice);
-    const mdRe = /\[!\[([^\]]+)\]\([^)]*\)\]\([^)]*\)/g;
-    const mdNames = [];
-    let mm;
-    while ((mm = mdRe.exec(md)) !== null) {
-      mdNames.push(mm[1].trim());
-    }
-    if (mdNames.length >= 11) {
-      xi = dedupePreserveOrder(mdNames).slice(0, 11);
-    }
-  }
-  return xi;
+  return parseStartingXIFromHtml(html);
 }
 
-function dedupePreserveOrder(arr) {
-  const seen = new Set();
-  const out = [];
-  for (const x of arr) {
-    const k = x.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(x);
+// Helper para obtener HTML de FF: cache primero, fallback fetch live.
+async function getFFLineupHtml(slug, { iso3, verbose = false } = {}) {
+  if (iso3) {
+    try {
+      const html = loadCachedHtml(`ff-${iso3.toLowerCase()}`);
+      if (verbose) console.log(`  [ff] cache hit ff-${iso3.toLowerCase()} (${html.length} bytes)`);
+      return html;
+    } catch (e) {
+      if (verbose) console.log(`  [ff] cache miss para ${iso3} (${e.message.slice(0, 60)}), fallback fetch live`);
+    }
   }
-  return out;
+  return await fetchText(`${FF_BASE}/equipos/${slug}`, { verbose });
 }
 
 // Pipeline completo para un país: detecta lista, parsea roster, parsea XI, cruza.
 // Devuelve { roster: [...], is_final: bool, xi_names: [...], newsUrl: string|null }.
 // Si refreshFinal=true forzamos parseStartingXI aunque ya tengamos roster.
+// Si iso3 se proporciona, intenta leer el HTML del XI de cache/sources/ff-<iso3>.html
+// (poblado por scripts/scraping/fetch_sources.py) antes de hacer fetch live.
 export async function scrapeCountry(slug, opts = {}) {
-  const { verbose = false, refreshFinal = false } = opts;
+  const { verbose = false, refreshFinal = false, iso3 = null } = opts;
   const result = {
     roster: [],
     is_final: false,
@@ -220,10 +261,12 @@ export async function scrapeCountry(slug, opts = {}) {
     }
   }
 
-  // XI: lo intentamos siempre que haya roster, o si refreshFinal está activo
+  // XI: lo intentamos siempre que haya roster, o si refreshFinal está activo.
+  // Lee del cache cuando iso3 está disponible (FF_COUNTRIES en fetch_sources.py).
   if (result.roster.length > 0 || refreshFinal) {
     try {
-      result.xi_names = await parseStartingXI(slug, { verbose });
+      const html = await getFFLineupHtml(slug, { iso3, verbose });
+      result.xi_names = parseStartingXIFromHtml(html);
     } catch (err) {
       if (verbose) console.log(`  ! parseStartingXI falló: ${err.message}`);
     }

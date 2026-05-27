@@ -175,7 +175,7 @@ async function runScrape(targets) {
     }
 
     try {
-      const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal });
+      const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal, iso3 });
 
       // Si refresh-final: preservar roster existente y solo actualizar es_titular
       let players = scrape.roster;
@@ -453,7 +453,7 @@ async function runDetect(targetsArg) {
       const slug = ISO3_TO_SLUG[r.iso3];
       if (!slug) continue;
       try {
-        const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal: true });
+        const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal: true, iso3: r.iso3 });
         if (!scrape.xi_names || scrape.xi_names.length === 0) {
           if (VERBOSE) console.log(`    ${r.iso3} — FF sin XI titular`);
           continue;
