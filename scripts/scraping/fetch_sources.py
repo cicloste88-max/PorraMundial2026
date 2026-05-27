@@ -64,7 +64,7 @@ FF_COUNTRIES = {
 for iso3, slug in FF_COUNTRIES.items():
     SOURCES[f"ff-{iso3.lower()}"] = (
         f"https://www.futbolfantasy.com/world-cup/equipos/{slug}",
-        "stealthy",
+        "stealthy-ff",
         FF_MARKERS,
     )
 
@@ -75,11 +75,27 @@ def fetch(method, url):
     if method == "impersonate":
         return Fetcher.get(url, timeout=30, impersonate="chrome", stealthy_headers=True)
     if method == "stealthy":
+        # AS/ESPN: rinden bien con load + network_idle en <10s.
         return StealthyFetcher.fetch(
             url,
             headless=True,
             network_idle=True,
             timeout=45000,
+            solve_cloudflare=False,
+            google_search=False,
+        )
+    if method == "stealthy-ff":
+        # FF (futbolfantasy.com): página con muchos trackers/analytics que
+        # mantienen network ocupado >45s → first attempt timeoutea esperando
+        # `load`. Validado en run 27-may 20:46 UTC (1 retry necesario, 98s
+        # total). Fix: network_idle=False (no espera idle, solo DOM listo)
+        # + timeout 60s margen para el load inicial. Esperado: 1 attempt
+        # ~25-40s sin retry.
+        return StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=False,
+            timeout=60000,
             solve_cloudflare=False,
             google_search=False,
         )
