@@ -519,7 +519,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
           'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
           'class="jv2-boost-check">' +
         boostLabel +
-        '<button onclick="openJcardModal(\'' + matchKey + '\')" class="jv2-card-link" type="button">🔍 Ver tarjeta</button>' +
+        '<button onclick="openTarjetaStats(\'' + matchKey + '\')" class="jv2-card-link" type="button">🔍 Ver tarjeta</button>' +
       '</div>' +
     '</div>'
   );
