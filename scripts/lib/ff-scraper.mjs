@@ -190,9 +190,15 @@ export function parseStartingXIFromHtml(html) {
     // Excluir slots de suplentes que pudieran caer aquí por error de marcado.
     if (/\bsupl-\d+\b/.test(classes)) return;
 
-    // Nombre prioritario: <img alt> dentro de <a.camiseta>.
-    const $cam = $el.children('a.camiseta').first();
-    const altName = $cam.find('img').first().attr('alt');
+    // PRIMARIO: foto del jugador. FF tiene 4 <img> por slot — escudo del club
+    // (alt=""), bandera país (alt=""), bandera región (alt="") y foto del
+    // jugador (alt="Nombre Completo"). Buscamos el primer img con alt
+    // no-vacío. Validado con HTML real ESP 27-may (img 4/4 en cada slot).
+    const altName = $el
+      .find('img[alt]')
+      .filter((_, img) => ($(img).attr('alt') || '').trim() !== '')
+      .first()
+      .attr('alt');
     if (altName) {
       const n = decodeHtml(altName).trim();
       if (n) {
@@ -201,9 +207,21 @@ export function parseStartingXIFromHtml(html) {
       }
     }
 
-    // Fallback: texto del <a> si <img alt> está vacío (raro).
-    const linkText = $cam.text().trim();
-    if (linkText) names.push(linkText);
+    // FALLBACK 1: slug del href de <a.camiseta> → "nico-williams" → "Nico Williams".
+    // Pierde acentos pero garantiza algo extractable si la foto no cargó.
+    const href = $el.children('a.camiseta').first().attr('href') || '';
+    const slugMatch = href.match(/\/jugadores\/([^/]+)\//);
+    if (slugMatch) {
+      const slug = slugMatch[1];
+      const fromSlug = slug
+        .split('-')
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(' ');
+      if (fromSlug) {
+        names.push(fromSlug);
+        return;
+      }
+    }
   });
 
   return names.slice(0, 11);
