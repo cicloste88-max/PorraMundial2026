@@ -6,10 +6,17 @@ parsers to read. Designed to run as a GH Actions step BEFORE node runs.
 Methods (per source, validated 22-may con probes 26279588881/26281337027/
 26293035353/26293757651):
   - sport, olympics, marca → Fetcher.get(impersonate='chrome')  (curl_cffi, ~50-2000ms)
-  - as, espn               → StealthyFetcher.fetch(solve_cloudflare=False)  (~3-7s)
+  - as, espn, ff-*         → StealthyFetcher.fetch(solve_cloudflare=False)  (~3-7s)
 
 Eurosport descartada: server-side geoblock 307 → /geoblocking.shtml desde IPs
 USA, irresoluble client-side. ESPN Deportes (Disney/Hearst) la reemplaza.
+
+FF (futbolfantasy.com) integración 27-may-2026:
+- Pre-fetch del HTML de equipos/<slug> de FF para el XI titular.
+- Cloudflare en FF bloquea Fetcher.get(impersonate) en IPs USA, requiere
+  StealthyFetcher (validado).
+- Empezamos con España como piloto para validar el flujo end-to-end.
+  Si OK, escalable a las 30+ FINAL via FF_COUNTRIES list.
 
 Exit codes:
   0  → all sources OK (markers >=3, bytes > 10K)
@@ -29,18 +36,37 @@ from pathlib import Path
 
 from scrapling.fetchers import Fetcher, StealthyFetcher
 
+# Fuentes primarias del cross-validate detect (5 fuentes Mundial 2026).
+# Tuple: (url, method, markers_list). Markers verifican que es la página real.
+PRIMARY_MARKERS = ["deschamps", "ancelotti", "yakin", "francia", "alemania", "convocados", "selecci"]
+
 SOURCES = {
-    "sport":    ("https://www.sport.es/es/noticias/mundial-futbol/listas-convocados-mundial-2026-jugadores-plantillas-selecciones-130245904", "impersonate"),
-    "olympics": ("https://www.olympics.com/es/noticias/mundial-2026-listas-48-selecciones", "impersonate"),
-    "marca":    ("https://www.marca.com/futbol/mundial/2026/05/16/convocatorias-oficiales-selecciones-disputaran-mundial.html", "impersonate"),
-    "as":       ("https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-selecciones-y-todos-los-jugadores-que-estaran-en-la-copa-del-mundo-f202605-n-2/", "stealthy"),
-    "espn":     ("https://espndeportes.espn.com/futbol/mundial/nota/_/id/16715015/mundial-2026-convocatorias-de-selecciones-todas-las-listas-de-jugadores", "stealthy"),
+    "sport":    ("https://www.sport.es/es/noticias/mundial-futbol/listas-convocados-mundial-2026-jugadores-plantillas-selecciones-130245904", "impersonate", PRIMARY_MARKERS),
+    "olympics": ("https://www.olympics.com/es/noticias/mundial-2026-listas-48-selecciones", "impersonate", PRIMARY_MARKERS),
+    "marca":    ("https://www.marca.com/futbol/mundial/2026/05/16/convocatorias-oficiales-selecciones-disputaran-mundial.html", "impersonate", PRIMARY_MARKERS),
+    "as":       ("https://as.com/futbol/mundial/listas-de-convocados-para-el-mundial-2026-selecciones-y-todos-los-jugadores-que-estaran-en-la-copa-del-mundo-f202605-n-2/", "stealthy", PRIMARY_MARKERS),
+    "espn":     ("https://espndeportes.espn.com/futbol/mundial/nota/_/id/16715015/mundial-2026-convocatorias-de-selecciones-todas-las-listas-de-jugadores", "stealthy", PRIMARY_MARKERS),
 }
 
-# Markers semánticos esperados en la página real (convocatorias Mundial 2026).
-# Si <3 markers o <10KB de HTML, se considera "no es la página real" (e.g.
-# interstitial CF, paywall, geoblock).
-CONTENT_MARKERS = ["deschamps", "ancelotti", "yakin", "francia", "alemania", "convocados", "selecci"]
+# Markers para FF: presencia del contenedor del XI tipo + términos del sitio.
+# "jugadores-titulares-" es el prefijo de la class del <div> que envuelve los
+# 11 slots (sufijo numérico cambia por seleccionador, ver brief 27-may).
+FF_MARKERS = ["jugadores-titulares-", "once tipo", "futbolfantasy", "alineac"]
+
+# Mapeo iso3 → slug FF. Slug usa nombre español del país. Coincide en mayoría
+# con scripts/lib/iso3-slugs.json pero mantenemos copia local para que el
+# fetcher Python no dependa de un JSON de Node.
+FF_COUNTRIES = {
+    "ESP": "espana",
+    # TODO scale a las demás FINAL tras validar el piloto con España.
+}
+
+for iso3, slug in FF_COUNTRIES.items():
+    SOURCES[f"ff-{iso3.lower()}"] = (
+        f"https://www.futbolfantasy.com/world-cup/equipos/{slug}",
+        "stealthy",
+        FF_MARKERS,
+    )
 
 CACHE_DIR = Path("cache/sources")
 
@@ -82,7 +108,8 @@ def main():
     summary = {}
     any_failed = False
 
-    for source, (url, method) in SOURCES.items():
+    for source, entry in SOURCES.items():
+        url, method, markers_list = entry
         t0 = time.time()
         target = CACHE_DIR / f"{source}.html"
         try:
@@ -90,7 +117,7 @@ def main():
             html = extract_html(page)
             elapsed_ms = int((time.time() - t0) * 1000)
             html_lower = html.lower()
-            markers = [m for m in CONTENT_MARKERS if m in html_lower]
+            markers = [m for m in markers_list if m in html_lower]
             ok = len(markers) >= 3 and len(html) > 10_000
 
             if ok:
@@ -102,7 +129,7 @@ def main():
                     "markers": markers[:5],
                 }
                 print(
-                    f"[OK]   {source:10} bytes={len(html):7} ms={elapsed_ms:5} "
+                    f"[OK]   {source:12} bytes={len(html):7} ms={elapsed_ms:5} "
                     f"markers={markers[:3]}",
                     file=sys.stderr,
                 )
@@ -116,7 +143,7 @@ def main():
                     "markers": markers,
                 }
                 print(
-                    f"[FAIL] {source:10} bytes={len(html):7} ms={elapsed_ms:5} "
+                    f"[FAIL] {source:12} bytes={len(html):7} ms={elapsed_ms:5} "
                     f"markers={markers}",
                     file=sys.stderr,
                 )
@@ -124,7 +151,7 @@ def main():
         except Exception as e:
             target.write_text("", encoding="utf-8")
             summary[source] = {"ok": False, "error": str(e)[:200]}
-            print(f"[ERR]  {source:10} {e}", file=sys.stderr)
+            print(f"[ERR]  {source:12} {e}", file=sys.stderr)
             any_failed = True
 
     (CACHE_DIR / "fetch-summary.json").write_text(
