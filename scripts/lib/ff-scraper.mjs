@@ -172,73 +172,101 @@ export async function parseNewsRoster(newsUrl, opts = {}) {
 //
 // Suplentes excluidos automáticamente: tienen data-onceff="suplente", no
 // "titular". El selector ya los filtra sin necesidad de chequeo de clase.
+//
+// 28-may-2026 — `parseStartingXISlotsFromHtml` añadida para extraer pos-0
+// (titular) + pos-1 (alternativa) por slot. FF en /equipos/<slug> coloca:
+//   <a class="juggador pos-0 flex-column">Titular</a>
+//   <a class="juggador pos-1 flex-column">Alternativa</a>  (opcional)
+// dentro del slot div[data-onceff="titular"]. ATENCIÓN: la clase es "juggador"
+// con doble-g (typo literal de FF). El texto va dentro de <a> directamente
+// (JPN-style) o anidado en <span class="truncate-name"> (ESP-style con
+// metadata price/age). El helper `juggadorText` cubre ambas.
+
+function juggadorText($el, posClass) {
+  const $a = $el.find(`a.juggador.${posClass}`).first();
+  if ($a.length === 0) return '';
+  // Preferir .truncate-name si existe (ESP-style con metadata adicional).
+  const $trunc = $a.find('.truncate-name').first();
+  if ($trunc.length > 0) return decodeHtml($trunc.text()).trim();
+  // Fallback JPN-style: el texto del <a> es directamente el nombre.
+  return decodeHtml($a.text()).trim();
+}
 
 /**
- * Parsea el HTML completo de /equipos/<slug> de FF y devuelve los 11 nombres
- * del XI titular. Robusto contra las 2 variantes de markup FF (con/sin
- * wrapper class "jugadores-titulares-X").
+ * Versión enriquecida: devuelve por slot { titular, alternativa? } con la
+ * pos-1 cuando FF la publica. Cubre Causa 4 del brief 28-may (FF lista
+ * titulares no convocados): si el matcher no encuentra el titular en el
+ * roster oficial, hace fallback a la alternativa.
  *
- * @returns {string[]} array de hasta 11 nombres en orden DOM
+ * @returns {Array<{titular: string, alternativa?: string}>} hasta 11 slots
  */
-export function parseStartingXIFromHtml(html) {
+export function parseStartingXISlotsFromHtml(html) {
   if (!html || html.length < 1000) return [];
-
-  // Si FF aún no ha publicado el XI predicho, sirve la imagen de campo vacío.
-  // El texto "Alineación aún no disponible" se inyecta por JS tras hidratación
-  // cliente, no aparece en HTML servido — detectamos la imagen.
   if (/\/alineaciones\/0\.jpg/i.test(html)) return [];
 
   const $ = cheerio.load(html);
 
-  // PRIMARIO: atributo semántico data-onceff="titular" (ambas variantes FF).
   let $players = $('[data-onceff="titular"]');
-
-  // FALLBACK: wrapper-style legacy, por si FF dropea el data-attr.
   if ($players.length === 0) {
     const $tit = $('div[class*="jugadores-titulares-"]').first();
     if ($tit.length === 0) return [];
     $players = $tit.children('div.tipo_campo');
   }
 
-  const names = [];
+  const slots = [];
   $players.each((_, el) => {
     const $el = $(el);
     const classes = $el.attr('class') || '';
-    // Defensa contra slots supl-N que pudieran caer aquí por marcado raro.
     if (/\bsupl-\d+\b/.test(classes)) return;
 
-    // PRIMARIO: foto del jugador con alt poblado. FF tiene 4 <img> por slot —
-    // escudo club (alt=""), bandera país (alt=""), bandera región (alt="") y
-    // foto del jugador (alt="Nombre Completo"). Filtro img[alt] non-empty
-    // garantiza que cogemos la foto, no el escudo. Validado en PR #106.
+    // TITULAR — orden de preferencia:
+    //   1) img[alt] non-empty: nombre completo "Nico Williams" (vs truncado
+    //      "N. Williams" del juggador.pos-0). Validado en HTML real ESP/JPN.
+    //   2) Fallback a a.juggador.pos-0 si no hay img alt utilizable.
+    //   3) Fallback final a slug del href.
+    let titular = '';
     const altName = $el
       .find('img[alt]')
       .filter((_, img) => ($(img).attr('alt') || '').trim() !== '')
       .first()
       .attr('alt');
-    if (altName) {
-      const n = decodeHtml(altName).trim();
-      if (n) {
-        names.push(n);
-        return;
+    if (altName) titular = decodeHtml(altName).trim();
+
+    if (!titular) titular = juggadorText($el, 'pos-0');
+
+    if (!titular) {
+      const href = $el.find('a.camiseta').first().attr('href') || '';
+      const slugMatch = href.match(/\/jugadores\/([^/]+)\//);
+      if (slugMatch) {
+        titular = slugMatch[1]
+          .split('-')
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+          .join(' ');
       }
     }
 
-    // FALLBACK: slug del href de <a.camiseta> → "nico-williams" → "Nico Williams".
-    // Pierde acentos pero garantiza algo extractable si la foto no cargó.
-    const href = $el.find('a.camiseta').first().attr('href') || '';
-    const slugMatch = href.match(/\/jugadores\/([^/]+)\//);
-    if (slugMatch) {
-      const slug = slugMatch[1];
-      const fromSlug = slug
-        .split('-')
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(' ');
-      if (fromSlug) names.push(fromSlug);
+    // ALTERNATIVA — sólo desde a.juggador.pos-1 (no hay otra fuente). El
+    // truncado "M. Penders" del juggador funciona bien para el matcher (path
+    // last-name) cuando pos-0 no está convocado oficialmente.
+    const alternativa = juggadorText($el, 'pos-1') || null;
+
+    if (titular) {
+      slots.push(alternativa ? { titular, alternativa } : { titular });
     }
   });
 
-  return names.slice(0, 11);
+  return slots.slice(0, 11);
+}
+
+/**
+ * Wrapper backward compat — devuelve sólo los 11 nombres titulares como
+ * array plano de strings. Equivale a parseStartingXISlotsFromHtml(html)
+ * mapeado a `s.titular`.
+ *
+ * @returns {string[]} array de hasta 11 nombres en orden DOM
+ */
+export function parseStartingXIFromHtml(html) {
+  return parseStartingXISlotsFromHtml(html).map((s) => s.titular);
 }
 
 /**
@@ -267,16 +295,21 @@ async function getFFLineupHtml(slug, { iso3, verbose = false } = {}) {
 }
 
 // Pipeline completo para un país: detecta lista, parsea roster, parsea XI, cruza.
-// Devuelve { roster: [...], is_final: bool, xi_names: [...], newsUrl: string|null }.
+// Devuelve { roster, is_final, xi_names, xi_slots, newsUrl, titulares }.
 // Si refreshFinal=true forzamos parseStartingXI aunque ya tengamos roster.
 // Si iso3 se proporciona, intenta leer el HTML del XI de cache/sources/ff-<iso3>.html
 // (poblado por scripts/scraping/fetch_sources.py) antes de hacer fetch live.
+//
+// 28-may-2026 — `xi_slots` añadido (Array<{titular, alternativa?}>) para
+// soportar fallback pos-0 → pos-1 en el matcher. `xi_names` mantenido como
+// array plano de titulares por compat con llamadores legacy.
 export async function scrapeCountry(slug, opts = {}) {
   const { verbose = false, refreshFinal = false, iso3 = null } = opts;
   const result = {
     roster: [],
     is_final: false,
     xi_names: [],
+    xi_slots: [],
     newsUrl: null,
     titulares: 0,
   };
@@ -298,21 +331,41 @@ export async function scrapeCountry(slug, opts = {}) {
   if (result.roster.length > 0 || refreshFinal) {
     try {
       const html = await getFFLineupHtml(slug, { iso3, verbose });
-      result.xi_names = parseStartingXIFromHtml(html);
+      result.xi_slots = parseStartingXISlotsFromHtml(html);
+      result.xi_names = result.xi_slots.map((s) => s.titular);
     } catch (err) {
       if (verbose) console.log(`  ! parseStartingXI falló: ${err.message}`);
     }
   }
 
-  // Cruzar XI con roster: marcar es_titular=true en los matches
-  if (result.roster.length > 0 && result.xi_names.length > 0) {
-    const { matches } = matchAgainstRoster(result.xi_names, result.roster, { minScore: 65 });
+  // Cruzar XI con roster: marcar es_titular=true en los matches.
+  // Usa xi_slots (con pos-0 + pos-1) + iso3 para alias dict + threshold adaptativo.
+  if (result.roster.length > 0 && result.xi_slots.length > 0) {
+    // Lazy-load alias dict: only when needed, sync import via JSON file read.
+    let aliases = null;
+    try {
+      const { readFileSync } = await import('node:fs');
+      const { fileURLToPath } = await import('node:url');
+      const { dirname, resolve } = await import('node:path');
+      const __dirname = dirname(fileURLToPath(import.meta.url));
+      aliases = JSON.parse(readFileSync(resolve(__dirname, 'name-aliases.json'), 'utf-8'));
+    } catch (e) {
+      if (verbose) console.log(`  ! name-aliases.json no cargado: ${e.message}`);
+    }
+    const candidateGroups = result.xi_slots.map((s) =>
+      s.alternativa ? [s.titular, s.alternativa] : [s.titular],
+    );
+    const { matches } = matchAgainstRoster(candidateGroups, result.roster, {
+      minScore: 65,
+      iso3,
+      aliases,
+    });
     for (const { matchIdx } of matches) {
       result.roster[matchIdx].es_titular = true;
     }
     result.titulares = matches.length;
     if (verbose) {
-      console.log(`  → XI matched ${matches.length}/${result.xi_names.length}`);
+      console.log(`  → XI matched ${matches.length}/${result.xi_slots.length}`);
     }
   }
 

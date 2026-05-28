@@ -309,3 +309,46 @@ test('parseStartingXIFromHtml: variante JPN-style excluye data-onceff="suplente"
   assert.ok(!xi.includes('Sugawara'), 'data-onceff=suplente debe excluirse');
   assert.ok(!xi.includes('Watanabe'), 'data-onceff=suplente debe excluirse');
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// 28-may-2026 — parseStartingXISlotsFromHtml: pos-0 + pos-1 desde HTML real
+// JPN. Captura de 11 slots con 3 alternativas (Watanabe, Sugawara, Maeda)
+// confirmadas via grep en el fixture.
+// ────────────────────────────────────────────────────────────────────────────
+
+import { parseStartingXISlotsFromHtml } from '../ff-scraper.mjs';
+
+const REAL_JPN_HTML = readFileSync(resolve(FIXTURES_DIR, 'jpn.html'), 'utf-8');
+
+test('parseStartingXISlotsFromHtml: HTML REAL JPN devuelve 11 slots', () => {
+  const slots = parseStartingXISlotsFromHtml(REAL_JPN_HTML);
+  assert.equal(slots.length, 11, `esperado 11 slots, fue ${slots.length}`);
+  for (const s of slots) {
+    assert.ok(s.titular && typeof s.titular === 'string');
+  }
+});
+
+test('parseStartingXISlotsFromHtml: JPN slots con alternativa (3 pos-1)', () => {
+  const slots = parseStartingXISlotsFromHtml(REAL_JPN_HTML);
+  const withAlt = slots.filter((s) => s.alternativa);
+  assert.equal(withAlt.length, 3, `esperado 3 slots con alternativa, fue ${withAlt.length}`);
+  // Las 3 alternativas conocidas extraídas vía grep:
+  const alts = withAlt.map((s) => s.alternativa).sort();
+  assert.deepEqual(alts, ['Maeda', 'Sugawara', 'Watanabe']);
+});
+
+test('parseStartingXISlotsFromHtml: titular preferido vs alternativa (Tomiyasu titular, Watanabe alt)', () => {
+  const slots = parseStartingXISlotsFromHtml(REAL_JPN_HTML);
+  // Slot Tomiyasu/Watanabe: titular debe ser Tomiyasu (img alt), no Watanabe.
+  const tomiyasuSlot = slots.find((s) => /Tomiyasu/i.test(s.titular));
+  assert.ok(tomiyasuSlot, 'no encontré slot de Tomiyasu');
+  assert.equal(tomiyasuSlot.alternativa, 'Watanabe');
+});
+
+test('parseStartingXIFromHtml: wrapper devuelve los 11 titulares JPN (backward compat)', () => {
+  const xi = parseStartingXIFromHtml(REAL_JPN_HTML);
+  assert.equal(xi.length, 11);
+  // Sample check: Tomiyasu en la lista (no Watanabe).
+  assert.ok(xi.some((n) => /Tomiyasu/i.test(n)), 'Tomiyasu debe estar como titular');
+  assert.ok(!xi.includes('Watanabe'), 'Watanabe NO debe estar (es alternativa)');
+});

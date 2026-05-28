@@ -2160,3 +2160,23 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [10:25] PARALELIZACIÓN: `ProcessPoolExecutor(max_workers=3, mp_context='spawn')` para FF (48 fuentes). Primarias siguen en serie (sólo 5). Wall time esperado: 48/3 × 30s ≈ 8 min FF + 80s primarias = ~10 min total (vs 24 min serial que excedería el timeout 15 min). ProcessPool (no ThreadPool) porque Playwright sync_api usa greenlets thread-unsafe; spawn ctx para evitar fork-state issues de browser embedded. `process_one()` extraído a top-level (no closure) para pickling.
 
 [10:30] PUSH: branch `claude/scale-ff-countries` con commit `accdaf0` pusheado a origin. Pendiente: dispatch workflow para validar wall time real (esperado ~10 min); revisar `fetch-summary.json` artifact para ver qué países publican XI hoy.
+
+## 2026-05-28 — Sprint Fix XI Pipeline Capas A+B+C (claude/fix-xi-pipeline-abc)
+
+[17:00] CONTEXTO: tras dispatch productivo #69 con PR #108 (33/48 países a 11/11 tras correcciones manuales de San via MCP), auditoría reveló 4 causas raíz que el próximo cron sobrescribiría sin protección. Brief recibido con causas + solución 3 capas + decisión PR único.
+
+[17:15] CAPA A — `parsePlayer` (`scripts/lib/parsers/_util.mjs`) endurecida para tolerar 5 patrones reales de corrupción (EGY 'Ade (Pyramids FC)l', ENG '(Tottenham)' nombre vacío, KOR 'Lee Jjae-Sung )Mainz 05)' paréntesis invertido, SCO 'Stewart (Southampton)Stewart' apellido duplicado, SWE 'Brujas)' club pegado). Dos paths: well-formed sin regresión + robust fallback con strip-by-pattern + dedupe de apellido repetido. NUNCA devuelve `{nombre:''}` ni el string corrupto crudo. 13 tests (8 nuevos cubriendo los 5 casos reales + 3 control).
+
+[17:30] CAPA B — `name-matcher.mjs` reforzado:
+  - (1) alias dict per-iso3 `scripts/lib/name-aliases.json` (semilla con MAR Bono → Yassine Bounou, CPV Vozinha → Josimar Dias, HAI Deedson L. → Louicius Deedson, NOR Sorloth → Alexander Sorloth, KOR Tae-hyeon → Tae-Hwan, EGY Fattouh → Ahmed Fotouh, JOR Al Nadi → Mohammad Abualnadi). Consultado ANTES de Levenshtein vía `resolveAlias`.
+  - (2) threshold adaptativo `simThreshold` en `scorePair`: 0.75 latino, 0.70 para iso3 ∈ `NON_LATIN_ISO3` {KOR,EGY,KSA,MAR,IRN,IRQ,JOR,SEN,GHA,CIV,COD,TUN,ALG,BIH}. BIH incluido por colisiones balcánicas -ic/-vic.
+  - (3) anti-colisión `ambiguityMargin=5` (default): si top-2 difieren <5 puntos sobre 100 Y secondBest>0 → NO marcar (devuelve unmatched). Evita falso positivo tipo 'García' contra 2 jugadores García.
+  - (4) candidate groups `string[][]`: cada slot puede ser pos-0 + pos-1. Si pos-0 no matchea, fallback a pos-1. API legacy `string[]` sigue funcional. 17 tests nuevos (4 alias, 3 threshold, 3 anti-colisión, 4 groups, 3 misc).
+
+[17:45] FF parser pos-1: `ff-scraper.parseStartingXISlotsFromHtml` añadido. Selector `a.juggador.pos-0` (titular) + `a.juggador.pos-1` (alternativa) — NOTA: clase 'juggador' con doble-g, typo literal de FF. Texto extraído de `.truncate-name` (ESP-style con metadata) o directamente del `<a>` (JPN-style). Titular prefiere img[alt] (nombre completo "Nico Williams" vs truncado "N. Williams" del juggador). 4 tests con HTML real JPN (11 slots, 3 con alternativa: Watanabe/Sugawara/Maeda). `parseStartingXIFromHtml` wrapper backward compat. `scrapeCountry` ahora expone `xi_slots` + `xi_names`.
+
+[18:00] CAPA C — migración `20260528170000_squads_xi_pinned.sql` (aplicada via MCP idempotente): `squads.xi_pinned bool DEFAULT false` + `xi_pinned_at timestamptz`. `getSquadRow`/`listAllSquads` (squads-db.mjs) extienden SELECT con las nuevas columnas. `sync-squads.mjs` Paso 2 detect + scrape `--refresh-final` chequean `xi_pinned===true` y saltan recálculo de es_titular. El roster (nombres, club, edad, valor, etc.) sigue mutable por preserveEnrichment — sólo el flag se congela.
+
+[18:15] DOCS: `errores_conocidos_porra.md` entradas ERR-71 (parser corruptos) + ERR-72 (Levenshtein adaptativo) + ERR-73 (anti-colisión) + ERR-74 (pin de estabilidad) + ERR-75 (FF dudosos + pos-1 fallback). Coreografía documentada: aplicar migración → merge PR → San pinea los 33 inmediato post-merge → próximo cron 6h protege los 33 + Capa A corrige los 5 nombres corruptos + Capa B mejora match de tier B/C.
+
+[18:20] TESTS: 146/146 pass. Branch `claude/fix-xi-pipeline-abc` desde main `5656215`. Pendiente: push + abrir PR. 3 dudosos (IRN Kanaanizadegan, GHA Kohn, JOR Layla) registrados en ERR-75 para verificación manual de San con fuente oficial (no se forza match).

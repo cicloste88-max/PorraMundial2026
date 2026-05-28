@@ -2,6 +2,72 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [28-may-2026] fix/xi-pipeline-abc — endurecer pipeline XI titular (Capas A+B+C)
+
+**Sprint contexto**: tras dispatch #69 productivo de PR #108 (scaling FF a 48
+países), San auditó manualmente las 48 squads via MCP y dejó 33/48 a 11/11
+titulares. La auditoría reveló 4 causas raíz que el próximo cron habría
+sobrescrito. Las 3 capas resuelven el problema completo en un único PR.
+
+**Capa A — Parser robusto** (`scripts/lib/parsers/_util.mjs`):
+`parsePlayer` reescrito para tolerar 5 patrones reales de corrupción
+observados en BD: EGY 'Ade (Pyramids FC)l' (letra cortada), ENG '(Tottenham)'
+(nombre vacío), KOR 'Lee Jjae-Sung )Mainz 05)' (paréntesis invertido),
+SCO 'Stewart (Southampton)Stewart' (apellido duplicado), SWE 'Brujas)'
+(club pegado). Dos paths: well-formed sin regresión + robust fallback con
+strip secuencial + dedupe de apellido repetido. NUNCA devuelve nombre
+vacío ni el string corrupto. 8 tests nuevos cubriendo los 5 casos reales.
+
+**Capa B — Matcher reforzado** (`scripts/lib/name-matcher.mjs` +
+`scripts/lib/name-aliases.json`):
+- **Alias dict per-iso3** consultado ANTES de Levenshtein. Semilla con
+  MAR Bono → Yassine Bounou, CPV Vozinha → Josimar Dias, HAI Deedson L. →
+  Louicius Deedson, NOR Sorloth → Alexander Sorloth, KOR Tae-hyeon →
+  Tae-Hwan, EGY Fattouh → Ahmed Fotouh, JOR Al Nadi → Mohammad Abualnadi.
+- **Threshold adaptativo**: `scorePair` acepta `simThreshold` (default 0.75).
+  `matchAgainstRoster` baja a 0.70 cuando `iso3 ∈ NON_LATIN_ISO3`
+  {KOR,EGY,KSA,MAR,IRN,IRQ,JOR,SEN,GHA,CIV,COD,TUN,ALG,BIH} (transliteración
+  inestable; BIH por colisiones balcánicas -ic/-vic).
+- **Anti-colisión** `ambiguityMargin=5`: si top-2 candidatos del roster
+  están a <5 puntos sobre 100 Y secondBest>0 → NO marcar (devuelve
+  unmatched). Evita falso positivo con apellidos compartidos.
+- **Candidate groups** `string[][]`: cada slot puede ser pos-0 + pos-1
+  desde FF. Si pos-0 no matchea, fallback a pos-1. Resuelve caso TUN
+  Laidouni (FF) no convocado → match con Rani Khedira (pos-1 FF).
+
+**FF parser pos-1**: `parseStartingXISlotsFromHtml` añadido en
+`ff-scraper.mjs`. Selector `a.juggador.pos-{0,1}` (clase 'juggador' con
+doble-g, typo literal de FF). Detección robusta vs ESP-style con
+`.truncate-name` y JPN-style con texto directo. Validado con HTML real
+JPN (11 slots, 3 alternativas confirmadas: Watanabe/Sugawara/Maeda).
+
+**Capa C — Pin de estabilidad** (migración
+`20260528170000_squads_xi_pinned.sql`):
+`squads.xi_pinned boolean DEFAULT false` + `xi_pinned_at timestamptz`.
+`sync-squads.mjs` Paso 2 detect + scrape `--refresh-final` chequean
+`xi_pinned===true` y saltan recálculo de es_titular. El resto del roster
+(nombres, club, edad, valor, dorsal, dob) sigue actualizable por
+preserveEnrichment — sólo el flag se congela. Permite a Capa A corregir
+los 5 nombres corruptos del roster aunque el XI esté pineado.
+
+**Coreografía post-merge**:
+1. PR merged (ya aplicada la migración via MCP antes del merge).
+2. San pinea inmediato los 33 países corregidos:
+   `UPDATE squads SET xi_pinned=true, xi_pinned_at=NOW() WHERE iso3 IN (...)`.
+3. Próximo cron 6h: salta los 33 pineados (es_titular preservado), corrige
+   los 5 nombres corruptos via Capa A, mejora match de tier B/C via Capa B.
+
+**Tests**: 146/146 pass (8 nuevos parser, 17 nuevos matcher, 4 nuevos FF
+pos-1, 117 regresión).
+
+**3 dudosos** registrados en `errores_conocidos_porra.md` ERR-75 para
+verificación manual de San con fuente oficial (no se forza match): IRN
+Kanaanizadegan, GHA Kohn, JOR Layla portero.
+
+**Documentación**: ERR-71 (parser corruptos), ERR-72 (Levenshtein
+adaptativo), ERR-73 (anti-colisión), ERR-74 (pin estabilidad), ERR-75
+(FF dudosos + pos-1 fallback).
+
 ## [28-may-2026] feat/scale-ff-countries — FF_COUNTRIES 1→48 + ProcessPool paralelo
 
 **Sprint contexto**: tras hotfix PR #106 (parser FF cheerio + `img[alt]` non-empty filter), ESP valida 11/11 XI matched contra HTML real cacheado por Scrapling. Pero `FF_COUNTRIES` en `fetch_sources.py` aún tenía sólo `{"ESP": "espana"}` — los otros 47 países WC 2026 caen al fallback `fetch live` en `getFFLineupHtml`, sin estar pre-cacheados.

@@ -12,6 +12,22 @@
 // tokens()/lastToken() mantienen orden ORIGINAL — scorePair sigue usando "último
 // token = apellido" para evitar falsos positivos tipo 'João Félix' vs 'João
 // Cancelo'. La sort es solo en normalize() (la salida del hash).
+//
+// 28-may-2026 — refuerzo del pipeline XI (3 mejoras + 1 estructural):
+//   1) Diccionario de alias per-iso3 (name-aliases.json) consultado ANTES de
+//      Levenshtein. Cubre apodos (MAR Bono → Yassine Bounou), iniciales
+//      (HAI 'Deedson L.' → Louicius Deedson), transcripción divergente
+//      (EGY Fattouh → Ahmed Fotouh) y prefijos árabes mal mapeados.
+//   2) Threshold adaptativo Levenshtein: 0.75 (latino) → 0.70 para iso3 con
+//      transliteración inestable {KOR,EGY,KSA,MAR,IRN,IRQ,JOR,SEN,GHA,CIV,COD,
+//      TUN,ALG,BIH}. Concedido en scorePair via opción simThreshold.
+//   3) Anti-colisión: si los 2 mejores candidatos del roster están a <5 puntos
+//      del top score, NO marcar (evita falso positivo tipo BRA Vinicius ↔
+//      Wesley Vinicius cuando hay un Vinicius Júnior real).
+//   4) Soporte de candidate groups: cada slot puede ser `string` (legacy) o
+//      `string[]` (e.g. [pos-0, pos-1] de FF). Si el primero no matchea, se
+//      intenta el segundo. Cubre Causa 4 (FF lista titulares no convocados —
+//      e.g. TUN Laidouni no convocado → fallback Rani Khedira).
 
 // Hyphens (ascii + unicode): ELIMINADOS para tratar compuestos como un token único.
 const HYPHENS_RE = /[-‐‑‒–—―−]/g;
@@ -99,7 +115,11 @@ function levenshtein(a, b) {
 //  - subset 1-token (un nombre es un único token presente en el otro) → 75
 //  - token-set parcial (≥2 tokens significativos solapan) → 78-92
 //  - Levenshtein del último apellido (typos) → 60-80
-function scorePair(a, b) {
+//
+// 28-may-2026 — `simThreshold` opcional: 0.75 por defecto (latino), 0.70 para
+// iso3 con transliteración inestable (KOR/EGY/MAR/...). El llamador desde
+// matchAgainstRoster lo ajusta según el iso3 del target.
+function scorePair(a, b, { simThreshold = 0.75 } = {}) {
   const na = normalize(a);
   const nb = normalize(b);
   if (!na || !nb) return 0;
@@ -143,51 +163,137 @@ function scorePair(a, b) {
   // 23-may-2026 — Bajado threshold sim 0.85 → 0.75 para cubrir variantes árabes
   // donde R1+R2+R3 dejan resto del nombre con typo aún (e.g. "hashesh" vs
   // "hashish" sim=0.857 — match; previo a R2 era "hasheesh" vs "hashish" sim=0.75).
+  // 28-may-2026 — simThreshold opcional baja a 0.70 para iso3 no-latinos.
   if (la && lb) {
     const dist = levenshtein(la, lb);
     const maxLen = Math.max(la.length, lb.length);
     if (maxLen > 0) {
       const sim = 1 - dist / maxLen;
-      if (sim >= 0.75) return Math.round(60 + sim * 20);
+      if (sim >= simThreshold) return Math.round(60 + sim * 20);
     }
   }
 
   return 0;
 }
 
+// iso3 con transliteración inestable (latín ↔ árabe/eslavo/etc.) — bajan
+// el simThreshold de Levenshtein a 0.70 para tolerar variantes Fattouh/Fotouh,
+// Kanaani/Kanaanizadegan, Burnic/Memic, etc. BIH incluido por colisiones
+// balcánicas en apellidos -ic/-vic.
+const NON_LATIN_ISO3 = new Set([
+  'KOR', 'EGY', 'KSA', 'MAR', 'IRN', 'IRQ', 'JOR',
+  'SEN', 'GHA', 'CIV', 'COD', 'TUN', 'ALG', 'BIH',
+]);
+
+// Resuelve alias del diccionario per-iso3. Lookup case-sensitive sobre string
+// trimmed. Si no hay alias o no hay iso3, devuelve el candidato sin cambios.
+function resolveAlias(cand, iso3, aliases) {
+  if (!iso3 || !aliases || typeof aliases !== 'object') return cand;
+  const dict = aliases[iso3];
+  if (!dict || typeof dict !== 'object') return cand;
+  const trimmed = String(cand).trim();
+  return Object.prototype.hasOwnProperty.call(dict, trimmed) ? dict[trimmed] : cand;
+}
+
 // Empareja una lista de candidatos (e.g. nombres XI) contra un roster grande.
-// Devuelve { matches: [{ candidate, match, score }], unmatched: [candidates...] }.
+// Devuelve { matches: [{ candidate, match, score, ... }], unmatched: [candidates...] }.
+//
 // 23-may-2026 — minScore por defecto bajado 65 → 60 tras añadir normalizaciones
 // árabes en rawTokens (R1+R2+R3). Filtra ruido pero permite que casos como
 // "Mohammad Abu Taha ↔ Mohannad Abu Taha" (token-set overlap 2/3 → score 78)
 // y casos Levenshtein de apellidos transliterados scoren ≥60.
-export function matchAgainstRoster(candidates, roster, { minScore = 60 } = {}) {
+//
+// 28-may-2026 — extendido:
+//   - `candidates` admite array de strings (legacy) o array de grupos
+//     (string[][]). Cada grupo es una lista ordenada de alternativas para el
+//     mismo slot (pos-0, pos-1, ...). Se intenta cada alternativa en orden
+//     hasta encontrar match. El elemento del grupo que matcheó se devuelve
+//     en `matches[i].candidate`; el original primero del grupo en `unmatched`
+//     si todas fallan.
+//   - `iso3` (string opcional): si está en NON_LATIN_ISO3 baja Levenshtein
+//     simThreshold a 0.70. Se usa también para resolver alias contra el dict
+//     name-aliases.json.
+//   - `aliases` (object opcional): diccionario completo (no por iso3, el
+//     iso3 lo aplica `resolveAlias`). Default: null → no aplica alias dict.
+//     `sync-squads.mjs` lo carga via `import name-aliases.json` y pasa.
+//   - `ambiguityMargin` (number, default 5): si bestScore - secondBestScore
+//     es < esto Y hay segundo candidato real (>0), NO marcar (ambigüedad).
+//     Evita falsos positivos cuando hay varios apellidos idénticos en el
+//     roster (Vinicius Júnior ↔ Wesley Vinicius — ambos scorearían 85).
+export function matchAgainstRoster(
+  candidates,
+  roster,
+  {
+    minScore = 60,
+    iso3 = null,
+    aliases = null,
+    nonLatinIso3 = NON_LATIN_ISO3,
+    ambiguityMargin = 5,
+  } = {},
+) {
+  // Normalize: cada slot puede ser string (legacy) o string[] (grupos pos-0/pos-1).
+  const groups = candidates.map((c) => (Array.isArray(c) ? c.filter(Boolean) : [c]));
+
+  const isNonLatin = iso3 && nonLatinIso3.has(iso3);
+  const simThreshold = isNonLatin ? 0.7 : 0.75;
+
   const matches = [];
   const unmatched = [];
   const usedIdx = new Set();
 
-  for (const cand of candidates) {
-    let bestIdx = -1;
-    let bestScore = 0;
-    for (let i = 0; i < roster.length; i++) {
-      if (usedIdx.has(i)) continue;
-      const player = roster[i];
-      const playerName = typeof player === 'string' ? player : player?.nombre;
-      if (!playerName) continue;
-      const sc = scorePair(cand, playerName);
-      if (sc > bestScore) {
-        bestScore = sc;
-        bestIdx = i;
+  for (const group of groups) {
+    if (group.length === 0) continue;
+    let matchedForGroup = false;
+
+    for (const candRaw of group) {
+      const candResolved = resolveAlias(candRaw, iso3, aliases);
+      let bestIdx = -1;
+      let bestScore = 0;
+      let secondBestScore = 0;
+
+      for (let i = 0; i < roster.length; i++) {
+        if (usedIdx.has(i)) continue;
+        const player = roster[i];
+        const playerName = typeof player === 'string' ? player : player?.nombre;
+        if (!playerName) continue;
+        const sc = scorePair(candResolved, playerName, { simThreshold });
+        if (sc > bestScore) {
+          secondBestScore = bestScore;
+          bestScore = sc;
+          bestIdx = i;
+        } else if (sc > secondBestScore) {
+          secondBestScore = sc;
+        }
       }
-    }
-    if (bestIdx >= 0 && bestScore >= minScore) {
+
+      if (bestIdx < 0 || bestScore < minScore) continue;
+
+      // Anti-colisión: si segundo candidato real existe y está a <margin de
+      // diferencia → ambigüedad, descartamos este intento (probamos siguiente
+      // del grupo si lo hay; si no, queda unmatched).
+      if (secondBestScore > 0 && (bestScore - secondBestScore) < ambiguityMargin) {
+        continue;
+      }
+
       usedIdx.add(bestIdx);
-      matches.push({ candidate: cand, match: roster[bestIdx], matchIdx: bestIdx, score: bestScore });
-    } else {
-      unmatched.push(cand);
+      matches.push({
+        candidate: candRaw,
+        resolvedCandidate: candResolved !== candRaw ? candResolved : undefined,
+        match: roster[bestIdx],
+        matchIdx: bestIdx,
+        score: bestScore,
+      });
+      matchedForGroup = true;
+      break;
+    }
+
+    if (!matchedForGroup) {
+      // Primer elemento del grupo en unmatched (representa el slot fallido).
+      unmatched.push(group[0]);
     }
   }
+
   return { matches, unmatched };
 }
 
-export { scorePair, levenshtein };
+export { scorePair, levenshtein, resolveAlias, NON_LATIN_ISO3 };

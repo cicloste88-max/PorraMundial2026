@@ -66,12 +66,15 @@ export function getClient() {
   return _client;
 }
 
-// SELECT row de un país: { iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at }
+// SELECT row de un país. 28-may-2026 — añadido xi_pinned/xi_pinned_at (Capa C)
+// para que el motor sepa si debe saltar el recálculo de es_titular.
 export async function getSquadRow(iso3) {
   const supa = getClient();
   const { data, error } = await supa
     .from('squads')
-    .select('iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at')
+    .select(
+      'iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
+    )
     .eq('iso3', iso3)
     .maybeSingle();
   if (error) throw error;
@@ -83,7 +86,9 @@ export async function listAllSquads() {
   const supa = getClient();
   const { data, error } = await supa
     .from('squads')
-    .select('iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at')
+    .select(
+      'iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
+    )
     .order('iso3');
   if (error) throw error;
   return data || [];

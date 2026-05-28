@@ -1013,3 +1013,150 @@ tarda ~30s adicional por run, aceptable para un cron 6h.
 **Patrón:** las directivas `cache:` de las setup-* actions exigen archivos
 manifest específicos. Si el proyecto no los tiene, no añadirlas — el
 overhead es marginal.
+
+
+## ERR-71 — Parser `parsePlayer` no tolera paréntesis malformados (5 patrones reales)
+
+**Síntoma:** 5 entradas corruptas en `squads.jugadores` tras auditoría manual
+28-may-2026:
+  - EGY `'Ibrahim Ade (Pyramids FC)l'` — letra cortada por mala segmentación
+  - ENG `'(Tottenham)'` — nombre VACÍO, sólo club entre paréntesis
+  - KOR `'Lee Jjae-Sung )Mainz 05)'` — paréntesis invertido sin `(` apertura
+  - SCO `'Ross Stewart (Southampton)Stewart'` — apellido duplicado tras `)`
+  - SWE `'Gustaf Nilsson Brujas)'` — club pegado sin paréntesis abierto
+
+**Causa:** regex previa `^(.+?)\s*\(([^)]+)\)\s*$` requería paréntesis
+bien formados y end-of-string anclado. Los 5 casos fallaban el match y
+caían al fallback `{ nombre: s }` que devolvía la cadena CORRUPTA tal cual
+como nombre. La BD acababa con jugadores tipo "(Tottenham)" o "Ross Stewart
+(Southampton)Stewart" indistinguibles para el matcher.
+
+**Fix:** dos caminos en `parsePlayer` (`scripts/lib/parsers/_util.mjs`):
+  1. Path well-formed: regex original intacta (sin regresión).
+  2. Path robusto: secuencia de strips para limpiar parens malformados
+     (leading paren, well-formed con leading whitespace, inverted, club
+     pegado al final sin `(`) + dedupe de apellido repetido. Devuelve
+     `null` si tras limpieza el nombre queda vacío — el llamador
+     (`parsePlayerList` con `filter(Boolean)`) descarta. NUNCA inserta
+     entrada con nombre vacío o corrupto.
+
+**Patrón:** cuando una regex estricta falla, NO regresar el input crudo
+como fallback. Devolver `null` y dejar al caller decidir (filter, warn,
+o re-intentar con regex relajada).
+
+
+## ERR-72 — Name-matcher Levenshtein 0.75 demasiado estricto para transliteración no-latina
+
+**Síntoma:** matcher devolvía `unmatched` para casos verificados manualmente
+por San como mismo jugador:
+  - KOR `'Kim Tae-hyeon'` (FF) vs `'Kim Tae-Hwan'` (roster) — sim < 0.75
+  - EGY `'Fattouh'` (FF) vs `'Ahmed Fotouh'` (roster) — sim ~0.71
+  - BIH apellidos -ic/-vic con colisiones (Burnic/Memic).
+
+**Causa:** threshold global de Levenshtein `sim ≥ 0.75` en `scorePair` era
+adecuado para nombres latinos pero rechazaba variantes de transliteración
+árabe/coreana/eslava donde dos fuentes oficiales discrepan en 1-2 chars
+del último apellido sin que sean personas distintas.
+
+**Fix:** threshold adaptativo en `name-matcher.mjs`:
+  - `scorePair` acepta opción `simThreshold` (default 0.75 latino).
+  - `matchAgainstRoster` baja a 0.70 cuando `iso3 ∈ NON_LATIN_ISO3`
+    `{KOR, EGY, KSA, MAR, IRN, IRQ, JOR, SEN, GHA, CIV, COD, TUN, ALG, BIH}`.
+
+Más: diccionario de alias per-iso3 (`scripts/lib/name-aliases.json`)
+consultado ANTES de Levenshtein para casos sin patrón regular (apodos
+MAR Bono → Yassine Bounou, iniciales HAI Deedson L. → Louicius Deedson).
+
+**Patrón:** scoring fuzzy debe poder calibrarse por dominio. Un único
+threshold global produce falsos negativos en idiomas no-latinos y/o
+falsos positivos en latinos. Mejor: threshold base + override por contexto
+(en este caso iso3 del target).
+
+
+## ERR-73 — Matcher single-best sin anti-colisión produce falsos positivos en apellidos compartidos
+
+**Síntoma potencial:** un candidato XI con apellido común (e.g. "García",
+"Vinicius") matchearía con score idéntico a múltiples jugadores del roster.
+El matcher devolvía el PRIMERO en orden DOM, sin avisar de la ambigüedad.
+
+**Causa:** algoritmo greedy `if (sc > bestScore)`. No registraba el
+segundo mejor candidato ni detectaba empates.
+
+**Fix:** `matchAgainstRoster` registra `secondBestScore`. Si
+`bestScore - secondBestScore < ambiguityMargin` (default 5 sobre 100)
+y `secondBestScore > 0`, NO marca el match — devuelve el candidato como
+unmatched. Cubre casos como 'García' contra {Joan García, Pablo García}
+donde sin contexto adicional el matcher no puede elegir.
+
+`ambiguityMargin=0` desactiva el guard (compat con tests legacy).
+
+**Patrón:** matching fuzzy debe distinguir "match seguro" de "match
+ambiguo". Marcar ambiguo es preferible a marcar arbitrariamente — el
+fallback humano (Capa C `xi_pinned`) corrige sin riesgo, mientras que
+un falso positivo no se detecta sin auditoría externa.
+
+
+## ERR-74 — Cron sobrescribe correcciones manuales del XI titular
+
+**Síntoma:** San corrige manualmente 33 países a 11/11 titulares via MCP.
+El siguiente tick del cron (`mode=detect`) recalcula `es_titular` para
+todos los países y revierte las correcciones manuales — al alias dict
+no le da tiempo a cubrir todos los apodos/inversiones edge case.
+
+**Causa:** Paso 2 de detect siempre re-mapea XI titular contra el roster,
+sin distinguir entre países procesados automáticamente vs corregidos a
+mano. No había marcador "este XI ya está validado, no tocar".
+
+**Fix:** Capa C del fix XI pipeline (migración 20260528170000):
+  - `squads.xi_pinned boolean DEFAULT false`
+  - `squads.xi_pinned_at timestamptz`
+  - `sync-squads.mjs` Paso 2 + scrape `--refresh-final` chequean
+    `xi_pinned===true` ANTES de recalcular es_titular y saltan.
+  - El roster (nombres, club, dorsal, edad, valor, etc.) sigue actualizable
+    por detect/enrich-tm vía preserveEnrichment — sólo el flag es_titular
+    se congela. Esto permite que la Capa A corrija nombres corruptos del
+    roster aunque el XI esté pineado.
+
+Pin manual via MCP:
+```sql
+UPDATE squads SET xi_pinned=true, xi_pinned_at=NOW() WHERE iso3 IN (...);
+```
+
+**Patrón:** cualquier campo que pueda ser corregido manualmente debe tener
+un flag "no machacar" (pin). Sin ello, la próxima ejecución del proceso
+automático sobrescribe el trabajo humano.
+
+
+## ERR-75 — XI dudosos en FF: jugadores en pos-0 NO convocados oficialmente
+
+**Síntoma:** FF coloca a veces como titular pos-0 a jugadores que NO
+aparecen en la convocatoria oficial. Ejemplo confirmado 28-may: TUN
+Aissa Laidouni en pos-0 pero Lamouchi no lo convocó (verificado con
+lista DAZN). Esto producía `unmatched` para el slot, no 10/11.
+
+**Causa:** FF actualiza el "Posible once tipo" en tiempo real con
+proyecciones tácticas que no siempre coinciden con la convocatoria
+final que San importa en BD desde fuentes primarias (AS/Sport/Olympics/
+ESPN/Marca).
+
+**Fix:** Capa B punto 4 del fix XI pipeline:
+  - `ff-scraper.parseStartingXISlotsFromHtml` extrae tanto pos-0
+    (titular) como pos-1 (alternativa) desde `a.juggador.pos-{0,1}`.
+  - `matchAgainstRoster` acepta `candidate groups` (array de arrays).
+    Por slot: intenta pos-0 primero, si no matchea contra el roster
+    intenta pos-1. Si pos-1 SÍ está convocado, marca a ese.
+  - Caso TUN: pos-0 Laidouni → unmatched → pos-1 Rani Khedira → match.
+
+Pendiente verificar con fuente oficial 3 dudosos (no se aplica alias ni
+fallback ciego):
+  - IRN: Kanaanizadegan (FF) vs roster Hossein Kanaani (¿misma persona?)
+  - GHA: Kohn (FF) — no casa con roster
+  - JOR: Layla portero (FF) — no identificado en roster
+
+Para esos 3 dejar 10/11 (no forzar match incorrecto). San verificará con
+fuente oficial y aplicará pin manual cuando confirme.
+
+**Patrón:** un scraper de "posible once" no es fuente de verdad de la
+convocatoria — es una predicción. Cuando colisiona con la convocatoria
+oficial, manda la convocatoria. El fallback pos-1 es heurístico
+pero suficiente para los casos comunes.

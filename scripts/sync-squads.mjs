@@ -195,22 +195,53 @@ async function runScrape(targets) {
           const decodeName = (s) => decode(String(s ?? ''))
             .replace(/[‘’‚′]/g, "'")
             .replace(/[“”„″]/g, '"');
+          // Preservar es_titular ORIGINAL si xi_pinned (Capa C 28-may): el
+          // refresh-final no debe machacar el pin manual de San. Si NO está
+          // pineado, reset a false (lo recalcula el matcher abajo).
+          const isPinned = existing.xi_pinned === true;
           players = existing.jugadores.map((p) => ({
             ...p,
             nombre: decodeName(p.nombre),
             club: decodeName(p.club),
-            es_titular: false,
+            es_titular: isPinned ? !!p.es_titular : false,
           }));
           isFinal = !!existing.jugadores_is_final;
           fuente = existing.jugadores_fuente || 'ff';
 
-          if (scrape.xi_names.length > 0) {
+          if (!isPinned && (scrape.xi_slots?.length > 0 || scrape.xi_names.length > 0)) {
             const { matchAgainstRoster } = await import('./lib/name-matcher.mjs');
-            const { matches } = matchAgainstRoster(scrape.xi_names, players, { minScore: 65 });
+            // Lazy-load alias dict (Capa B). Inofensivo si falta el fichero.
+            let aliases = null;
+            try {
+              const { readFileSync } = await import('node:fs');
+              const { fileURLToPath } = await import('node:url');
+              const { dirname, resolve } = await import('node:path');
+              const __dirname = dirname(fileURLToPath(import.meta.url));
+              aliases = JSON.parse(
+                readFileSync(resolve(__dirname, 'lib/name-aliases.json'), 'utf-8'),
+              );
+            } catch {
+              /* sin alias dict, matcher sigue funcional */
+            }
+            const candidateGroups =
+              scrape.xi_slots?.length > 0
+                ? scrape.xi_slots.map((s) =>
+                    s.alternativa ? [s.titular, s.alternativa] : [s.titular],
+                  )
+                : scrape.xi_names.map((n) => [n]);
+            const { matches } = matchAgainstRoster(candidateGroups, players, {
+              minScore: 65,
+              iso3,
+              aliases,
+            });
             for (const { matchIdx } of matches) {
               players[matchIdx].es_titular = true;
             }
             scrape.titulares = matches.length;
+          } else if (isPinned) {
+            // Reportar titulares conservados (count del roster preservado).
+            scrape.titulares = players.filter((p) => p.es_titular).length;
+            if (VERBOSE) console.log(`  ${iso3} — xi_pinned=true, preservados ${scrape.titulares} titulares`);
           }
         }
         // Si no hay existing roster, players queda con scrape.roster del flujo
@@ -448,20 +479,60 @@ async function runDetect(targetsArg) {
 
   if (enrichXi && !DRY_RUN) {
     console.log('\n  Paso 2 — enrich XI titular vía FF (solo FINAL recién escritas)\n');
+    // Lazy-load del diccionario de alias per-iso3 (Capa B del fix XI pipeline
+    // 28-may-2026). Si falta el fichero, seguimos sin alias (no rompe).
+    let aliases = null;
+    try {
+      const { readFileSync } = await import('node:fs');
+      const { fileURLToPath } = await import('node:url');
+      const { dirname, resolve } = await import('node:path');
+      const __dirname = dirname(fileURLToPath(import.meta.url));
+      aliases = JSON.parse(
+        readFileSync(resolve(__dirname, 'lib/name-aliases.json'), 'utf-8'),
+      );
+    } catch (e) {
+      if (VERBOSE) console.log(`  ! name-aliases.json no cargado: ${e.message.slice(0, 60)}`);
+    }
+
     for (const r of results) {
       if (!['updated', 'no-op'].includes(r.status)) continue;
       const slug = ISO3_TO_SLUG[r.iso3];
       if (!slug) continue;
       try {
-        const scrape = await scrapeCountry(slug, { verbose: VERBOSE, refreshFinal: true, iso3: r.iso3 });
-        if (!scrape.xi_names || scrape.xi_names.length === 0) {
+        const row = await getSquadRow(r.iso3);
+        if (!Array.isArray(row?.jugadores) || row.jugadores.length === 0) continue;
+        // Capa C — pin de estabilidad: si el país está pineado, NO recalcular
+        // es_titular (preserva trabajo manual). El roster (jugadores) sigue
+        // mutable por detect/enrich-tm vía preserveEnrichment — sólo el flag
+        // es_titular se congela.
+        if (row.xi_pinned === true) {
+          if (VERBOSE) console.log(`    ${r.iso3} — xi_pinned=true, salto enrich-XI`);
+          continue;
+        }
+        const scrape = await scrapeCountry(slug, {
+          verbose: VERBOSE,
+          refreshFinal: true,
+          iso3: r.iso3,
+        });
+        const slots = scrape.xi_slots || [];
+        const xiCount = slots.length || (scrape.xi_names ? scrape.xi_names.length : 0);
+        if (xiCount === 0) {
           if (VERBOSE) console.log(`    ${r.iso3} — FF sin XI titular`);
           continue;
         }
-        const row = await getSquadRow(r.iso3);
-        if (!Array.isArray(row?.jugadores) || row.jugadores.length === 0) continue;
         const players = row.jugadores.map((p) => ({ ...p, es_titular: false }));
-        const { matches } = matchAgainstRoster(scrape.xi_names, players, { minScore: 65 });
+        // Candidate groups: cada slot {titular, alternativa?} → [titular] o
+        // [titular, alternativa]. Cubre Causa 4 (FF lista titulares no
+        // convocados, e.g. TUN Laidouni → fallback Rani Khedira).
+        const candidateGroups =
+          slots.length > 0
+            ? slots.map((s) => (s.alternativa ? [s.titular, s.alternativa] : [s.titular]))
+            : scrape.xi_names.map((n) => [n]);
+        const { matches } = matchAgainstRoster(candidateGroups, players, {
+          minScore: 65,
+          iso3: r.iso3,
+          aliases,
+        });
         for (const { matchIdx } of matches) players[matchIdx].es_titular = true;
         await upsertSquad(r.iso3, players, {
           isFinal: true,
@@ -469,7 +540,7 @@ async function runDetect(targetsArg) {
           dryRun: false,
           force: false,
         });
-        console.log(`    ${r.iso3} — XI matched: ${matches.length}/${scrape.xi_names.length}`);
+        console.log(`    ${r.iso3} — XI matched: ${matches.length}/${xiCount}`);
         await sleep(1500);
       } catch (err) {
         console.warn(`    ${r.iso3} — FF enrich-xi falló: ${err.message.slice(0, 80)}`);
