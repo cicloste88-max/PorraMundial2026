@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `0e49612` (PR #78 hotfix iOS modal grupos, 20-may). Tres PRs hoy: #75 fix pre-launch 11 fixes F-01..F-10b (`72e3b75`), #77 iOS scroll → inner (`7d8b706`), #78 max-height descuenta tabbar (`0e49612`). Sprint Pre-Launch cerrado. **10/48 squads operativas**. ERR-65 (iOS scroll en `pointer-events:none`) + ERR-66 (max-height vs `.fc-tabbar` fija) registrados. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
+Main HEAD `0c45bf2` (PR #109 fix XI pipeline 3 capas A+B+C, 28-may). Cluster squads-pipeline #105-109 cerrado. **33/48 squads protegidas a 11/11** via `xi_pinned` (Capa C); 3 dudosos a 10/11 sin pin (GHA/IRN/JOR — Capa B mejora en cron); 12 sin lista FF (ALG,ARG,AUS,CAN,ECU,IRQ,MEX,PAR,QAT,TUR,URU,UZB). Migration `squads_xi_pinned` aplicada. ERR-71..75 (parser corruptos, Levenshtein adaptativo, anti-colisión, pin, FF pos-1). Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
 
 ## Top-3 pendientes inmediatos
 
 1. **Sprint Reglamento FIFA** (3 commits): aplicar Art13 head-to-head + Art16 a scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md` reservado; brief específico cuando San active.
-2. **PR `feat/squads-sources-refactor`**: 4 commits sobre `bd6e977`. 5 fuentes primarias (AS+Sport+Olympics+Eurosport+Marca) cross-validate 2-of-N + maxPlayers=30. ERR-59. San abre PR.
-3. **Operacional pre-launch 11-jun**: activar `pg_cron update-results`, squads 38/48 via sync-squads, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked).
+2. **Operacional pre-launch 11-jun** (14 días vista): activar `pg_cron update-results`, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked). Squads pipeline ya estabilizado tras #109.
+3. **Pizarra Táctica apellidos invisibles iPhone real**: ver Bugs UI #5 abajo.
 
 ## Pendientes — Bugs UI
 
