@@ -37,6 +37,10 @@ on:
         description: '[enrich-tm-mw] forzar fase B siempre (rellena dob+dorsal incluso en países con buena cobertura A)'
         type: boolean
         default: false
+      dry_run:
+        description: 'Dry-run: NO aplica UPDATE a BD, solo loguea diff propuesto. Higiene operativa para validar antes de productivo.'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -118,6 +122,7 @@ jobs:
           ENRICH_XI: ${{ inputs.enrich_xi }}
           REFRESH_FINAL: ${{ inputs.refresh_final }}
           FULL: ${{ inputs.full }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
           # solo cuando está unset/empty, preservando "false" explícito de UI.
@@ -127,6 +132,7 @@ jobs:
           ENRICH_XI="${ENRICH_XI:-true}"
           REFRESH_FINAL="${REFRESH_FINAL:-false}"
           FULL="${FULL:-false}"
+          DRY_RUN="${DRY_RUN:-false}"
 
           # Sanity check del input libre.
           if [ -n "${ISO3_FILTER}" ] && ! printf '%s' "${ISO3_FILTER}" | grep -qE '^[A-Z]{3}(,[A-Z]{3})*$'; then
@@ -164,6 +170,12 @@ jobs:
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --verbose"
             TM_FLAGS="${TM_FLAGS} --verbose"
             TMMW_FLAGS="${TMMW_FLAGS} --verbose"
+          fi
+          if [ "${DRY_RUN}" = "true" ]; then
+            DETECT_FLAGS="${DETECT_FLAGS} --dry-run"
+            SCRAPE_FLAGS="${SCRAPE_FLAGS} --dry-run"
+            TM_FLAGS="${TM_FLAGS} --dry-run"
+            TMMW_FLAGS="${TMMW_FLAGS} --dry-run"
           fi
 
           {
