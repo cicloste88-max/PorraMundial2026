@@ -1,0 +1,662 @@
+{
+  "MEX": [
+    {
+      "key": "Jimenez",
+      "name": "9 · Raúl Jiménez"
+    },
+    {
+      "key": "Lozano",
+      "name": "22 · H. Lozano"
+    },
+    {
+      "key": "Martin",
+      "name": "8 · C. Rodríguez"
+    },
+    {
+      "key": "Vega",
+      "name": "11 · A. Vega"
+    }
+  ],
+  "RSA": [
+    {
+      "key": "Percy",
+      "name": "10 · Percy Tau"
+    },
+    {
+      "key": "Dolly",
+      "name": "11 · Keagan Dolly"
+    }
+  ],
+  "KOR": [
+    {
+      "key": "Son",
+      "name": "7 · Son Heung-min"
+    },
+    {
+      "key": "Hwang",
+      "name": "9 · Hwang Ui-jo"
+    },
+    {
+      "key": "Lee",
+      "name": "11 · Lee Kang-in"
+    }
+  ],
+  "CZE": [
+    {
+      "key": "Schick",
+      "name": "9 · Patrik Schick"
+    },
+    {
+      "key": "Hlozek",
+      "name": "11 · Adam Hložek"
+    }
+  ],
+  "CAN": [
+    {
+      "key": "David",
+      "name": "9 · Jonathan David"
+    },
+    {
+      "key": "Davies",
+      "name": "3 · Alphonso Davies"
+    },
+    {
+      "key": "Buchanan",
+      "name": "11 · Tajon Buchanan"
+    }
+  ],
+  "BIH": [
+    {
+      "key": "Dzeko",
+      "name": "9 · Edin Džeko"
+    },
+    {
+      "key": "Pjanic",
+      "name": "8 · Miralem Pjanić"
+    }
+  ],
+  "QAT": [
+    {
+      "key": "Afif",
+      "name": "11 · Akram Afif"
+    },
+    {
+      "key": "Almoez",
+      "name": "9 · Almoez Ali"
+    }
+  ],
+  "SUI": [
+    {
+      "key": "Xhaka",
+      "name": "10 · Granit Xhaka"
+    },
+    {
+      "key": "Embolo",
+      "name": "7 · Breel Embolo"
+    },
+    {
+      "key": "Ndoye",
+      "name": "11 · Dan Ndoye"
+    }
+  ],
+  "BRA": [
+    {
+      "key": "Vinicius",
+      "name": "7 · Vinícius Jr."
+    },
+    {
+      "key": "Raphinha",
+      "name": "11 · Raphinha"
+    },
+    {
+      "key": "Rodrygo",
+      "name": "9 · Rodrygo"
+    },
+    {
+      "key": "Endrick",
+      "name": "19 · Endrick"
+    }
+  ],
+  "MAR": [
+    {
+      "key": "Hakimi",
+      "name": "2 · Achraf Hakimi"
+    },
+    {
+      "key": "Ziyech",
+      "name": "7 · Hakim Ziyech"
+    },
+    {
+      "key": "EnNesyri",
+      "name": "9 · Youssef En-Nesyri"
+    }
+  ],
+  "HAI": [
+    {
+      "key": "Nazon",
+      "name": "9 · Duckens Nazon"
+    },
+    {
+      "key": "Borgella",
+      "name": "11 · Frantzdy Pierrot"
+    }
+  ],
+  "SCO": [
+    {
+      "key": "McTominay",
+      "name": "8 · Scott McTominay"
+    },
+    {
+      "key": "Adams",
+      "name": "9 · Che Adams"
+    },
+    {
+      "key": "Christie",
+      "name": "11 · Ryan Christie"
+    }
+  ],
+  "USA": [
+    {
+      "key": "Pulisic",
+      "name": "10 · Christian Pulisic"
+    },
+    {
+      "key": "Reyna",
+      "name": "7 · Giovanni Reyna"
+    },
+    {
+      "key": "Balogun",
+      "name": "9 · Folarin Balogun"
+    }
+  ],
+  "PAR": [
+    {
+      "key": "Almiron",
+      "name": "10 · Miguel Almirón"
+    },
+    {
+      "key": "Sanabria",
+      "name": "9 · Antonio Sanabria"
+    }
+  ],
+  "AUS": [
+    {
+      "key": "Hrustic",
+      "name": "10 · Ajdin Hrustic"
+    },
+    {
+      "key": "Taggart",
+      "name": "9 · Adam Taggart"
+    },
+    {
+      "key": "Irvine",
+      "name": "8 · Jackson Irvine"
+    }
+  ],
+  "TUR": [
+    {
+      "key": "Calhanoglu",
+      "name": "10 · Hakan Çalhanoğlu"
+    },
+    {
+      "key": "Guler",
+      "name": "10 · Arda Güler"
+    },
+    {
+      "key": "Yildiz",
+      "name": "7 · Kenan Yıldız"
+    }
+  ],
+  "GER": [
+    {
+      "key": "Wirtz",
+      "name": "10 · Florian Wirtz"
+    },
+    {
+      "key": "Musiala",
+      "name": "14 · Jamal Musiala"
+    },
+    {
+      "key": "Havertz",
+      "name": "9 · Kai Havertz"
+    },
+    {
+      "key": "Gnabry",
+      "name": "7 · Serge Gnabry"
+    }
+  ],
+  "CUW": [
+    {
+      "key": "Bacuna",
+      "name": "8 · Juninho Bacuna"
+    },
+    {
+      "key": "Fer",
+      "name": "6 · Leroy Fer"
+    }
+  ],
+  "CIV": [
+    {
+      "key": "Pepe",
+      "name": "7 · Nicolas Pépé"
+    },
+    {
+      "key": "Cornet",
+      "name": "11 · Maxwel Cornet"
+    },
+    {
+      "key": "Gradel",
+      "name": "9 · Max-Alain Gradel"
+    }
+  ],
+  "ECU": [
+    {
+      "key": "Caicedo",
+      "name": "14 · Moisés Caicedo"
+    },
+    {
+      "key": "Valencia",
+      "name": "13 · Enner Valencia"
+    },
+    {
+      "key": "Plata",
+      "name": "11 · Gonzalo Plata"
+    }
+  ],
+  "NED": [
+    {
+      "key": "Gakpo",
+      "name": "11 · Cody Gakpo"
+    },
+    {
+      "key": "VanDijk",
+      "name": "4 · Virgil van Dijk"
+    },
+    {
+      "key": "Simons",
+      "name": "9 · Xavi Simons"
+    },
+    {
+      "key": "Depay",
+      "name": "10 · Memphis Depay"
+    }
+  ],
+  "JPN": [
+    {
+      "key": "Mitoma",
+      "name": "10 · Kaoru Mitoma"
+    },
+    {
+      "key": "Kubo",
+      "name": "7 · Takefusa Kubo"
+    },
+    {
+      "key": "Doan",
+      "name": "8 · Ritsu Dōan"
+    }
+  ],
+  "SWE": [
+    {
+      "key": "Isak",
+      "name": "10 · Alexander Isak"
+    },
+    {
+      "key": "Gyokeres",
+      "name": "9 · Viktor Gyökeres"
+    },
+    {
+      "key": "Karlsson",
+      "name": "11 · Jesper Karlsson"
+    }
+  ],
+  "TUN": [
+    {
+      "key": "Msakni",
+      "name": "7 · Youssef Msakni"
+    },
+    {
+      "key": "Jebali",
+      "name": "9 · Issam Jebali"
+    }
+  ],
+  "BEL": [
+    {
+      "key": "DeBruyne",
+      "name": "7 · Kevin De Bruyne"
+    },
+    {
+      "key": "Lukaku",
+      "name": "9 · Romelu Lukaku"
+    },
+    {
+      "key": "Doku",
+      "name": "11 · Jérémy Doku"
+    }
+  ],
+  "EGY": [
+    {
+      "key": "Salah",
+      "name": "10 · Mohamed Salah"
+    },
+    {
+      "key": "Trezeguet",
+      "name": "11 · Trezeguet"
+    },
+    {
+      "key": "Mostafa",
+      "name": "9 · Mostafa Mohamed"
+    }
+  ],
+  "IRN": [
+    {
+      "key": "Taremi",
+      "name": "9 · Mehdi Taremi"
+    },
+    {
+      "key": "Jahanbakhsh",
+      "name": "7 · Alireza Jahanbakhsh"
+    }
+  ],
+  "NZL": [
+    {
+      "key": "Wood",
+      "name": "9 · Chris Wood"
+    },
+    {
+      "key": "Cacace",
+      "name": "7 · Liberato Cacace"
+    }
+  ],
+  "ESP": [
+    {
+      "key": "Yamal",
+      "name": "10 · Lamine Yamal"
+    },
+    {
+      "key": "Nico",
+      "name": "17 · Nico Williams"
+    },
+    {
+      "key": "Morata",
+      "name": "7 · Álvaro Morata"
+    },
+    {
+      "key": "Rodri",
+      "name": "16 · Rodri"
+    },
+    {
+      "key": "Olmo",
+      "name": "8 · Dani Olmo"
+    },
+    {
+      "key": "Pedri",
+      "name": "26 · Pedri"
+    }
+  ],
+  "CPV": [
+    {
+      "key": "Mendes",
+      "name": "7 · Ryan Mendes"
+    },
+    {
+      "key": "Tavares",
+      "name": "11 · Garry Rodrigues"
+    }
+  ],
+  "KSA": [
+    {
+      "key": "AlDawsari",
+      "name": "11 · Salem Al-Dawsari"
+    },
+    {
+      "key": "Firas",
+      "name": "9 · Firas Al-Buraikan"
+    }
+  ],
+  "URU": [
+    {
+      "key": "Nunez",
+      "name": "9 · Darwin Núñez"
+    },
+    {
+      "key": "Valverde",
+      "name": "8 · F. Valverde"
+    },
+    {
+      "key": "Suarez",
+      "name": "9 · Luis Suárez"
+    },
+    {
+      "key": "Araujo",
+      "name": "4 · R. Araújo"
+    }
+  ],
+  "FRA": [
+    {
+      "key": "Mbappe",
+      "name": "10 · Kylian Mbappé"
+    },
+    {
+      "key": "Griezmann",
+      "name": "7 · Antoine Griezmann"
+    },
+    {
+      "key": "Dembele",
+      "name": "11 · Ousmane Dembélé"
+    },
+    {
+      "key": "Giroud",
+      "name": "9 · Olivier Giroud"
+    }
+  ],
+  "SEN": [
+    {
+      "key": "Mane",
+      "name": "10 · Sadio Mané"
+    },
+    {
+      "key": "Dia",
+      "name": "9 · Boulaye Dia"
+    },
+    {
+      "key": "Diatta",
+      "name": "7 · Lamine Diatta"
+    }
+  ],
+  "IRQ": [
+    {
+      "key": "AlAmmari",
+      "name": "20 · Amir Al-Ammari"
+    },
+    {
+      "key": "AlHamadi",
+      "name": "9 · Ali Al-Hamadi"
+    }
+  ],
+  "NOR": [
+    {
+      "key": "Haaland",
+      "name": "9 · Erling Haaland"
+    },
+    {
+      "key": "Odegaard",
+      "name": "8 · M. Ødegaard"
+    },
+    {
+      "key": "Sorloth",
+      "name": "11 · A. Sørloth"
+    }
+  ],
+  "ARG": [
+    {
+      "key": "Messi",
+      "name": "10 · Lionel Messi"
+    },
+    {
+      "key": "Alvarez",
+      "name": "9 · Julián Álvarez"
+    },
+    {
+      "key": "DePaul",
+      "name": "7 · Rodrigo De Paul"
+    },
+    {
+      "key": "MacAllister",
+      "name": "20 · A. Mac Allister"
+    },
+    {
+      "key": "Dibu",
+      "name": "23 · E. Martínez"
+    }
+  ],
+  "ALG": [
+    {
+      "key": "Mahrez",
+      "name": "7 · Riyad Mahrez"
+    },
+    {
+      "key": "Belaili",
+      "name": "17 · Youcef Belaïli"
+    }
+  ],
+  "AUT": [
+    {
+      "key": "Sabitzer",
+      "name": "8 · Marcel Sabitzer"
+    },
+    {
+      "key": "Gregoritsch",
+      "name": "9 · M. Gregoritsch"
+    },
+    {
+      "key": "Arnautovic",
+      "name": "19 · M. Arnautović"
+    }
+  ],
+  "JOR": [
+    {
+      "key": "AlTaamari",
+      "name": "7 · Musa Al-Taamari"
+    },
+    {
+      "key": "Bani",
+      "name": "9 · Hamza Bani"
+    }
+  ],
+  "POR": [
+    {
+      "key": "Ronaldo",
+      "name": "7 · C. Ronaldo"
+    },
+    {
+      "key": "Bruno",
+      "name": "8 · Bruno Fernandes"
+    },
+    {
+      "key": "Leao",
+      "name": "17 · Rafael Leão"
+    },
+    {
+      "key": "Dias",
+      "name": "3 · Rúben Dias"
+    }
+  ],
+  "COD": [
+    {
+      "key": "Bakambu",
+      "name": "9 · Cédric Bakambu"
+    },
+    {
+      "key": "Wissa",
+      "name": "11 · Yoane Wissa"
+    }
+  ],
+  "UZB": [
+    {
+      "key": "Shomurodov",
+      "name": "9 · Eldor Shomurodov"
+    },
+    {
+      "key": "Fayzullaev",
+      "name": "11 · A. Fayzullaev"
+    }
+  ],
+  "COL": [
+    {
+      "key": "Diaz",
+      "name": "7 · Luis Díaz"
+    },
+    {
+      "key": "James",
+      "name": "10 · James Rodríguez"
+    },
+    {
+      "key": "Borja",
+      "name": "9 · Miguel Borja"
+    },
+    {
+      "key": "Rios",
+      "name": "8 · Richard Ríos"
+    }
+  ],
+  "ENG": [
+    {
+      "key": "Kane",
+      "name": "9 · Harry Kane"
+    },
+    {
+      "key": "Bellingham",
+      "name": "10 · Jude Bellingham"
+    },
+    {
+      "key": "Saka",
+      "name": "7 · Bukayo Saka"
+    },
+    {
+      "key": "Foden",
+      "name": "11 · Phil Foden"
+    }
+  ],
+  "CRO": [
+    {
+      "key": "Modric",
+      "name": "10 · Luka Modrić"
+    },
+    {
+      "key": "Kramaric",
+      "name": "9 · Andrej Kramarić"
+    },
+    {
+      "key": "Perisic",
+      "name": "4 · Ivan Perišić"
+    }
+  ],
+  "GHA": [
+    {
+      "key": "Kudus",
+      "name": "14 · Mohammed Kudus"
+    },
+    {
+      "key": "Partey",
+      "name": "5 · Thomas Partey"
+    },
+    {
+      "key": "Ayew",
+      "name": "9 · Jordan Ayew"
+    }
+  ],
+  "PAN": [
+    {
+      "key": "Carrasquilla",
+      "name": "8 · A. Carrasquilla"
+    },
+    {
+      "key": "Diaz",
+      "name": "9 · Ismael Díaz"
+    },
+    {
+      "key": "Blackburn",
+      "name": "11 · R. Blackburn"
+    }
+  ]
+}

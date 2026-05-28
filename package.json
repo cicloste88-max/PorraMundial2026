@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/export-equipos-players.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "export-equipos-players": "node scripts/export-equipos-players.mjs",
     "sync-squads": "node --env-file=.env scripts/sync-squads.mjs"
   },
   "repository": {
