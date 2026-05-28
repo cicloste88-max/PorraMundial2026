@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parsePlayerList } from '../_util.mjs';
+import { parsePlayer, parsePlayerList } from '../_util.mjs';
 
 test('parsePlayerList resiliente a paréntesis huérfano (typo AS 18-may KOR)', () => {
   // Caso real: typo en AS donde un jugador tiene ")Mainz 05)" con ) sin (
@@ -54,4 +54,66 @@ test('parsePlayerList NO confunde " e " dentro de un nombre (palabra minúscula 
   // Debería interpretar "Pedro e su amigo" como UN solo jugador y "Juan" como otro
   assert.equal(out.length, 2);
   assert.equal(out[0].nombre, 'Pedro e su amigo');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// parsePlayer — regresión 28-may-2026 sobre 5 patrones reales de corrupción
+// observados en BD tras auditoría manual de 48 países por San.
+// ────────────────────────────────────────────────────────────────────────────
+
+test('parsePlayer well-formed sigue funcionando (regresión)', () => {
+  assert.deepEqual(parsePlayer('Maignan (Milan)'), { nombre: 'Maignan', club: 'Milan' });
+  assert.deepEqual(parsePlayer('Lautaro Martínez (Inter, ITA)'), {
+    nombre: 'Lautaro Martínez',
+    club: 'Inter',
+  });
+  assert.deepEqual(parsePlayer('Cristiano'), { nombre: 'Cristiano' });
+});
+
+test('parsePlayer caso 1 EGY: "Ibrahim Ade (Pyramids FC)l" → "Ibrahim Adel"', () => {
+  // Letra cortada del nombre por mala segmentación upstream. El club se descarta
+  // (mejor sin club que con club erróneo). El nombre se reune correctamente.
+  const out = parsePlayer('Ibrahim Ade (Pyramids FC)l');
+  assert.equal(out?.nombre, 'Ibrahim Adel', `recibí ${JSON.stringify(out)}`);
+});
+
+test('parsePlayer caso 2 ENG: "(Tottenham)" → null (nombre vacío)', () => {
+  // Sólo club entre paréntesis, sin nombre — entrada inválida. Devuelve null
+  // y el llamador (parsePlayerList con filter(Boolean)) descarta. NO debe
+  // dejar entrada con nombre='' o nombre='(Tottenham)' en BD.
+  const out = parsePlayer('(Tottenham)');
+  assert.equal(out, null);
+});
+
+test('parsePlayer caso 3 KOR: "Lee Jjae-Sung )Mainz 05)" → "Lee Jjae-Sung"', () => {
+  // Paréntesis invertido — ) sin ( de apertura. El typo 'Jjae' se preserva
+  // (no es trabajo del parser corregir typos, lo hace el matcher Levenshtein).
+  const out = parsePlayer('Lee Jjae-Sung )Mainz 05)');
+  assert.equal(out?.nombre, 'Lee Jjae-Sung', `recibí ${JSON.stringify(out)}`);
+});
+
+test('parsePlayer caso 4 SCO: "Ross Stewart (Southampton)Stewart" → "Ross Stewart"', () => {
+  // Apellido duplicado tras `)`. El dedupe detecta "StewartStewart" y elimina
+  // la repetición del último token (mínimo N=3 chars).
+  const out = parsePlayer('Ross Stewart (Southampton)Stewart');
+  assert.equal(out?.nombre, 'Ross Stewart', `recibí ${JSON.stringify(out)}`);
+});
+
+test('parsePlayer caso 5 SWE: "Gustaf Nilsson Brujas)" → "Gustaf Nilsson"', () => {
+  // Club pegado sin paréntesis abierto. El stripping de "\\s+\\S+\\)$" sólo
+  // se aplica cuando NO hay ningún `(` en el string (señal clara de malformación).
+  const out = parsePlayer('Gustaf Nilsson Brujas)');
+  assert.equal(out?.nombre, 'Gustaf Nilsson', `recibí ${JSON.stringify(out)}`);
+});
+
+test('parsePlayer: nombre simple sin paréntesis se preserva intacto', () => {
+  assert.equal(parsePlayer('Bono')?.nombre, 'Bono');
+  assert.equal(parsePlayer('Pelé')?.nombre, 'Pelé');
+});
+
+test('parsePlayer: apellidos cortos no caen en falso positivo de dedupe', () => {
+  // El dedupe exige N≥3 en la mitad repetida. Apellidos cortos no deben
+  // colapsar (e.g. 'Vavá' no debería convertirse en 'V').
+  assert.equal(parsePlayer('Vavá')?.nombre, 'Vavá');
+  assert.equal(parsePlayer('Lee Jo')?.nombre, 'Lee Jo');
 });

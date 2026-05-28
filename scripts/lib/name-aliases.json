@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "_doc": "Aliases por iso3 — diccionario canónico para reconciliar nombres FF vs roster. Consultado por name-matcher.mjs ANTES de Levenshtein. Caso de uso: apodos (Bono → Yassine Bounou), iniciales (Deedson L. → Louicius Deedson), transcripción divergente (Fattouh vs Ahmed Fotouh), prefijos árabes (Al Nadi → Mohammad Abualnadi). Formato: { iso3: { 'FF candidate': 'roster canonical' } }. Búsqueda case-sensitive sobre el string trimmed exacto. Semilla 28-may-2026 desde auditoría manual 48 países por San.",
+    "_versioned": "actualizar este fichero con nuevos casos según aparezcan en logs/audits. NO incluir aliases ambiguos sin verificación contra fuente oficial."
+  },
+  "MAR": {
+    "Bono": "Yassine Bounou"
+  },
+  "CPV": {
+    "Pico Lopes": "Roberto Lopes",
+    "Vozinha": "Josimar Dias"
+  },
+  "HAI": {
+    "Deedson L.": "Louicius Deedson",
+    "Jean Jacques": "Jean-Jacques Danley"
+  },
+  "NOR": {
+    "Sorloth": "Alexander Sorloth"
+  },
+  "KOR": {
+    "Kim Tae-hyeon": "Kim Tae-Hwan"
+  },
+  "EGY": {
+    "Fattouh": "Ahmed Fotouh"
+  },
+  "JOR": {
+    "Al Nadi": "Mohammad Abualnadi"
+  }
+}

@@ -198,23 +198,89 @@ export function detectBucketLine(line) {
 
 /**
  * Parsea "Nombre (Club)" o "Nombre (Club, PAIS)" o "Nombre" suelto.
+ *
+ * 28-may-2026 — endurecido para tolerar 5 patrones reales de corrupción
+ * observados en BD (auditoría manual San):
+ *   1) 'Ibrahim Ade (Pyramids FC)l' — texto tras `)` (letra cortada del nombre)
+ *   2) '(Tottenham)'                — nombre VACÍO (sólo club) → null + WARN
+ *   3) 'Lee Jjae-Sung )Mainz 05)'   — paréntesis invertido sin `(` apertura
+ *   4) 'Ross Stewart (Southampton)Stewart' — apellido duplicado tras `)`
+ *   5) 'Gustaf Nilsson Brujas)'     — club pegado sin paréntesis abierto
+ *
+ * Estrategia en 2 caminos:
+ *   - Path 1 well-formed: regex estricta `^(.+?)\s*\(([^)]+)\)\s*$`. Misma
+ *     semántica que antes: cuando matchea, devuelve {nombre, club} con el
+ *     handling de ", PAIS" trailing intacto.
+ *   - Path 2 fallback robusto: si el well-formed falla, aplica una secuencia
+ *     de strip ops para limpiar parens malformados y dedupe de apellido
+ *     repetido. Si tras limpieza el nombre queda vacío → null (caller debe
+ *     descartar; el llamador desde parsePlayerList lo hace via filter(Boolean)).
+ *
+ * NUNCA devuelve `{ nombre: '' }` ni `{ nombre: '(Tottenham)' }` — esos casos
+ * eran el bug que dejaba entradas corruptas en BD.
+ *
  * @returns {{ nombre: string, club?: string } | null}
  */
 export function parsePlayer(raw) {
-  const s = String(raw || '').replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
+  let s = String(raw || '').replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
   if (!s) return null;
-  const m = s.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-  if (m) {
-    const nombre = m[1].trim();
-    let club = m[2].trim();
+
+  // Path 1 — well-formed: "Nombre (Club)" o "Nombre (Club, PAIS)".
+  const wellFormed = s.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (wellFormed) {
+    const nombre = wellFormed[1].trim().replace(/[.,;]+$/, '');
+    let club = wellFormed[2].trim();
     // "FC Tokyo, JPN" → quitar el ", JPN" si parece código país (2-4 letras todo mayúsculas)
     const parts = club.split(',').map((p) => p.trim());
     if (parts.length >= 2 && /^[A-ZÁ-Ú]{2,4}$/u.test(parts[parts.length - 1])) {
       club = parts.slice(0, -1).join(', ');
     }
+    if (!nombre || /^[-•·]+$/.test(nombre)) return null;
     return club ? { nombre, club } : { nombre };
   }
-  return { nombre: s };
+
+  // Path 2 — robust fallback para entradas malformadas.
+  let cleaned = s;
+  // (a) Strip leading paren chunk: "(Club) Resto" → "Resto" (caso 2 si chunk == s).
+  cleaned = cleaned.replace(/^\s*\([^()]*\)\s*/, '');
+  // (b) Strip well-formed paren chunks con leading whitespace:
+  //     "Ade (Club)l"     → "Adel"           (caso 1 — letra cortada se reune)
+  //     "Name (Club) Suf" → "Name Suf"
+  //     "Stewart (Club)Stewart" → "StewartStewart" (caso 4 — dedupe en (e))
+  cleaned = cleaned.replace(/\s\([^()]*\)/g, '');
+  // (c) Strip inverted paren chunks: "Name )Club)" → "Name" (caso 3).
+  cleaned = cleaned.replace(/\s\)[^()]*\)/g, '');
+  // (d) Strip trailing "Club)" pegado sin '(' (caso 5):
+  //     "Name Brujas)" → "Name"   sólo si NO quedan '(' que sugieran paren válido.
+  if (!cleaned.includes('(')) {
+    cleaned = cleaned.replace(/\s+\S+\)$/, '');
+  }
+  // (e) Cualquier paréntesis residual → eliminar. Trim final.
+  cleaned = cleaned.replace(/[()]/g, '').replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
+  // (f) Dedupe trailing-token repetition: "Ross StewartStewart" → "Ross Stewart" (caso 4).
+  cleaned = dedupeRepeatedSuffix(cleaned);
+
+  if (!cleaned || /^[-•·]+$/.test(cleaned)) return null;
+  return { nombre: cleaned };
+}
+
+/**
+ * Helper: si el último token del nombre contiene su mitad final repetida
+ * (e.g. "StewartStewart" → "Stewart"), elimina la repetición. N mínimo = 3
+ * para evitar falsos positivos en apellidos cortos (e.g. "Vavá", "Pelé").
+ */
+function dedupeRepeatedSuffix(name) {
+  const tokens = name.split(/\s+/);
+  if (tokens.length === 0) return name;
+  const last = tokens[tokens.length - 1];
+  const half = Math.floor(last.length / 2);
+  for (let n = half; n >= 3; n--) {
+    if (last.slice(-2 * n, -n) === last.slice(-n)) {
+      tokens[tokens.length - 1] = last.slice(0, -n);
+      return tokens.join(' ').replace(/\s+/g, ' ').trim();
+    }
+  }
+  return name;
 }
 
 /**
