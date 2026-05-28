@@ -11,12 +11,17 @@ Methods (per source, validated 22-may con probes 26279588881/26281337027/
 Eurosport descartada: server-side geoblock 307 → /geoblocking.shtml desde IPs
 USA, irresoluble client-side. ESPN Deportes (Disney/Hearst) la reemplaza.
 
-FF (futbolfantasy.com) integración 27-may-2026:
-- Pre-fetch del HTML de equipos/<slug> de FF para el XI titular.
+FF (futbolfantasy.com) — scaling 28-may-2026:
+- 48 países WC 2026 leídos desde scripts/lib/iso3-slugs.json (canonical, DRY).
 - Cloudflare en FF bloquea Fetcher.get(impersonate) en IPs USA, requiere
-  StealthyFetcher (validado).
-- Empezamos con España como piloto para validar el flujo end-to-end.
-  Si OK, escalable a las 30+ FINAL via FF_COUNTRIES list.
+  StealthyFetcher (validado 27-may con ESP piloto).
+- Paralelización ProcessPool max_workers=3 para mantener wall time <10 min:
+  48 fuentes × ~30s serial = 24 min → 48/3 ≈ 8 min con workers.
+  ProcessPool (no ThreadPool): Playwright sync_api usa greenlets que NO son
+  thread-safe; cada worker necesita su propio event loop. mp_context='spawn'
+  fuerza fresh Python por worker (evita fork-state issues con browsers).
+- Países sin XI publicado: FF devuelve /alineaciones/0.jpg → parser detecta y
+  retorna []. Coste: fetch malgastado (~30s) pero no daño.
 
 Exit codes:
   0  → all sources OK (markers >=3, bytes > 10K)
@@ -28,11 +33,12 @@ vacío como sentinel y loga a stderr, para que el motor Node pueda fallback
 a las fuentes que sí cargaron.
 """
 
-import os
 import sys
 import time
 import json
+import multiprocessing as mp
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from scrapling.fetchers import Fetcher, StealthyFetcher
 
@@ -53,13 +59,12 @@ SOURCES = {
 # 11 slots (sufijo numérico cambia por seleccionador, ver brief 27-may).
 FF_MARKERS = ["jugadores-titulares-", "once tipo", "futbolfantasy", "alineac"]
 
-# Mapeo iso3 → slug FF. Slug usa nombre español del país. Coincide en mayoría
-# con scripts/lib/iso3-slugs.json pero mantenemos copia local para que el
-# fetcher Python no dependa de un JSON de Node.
-FF_COUNTRIES = {
-    "ESP": "espana",
-    # TODO scale a las demás FINAL tras validar el piloto con España.
-}
+# FF_COUNTRIES — leer desde scripts/lib/iso3-slugs.json (canonical, single source
+# of truth compartido con Node parsers). 48 países WC 2026. Países sin lista
+# publicada: FF servirá /alineaciones/0.jpg → parser retorna [] (no daño).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+with open(_REPO_ROOT / "scripts" / "lib" / "iso3-slugs.json", encoding="utf-8") as _f:
+    FF_COUNTRIES = json.load(_f)
 
 for iso3, slug in FF_COUNTRIES.items():
     SOURCES[f"ff-{iso3.lower()}"] = (
@@ -119,56 +124,86 @@ def extract_html(page):
     return ""
 
 
+def process_one(source, url, method, markers_list):
+    """Procesa una fuente: fetch, valida markers, escribe a cache.
+
+    Función top-level (no closure) para que ProcessPoolExecutor pueda
+    pickearla. Devuelve (source, summary_dict, failed_bool, log_line).
+    """
+    t0 = time.time()
+    target = CACHE_DIR / f"{source}.html"
+    try:
+        page = fetch(method, url)
+        html = extract_html(page)
+        elapsed_ms = int((time.time() - t0) * 1000)
+        html_lower = html.lower()
+        markers = [m for m in markers_list if m in html_lower]
+        ok = len(markers) >= 3 and len(html) > 10_000
+
+        if ok:
+            target.write_text(html, encoding="utf-8")
+            return (
+                source,
+                {"ok": True, "bytes": len(html), "ms": elapsed_ms, "markers": markers[:5]},
+                False,
+                f"[OK]   {source:12} bytes={len(html):7} ms={elapsed_ms:5} markers={markers[:3]}",
+            )
+        target.write_text("", encoding="utf-8")
+        return (
+            source,
+            {
+                "ok": False,
+                "bytes": len(html),
+                "ms": elapsed_ms,
+                "reason": "no_markers_or_tiny",
+                "markers": markers,
+            },
+            True,
+            f"[FAIL] {source:12} bytes={len(html):7} ms={elapsed_ms:5} markers={markers}",
+        )
+    except Exception as e:
+        target.write_text("", encoding="utf-8")
+        return (
+            source,
+            {"ok": False, "error": str(e)[:200]},
+            True,
+            f"[ERR]  {source:12} {e}",
+        )
+
+
 def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     summary = {}
     any_failed = False
 
-    for source, entry in SOURCES.items():
-        url, method, markers_list = entry
-        t0 = time.time()
-        target = CACHE_DIR / f"{source}.html"
-        try:
-            page = fetch(method, url)
-            html = extract_html(page)
-            elapsed_ms = int((time.time() - t0) * 1000)
-            html_lower = html.lower()
-            markers = [m for m in markers_list if m in html_lower]
-            ok = len(markers) >= 3 and len(html) > 10_000
+    # Split: FF en paralelo (hasta 48 fuentes), primarias en serie (solo 5).
+    ff_sources = [(k, v) for k, v in SOURCES.items() if v[1] == "stealthy-ff"]
+    primary_sources = [(k, v) for k, v in SOURCES.items() if v[1] != "stealthy-ff"]
 
-            if ok:
-                target.write_text(html, encoding="utf-8")
-                summary[source] = {
-                    "ok": True,
-                    "bytes": len(html),
-                    "ms": elapsed_ms,
-                    "markers": markers[:5],
-                }
-                print(
-                    f"[OK]   {source:12} bytes={len(html):7} ms={elapsed_ms:5} "
-                    f"markers={markers[:3]}",
-                    file=sys.stderr,
-                )
-            else:
-                target.write_text("", encoding="utf-8")
-                summary[source] = {
-                    "ok": False,
-                    "bytes": len(html),
-                    "ms": elapsed_ms,
-                    "reason": "no_markers_or_tiny",
-                    "markers": markers,
-                }
-                print(
-                    f"[FAIL] {source:12} bytes={len(html):7} ms={elapsed_ms:5} "
-                    f"markers={markers}",
-                    file=sys.stderr,
-                )
-                any_failed = True
-        except Exception as e:
-            target.write_text("", encoding="utf-8")
-            summary[source] = {"ok": False, "error": str(e)[:200]}
-            print(f"[ERR]  {source:12} {e}", file=sys.stderr)
-            any_failed = True
+    # Primarias serial: 5 fuentes ~80s. No vale la pena paralelizar.
+    for source, (url, method, markers_list) in primary_sources:
+        src, smry, failed, line = process_one(source, url, method, markers_list)
+        summary[src] = smry
+        any_failed = any_failed or failed
+        print(line, file=sys.stderr)
+
+    # FF paralelo: 48 fuentes / 3 workers ≈ 8 min wall time.
+    if ff_sources:
+        print(
+            f"[INFO] FF paralelo: {len(ff_sources)} fuentes, workers=3, spawn ctx",
+            file=sys.stderr,
+        )
+        ctx = mp.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=3, mp_context=ctx) as executor:
+            futures = {
+                executor.submit(process_one, src, entry[0], entry[1], entry[2]): src
+                for src, entry in ff_sources
+            }
+            for future in as_completed(futures):
+                src, smry, failed, line = future.result()
+                summary[src] = smry
+                any_failed = any_failed or failed
+                print(line, file=sys.stderr)
 
     (CACHE_DIR / "fetch-summary.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"
