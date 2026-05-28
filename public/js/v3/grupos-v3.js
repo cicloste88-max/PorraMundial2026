@@ -731,9 +731,15 @@ function v3RenderGoleadoresTabGrupos(grupo, matchesInGroup) {
 
 // F2.8.1: render del pick unificado (1 por partido).
 // Estados: unavailable (ambos squads vacíos) / empty (sin elegir) / filled (con jugador + chip equipo).
+// Sprint Combos & Awards F1: lookup del pick en EQUIPOS[].players (legacy)
+// + fallback en window._scorerCandidatesCache[iso3] (squad pinneado, poblado
+// al abrir el picker la primera vez). Si la cache aún no se ha calentado y
+// la key no está en EQUIPOS, render fallback genérico para no perder el pick.
 function v3RenderGoleadorPickUnified(idx, match, homeEquipo, awayEquipo, prediction) {
-  var homeHasSquad = homeEquipo && homeEquipo.players && homeEquipo.players.length > 0;
-  var awayHasSquad = awayEquipo && awayEquipo.players && awayEquipo.players.length > 0;
+  var homeHasSquad = (homeEquipo && homeEquipo.players && homeEquipo.players.length > 0)
+                  || _v3HasScorerCacheForTeam(homeEquipo);
+  var awayHasSquad = (awayEquipo && awayEquipo.players && awayEquipo.players.length > 0)
+                  || _v3HasScorerCacheForTeam(awayEquipo);
   var bothEmpty = !homeHasSquad && !awayHasSquad;
 
   if (bothEmpty) {
@@ -742,21 +748,28 @@ function v3RenderGoleadorPickUnified(idx, match, homeEquipo, awayEquipo, predict
       + '</div>';
   }
 
-  // Buscar el jugador elegido (si lo hay) entre ambos squads.
+  // Buscar el jugador elegido en EQUIPOS y luego en cache nueva.
   var pickedPlayer = null;
   var pickedTeam = null;
   if (prediction.gol) {
-    if (homeHasSquad) {
-      var foundHome = homeEquipo.players.find(function(pl) { return pl.key === prediction.gol; });
-      if (foundHome) { pickedPlayer = foundHome; pickedTeam = homeEquipo; }
-    }
-    if (!pickedPlayer && awayHasSquad) {
-      var foundAway = awayEquipo.players.find(function(pl) { return pl.key === prediction.gol; });
-      if (foundAway) { pickedPlayer = foundAway; pickedTeam = awayEquipo; }
+    var found = _v3FindPickedPlayer(prediction.gol, homeEquipo);
+    if (found) { pickedPlayer = found; pickedTeam = homeEquipo; }
+    if (!pickedPlayer) {
+      found = _v3FindPickedPlayer(prediction.gol, awayEquipo);
+      if (found) { pickedPlayer = found; pickedTeam = awayEquipo; }
     }
   }
 
   if (!pickedPlayer) {
+    if (prediction.gol) {
+      // Pick guardado pero jugador no resuelto (cache aún no caliente). Render
+      // fallback con la key cruda. Click reabre el picker → resuelve y re-renderiza.
+      return '<button class="v3-goleador-pick is-filled" data-v3-goleador-pick data-v3-match="' + idx + '">'
+        + '<span class="v3-goleador-pick__avatar">·</span>'
+        + '<span class="v3-goleador-pick__name">' + prediction.gol + '</span>'
+        + '<span class="v3-goleador-pick__chev">▾</span>'
+        + '</button>';
+    }
     return '<button class="v3-goleador-pick v3-goleador-pick--empty" data-v3-goleador-pick data-v3-match="' + idx + '">'
       + '<span class="v3-goleador-pick__hint">— Elegir goleador</span>'
       + '<span class="v3-goleador-pick__chev">▾</span>'
@@ -771,18 +784,79 @@ function v3RenderGoleadorPickUnified(idx, match, homeEquipo, awayEquipo, predict
   return '<button class="v3-goleador-pick is-filled" data-v3-goleador-pick data-v3-match="' + idx + '">'
     + '<span class="v3-goleador-pick__avatar">' + avatarNum + '</span>'
     + '<span class="v3-goleador-pick__name">' + playerName + '</span>'
-    + '<span class="v3-goleador-pick__team">' + pickedTeam.flag + '</span>'
+    + '<span class="v3-goleador-pick__team">' + (pickedTeam && pickedTeam.flag ? pickedTeam.flag : '') + '</span>'
     + '<span class="v3-goleador-pick__chev">▾</span>'
     + '</button>';
 }
 
+// Helper: ¿hay cache de scorer candidates ya cargada para este equipo?
+function _v3HasScorerCacheForTeam(equipo) {
+  if (!equipo || !equipo.flag) return false;
+  var cache = window._scorerCandidatesCache && window._scorerCandidatesCache[equipo.flag];
+  return Array.isArray(cache) && cache.length > 0;
+}
+
+// Helper: busca un jugador por key en EQUIPOS y cache nueva. Devuelve
+// {key, name} o null.
+function _v3FindPickedPlayer(playerKey, equipo) {
+  if (!playerKey || !equipo) return null;
+  if (equipo.players && equipo.players.length) {
+    var hitLegacy = equipo.players.find(function(pl) { return pl.key === playerKey; });
+    if (hitLegacy) return hitLegacy;
+  }
+  var cache = window._scorerCandidatesCache && equipo.flag
+    ? window._scorerCandidatesCache[equipo.flag]
+    : null;
+  if (Array.isArray(cache)) {
+    var hitCache = cache.find(function(pl) { return pl.key === playerKey; });
+    if (hitCache) return hitCache;
+  }
+  return null;
+}
+
 // F2.8.1: Open squad picker sub-overlay (z-index 120 sobre el modal z-index 100). Sin side.
-function v3OpenGoleadorPickerGrupos(matchIdx) {
+// Sprint Combos & Awards F1 (28-may): async — carga candidates desde
+// getScorerCandidates(iso3) (squads.jugadores con xi_pinned=true; fallback
+// a EQUIPOS[].players si no hay pin). Pinta skeleton "Cargando jugadores…"
+// mientras llega la promesa. Guard de match.idx para evitar render stale
+// si el usuario cierra/cambia antes de resolver.
+var _v3SquadPickerHomeCands = [];
+var _v3SquadPickerAwayCands = [];
+var _v3SquadPickerLoading = false;
+
+async function v3OpenGoleadorPickerGrupos(matchIdx) {
   _v3SquadPickerMatchIdx = matchIdx;
+  _v3SquadPickerHomeCands = [];
+  _v3SquadPickerAwayCands = [];
+  _v3SquadPickerLoading = true;
   v3EnsureSquadPickerOverlay();
   v3RenderSquadPickerGrupos();
   var overlay = document.querySelector('.v3-squad-picker-overlay');
   if (overlay) overlay.classList.add('is-open');
+
+  var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
+  var match = matchesInGroup[matchIdx];
+  if (!match) { _v3SquadPickerLoading = false; return; }
+  var homeEquipo = v3FindEquipoByName(match.home);
+  var awayEquipo = v3FindEquipoByName(match.away);
+  if (typeof getScorerCandidates !== 'function' || !homeEquipo || !awayEquipo) {
+    _v3SquadPickerLoading = false;
+    v3RenderSquadPickerGrupos();
+    return;
+  }
+  try {
+    var pair = await Promise.all([
+      getScorerCandidates(homeEquipo.flag),
+      getScorerCandidates(awayEquipo.flag),
+    ]);
+    if (_v3SquadPickerMatchIdx !== matchIdx) return; // user moved on
+    _v3SquadPickerHomeCands = pair[0] || [];
+    _v3SquadPickerAwayCands = pair[1] || [];
+  } catch (e) {
+    console.warn('[v3-squad-picker] error cargando candidates', e);
+  }
+  _v3SquadPickerLoading = false;
+  v3RenderSquadPickerGrupos();
 }
 
 function v3CloseGoleadorPickerGrupos() {
@@ -839,15 +913,21 @@ function v3RenderSquadPickerGrupos() {
     + '<div class="v3-squad-picker-body">'
     + '<h3 class="v3-squad-picker-body__title">Elige goleador</h3>';
 
-  var bothEmpty = (!homeEquipo.players || !homeEquipo.players.length) && (!awayEquipo.players || !awayEquipo.players.length);
-  if (bothEmpty) {
-    html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
+  // Sprint Combos & Awards F1: candidates cargados via getScorerCandidates
+  // (squads.jugadores con xi_pinned=true; fallback EQUIPOS[].players). Si
+  // aún estamos cargando, muestra skeleton.
+  if (_v3SquadPickerLoading && !_v3SquadPickerHomeCands.length && !_v3SquadPickerAwayCands.length) {
+    html += '<div class="v3-squad-picker-empty">Cargando jugadores…</div>';
   } else {
-    // Sección equipo home + away (cada una si tiene squad).
-    html += v3RenderSquadPickerTeamSection(homeEquipo, p.gol);
-    html += v3RenderSquadPickerTeamSection(awayEquipo, p.gol);
-    if (p.gol) {
-      html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+    var bothEmpty = !_v3SquadPickerHomeCands.length && !_v3SquadPickerAwayCands.length;
+    if (bothEmpty) {
+      html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
+    } else {
+      html += v3RenderSquadPickerTeamSection(homeEquipo, _v3SquadPickerHomeCands, p.gol, 'home');
+      html += v3RenderSquadPickerTeamSection(awayEquipo, _v3SquadPickerAwayCands, p.gol, 'away');
+      if (p.gol) {
+        html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+      }
     }
   }
   html += '</div>';
@@ -860,25 +940,36 @@ function v3RenderSquadPickerGrupos() {
   inner.querySelectorAll('[data-v3-squad-player]').forEach(function(btn) {
     btn.onclick = function() {
       if (btn.disabled) return;
-      v3SaveGoleadorGrupos(_v3SquadPickerMatchIdx, btn.dataset.v3SquadPlayer);
+      var playerKey = btn.dataset.v3SquadPlayer;
+      var side = btn.dataset.v3Side || null; // Quitar (clear) no lleva side
+      v3SaveGoleadorGrupos(_v3SquadPickerMatchIdx, playerKey, side);
     };
   });
 }
 
-// F2.8.1: render sección por equipo (header + lista jugadores). Skipped si squad vacío.
-function v3RenderSquadPickerTeamSection(equipo, currentPickKey) {
-  if (!equipo.players || !equipo.players.length) {
+// F2.8.1 + Sprint Combos & Awards F1: render sección por equipo. Acepta
+// `candidates` como array {key, name, foto_url, dorsal, bucket}. `side`
+// ('home'|'away') se incluye en data-v3-side para que el save infiera el
+// lado sin hacer lookup en EQUIPOS (el squad pinneado puede tener jugadores
+// que NO están en data.js). Compartido con eliminatoria-v3.js.
+function v3RenderSquadPickerTeamSection(equipo, candidates, currentPickKey, side) {
+  if (!candidates || !candidates.length) {
     return '<div class="v3-squad-picker-team-section v3-squad-picker-team-section--empty">'
       + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>'
       + '<div class="v3-squad-picker-team-section__hint">Plantilla pendiente</div>'
       + '</div>';
   }
+  var sideAttr = side ? ' data-v3-side="' + side + '"' : '';
   var html = '<div class="v3-squad-picker-team-section">'
     + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>'
     + '<div class="v3-squad-picker-list">';
-  equipo.players.forEach(function(pl) {
+  candidates.forEach(function(pl) {
     var isPicked = currentPickKey === pl.key;
-    html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '">'
+    var photo = pl.foto_url
+      ? '<span class="v3-squad-picker-player__photo"><img src="' + pl.foto_url + '" alt="" onerror="this.parentElement.style.display=\'none\'"/></span>'
+      : '';
+    html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '"' + sideAttr + '>'
+      + photo
       + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
       + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
       + '</button>';
@@ -888,7 +979,11 @@ function v3RenderSquadPickerTeamSection(equipo, currentPickKey) {
 }
 
 // F2.8.1: save infiere side por lookup playerKey en EQUIPOS de ambos equipos del partido.
-function v3SaveGoleadorGrupos(matchIdx, playerKey) {
+// Sprint Combos & Awards F1: `side` puede venir como tercer argumento desde
+// el botón del picker (data-v3-side). Útil cuando el squad pinneado tiene
+// jugadores que NO están en EQUIPOS legacy (data.js). Fallback al lookup
+// EQUIPOS sigue funcionando para keys históricas.
+function v3SaveGoleadorGrupos(matchIdx, playerKey, side) {
   // Polish v1 B4: lock tras cerrar porra. v3IsPorraCerrada vive en eliminatoria-v3.js.
   if (typeof v3IsPorraCerrada === 'function' && v3IsPorraCerrada()) return;
   var matchesInGroup = PARTIDOS.filter(m => m.group === _v3CurrentLetter);
@@ -906,14 +1001,17 @@ function v3SaveGoleadorGrupos(matchIdx, playerKey) {
   }
 
   if (playerKey) {
-    // Infer side por lookup en home/away.
-    var homeEquipo = v3FindEquipoByName(match.home);
-    var awayEquipo = v3FindEquipoByName(match.away);
-    var side = null;
-    if (homeEquipo.players && homeEquipo.players.find(function(p) { return p.key === playerKey; })) {
-      side = 'home';
-    } else if (awayEquipo.players && awayEquipo.players.find(function(p) { return p.key === playerKey; })) {
-      side = 'away';
+    if (!side) {
+      // Fallback: lookup playerKey en EQUIPOS para keys históricas que sí
+      // están en data.js (jugadores cargados antes del refactor sin
+      // data-v3-side en el botón).
+      var homeEquipo = v3FindEquipoByName(match.home);
+      var awayEquipo = v3FindEquipoByName(match.away);
+      if (homeEquipo.players && homeEquipo.players.find(function(p) { return p.key === playerKey; })) {
+        side = 'home';
+      } else if (awayEquipo.players && awayEquipo.players.find(function(p) { return p.key === playerKey; })) {
+        side = 'away';
+      }
     }
     predictions[key].gol = playerKey;
     predictions[key].goleadorSide = side; // backward compat; scoring.js lee gol, no side.

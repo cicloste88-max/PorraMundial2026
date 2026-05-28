@@ -1450,6 +1450,120 @@ const CLASSIFICATION_PTS = {
 
 window.AWARDS_CFG         = AWARDS_CFG;
 
+// Sprint Combos & Awards (PR#1 F1+F2) — helpers de keys de jugadores.
+// Formato corto acordado con San (28-may): apellido sin diacríticos. Para
+// preservar scorers históricos guardados en BD (Mbappe, Kane, Yamal, etc.)
+// que ya existen en EQUIPOS[].players, hacemos lookup primero ahí. Si el
+// jugador no está, fallback al último token sin diacríticos. Anti-colisión
+// resuelta a nivel squad por resolveKeysForSquad — añade "I. " (inicial+
+// punto+espacio) cuando dos jugadores del mismo iso3 colapsan al mismo
+// apellido (ej: B. Iglesias / I. Iglesias).
+function playerToShortKey(nombre, iso3) {
+  if (!nombre) return '';
+  // 1. Match exacto en EQUIPOS[iso3].players[].name → devolver .key
+  //    (preserva scorers de partidas históricas).
+  if (typeof EQUIPOS !== 'undefined') {
+    const eq = EQUIPOS.find(e => e.flag === iso3);
+    if (eq && Array.isArray(eq.players)) {
+      const hit = eq.players.find(p => p.name && p.name.includes(nombre));
+      if (hit) return hit.key;
+    }
+  }
+  // 2. Fallback: último token sin diacríticos. ̀-ͯ = bloque
+  //    Unicode "Combining Diacritical Marks" producido por NFD.
+  const norm = String(nombre).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const parts = norm.trim().split(/\s+/);
+  return parts[parts.length - 1] || '';
+}
+window.playerToShortKey = playerToShortKey;
+
+// Dado un array de jugadores del mismo iso3, devuelve [{j, key}] con keys
+// únicos dentro del squad. Si dos jugadores producen el mismo key, ambos
+// reciben "Inicial. Apellido" (ej: "B. Iglesias", "I. Iglesias").
+function resolveKeysForSquad(jugadores, iso3) {
+  if (!Array.isArray(jugadores)) return [];
+  const tentative = jugadores.map(j => ({
+    j, key: playerToShortKey(j.nombre, iso3),
+  }));
+  const counts = {};
+  tentative.forEach(t => { counts[t.key] = (counts[t.key] || 0) + 1; });
+  return tentative.map(t => {
+    if (counts[t.key] > 1) {
+      const first = String(t.j.nombre || '').trim().split(/\s+/)[0];
+      const initial = first ? first.charAt(0).toUpperCase() : '';
+      return { j: t.j, key: initial ? (initial + '. ' + t.key) : t.key };
+    }
+    return t;
+  });
+}
+window.resolveKeysForSquad = resolveKeysForSquad;
+
+// Sprint Combos & Awards (F1) — candidates dinámicos por iso3 para el picker
+// de goleador en grupos+KO. Lee squads.jugadores con xi_pinned=true; fallback
+// a EQUIPOS[].players legacy si BD no disponible o squad sin pin.
+let _scorerCandidatesCache = {};
+window._scorerCandidatesCache = _scorerCandidatesCache;
+
+function _fallbackScorerFromEquipos(iso3) {
+  if (typeof EQUIPOS === 'undefined') return [];
+  const eq = EQUIPOS.find(e => e.flag === iso3);
+  if (!eq || !Array.isArray(eq.players)) return [];
+  return eq.players.map(p => ({
+    key: p.key,
+    name: p.name,
+    bucket: null,
+    foto_url: null,
+    dorsal: 999,
+  }));
+}
+
+async function getScorerCandidates(iso3) {
+  if (!iso3) return [];
+  if (_scorerCandidatesCache[iso3]) return _scorerCandidatesCache[iso3];
+  if (typeof db === 'undefined' || !db) {
+    const fb = _fallbackScorerFromEquipos(iso3);
+    _scorerCandidatesCache[iso3] = fb;
+    return fb;
+  }
+  let row = null;
+  try {
+    const { data, error } = await db
+      .from('squads')
+      .select('iso3, jugadores, xi_pinned')
+      .eq('iso3', iso3)
+      .limit(1)
+      .maybeSingle();
+    if (error) console.warn('[scorer-candidates] error iso3=' + iso3, error);
+    row = data;
+  } catch (e) {
+    console.warn('[scorer-candidates] exception iso3=' + iso3, e);
+  }
+
+  let candidates;
+  if (!row || !row.xi_pinned || !Array.isArray(row.jugadores) || !row.jugadores.length) {
+    candidates = _fallbackScorerFromEquipos(iso3);
+  } else {
+    const resolved = resolveKeysForSquad(row.jugadores, iso3);
+    candidates = resolved.map(({ j, key }) => {
+      const dorsal = (typeof j.dorsal === 'number' && j.dorsal > 0) ? j.dorsal : 999;
+      const nombre = j.nombre || '';
+      // name preserva formato "dorsal · nombre" del legacy para consistencia
+      // visual con EQUIPOS[].players.name. Si no hay dorsal real, omitimos.
+      const display = (dorsal !== 999) ? (dorsal + ' · ' + nombre) : nombre;
+      return {
+        key,
+        name: display,
+        bucket: j.posicion || null,
+        foto_url: j.foto_url || null,
+        dorsal,
+      };
+    }).sort((a, b) => a.dorsal - b.dorsal || (a.name || '').localeCompare(b.name || ''));
+  }
+  _scorerCandidatesCache[iso3] = candidates;
+  return candidates;
+}
+window.getScorerCandidates = getScorerCandidates;
+
 // Polish v1 Fix-Pack-2 Fix-3+4: cache de candidatos por award.
 // Llave 'golden_ball' | 'golden_boot' | 'golden_glove' | 'young_player'.
 // Pre-cargada en background al render de awards card (setTimeout 100ms);
@@ -1500,12 +1614,18 @@ async function getAwardCandidates(award) {
     .in('iso3', topCodes);
   if (sqErr || !squadsData) { console.warn('[awards] error squads:', sqErr); return []; }
 
+  // Sprint Combos & Awards (F2) — unificar keys con el picker de scorer.
+  // resolveKeysForSquad aplica anti-colisión por iso3 (I. + apellido) y
+  // playerToShortKey resuelve a la key corta (Mbappe, Kane, Yamal...). Si
+  // el jugador ya está en EQUIPOS[].players, devuelve su .key histórica
+  // para preservar award_picks guardados antes del refactor.
   const players = [];
   squadsData.forEach(squad => {
     const arr = Array.isArray(squad.jugadores) ? squad.jugadores : [];
-    arr.forEach(j => {
+    const resolved = resolveKeysForSquad(arr, squad.iso3);
+    resolved.forEach(({ j, key }) => {
       players.push({
-        key: (j.nombre || '').replace(/\s+/g, '_'),
+        key,
         name: j.nombre,
         teamName: teamNameByCode[squad.iso3] || squad.iso3,
         flag: squad.iso3,
@@ -1513,6 +1633,7 @@ async function getAwardCandidates(award) {
         bucket: j.posicion,
         edad: (typeof j.edad === 'number') ? j.edad : (j.edad ? Number(j.edad) : null),
         club: j.club,
+        foto_url: j.foto_url || null,
         rank: rankByCode[squad.iso3] || 999,
       });
     });

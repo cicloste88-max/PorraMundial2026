@@ -880,7 +880,9 @@ function v3RenderZoomKO() {
     ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong></div>`
     : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
 
-  // F1 — picker goleador KO. Lookup nombre del jugador desde EQUIPOS resueltos.
+  // F1 — picker goleador KO. Lookup nombre del jugador desde EQUIPOS resueltos
+  // + fallback en window._scorerCandidatesCache (poblado al abrir el picker
+  // la primera vez con squad pinneado de BD).
   var scorerKey = pred.gol || null;
   var scorerName = null;
   if (scorerKey) {
@@ -890,6 +892,15 @@ function v3RenderZoomKO() {
     var awayEq = awayName ? v3FindEquipoByName(awayName) : null;
     var found = (homeEq && homeEq.players || []).find(function (p) { return p.key === scorerKey; })
              || (awayEq && awayEq.players || []).find(function (p) { return p.key === scorerKey; });
+    if (!found) {
+      var cacheH = (homeEq && homeEq.flag && window._scorerCandidatesCache)
+        ? window._scorerCandidatesCache[homeEq.flag] : null;
+      var cacheA = (awayEq && awayEq.flag && window._scorerCandidatesCache)
+        ? window._scorerCandidatesCache[awayEq.flag] : null;
+      found = (Array.isArray(cacheH) && cacheH.find(function (p) { return p.key === scorerKey; }))
+           || (Array.isArray(cacheA) && cacheA.find(function (p) { return p.key === scorerKey; }))
+           || null;
+    }
     scorerName = found ? found.name : scorerKey;
   }
   var goleadorHtml = `
@@ -1025,14 +1036,52 @@ function v3SetPenaltyWinner(matchId, side) {
 // Reutiliza el sub-overlay singleton `.v3-squad-picker-overlay` montado por grupos-v3
 // (v3EnsureSquadPickerOverlay) y la sección de jugadores por equipo
 // (v3RenderSquadPickerTeamSection). Funciones de grupos asumidas globales (classic scripts).
+// Sprint Combos & Awards F1 (28-may): async — carga candidates desde
+// getScorerCandidates(iso3) para usar squad pinneado en BD (no solo
+// EQUIPOS[].players de data.js).
 var _v3KOGoleadorPickerMatchId = null;
+var _v3KOPickerHomeCands = [];
+var _v3KOPickerAwayCands = [];
+var _v3KOPickerLoading = false;
 
-function v3OpenGoleadorPickerKO(matchId) {
+async function v3OpenGoleadorPickerKO(matchId) {
   _v3KOGoleadorPickerMatchId = matchId;
+  _v3KOPickerHomeCands = [];
+  _v3KOPickerAwayCands = [];
+  _v3KOPickerLoading = true;
   if (typeof v3EnsureSquadPickerOverlay === 'function') v3EnsureSquadPickerOverlay();
   v3RenderGoleadorPickerKO();
   var overlay = document.querySelector('.v3-squad-picker-overlay');
   if (overlay) overlay.classList.add('is-open');
+
+  // Resolver equipos del match para cargar candidates.
+  var allKO = (typeof BRACKET !== 'undefined')
+    ? [].concat(BRACKET.r32 || [], BRACKET.r16 || [], BRACKET.qf || [], BRACKET.sf || [], BRACKET.third || [], BRACKET.final || [])
+    : [];
+  var match = allKO.find(function (m) { return m.id === matchId; });
+  if (!match) { _v3KOPickerLoading = false; return; }
+  var homeName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.home] : null;
+  var awayName = (typeof resolvedSlots !== 'undefined') ? resolvedSlots[match.away] : null;
+  var homeEquipo = homeName && typeof v3FindEquipoByName === 'function' ? v3FindEquipoByName(homeName) : null;
+  var awayEquipo = awayName && typeof v3FindEquipoByName === 'function' ? v3FindEquipoByName(awayName) : null;
+  if (typeof getScorerCandidates !== 'function' || !homeEquipo || !awayEquipo) {
+    _v3KOPickerLoading = false;
+    v3RenderGoleadorPickerKO();
+    return;
+  }
+  try {
+    var pair = await Promise.all([
+      getScorerCandidates(homeEquipo.flag),
+      getScorerCandidates(awayEquipo.flag),
+    ]);
+    if (_v3KOGoleadorPickerMatchId !== matchId) return; // user moved on
+    _v3KOPickerHomeCands = pair[0] || [];
+    _v3KOPickerAwayCands = pair[1] || [];
+  } catch (e) {
+    console.warn('[v3-ko-picker] error cargando candidates', e);
+  }
+  _v3KOPickerLoading = false;
+  v3RenderGoleadorPickerKO();
 }
 
 function v3RenderGoleadorPickerKO() {
@@ -1075,14 +1124,19 @@ function v3RenderGoleadorPickerKO() {
     + '<div class="v3-squad-picker-body">'
     + '<h3 class="v3-squad-picker-body__title">Elige goleador</h3>';
 
-  var bothEmpty = (!homeEquipo.players || !homeEquipo.players.length) && (!awayEquipo.players || !awayEquipo.players.length);
-  if (bothEmpty) {
-    html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
+  // Sprint Combos & Awards F1: usar caches cargadas por v3OpenGoleadorPickerKO.
+  if (_v3KOPickerLoading && !_v3KOPickerHomeCands.length && !_v3KOPickerAwayCands.length) {
+    html += '<div class="v3-squad-picker-empty">Cargando jugadores…</div>';
   } else {
-    html += v3RenderSquadPickerTeamSection(homeEquipo, currentPickKey);
-    html += v3RenderSquadPickerTeamSection(awayEquipo, currentPickKey);
-    if (currentPickKey) {
-      html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+    var bothEmpty = !_v3KOPickerHomeCands.length && !_v3KOPickerAwayCands.length;
+    if (bothEmpty) {
+      html += '<div class="v3-squad-picker-empty">Plantillas no cargadas. Disponible al cargar las convocatorias oficiales.</div>';
+    } else {
+      html += v3RenderSquadPickerTeamSection(homeEquipo, _v3KOPickerHomeCands, currentPickKey, 'home');
+      html += v3RenderSquadPickerTeamSection(awayEquipo, _v3KOPickerAwayCands, currentPickKey, 'away');
+      if (currentPickKey) {
+        html += '<button class="v3-squad-picker-player v3-squad-picker-player--clear" data-v3-squad-player="">Quitar selección</button>';
+      }
     }
   }
   html += '</div>';
