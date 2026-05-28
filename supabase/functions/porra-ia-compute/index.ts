@@ -30,6 +30,11 @@ import {
   WC2026_ISO3,
   WC2026_TEAMS,
 } from "./lib/wc2026.ts";
+import {
+  pickDeterministicScorer,
+  type EquiposPlayersByIso3,
+  type SquadPlayer,
+} from "./lib/scorer-keys.ts";
 
 // ─── CORS whitelist ────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set([
@@ -91,6 +96,33 @@ async function loadMatches(): Promise<Record<string, any>> {
   if (!res.ok) throw new Error(`matches_fetch:HTTP ${res.status}`);
   MATCHES_CACHE = await res.json();
   return MATCHES_CACHE!;
+}
+
+// Sprint Combos & Awards F3 (28-may) — EQUIPOS[].players mapeados a JSON por
+// scripts/export-equipos-players.mjs (prebuild). Consumido por update_ia_scorers
+// para que playerToShortKey preserve keys históricas (Mbappe, Yamal, Kane…)
+// idénticas a las del frontend (public/js/scoring.js).
+const EQUIPOS_PLAYERS_URL =
+  "https://porramundial2026-seven.vercel.app/data/equipos-players.json";
+let EQUIPOS_PLAYERS_CACHE: EquiposPlayersByIso3 | null = null;
+let EQUIPOS_PLAYERS_CACHE_TS = 0;
+const EQUIPOS_PLAYERS_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
+
+async function loadEquiposPlayers(): Promise<EquiposPlayersByIso3> {
+  const now = Date.now();
+  if (
+    EQUIPOS_PLAYERS_CACHE &&
+    (now - EQUIPOS_PLAYERS_CACHE_TS) < EQUIPOS_PLAYERS_CACHE_TTL_MS
+  ) {
+    return EQUIPOS_PLAYERS_CACHE;
+  }
+  const res = await fetch(EQUIPOS_PLAYERS_URL, {
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) throw new Error(`equipos_players_fetch:HTTP ${res.status}`);
+  EQUIPOS_PLAYERS_CACHE = await res.json();
+  EQUIPOS_PLAYERS_CACHE_TS = now;
+  return EQUIPOS_PLAYERS_CACHE!;
 }
 
 const ALIAS_MAP: Record<string, string> = {
@@ -196,6 +228,11 @@ serve(async (req) => {
       case "seed_ia_user_predictions":
         await requireAdminOrCron(req, supa);
         return json(await handleSeedIaUserPredictions(supa, body), 200, corsH);
+
+      // ── Sprint Combos & Awards F3 (28-may) — backfill bot Zayu scorers ──
+      case "update_ia_scorers":
+        await requireAdminOrCron(req, supa);
+        return json(await handleUpdateIaScorers(supa, body), 200, corsH);
 
       default:
         return errJson("unknown_action", 400, origin);
@@ -1769,4 +1806,302 @@ async function callAnthropicWebSearch(apiKey: string, query: string): Promise<st
   return (data?.content || [])
     .filter((b: { type: string }) => b.type === "text")
     .map((b: { text: string }) => b.text).join("\n");
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// handleUpdateIaScorers — Sprint Combos & Awards F3 (28-may)
+// ──────────────────────────────────────────────────────────────────────────
+// Backfill de `scorer` para las predicciones del bot IA Zayu que se sembraron
+// con scorer=NULL (handleSeedIaUserPredictions). Estrategia determinista:
+// el delantero titular más caro (fallback centrocampista) del lado que más
+// marca en la predicción. Keys formato corto (apellido sin diacríticos),
+// idénticas a las del frontend.
+//
+// Body opcional: { league_id?: string } para procesar una sola liga.
+// Skip: 0-0 (sin scorer); país sin xi_pinned (squad pendiente, registrado
+// en skipped_iso3).
+// deno-lint-ignore no-explicit-any
+async function handleUpdateIaScorers(supa: any, body: any) {
+  const leagueIdFilter: string | undefined = body?.league_id;
+
+  const { data: bot } = await supa
+    .from("profiles").select("id").eq("is_bot", true).limit(1).maybeSingle();
+  if (!bot?.id) throw new Error("not_found:bot");
+  const botId: string = bot.id;
+
+  const { data: pinned, error: sqErr } = await supa
+    .from("squads")
+    .select("iso3, jugadores, xi_pinned")
+    .eq("xi_pinned", true);
+  if (sqErr) throw new Error(`squads_read:${sqErr.message}`);
+
+  const squadByIso = new Map<string, SquadPlayer[]>();
+  for (const s of (pinned || [])) {
+    if (Array.isArray(s.jugadores) && s.jugadores.length > 0) {
+      squadByIso.set(s.iso3, s.jugadores as SquadPlayer[]);
+    }
+  }
+
+  let equiposPlayers: EquiposPlayersByIso3;
+  try {
+    equiposPlayers = await loadEquiposPlayers();
+  } catch (e) {
+    console.warn(
+      "[update_ia_scorers] equipos_players fallback {}:",
+      String((e as any)?.message || e),
+    );
+    equiposPlayers = {};
+  }
+
+  const NAME_TO_ISO3: Record<string, string> = {};
+  for (const [iso, name] of Object.entries(ISO3_TO_NAME_ES)) {
+    NAME_TO_ISO3[name] = iso;
+  }
+
+  // Cache scorer por iso3 dentro de la invocación.
+  const scorerByIso = new Map<string, string | null>();
+  const skipped_iso3 = new Set<string>();
+  function pickScorerFor(iso3: string): string | null {
+    if (scorerByIso.has(iso3)) return scorerByIso.get(iso3)!;
+    const squad = squadByIso.get(iso3);
+    if (!squad) {
+      skipped_iso3.add(iso3);
+      scorerByIso.set(iso3, null);
+      return null;
+    }
+    const k = pickDeterministicScorer(squad, iso3, equiposPlayers);
+    if (!k) skipped_iso3.add(iso3);
+    scorerByIso.set(iso3, k);
+    return k;
+  }
+
+  // ── 1) Group predictions ───────────────────────────────────────────────
+  let groupQuery = supa.from("predictions")
+    .select("user_id, match_id, league_id, local, visitante")
+    .eq("user_id", botId).is("scorer", null);
+  if (leagueIdFilter) groupQuery = groupQuery.eq("league_id", leagueIdFilter);
+  const { data: groupRows, error: gErr } = await groupQuery;
+  if (gErr) throw new Error(`group_pred_read:${gErr.message}`);
+
+  const nowIso = new Date().toISOString();
+  const groupUpdates: Array<{
+    user_id: string;
+    match_id: string;
+    league_id: string;
+    local: number;
+    visitante: number;
+    scorer: string;
+    saved_at: string;
+  }> = [];
+  let group_filled = 0;
+
+  for (const r of (groupRows || [])) {
+    const parts = String(r.match_id).split("_");
+    if (parts.length < 3) continue;
+    const homeName = parts[1];
+    const awayName = parts[2];
+    const homeIso = NAME_TO_ISO3[homeName];
+    const awayIso = NAME_TO_ISO3[awayName];
+    if (!homeIso || !awayIso) continue;
+
+    const l = Number(r.local);
+    const v = Number(r.visitante);
+    if (!Number.isFinite(l) || !Number.isFinite(v)) continue;
+    if (l + v === 0) continue; // 0-0 sin scorer
+
+    // Lado que más marca → de ahí sale el scorer. Empate con goles → local.
+    const scorerIso = l > v ? homeIso : v > l ? awayIso : homeIso;
+    const k = pickScorerFor(scorerIso);
+    if (!k) continue;
+
+    groupUpdates.push({
+      user_id: botId,
+      match_id: r.match_id,
+      league_id: r.league_id,
+      local: l,
+      visitante: v,
+      scorer: k,
+      saved_at: nowIso,
+    });
+    group_filled++;
+  }
+
+  if (groupUpdates.length > 0) {
+    const { error: upErr } = await supa.from("predictions")
+      .upsert(groupUpdates, { onConflict: "league_id,user_id,match_id" });
+    if (upErr) throw new Error(`group_pred_upsert:${upErr.message}`);
+  }
+
+  // ── 2) KO predictions ──────────────────────────────────────────────────
+  // Para cada KO con scorer NULL, hay que resolver homeName/awayName via
+  // standings simulados + propagación W/L slots. Hacemos por liga porque
+  // los standings son por usuario+league.
+  let koQuery = supa.from("ko_predictions")
+    .select("user_id, match_id, league_id, local, visitante, classifier")
+    .eq("user_id", botId).is("scorer", null);
+  if (leagueIdFilter) koQuery = koQuery.eq("league_id", leagueIdFilter);
+  const { data: koRows, error: kErr } = await koQuery;
+  if (kErr) throw new Error(`ko_pred_read:${kErr.message}`);
+
+  const koByLeague = new Map<string, Array<{
+    user_id: string;
+    match_id: number;
+    league_id: string;
+    local: number;
+    visitante: number;
+    classifier: string | null;
+  }>>();
+  for (const r of (koRows || [])) {
+    const arr = koByLeague.get(r.league_id) || [];
+    arr.push({
+      user_id: r.user_id,
+      match_id: Number(r.match_id),
+      league_id: r.league_id,
+      local: Number(r.local),
+      visitante: Number(r.visitante),
+      classifier: r.classifier || null,
+    });
+    koByLeague.set(r.league_id, arr);
+  }
+
+  const koUpdates: Array<{
+    user_id: string;
+    match_id: number;
+    league_id: string;
+    local: number;
+    visitante: number;
+    classifier: string | null;
+    scorer: string;
+    saved_at: string;
+  }> = [];
+  let ko_filled = 0;
+
+  for (const [leagueId, koList] of koByLeague.entries()) {
+    // Group predictions del bot en esta liga → standings.
+    const { data: gRows } = await supa.from("predictions")
+      .select("match_id, local, visitante")
+      .eq("user_id", botId).eq("league_id", leagueId);
+    const predMap: Record<string, { l: number; v: number }> = {};
+    for (const g of (gRows || [])) {
+      predMap[g.match_id] = { l: Number(g.local), v: Number(g.visitante) };
+    }
+
+    const tables: Record<string, GroupStat[]> = {};
+    for (const letra of Object.keys(GROUP_TO_ISO3)) {
+      tables[letra] = calcGroupStandings(letra, predMap);
+    }
+    const bestThirds = getBestThirds(tables);
+    const slots: Record<string, string> = {};
+    for (const [letra, table] of Object.entries(tables)) {
+      if (table[0]) slots["1" + letra] = table[0].name;
+      if (table[1]) slots["2" + letra] = table[1].name;
+      if (table[2]) slots["3" + letra] = table[2].name;
+    }
+    THIRD_SLOT_ORDER.forEach((slot, i) => {
+      if (bestThirds[i]) slots[slot] = bestThirds[i];
+    });
+
+    // W/L slots propagados desde las ko_predictions del bot en esta liga.
+    const { data: allKo } = await supa.from("ko_predictions")
+      .select("match_id, local, visitante, classifier")
+      .eq("user_id", botId).eq("league_id", leagueId);
+    const koPredMap = new Map<
+      number,
+      { l: number; v: number; classifier: string | null }
+    >();
+    for (const k of (allKo || [])) {
+      koPredMap.set(Number(k.match_id), {
+        l: Number(k.local),
+        v: Number(k.visitante),
+        classifier: k.classifier || null,
+      });
+    }
+    for (const round of BRACKET_KO_ROUNDS) {
+      for (const m of round.matches) {
+        const homeName = slots[m.home];
+        const awayName = slots[m.away];
+        if (!homeName || !awayName) continue;
+        const kPred = koPredMap.get(m.id);
+        if (!kPred) continue;
+        let winner: string;
+        let loser: string;
+        if (kPred.l > kPred.v) {
+          winner = homeName;
+          loser = awayName;
+        } else if (kPred.v > kPred.l) {
+          winner = awayName;
+          loser = homeName;
+        } else {
+          winner = kPred.classifier || homeName;
+          loser = winner === homeName ? awayName : homeName;
+        }
+        slots["W" + m.id] = winner;
+        slots["L" + m.id] = loser;
+      }
+    }
+
+    for (const r of koList) {
+      const m = findKoMatchById(r.match_id);
+      if (!m) continue;
+      const homeName = slots[m.home];
+      const awayName = slots[m.away];
+      if (!homeName || !awayName) continue;
+      const homeIso = NAME_TO_ISO3[homeName];
+      const awayIso = NAME_TO_ISO3[awayName];
+      if (!homeIso || !awayIso) continue;
+
+      const l = r.local;
+      const v = r.visitante;
+      if (!Number.isFinite(l) || !Number.isFinite(v)) continue;
+      // En KO con marcador 0-0, el ganador se decide por penaltis (classifier)
+      // pero NO hay goleador en los 90'+prórroga → skip scorer.
+      if (l + v === 0) continue;
+
+      const scorerIso = l > v ? homeIso : v > l ? awayIso : homeIso;
+      const k = pickScorerFor(scorerIso);
+      if (!k) continue;
+
+      koUpdates.push({
+        user_id: botId,
+        match_id: r.match_id,
+        league_id: r.league_id,
+        local: l,
+        visitante: v,
+        classifier: r.classifier,
+        scorer: k,
+        saved_at: nowIso,
+      });
+      ko_filled++;
+    }
+  }
+
+  if (koUpdates.length > 0) {
+    const { error: koUpErr } = await supa.from("ko_predictions")
+      .upsert(koUpdates, { onConflict: "league_id,user_id,match_id" });
+    if (koUpErr) throw new Error(`ko_pred_upsert:${koUpErr.message}`);
+  }
+
+  return {
+    ok: true,
+    bot_id: botId,
+    group_filled,
+    ko_filled,
+    leagues_processed: koByLeague.size,
+    skipped_iso3_count: skipped_iso3.size,
+    skipped_iso3: Array.from(skipped_iso3).sort(),
+  };
+}
+
+// Helper: localizar un KO match por id en cualquier ronda del BRACKET.
+function findKoMatchById(
+  id: number | string,
+): { id: number; home: string; away: string } | null {
+  const target = Number(id);
+  if (!Number.isFinite(target)) return null;
+  for (const round of BRACKET_KO_ROUNDS) {
+    for (const m of round.matches) {
+      if (m.id === target) return m;
+    }
+  }
+  return null;
 }
