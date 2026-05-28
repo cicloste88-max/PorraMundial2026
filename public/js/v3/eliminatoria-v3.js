@@ -1204,34 +1204,27 @@ function v3RenderAwardsCard() {
 }
 window.v3RenderAwardsCard = v3RenderAwardsCard;
 
-// Polish v1 B4 + Fix-Pack-2 Fix-3+4: deducción automática para Bota de Oro.
-// Cuenta scorers en predictions (grupos) + koPredictions, filtra por
-// _awardCandidatesCache.golden_boot (Centrocampistas + Delanteros top 30
-// Elo, BD-driven). Tiebreak: alfabético por playerKey. Retorna null si
-// cache vacío (BD aún no precargada) — el picker se abrirá sin sugerencia.
-function _v3SuggestGoldenBoot() {
-  if (typeof predictions !== 'object' || typeof koPredictions !== 'object') return null;
-  var counts = {};
-  function tally(predictionsMap) {
-    Object.values(predictionsMap || {}).forEach(function (p) {
-      var key = p && (p.gol || p.scorer);
-      if (key) counts[key] = (counts[key] || 0) + 1;
+// F4 (auto-Bota de Oro) — sugerencia server-side vía RPC get_user_top_scorer.
+// Sustituye el tally client-side (Polish v1 B4): cuenta scorer en predictions
+// (grupos) + ko_predictions del usuario/liga en BD y solo sugiere si hay un
+// líder claro (n >= 3 picks Y margin >= 2 sobre el 2º). Devuelve { key, count }
+// para renderPickerList (matching + badge "tu goleador"); null si BD no
+// disponible, sin sesión/liga, o sin líder claro. Async: openPicker la await-ea.
+// Globals user/liga: currentUser.id + getActiveLeagueId() (patrón del fichero).
+async function _v3SuggestGoldenBoot() {
+  if (typeof db === 'undefined' || !db) return null;
+  var uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+  var leagueId = (typeof getActiveLeagueId === 'function') ? getActiveLeagueId() : null;
+  if (!uid || !leagueId) return null;
+  try {
+    const { data, error } = await db.rpc('get_user_top_scorer', {
+      p_user_id: uid, p_league_id: leagueId
     });
-  }
-  tally(predictions);
-  tally(koPredictions);
-
-  var cache = window._awardCandidatesCache && window._awardCandidatesCache.golden_boot;
-  if (!cache || !cache.length) return null;
-  var validKeys = new Set(cache.map(function (p) { return p.key; }));
-
-  var topKey = null, topCount = 0;
-  Object.entries(counts).forEach(function (entry) {
-    if (!validKeys.has(entry[0])) return;
-    if (entry[1] > topCount) { topKey = entry[0]; topCount = entry[1]; }
-    else if (entry[1] === topCount && topKey && entry[0] < topKey) { topKey = entry[0]; }
-  });
-  return topKey ? { key: topKey, count: topCount } : null;
+    if (error || !data || !data.length) return null;
+    const row = data[0];
+    if (row.n < 3 || row.margin < 2) return null;
+    return { key: row.scorer_key, count: row.n };
+  } catch (_e) { return null; }
 }
 window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
 

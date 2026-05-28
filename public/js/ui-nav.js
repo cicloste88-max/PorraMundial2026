@@ -689,8 +689,9 @@ function renderPickerList(list, selected, suggestion) {
     const rows = players.map(p => {
       const isActive = selected && selected.key === p.key ? 'active' : '';
       const isSuggested = suggestion && suggestion.key === p.key;
+      // F4: badge dorado "tu goleador" sobre el líder de scorers del usuario.
       const badge = isSuggested
-        ? `<span class="aw-suggestion-badge">💡 Sugerido — ${suggestion.count} goles previstos</span>`
+        ? `<span class="aw-suggestion-badge">tu goleador</span>`
         : '';
       return `<div class="aw-player-row ${isActive} ${isSuggested ? 'is-suggested' : ''}" onclick="selectAward('${p.key}')">
         <div class="aw-player-info">

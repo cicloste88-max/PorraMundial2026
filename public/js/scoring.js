@@ -1698,7 +1698,11 @@ async function openPicker(award) {
   let suggestion = null;
   if (award === 'golden_boot' && awPicks.golden_boot === null
       && typeof _v3SuggestGoldenBoot === 'function') {
-    suggestion = _v3SuggestGoldenBoot();
+    // F4: _v3SuggestGoldenBoot es async (RPC get_user_top_scorer). Re-validar
+    // currentAward tras el await por si el usuario cambió de premio o cerró
+    // el picker durante el round-trip a BD (evita pintar sugerencia stale).
+    suggestion = await _v3SuggestGoldenBoot();
+    if (currentAward !== award) return;
   }
   if (!candidates.length) {
     if (scroll) scroll.innerHTML = '<div style="padding:24px 18px;color:#94a3b8;font-size:13px;font-style:italic">No hay candidatos disponibles. Las convocatorias se completarán hasta el 2 de junio.</div>';

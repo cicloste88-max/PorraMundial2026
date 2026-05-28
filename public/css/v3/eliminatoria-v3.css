@@ -1510,15 +1510,17 @@ body.fc-shell-active #page-elim > #modal {
 }
 
 /* ============================================================
-   Polish v1 B4 — Badge sugerencia Bota de Oro
+   F4 (auto-Bota de Oro) — Badge dorado "tu goleador"
    Aplicado en .aw-player-row.is-suggested via renderPickerList
-   cuando openPicker('golden_boot') recibe sugerencia.
+   cuando openPicker('golden_boot') recibe sugerencia de
+   _v3SuggestGoldenBoot (RPC get_user_top_scorer, n>=3 & margin>=2).
+   Evoluciona el badge azul "Sugerido" de Polish v1 B4 → dorado.
    ============================================================ */
 .aw-suggestion-badge {
   display: inline-block;
-  background: rgba(96, 165, 250, 0.18);
-  color: #60a5fa;
-  font-size: 9px;
+  background: linear-gradient(135deg, #d4a017, #f5c842);
+  color: #1a1a1a;
+  font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1527,6 +1529,6 @@ body.fc-shell-active #page-elim > #modal {
   vertical-align: middle;
 }
 .aw-player-row.is-suggested {
-  background: rgba(96, 165, 250, 0.06);
-  border-left: 2px solid #60a5fa;
+  background: rgba(212, 160, 23, 0.08);
+  border-left: 2px solid #d4a017;
 }
