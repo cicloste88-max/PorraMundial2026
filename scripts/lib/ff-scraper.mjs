@@ -145,29 +145,38 @@ export async function parseNewsRoster(newsUrl, opts = {}) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Paso 3 — XI titular vía cheerio sobre div[class*="jugadores-titulares-"]
+// Paso 3 — XI titular vía cheerio sobre [data-onceff="titular"]
 // ────────────────────────────────────────────────────────────────────────────
 //
-// FF estructura validada 27-may-2026 con HTML real ESP:
+// FF tiene DOS variantes de markup observadas:
 //
+// Variante A — ESP-style (con wrapper class, validado 27-may con HTML real):
 //   <div class="jugadores-titulares-22208 mod lesionados mb-0">
 //     <div class="jugador_7279 tipo_campo camiseta-wrapper portero"
 //          data-onceff="titular" data-equipo="ESP" ...>
-//       <a class="camiseta" href="/jugadores/joan-garcia/world-cup-2026">
-//         <img alt="Joan Garcia" src="..."/>
-//       </a>
-//       ...
+//       <a class="camiseta"><img alt="Joan Garcia" .../></a>
 //     </div>
-//     <div class="jugador_5013 tipo_campo ..."> ... </div>  ← x10 más
+//     ... x10 más
 //   </div>
 //
-// Selector: hijos directos div.tipo_campo (NO supl-N), datos en data-* attrs.
-// Hay un mirror div.tipo_lista.d-none por jugador pero no aporta nada nuevo.
+// Variante B — JPN-style (sin wrapper, detectada 28-may en JPN/BEL/BIH/SWE):
+//   <div class="jugador_0 campo camiseta-wrapper"
+//        data-onceff="titular" data-onceff-x="23%" data-onceff-y="69%" ...>
+//     <a class="camiseta"><img alt="Itakura" .../></a>
+//   </div>
+//   ... x10 más, sin <div class="jugadores-titulares-X"> wrapper
+//
+// SELECTOR PRIMARIO: [data-onceff="titular"] — atributo semántico presente en
+// AMBAS variantes (verificado en fixture ESP real: 11 titular + 15 suplente).
+// El wrapper-style queda como fallback defensivo si FF cambiara el data attr.
+//
+// Suplentes excluidos automáticamente: tienen data-onceff="suplente", no
+// "titular". El selector ya los filtra sin necesidad de chequeo de clase.
 
 /**
  * Parsea el HTML completo de /equipos/<slug> de FF y devuelve los 11 nombres
- * del XI titular. Reemplaza el parser previo basado en <img alt> que perdía
- * nombres en texto bajo camisetas (8/11 sistemático en Tier A).
+ * del XI titular. Robusto contra las 2 variantes de markup FF (con/sin
+ * wrapper class "jugadores-titulares-X").
  *
  * @returns {string[]} array de hasta 11 nombres en orden DOM
  */
@@ -180,23 +189,28 @@ export function parseStartingXIFromHtml(html) {
   if (/\/alineaciones\/0\.jpg/i.test(html)) return [];
 
   const $ = cheerio.load(html);
-  const $tit = $('div[class*="jugadores-titulares-"]').first();
-  if ($tit.length === 0) return [];
+
+  // PRIMARIO: atributo semántico data-onceff="titular" (ambas variantes FF).
+  let $players = $('[data-onceff="titular"]');
+
+  // FALLBACK: wrapper-style legacy, por si FF dropea el data-attr.
+  if ($players.length === 0) {
+    const $tit = $('div[class*="jugadores-titulares-"]').first();
+    if ($tit.length === 0) return [];
+    $players = $tit.children('div.tipo_campo');
+  }
 
   const names = [];
-  $tit.children('div.tipo_campo').each((_, el) => {
+  $players.each((_, el) => {
     const $el = $(el);
     const classes = $el.attr('class') || '';
-    // Excluir slots de suplentes que pudieran caer aquí por error de marcado.
+    // Defensa contra slots supl-N que pudieran caer aquí por marcado raro.
     if (/\bsupl-\d+\b/.test(classes)) return;
 
-    // PRIMARIO: foto del jugador. FF tiene 4 <img> por slot — escudo del club
-    // (alt=""), bandera país (alt=""), bandera región (alt="") y foto del
-    // jugador (alt="Nombre Completo"). El parser inicial cogía el primer
-    // <img> que era el escudo (alt vacío) → fallback al texto del <a> que
-    // capturaba "1.81 50%" del widget de probabilidad. Validado con HTML
-    // real ESP 27-may (img 4/4 en cada slot — foto siempre última con
-    // alt poblado).
+    // PRIMARIO: foto del jugador con alt poblado. FF tiene 4 <img> por slot —
+    // escudo club (alt=""), bandera país (alt=""), bandera región (alt="") y
+    // foto del jugador (alt="Nombre Completo"). Filtro img[alt] non-empty
+    // garantiza que cogemos la foto, no el escudo. Validado en PR #106.
     const altName = $el
       .find('img[alt]')
       .filter((_, img) => ($(img).attr('alt') || '').trim() !== '')
@@ -212,7 +226,7 @@ export function parseStartingXIFromHtml(html) {
 
     // FALLBACK: slug del href de <a.camiseta> → "nico-williams" → "Nico Williams".
     // Pierde acentos pero garantiza algo extractable si la foto no cargó.
-    const href = $el.children('a.camiseta').first().attr('href') || '';
+    const href = $el.find('a.camiseta').first().attr('href') || '';
     const slugMatch = href.match(/\/jugadores\/([^/]+)\//);
     if (slugMatch) {
       const slug = slugMatch[1];
