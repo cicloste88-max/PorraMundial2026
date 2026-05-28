@@ -226,3 +226,86 @@ test('parseStartingXIFromHtml: HTML REAL ESP no incluye suplentes', () => {
     );
   }
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Regresión variante B — JPN-style markup SIN wrapper (28-may-2026)
+//
+// FF sirve dos variantes de markup para el XI:
+//   A) ESP-style: <div class="jugadores-titulares-X"> wrapper + hijos
+//      con data-onceff="titular".
+//   B) JPN-style: SIN wrapper, players sueltos con data-onceff="titular"
+//      directo en el árbol. Detectado tras run 26549858215 cuando FF servía
+//      el XI publicado para JPN/BEL/BIH/SWE pero el parser cheerio devolvía
+//      [] (selector buscaba sólo el wrapper).
+//
+// Fix: cambio del selector primario a [data-onceff="titular"] (semántico,
+// presente en AMBAS variantes). Wrapper queda como fallback defensivo.
+// ────────────────────────────────────────────────────────────────────────────
+
+const JPN_FIXTURE_NO_WRAPPER = `
+<html><body>
+<div class="campo-wrapper">
+  <div class="jugador_0 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="50%" data-onceff-y="87%">
+    <a class="camiseta" href="/jugadores/zion-suzuki/world-cup-2026"><img alt="Suzuki" src="/photo/1.jpg"/></a>
+  </div>
+  <div class="jugador_1 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="80%" data-onceff-y="70%">
+    <a class="camiseta" href="/jugadores/tomiyasu/world-cup-2026"><img alt="Tomiyasu" src="/photo/2.jpg"/></a>
+  </div>
+  <div class="jugador_2 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="65%" data-onceff-y="72%">
+    <a class="camiseta" href="/jugadores/hiroki-ito/world-cup-2026"><img alt="H. Ito" src="/photo/3.jpg"/></a>
+  </div>
+  <div class="jugador_3 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="35%" data-onceff-y="72%">
+    <a class="camiseta" href="/jugadores/itakura/world-cup-2026"><img alt="Itakura" src="/photo/4.jpg"/></a>
+  </div>
+  <div class="jugador_4 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="20%" data-onceff-y="70%">
+    <a class="camiseta" href="/jugadores/doan/world-cup-2026"><img alt="Doan" src="/photo/5.jpg"/></a>
+  </div>
+  <div class="jugador_5 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="60%" data-onceff-y="55%">
+    <a class="camiseta" href="/jugadores/wataru-endo/world-cup-2026"><img alt="Endo" src="/photo/6.jpg"/></a>
+  </div>
+  <div class="jugador_6 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="40%" data-onceff-y="55%">
+    <a class="camiseta" href="/jugadores/ao-tanaka/world-cup-2026"><img alt="Ao Tanaka" src="/photo/7.jpg"/></a>
+  </div>
+  <div class="jugador_7 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="20%" data-onceff-y="40%">
+    <a class="camiseta" href="/jugadores/keito-nakamura/world-cup-2026"><img alt="K. Nakamura" src="/photo/8.jpg"/></a>
+  </div>
+  <div class="jugador_8 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="80%" data-onceff-y="40%">
+    <a class="camiseta" href="/jugadores/take-kubo/world-cup-2026"><img alt="Kubo" src="/photo/9.jpg"/></a>
+  </div>
+  <div class="jugador_9 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="50%" data-onceff-y="30%">
+    <a class="camiseta" href="/jugadores/kamada/world-cup-2026"><img alt="Kamada" src="/photo/10.jpg"/></a>
+  </div>
+  <div class="jugador_10 campo camiseta-wrapper" data-onceff="titular" data-onceff-x="50%" data-onceff-y="15%">
+    <a class="camiseta" href="/jugadores/ueda/world-cup-2026"><img alt="Ueda" src="/photo/11.jpg"/></a>
+  </div>
+
+  <div class="jugador_99 campo camiseta-wrapper" data-onceff="suplente">
+    <a class="camiseta" href="/jugadores/sugawara/world-cup-2026"><img alt="Sugawara" src="/photo/99.jpg"/></a>
+  </div>
+  <div class="jugador_98 campo camiseta-wrapper" data-onceff="suplente">
+    <a class="camiseta" href="/jugadores/watanabe/world-cup-2026"><img alt="Watanabe" src="/photo/98.jpg"/></a>
+  </div>
+</div>
+</body></html>
+`;
+
+const EXPECTED_XI_JPN = [
+  'Suzuki', 'Tomiyasu', 'H. Ito', 'Itakura', 'Doan',
+  'Endo', 'Ao Tanaka', 'K. Nakamura', 'Kubo', 'Kamada', 'Ueda',
+];
+
+test('parseStartingXIFromHtml: variante JPN-style SIN wrapper extrae los 11', () => {
+  const padded = JPN_FIXTURE_NO_WRAPPER + '<!--' + ' '.repeat(2000) + '-->';
+  const xi = parseStartingXIFromHtml(padded);
+  assert.equal(xi.length, 11, `esperado 11, fue ${xi.length}: ${xi.join(', ')}`);
+  for (const expected of EXPECTED_XI_JPN) {
+    assert.ok(xi.includes(expected), `falta '${expected}' en XI: ${xi.join(', ')}`);
+  }
+});
+
+test('parseStartingXIFromHtml: variante JPN-style excluye data-onceff="suplente"', () => {
+  const padded = JPN_FIXTURE_NO_WRAPPER + '<!--' + ' '.repeat(2000) + '-->';
+  const xi = parseStartingXIFromHtml(padded);
+  assert.ok(!xi.includes('Sugawara'), 'data-onceff=suplente debe excluirse');
+  assert.ok(!xi.includes('Watanabe'), 'data-onceff=suplente debe excluirse');
+});
