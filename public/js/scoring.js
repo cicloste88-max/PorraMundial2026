@@ -1550,11 +1550,15 @@ async function getScorerCandidates(iso3) {
       // name preserva formato "dorsal · nombre" del legacy para consistencia
       // visual con EQUIPOS[].players.name. Si no hay dorsal real, omitimos.
       const display = (dorsal !== 999) ? (dorsal + ' · ' + nombre) : nombre;
+      // foto_url + posicion_tm se incluyen pero NO se renderizan en el picker
+      // scorer (decisión San 28-may). Reservados para sprints futuros:
+      // Pizarra Táctica sobre el campo + vista Plantilla estilo Transfermarkt.
       return {
         key,
         name: display,
         bucket: j.posicion || null,
-        foto_url: j.foto_url || null,
+        posicion_tm: j.posicion_tm || null,
+        foto_url: j.foto_url || j.foto_url_tm || null,
         dorsal,
       };
     }).sort((a, b) => a.dorsal - b.dorsal || (a.name || '').localeCompare(b.name || ''));

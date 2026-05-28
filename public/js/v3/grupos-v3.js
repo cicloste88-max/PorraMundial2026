@@ -948,10 +948,14 @@ function v3RenderSquadPickerGrupos() {
 }
 
 // F2.8.1 + Sprint Combos & Awards F1: render sección por equipo. Acepta
-// `candidates` como array {key, name, foto_url, dorsal, bucket}. `side`
-// ('home'|'away') se incluye en data-v3-side para que el save infiera el
-// lado sin hacer lookup en EQUIPOS (el squad pinneado puede tener jugadores
-// que NO están en data.js). Compartido con eliminatoria-v3.js.
+// `candidates` como array {key, name, foto_url, posicion_tm, dorsal, bucket}.
+// `side` ('home'|'away') se incluye en data-v3-side para que el save infiera
+// el lado sin hacer lookup en EQUIPOS (el squad pinneado puede tener
+// jugadores que NO están en data.js). Compartido con eliminatoria-v3.js.
+//
+// NOTA: foto_url y posicion_tm están disponibles en el candidate pero NO se
+// renderizan aquí — reservados para el sprint Pizarra Táctica sobre el
+// campo + vista Plantilla estilo Transfermarkt (decisión San 28-may).
 function v3RenderSquadPickerTeamSection(equipo, candidates, currentPickKey, side) {
   if (!candidates || !candidates.length) {
     return '<div class="v3-squad-picker-team-section v3-squad-picker-team-section--empty">'
@@ -965,11 +969,7 @@ function v3RenderSquadPickerTeamSection(equipo, candidates, currentPickKey, side
     + '<div class="v3-squad-picker-list">';
   candidates.forEach(function(pl) {
     var isPicked = currentPickKey === pl.key;
-    var photo = pl.foto_url
-      ? '<span class="v3-squad-picker-player__photo"><img src="' + pl.foto_url + '" alt="" onerror="this.parentElement.style.display=\'none\'"/></span>'
-      : '';
     html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '"' + sideAttr + '>'
-      + photo
       + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
       + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
       + '</button>';
