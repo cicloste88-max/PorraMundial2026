@@ -66,6 +66,27 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 with open(_REPO_ROOT / "scripts" / "lib" / "iso3-slugs.json", encoding="utf-8") as _f:
     FF_COUNTRIES = json.load(_f)
 
+# Filtro opcional vía env var ISO3_FILTER (CSV de iso3 mayúsculas, mismo formato
+# que el input iso3_filter del workflow_dispatch). Cuando se establece, sólo se
+# fetchea FF para esos países — las 5 primarias siempre se fetchean (son índices
+# HTML con todos los países; Node filtra después en cross-validate).
+#
+# Caso de uso: dispatches acotados (e.g. iso3_filter=JPN,BEL,BIH,SWE) — sin
+# este filtro, Python intenta fetchear las 48 FF aunque Node sólo procese 4,
+# lo que excede el timeout 15 min del job (validado en run 26549858215 que
+# fue cancelado a 15m24s con sólo URU acabando, los 4 últimos sin fetchear).
+import os as _os
+_iso3_filter_raw = _os.environ.get("ISO3_FILTER", "").strip().upper()
+if _iso3_filter_raw:
+    _allowed = {x.strip() for x in _iso3_filter_raw.split(",") if x.strip()}
+    _before = len(FF_COUNTRIES)
+    FF_COUNTRIES = {k: v for k, v in FF_COUNTRIES.items() if k in _allowed}
+    print(
+        f"[INFO] ISO3_FILTER={_iso3_filter_raw} aplicado: "
+        f"FF_COUNTRIES {_before}→{len(FF_COUNTRIES)} países",
+        file=sys.stderr,
+    )
+
 for iso3, slug in FF_COUNTRIES.items():
     SOURCES[f"ff-{iso3.lower()}"] = (
         f"https://www.futbolfantasy.com/world-cup/equipos/{slug}",

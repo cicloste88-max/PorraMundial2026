@@ -97,11 +97,16 @@ jobs:
         # continue-on-error: un fallo parcial NO bloquea el motor Node;
         # los parsers de las fuentes fallidas throw → Promise.allSettled
         # las marca como rejected y cross-validate sigue con las demás.
+        # ISO3_FILTER: propagado al pre-fetch para limitar FF_COUNTRIES en
+        # dispatches acotados (las 5 primarias son índices HTML — siempre se
+        # fetchean enteras). Sin esto el run 26549858215 (4 países pedidos)
+        # excedió 15m fetcheando los 48 FF.
         if: ${{ inputs.mode == '' || inputs.mode == 'detect' }}
         continue-on-error: true
         run: python scripts/scraping/fetch_sources.py
         env:
           PYTHONUNBUFFERED: "1"
+          ISO3_FILTER: ${{ inputs.iso3_filter }}
 
       - name: Write .env from secrets
         env:
