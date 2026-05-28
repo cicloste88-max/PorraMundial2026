@@ -173,6 +173,67 @@ const PARTIDOS = [
   { group:"L", home:"Croacia", away:"Ghana", date:"2026-06-27T17:00:00", stadium:"Philadelphia Stadium", realHome:0, realAway:0 }
 ];
 
+// ========== ESTADIOS MUNDIAL 2026 ==========
+// 16 sedes oficiales. Lookup por venue_id (cuando PARTIDOS lo lleve) o por
+// _STADIUM_BY_VENUE_TEXT (normaliza el string actual de PARTIDOS.stadium).
+const STADIUMS = [
+  { id:'toronto',    name:'Estadio Toronto',                       city:'Toronto',          country:'CAN', capacity:45000, max_round:'dieciseisavos' },
+  { id:'vancouver',  name:'BC Place',                              city:'Vancouver',        country:'CAN', capacity:54000, max_round:'octavos' },
+  { id:'azteca',     name:'Estadio Ciudad de México (Azteca)',     city:'Ciudad de México', country:'MEX', capacity:83000, max_round:'octavos', notes:'INAUGURAL 11-jun' },
+  { id:'guadalajara',name:'Estadio Akron Guadalajara',             city:'Zapopan',          country:'MEX', capacity:48000, max_round:'grupos' },
+  { id:'monterrey',  name:'Estadio BBVA Monterrey',                city:'Guadalupe',        country:'MEX', capacity:53500, max_round:'dieciseisavos' },
+  { id:'atlanta',    name:'Estadio Atlanta',                       city:'Atlanta',          country:'USA', capacity:75000, max_round:'semifinal' },
+  { id:'boston',     name:'Estadio Boston',                        city:'Foxborough',       country:'USA', capacity:65000, max_round:'cuartos' },
+  { id:'dallas',     name:'Estadio Dallas',                        city:'Arlington',        country:'USA', capacity:94000, max_round:'semifinal' },
+  { id:'houston',    name:'Estadio Houston',                       city:'Houston',          country:'USA', capacity:72220, max_round:'octavos' },
+  { id:'kansas',     name:'Estadio Kansas City',                   city:'Kansas City',      country:'USA', capacity:73000, max_round:'cuartos' },
+  { id:'losangeles', name:'Estadio Los Ángeles',                   city:'Inglewood',        country:'USA', capacity:70000, max_round:'cuartos' },
+  { id:'miami',      name:'Estadio Miami',                         city:'Miami Gardens',    country:'USA', capacity:65000, max_round:'cuartos', notes:'3er puesto 18-jul' },
+  { id:'nyjersey',   name:'Estadio Nueva York / Nueva Jersey',     city:'East Rutherford',  country:'USA', capacity:82500, max_round:'final',    notes:'FINAL 19-jul' },
+  { id:'philly',     name:'Estadio Filadelfia',                    city:'Filadelfia',       country:'USA', capacity:69000, max_round:'octavos' },
+  { id:'sfbay',      name:'Estadio Bahía de San Francisco',        city:'Santa Clara',      country:'USA', capacity:71000, max_round:'dieciseisavos' },
+  { id:'seattle',    name:'Estadio Seattle',                       city:'Seattle',          country:'USA', capacity:69000, max_round:'octavos' },
+];
+
+// Mapping del texto actual en PARTIDOS[].stadium → STADIUMS.id (legacy bridge).
+// Cuando PARTIDOS migre a venue_id explícito, este map deja de usarse.
+const _STADIUM_BY_VENUE_TEXT = {
+  'Estadio Toronto':                 'toronto',
+  'Toronto Stadium':                 'toronto',
+  'BC Place Vancouver':              'vancouver',
+  'BC Place':                        'vancouver',
+  'Estadio Ciudad de México':        'azteca',
+  'Estadio Azteca':                  'azteca',
+  'Estadio Guadalajara':             'guadalajara',
+  'Estadio Akron Guadalajara':       'guadalajara',
+  'Estadio Monterrey':               'monterrey',
+  'Estadio BBVA Monterrey':          'monterrey',
+  'Atlanta Stadium':                 'atlanta',
+  'Boston Stadium':                  'boston',
+  'Dallas Stadium':                  'dallas',
+  'Houston Stadium':                 'houston',
+  'Kansas City Stadium':             'kansas',
+  'Los Angeles Stadium':             'losangeles',
+  'Miami Stadium':                   'miami',
+  'Nueva York Nueva Jersey Stadium': 'nyjersey',
+  'Philadelphia Stadium':            'philly',
+  'San Francisco Bay Area Stadium':  'sfbay',
+  'Seattle Stadium':                 'seattle',
+};
+
+// Helper público: dado un match de PARTIDOS, devuelve la fila STADIUMS o null.
+function stadiumForMatch(m) {
+  if (!m) return null;
+  if (m.venue_id) {
+    return STADIUMS.find(s => s.id === m.venue_id) || null;
+  }
+  const id = _STADIUM_BY_VENUE_TEXT[m.stadium];
+  return id ? STADIUMS.find(s => s.id === id) || null : null;
+}
+// Exposición en window para classic scripts (const no se expone solo).
+window.STADIUMS = STADIUMS;
+window.stadiumForMatch = stadiumForMatch;
+
 // ========== ESTADO GLOBAL ==========
   // ─────────────────────────────────────────────────────────────
   // ESTADO GLOBAL — predictions, iaPredictions, totalPoints

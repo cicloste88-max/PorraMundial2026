@@ -135,6 +135,44 @@
       </div>`;
   }
 
+  // ── Meta del partido desde PARTIDOS + STADIUMS (no viene del payload EF) ──
+
+  // Jornada N = índice (1-based) del día único entre los días distintos de PARTIDOS.
+  // Partido M = posición (1-based) del match dentro de los partidos del mismo día.
+  let _jornadaCache = null;
+  function _jornadaInfo(match) {
+    if (!_jornadaCache) {
+      const arr = _partidos();
+      const byDate = {};
+      arr.forEach((m) => {
+        const d = m.date ? String(m.date).substring(0, 10) : null;
+        if (!d) return;
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(m);
+      });
+      const days = Object.keys(byDate).sort();
+      _jornadaCache = { byDate, days };
+    }
+    const d = match.date ? String(match.date).substring(0, 10) : null;
+    if (!d) return { jornada: null, indexInJornada: null };
+    const jornada = _jornadaCache.days.indexOf(d) + 1 || null;
+    const list = _jornadaCache.byDate[d] || [];
+    const idx = list.indexOf(match);
+    return { jornada, indexInJornada: idx >= 0 ? idx + 1 : null };
+  }
+
+  function _timeLabel(match) {
+    if (!match.date) return '';
+    const d = new Date(match.date);
+    if (isNaN(d.getTime())) return '';
+    const dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
+    const day = d.getDate();
+    const monthShort = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${dow} · ${day} ${monthShort} · ${hh}:${mm}`;
+  }
+
   function renderScreen(match, payload) {
     const matchKey = window.getMatchKey(match);
     const homeTeam = match.home, awayTeam = match.away;
@@ -156,12 +194,26 @@
     // Parche 7/8 — isGroupMatch: grupos llevan letra A-L en match.group; KO no.
     const isGroupMatch = !!match.group;
 
+    // Sprint 2C — host = país anfitrión del Mundial (USA/MEX/CAN).
+    const homeIso3 = codeFor(homeTeam);
+    const aIsHost  = ['USA','MEX','CAN'].includes(homeIso3);
+
+    // Sprint 2C — meta partido desde PARTIDOS + STADIUMS (no del payload).
+    const { jornada, indexInJornada } = _jornadaInfo(match);
+    const timeLine = _timeLabel(match);
+    const stadium = (typeof window.stadiumForMatch === 'function')
+      ? window.stadiumForMatch(match)
+      : null;
+
     const s = payload || {};
     const stats = s.stats || {};
     const formA = s.form?.a || '';
     const formB = s.form?.b || '';
+    // Sprint 2C — h2h_status drive el render (never_played / aggregates_only / has_detail).
+    const h2hStatus = s.h2h_status || (s.h2h ? 'aggregates_only' : null);
     const h2h   = s.h2h || { aWins: 0, draws: 0, bWins: 0, last: [] };
     const league = s.league || null;
+    const possPlaceholder = !!s.meta?.possession_placeholder;
 
     const rows = [
       { key:'fifaRank',  label:'Ranking FIFA',     suffix:null, prefix:'#', higherWins:false },
@@ -177,16 +229,21 @@
 
     const statsHtml = rows.map(r => {
       const a = stats[r.key]?.a, b = stats[r.key]?.b;
-      // Si higherWins === null → métrica neutral (no marcamos ganador)
-      const sp = r.higherWins == null
+      // Posesión es 50/50 placeholder en Sprint 2C — neutralizar barra y marcar
+      // con asterisco "* aprox" mientras no haya fuente real.
+      const isPlaceholderRow = r.key === 'possession' && possPlaceholder;
+      // Si higherWins === null o placeholder → métrica neutral (no marca ganador).
+      const sp = (r.higherWins == null || isPlaceholderRow)
         ? { leftPct: 25, rightPct: 25, leftWins: false, rightWins: false }
         : splitBar(a, b, r.higherWins);
-      const valA = r.prefix ? `<small>${r.prefix}</small>${fmtVal(a)}` : fmtVal(a, r.suffix);
-      const valB = r.prefix ? `<small>${r.prefix}</small>${fmtVal(b)}` : fmtVal(b, r.suffix);
+      const sufA = isPlaceholderRow ? '% *' : r.suffix;
+      const sufB = isPlaceholderRow ? '% *' : r.suffix;
+      const valA = r.prefix ? `<small>${r.prefix}</small>${fmtVal(a)}` : fmtVal(a, sufA);
+      const valB = r.prefix ? `<small>${r.prefix}</small>${fmtVal(b)}` : fmtVal(b, sufB);
       return `
         <div class="stm-stat-row">
           <div class="stm-stat-row__val stm-stat-row__val--left ${sp.leftWins ? 'is-winner' : ''}">${valA}</div>
-          <div class="stm-stat-row__label">${esc(r.label)}</div>
+          <div class="stm-stat-row__label">${esc(r.label)}${isPlaceholderRow ? ' <small style="opacity:.6">*aprox</small>' : ''}</div>
           <div class="stm-stat-row__val stm-stat-row__val--right ${sp.rightWins ? 'is-winner' : ''}">${valB}</div>
           <div class="stm-stat-row__bar">
             <span class="stm-stat-row__bar-left"  style="width:${sp.leftPct}%"></span>
@@ -195,10 +252,39 @@
         </div>`;
     }).join('');
 
-    const hasH2hData = (h2h.last && h2h.last.length > 0) || h2h.aWins || h2h.draws || h2h.bWins;
-    const h2hListHtml = h2h.last && h2h.last.length
-      ? h2h.last.slice(0,5).map(item => renderH2HItem(item, homeCode, awayCode, homeTeam, awayTeam)).join('')
-      : '';
+    // h2h render según status (Sprint 2C):
+    //  - never_played    → texto literal sin cabecera ni lista.
+    //  - aggregates_only → cabecera W/D/W + mensaje "Detalle no disponible".
+    //  - has_detail      → cabecera + lista (DESC, máx 5; EF ya devuelve last orientado A).
+    let h2hSectionHtml;
+    let h2hTotal = 0;
+    if (h2hStatus === 'never_played') {
+      h2hSectionHtml = '<div class="stm-section__empty">Sin enfrentamientos previos entre ambas selecciones</div>';
+    } else if (h2hStatus === 'aggregates_only') {
+      h2hTotal = (h2h.aWins || 0) + (h2h.draws || 0) + (h2h.bWins || 0);
+      h2hSectionHtml =
+        `<div class="stm-h2h-summary">
+          <div class="stm-h2h-cell stm-h2h-cell--a"><div class="stm-h2h-cell__num">${h2h.aWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(homeCode)}</div></div>
+          <div class="stm-h2h-cell stm-h2h-cell--d"><div class="stm-h2h-cell__num">${h2h.draws || 0}</div><div class="stm-h2h-cell__lbl">Empates</div></div>
+          <div class="stm-h2h-cell stm-h2h-cell--b"><div class="stm-h2h-cell__num">${h2h.bWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(awayCode)}</div></div>
+        </div>
+        <div class="stm-section__empty">Detalle de partidos no disponible</div>`;
+    } else if (h2hStatus === 'has_detail') {
+      h2hTotal = (h2h.aWins || 0) + (h2h.draws || 0) + (h2h.bWins || 0);
+      const list = (h2h.last || []).slice(0, 5)
+        .map(item => renderH2HItem(item, homeCode, awayCode, homeTeam, awayTeam))
+        .join('');
+      h2hSectionHtml =
+        `<div class="stm-h2h-summary">
+          <div class="stm-h2h-cell stm-h2h-cell--a"><div class="stm-h2h-cell__num">${h2h.aWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(homeCode)}</div></div>
+          <div class="stm-h2h-cell stm-h2h-cell--d"><div class="stm-h2h-cell__num">${h2h.draws || 0}</div><div class="stm-h2h-cell__lbl">Empates</div></div>
+          <div class="stm-h2h-cell stm-h2h-cell--b"><div class="stm-h2h-cell__num">${h2h.bWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(awayCode)}</div></div>
+        </div>
+        <div class="stm-h2h-list">${list}</div>`;
+    } else {
+      // Sin payload aún o status desconocido → mensaje genérico.
+      h2hSectionHtml = '<div class="stm-section__empty">Sin datos…</div>';
+    }
 
     const leagueHtml = league
       ? `
@@ -232,16 +318,16 @@
         </div>`
       : '<div class="stm-section__empty">Sin datos…</div>';
 
-    const stadiumLine = s.match?.stadium
-      ? `📍 ${esc(s.match.stadium)}${s.match.city ? ' · ' + esc(s.match.city) : ''}${s.match.capacity ? ' · ' + s.match.capacity.toLocaleString('es') + ' plazas' : ''}`
+    // Sprint 2C — stadium line desde STADIUMS lookup, con fallback al texto crudo.
+    const stadiumLine = stadium
+      ? `📍 ${esc(stadium.name)} · ${esc(stadium.city)} · ${stadium.capacity.toLocaleString('es')} plazas`
       : (match.stadium ? `📍 ${esc(match.stadium)}` : '');
 
-    // Parche 7 — eyebrow dinámico grupos vs KO.
+    // Parche 7 — eyebrow dinámico grupos vs KO. Jornada/Partido computados frontend.
     const stageLabel = isGroupMatch
       ? `Grupo ${esc(match.group)}`
       : esc(match.stage || 'Eliminatoria');
-    const eyebrow = `Jornada ${esc(s.match?.jornada || '?')} · ${stageLabel} · Partido ${esc(s.match?.indexInJornada || '?')}`;
-    const timeLine = s.match?.timeLabel || '';
+    const eyebrow = `Jornada ${esc(jornada || '?')} · ${stageLabel} · Partido ${esc(indexInJornada || '?')}`;
 
     return `
       <article class="stm-screen ${isFinal ? 'is-final' : ''}" id="${SCREEN_ID}" data-match-key="${esc(matchKey)}" aria-label="Datos comparativos ${esc(homeCode)} vs ${esc(awayCode)}">
@@ -269,7 +355,7 @@
           <div class="stm-team stm-team--a">
             <div class="stm-team__flag"><img src="${flagPath(homeTeam)}" alt="" onerror="this.style.display='none'"/></div>
             <div class="stm-team__name">${esc(homeTeam)}</div>
-            ${s.match?.aIsHost ? '<div class="stm-team__sub">Anfitrión · Local</div>' : '<div class="stm-team__sub">Local</div>'}
+            ${aIsHost ? '<div class="stm-team__sub">Anfitrión · Local</div>' : '<div class="stm-team__sub">Local</div>'}
           </div>
 
           <div class="stm-score">
@@ -306,15 +392,8 @@
           </section>
 
           <section class="stm-section">
-            <div class="stm-section__title">Cara a cara <span class="stm-section__count">${h2h.last?.length || 0} enfrentamientos</span></div>
-            ${hasH2hData ? `
-              <div class="stm-h2h-summary">
-                <div class="stm-h2h-cell stm-h2h-cell--a"><div class="stm-h2h-cell__num">${h2h.aWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(homeCode)}</div></div>
-                <div class="stm-h2h-cell stm-h2h-cell--d"><div class="stm-h2h-cell__num">${h2h.draws || 0}</div><div class="stm-h2h-cell__lbl">Empates</div></div>
-                <div class="stm-h2h-cell stm-h2h-cell--b"><div class="stm-h2h-cell__num">${h2h.bWins || 0}</div><div class="stm-h2h-cell__lbl">Victorias ${esc(awayCode)}</div></div>
-              </div>
-              <div class="stm-h2h-list">${h2hListHtml}</div>`
-              : '<div class="stm-section__empty">Sin datos…</div>'}
+            <div class="stm-section__title">Cara a cara${h2hStatus === 'has_detail' || h2hStatus === 'aggregates_only' ? ` <span class="stm-section__count">${h2hTotal} enfrentamiento${h2hTotal === 1 ? '' : 's'}</span>` : ''}</div>
+            ${h2hSectionHtml}
           </section>
 
           <section class="stm-section">
