@@ -1204,34 +1204,24 @@ function v3RenderAwardsCard() {
 }
 window.v3RenderAwardsCard = v3RenderAwardsCard;
 
-// Polish v1 B4 + Fix-Pack-2 Fix-3+4: deducción automática para Bota de Oro.
-// Cuenta scorers en predictions (grupos) + koPredictions, filtra por
-// _awardCandidatesCache.golden_boot (Centrocampistas + Delanteros top 30
-// Elo, BD-driven). Tiebreak: alfabético por playerKey. Retorna null si
-// cache vacío (BD aún no precargada) — el picker se abrirá sin sugerencia.
-function _v3SuggestGoldenBoot() {
-  if (typeof predictions !== 'object' || typeof koPredictions !== 'object') return null;
-  var counts = {};
-  function tally(predictionsMap) {
-    Object.values(predictionsMap || {}).forEach(function (p) {
-      var key = p && (p.gol || p.scorer);
-      if (key) counts[key] = (counts[key] || 0) + 1;
+// F4 (rediseño PR #112) — top 3 goleadores del usuario para la sección "Tus
+// goleadores" del picker golden_boot (sustituye el badge interno por una
+// sección destacada arriba con click-to-select). Devuelve array
+// [{scorer_key, n, rank}] (top 5, con margen). El render (_buildTopScorersHtml)
+// filtra a candidatos válidos de Bota y recorta a 3. [] si no hay sesión/liga,
+// error, o sin scorers. Sin gating de margin: el usuario decide.
+// Async: openPicker la await-ea. window._porraDb = cliente auth (RLS necesita
+// el JWT del usuario; el proxy `db` enruta al query client sin sesión).
+async function _v3SuggestGoldenBoot() {
+  var uid = currentUser?.id;
+  var leagueId = (typeof getActiveLeagueId === 'function') ? getActiveLeagueId() : null;
+  if (!uid || !leagueId || !window._porraDb) return [];
+  try {
+    const { data, error } = await window._porraDb.rpc('get_user_top_scorers', {
+      p_user_id: uid, p_league_id: leagueId, p_limit: 5
     });
-  }
-  tally(predictions);
-  tally(koPredictions);
-
-  var cache = window._awardCandidatesCache && window._awardCandidatesCache.golden_boot;
-  if (!cache || !cache.length) return null;
-  var validKeys = new Set(cache.map(function (p) { return p.key; }));
-
-  var topKey = null, topCount = 0;
-  Object.entries(counts).forEach(function (entry) {
-    if (!validKeys.has(entry[0])) return;
-    if (entry[1] > topCount) { topKey = entry[0]; topCount = entry[1]; }
-    else if (entry[1] === topCount && topKey && entry[0] < topKey) { topKey = entry[0]; }
-  });
-  return topKey ? { key: topKey, count: topCount } : null;
+    return (error || !data) ? [] : data;
+  } catch (_e) { return []; }
 }
 window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
 

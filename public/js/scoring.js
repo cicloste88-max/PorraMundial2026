@@ -1695,16 +1695,58 @@ async function openPicker(award) {
   const candidates = await getAwardCandidates(award);
   console.log('[awards] candidates loaded', award, candidates.length);
   if (currentAward !== award) return;
-  let suggestion = null;
-  if (award === 'golden_boot' && awPicks.golden_boot === null
-      && typeof _v3SuggestGoldenBoot === 'function') {
-    suggestion = _v3SuggestGoldenBoot();
+  // F4 (rediseño PR #112): top 3 goleadores del usuario para la sección "Tus
+  // goleadores" — solo golden_boot. Sin gating: se muestra siempre que haya
+  // datos, también con pick previo (permite cambiarlo de un toque). Re-validar
+  // currentAward tras el await (round-trip a BD) por si el usuario navegó.
+  let topScorers = [];
+  if (award === 'golden_boot' && typeof _v3SuggestGoldenBoot === 'function') {
+    topScorers = await _v3SuggestGoldenBoot();
+    if (currentAward !== award) return;
   }
   if (!candidates.length) {
     if (scroll) scroll.innerHTML = '<div style="padding:24px 18px;color:#94a3b8;font-size:13px;font-style:italic">No hay candidatos disponibles. Las convocatorias se completarán hasta el 2 de junio.</div>';
     return;
   }
-  renderPickerList(candidates, awPicks[award], suggestion);
+  renderPickerList(candidates, awPicks[award]);
+  // F4 (rediseño PR #112): inyectar la sección "Tus goleadores" al inicio del
+  // scroll, tras renderPickerList (que setea innerHTML). Solo golden_boot con
+  // datos. Las filas reutilizan selectAward (selecciona + cierra picker).
+  if (award === 'golden_boot' && Array.isArray(topScorers) && topScorers.length && scroll) {
+    scroll.insertAdjacentHTML('afterbegin', _buildTopScorersHtml(topScorers, candidates));
+  }
+}
+// F4 (rediseño PR #112 + fix huérfano): HTML de la sección "Tus goleadores"
+// (top 3) inyectada al inicio del picker golden_boot. Filtra los scorers a
+// candidatos válidos de Bota (un goleador de selección fuera del top-30 Elo o
+// sin bucket ofensivo no es seleccionable, y clicarlo no haría nada) y recorta
+// a 3 — la RPC pide top 5 para tener margen. Si no queda ninguno válido,
+// devuelve '' (sin sección). displayName = c.name del candidato. Click →
+// selectAward(key) (selecciona + cierra picker), igual que las filas normales.
+function _buildTopScorersHtml(topScorers, candidates) {
+  const nameByKey = {};
+  const candidateKeys = new Set();
+  (candidates || []).forEach(c => { nameByKey[c.key] = c.name; candidateKeys.add(c.key); });
+  const filteredTop = (topScorers || [])
+    .filter(t => candidateKeys.has(t.scorer_key))
+    .slice(0, 3);
+  if (!filteredTop.length) return '';
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const escAttr = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const rows = filteredTop.map((t) => {
+    const display = nameByKey[t.scorer_key] || t.scorer_key;
+    const goles = t.n + (t.n === 1 ? ' gol' : ' goles');
+    return `<div class="aw-top-scorer-row" onclick="selectAward('${escAttr(t.scorer_key)}')">
+        <span class="aw-top-scorer-name">${esc(display)}</span>
+        <span class="aw-top-scorer-count">${esc(goles)}</span>
+      </div>`;
+  }).join('');
+  return `<div class="aw-top-scorers">
+      <div class="aw-top-scorers-header">Tus goleadores</div>
+      ${rows}
+      <div class="aw-top-scorers-separator"></div>
+    </div>`;
 }
 function closePicker() {
   const overlayEl = document.getElementById('aw-overlay');

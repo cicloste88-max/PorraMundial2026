@@ -1510,23 +1510,40 @@ body.fc-shell-active #page-elim > #modal {
 }
 
 /* ============================================================
-   Polish v1 B4 — Badge sugerencia Bota de Oro
-   Aplicado en .aw-player-row.is-suggested via renderPickerList
-   cuando openPicker('golden_boot') recibe sugerencia.
+   F4 (rediseño PR #112) — Sección "Tus goleadores" (top 3)
+   Inyectada al inicio del picker golden_boot por openPicker +
+   _buildTopScorersHtml (scoring.js). Cada fila → selectAward
+   (selecciona + cierra picker). Sustituye el badge interno
+   "tu goleador" de la 1ª iteración F4. Valores compactos validados en
+   smoke en vivo (San).
    ============================================================ */
-.aw-suggestion-badge {
-  display: inline-block;
-  background: rgba(96, 165, 250, 0.18);
-  color: #60a5fa;
-  font-size: 9px;
+.aw-top-scorers {
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(212, 160, 23, 0.08), rgba(245, 200, 66, 0.08));
+  border-left: 3px solid #d4a017;
+  margin-bottom: 8px;
+}
+.aw-top-scorers-header {
+  font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-  letter-spacing: 0.02em;
-  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #d4a017;
+  margin-bottom: 4px;
 }
-.aw-player-row.is-suggested {
-  background: rgba(96, 165, 250, 0.06);
-  border-left: 2px solid #60a5fa;
+.aw-top-scorer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 9px;
+  margin: 3px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 160, 23, 0.3);
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.15s;
 }
+.aw-top-scorer-row:hover { background: rgba(212, 160, 23, 0.12); }
+.aw-top-scorer-name { font-size: 13px; }
+.aw-top-scorer-count { font-weight: 700; color: #d4a017; font-size: 11px; }
+.aw-top-scorers-separator { height: 1px; background: rgba(0, 0, 0, 0.08); margin: 4px 0; }
