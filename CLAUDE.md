@@ -5,11 +5,11 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `8119be4` (28-may). **Squads XI+Enrich pipeline EN PR** (`fix/squads-xi-enrich-pipeline`): PL-1 cron usa `enrich-tm-mw` (no depende de `tm-ids.json`; el legacy saltaba selecciones sin tm_id). PL-3 `mergeJugadores` preserva `es_titular` (match `tm_player_id`→nombre) + flag `--reseed-xi` re-marca XI en pineados. Previo: **Sprint Combos & Awards CERRADO** (#111+#112); Squads #105-109 **33/48 a 11/11**. Cron `cerrar-porras-mundial-2026` activo (jobid 23).
+Main HEAD `8c3079a` (PL-1/PL-3 #113 merged). **Pizarra XI real EN PR** (`feat/pizarra-xi-real`, A2 FIX C): columna `squads.xi` (XI por slot + foto, intocable por detect) vía `sync-squads --build-xi` (remap geométrico FF + desempate homónimos); `get-squad` v7.2 sirve `foto_url`; tokens con foto + de-overlap PO. Previo (#113): PL-1 cron `enrich-tm-mw`, PL-3 `es_titular` en merge. Cron cierre porras activo.
 
 ## Top-3 pendientes inmediatos
 
-1. **Backfill squads PL-1/PL-3** (tras merge PR `fix/squads-xi-enrich-pipeline`, San vía Actions): `enrich-tm-mw` 7 naciones + `detect reseed_xi=true` 33 pineadas + `detect iso3=ESP` durabilidad. Runbook + tests SQL en el PR.
+1. **Squads backfills + deploys pendientes** (Actions San / MCP Code): (a) `enrich-tm-mw` 7 naciones + `detect reseed_xi=true` 33 (PL-1/PL-3 #113); (b) `detect build_xi=true` 33 tras mergear `feat/pizarra-xi-real` (A2); (c) deploy `get-squad` v7.2. Runbooks en los PRs.
 2. **Operacional pre-launch 11-jun** (14 días vista): activar `pg_cron update-results`, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked). Squads pipeline ya estabilizado tras #109.
 3. **Pizarra Táctica apellidos invisibles iPhone real**: ver Bugs UI #5 abajo.
 
