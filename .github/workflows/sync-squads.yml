@@ -37,6 +37,10 @@ on:
         description: '[detect only] re-marcar XI vía FF también en squads pineados (PL-3 backfill one-time)'
         type: boolean
         default: false
+      build_xi:
+        description: '[detect only] construir squads.xi (Pizarra XI real, A2 FIX C) tras detect'
+        type: boolean
+        default: false
       refresh_final:
         description: '[scrape only, LEGACY] aplicar --refresh-final'
         type: boolean
@@ -134,6 +138,7 @@ jobs:
           VERBOSE: ${{ inputs.verbose }}
           ENRICH_XI: ${{ inputs.enrich_xi }}
           RESEED_XI: ${{ inputs.reseed_xi }}
+          BUILD_XI: ${{ inputs.build_xi }}
           REFRESH_FINAL: ${{ inputs.refresh_final }}
           FULL: ${{ inputs.full }}
           DRY_RUN: ${{ inputs.dry_run }}
@@ -145,6 +150,7 @@ jobs:
           VERBOSE="${VERBOSE:-true}"
           ENRICH_XI="${ENRICH_XI:-true}"
           RESEED_XI="${RESEED_XI:-false}"
+          BUILD_XI="${BUILD_XI:-false}"
           REFRESH_FINAL="${REFRESH_FINAL:-false}"
           FULL="${FULL:-false}"
           DRY_RUN="${DRY_RUN:-false}"
@@ -174,6 +180,9 @@ jobs:
           fi
           if [ "${RESEED_XI}" = "true" ]; then
             DETECT_FLAGS="${DETECT_FLAGS} --reseed-xi"
+          fi
+          if [ "${BUILD_XI}" = "true" ]; then
+            DETECT_FLAGS="${DETECT_FLAGS} --build-xi"
           fi
           if [ "${REFRESH_FINAL}" = "true" ]; then
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --refresh-final"
