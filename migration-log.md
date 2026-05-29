@@ -2180,3 +2180,19 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [18:15] DOCS: `errores_conocidos_porra.md` entradas ERR-71 (parser corruptos) + ERR-72 (Levenshtein adaptativo) + ERR-73 (anti-colisión) + ERR-74 (pin de estabilidad) + ERR-75 (FF dudosos + pos-1 fallback). Coreografía documentada: aplicar migración → merge PR → San pinea los 33 inmediato post-merge → próximo cron 6h protege los 33 + Capa A corrige los 5 nombres corruptos + Capa B mejora match de tier B/C.
 
 [18:20] TESTS: 146/146 pass. Branch `claude/fix-xi-pipeline-abc` desde main `5656215`. Pendiente: push + abrir PR. 3 dudosos (IRN Kanaanizadegan, GHA Kohn, JOR Layla) registrados en ERR-75 para verificación manual de San con fuente oficial (no se forza match).
+
+## 2026-05-28 — Sprint Combos & Awards F4 v2 + cierre docs (feat/auto-bota-suggest → PR #112)
+
+[23:10] F4 v1 (commit `bc07bf7`): migración `20260528230000_get_user_top_scorer.sql` (RPC singular + badge "tu goleador" en fila interna) + `_v3SuggestGoldenBoot` async. SQL smoke local (postgres 16) OK. NO aplicada en remoto en este punto.
+
+[23:40] F4 v2 rediseño (`baeb539`): San pide sección "Tus goleadores" top-3 al inicio del picker en vez de badge interno. Migración `20260529100000_get_user_top_scorers.sql`: DROP singular + CREATE plural `get_user_top_scorers(uuid,uuid,int=3)` RETURNS TABLE(scorer_key,n,rank). `_v3SuggestGoldenBoot` → array, `p_limit:5`, vía `window._porraDb` (NO el proxy `db`: la RPC SECURITY INVOKER perdía el JWT y RLS devolvía 0 filas). Nuevo helper `_buildTopScorersHtml`. Badge v1 eliminado.
+
+[23:55] F4 v2 fix huérfano (`85bec24`): filtrar top-scorers a `candidateKeys` de getAwardCandidates('golden_boot') + slice(0,3); RPC pide 5 para margen. Scorers de selecciones fuera top-30 Elo / sin `xi_pinned` ya no aparecen (eran no-seleccionables). Unit test del helper real + SQL smoke OK.
+
+[00:10] F4 v2 compact CSS (`b3d5a3a`): bloque `.aw-top-scorers*` ajustado tras smoke en vivo de San (padding 6/10, header 10px, row 5/9, name 13px, count 11px). PR #112 (4 commits squash) mergeado a main → HEAD `2a71da7`.
+
+[00:20] MIGRACIONES (aplicadas al remoto por Claude.ai vía Supabase MCP):
+  - `20260528230000_get_user_top_scorer.sql` (singular): APLICADA y luego DROPEADA — obsoleta, sustituida por la plural en el mismo sprint. El fichero se conserva en el repo.
+  - `20260529100000_get_user_top_scorers.sql` (plural): APLICADA. Nota: DELETE manual del row `schema_migrations.version = '20260528230000'` al consolidar (la función singular ya no existe en runtime; evita una entrada de migración huérfana en el tracking).
+
+[00:30] CIERRE DOCS (este commit, directo a main): `CLAUDE.md` HEAD `0c45bf2`→`2a71da7` + Sprint Combos & Awards a CERRADO en Estado actual; `CHANGELOG.md` entrada nueva del sprint (F1-F4) + entrada 2026-05-19 sync-squads movida a `CHANGELOG-archive-202605.md` (respeta límite 30KB del hook); esta entrada de log. Sin nuevos ERR. Tamaños OK (CLAUDE 10143B / CHANGELOG 27913B).

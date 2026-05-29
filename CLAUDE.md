@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `0c45bf2` (PR #109 fix XI pipeline 3 capas A+B+C, 28-may). Cluster squads-pipeline #105-109 cerrado. **33/48 squads protegidas a 11/11** via `xi_pinned` (Capa C); 3 dudosos a 10/11 sin pin (GHA/IRN/JOR — Capa B mejora en cron); 12 sin lista FF (ALG,ARG,AUS,CAN,ECU,IRQ,MEX,PAR,QAT,TUR,URU,UZB). Migration `squads_xi_pinned` aplicada. ERR-71..75 (parser corruptos, Levenshtein adaptativo, anti-colisión, pin, FF pos-1). Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
+Main HEAD `2a71da7` (PR #112, 28-may). **Sprint Combos & Awards CERRADO** (F1+F2+F3 #111 + F4 v2 #112): picker scorer dinámico grupos+KO desde `squads.jugadores`, keys awards unificadas (`Mbappe`), action `update_ia_scorers` (`porra-ia-compute` v14 — backfill bot Zayu 395 scorers; 125 NULL en países sin `xi_pinned`), sección "Tus goleadores" top-3 en picker golden_boot (RPC `get_user_top_scorers`). Previo: squads-pipeline #105-109 — **33/48 a 11/11** via `xi_pinned`, 12 sin lista FF. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
 
 ## Top-3 pendientes inmediatos
 

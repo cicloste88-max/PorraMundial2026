@@ -2,6 +2,44 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [28-may-2026] Sprint Combos & Awards (CERRADO 28-may-2026): F1+F2+F3 PR#111 + F4 v2 PR#112
+
+Cierre completo del sprint de scorers/combos y premios individuales.
+
+**F1+F2+F3 (PR #111)** — picker scorer dinámico + keys unificadas:
+- **F1**: picker de goleador en grupos + KO poblado dinámicamente desde
+  `squads.jugadores` (ya no arrays hardcoded).
+- **F2**: keys de awards card v3 unificadas con el picker de scorer
+  (`Mbappe` vs `Kylian_Mbappe`). Helpers en `window`: `playerToShortKey`,
+  `resolveKeysForSquad`, `getScorerCandidates`, `getAwardCandidates`.
+- **F3**: action `update_ia_scorers` en `porra-ia-compute` v14. Backfill del
+  bot IA Zayu: **395 scorers** (260 grupos + 135 KO); 125 NULL residuales en
+  países sin `xi_pinned` (ALG ARG AUS CAN ECU IRN MEX QAT TUR URU).
+- SQL: migration `award_picks` con 4 rows raros normalizados por Claude.ai
+  (`Kylian_Mbappe`→`Mbappe` ×2, `Nico_Wiliams`→`Nico`, `Borja_Iglesias`→
+  `B. Iglesias`).
+
+**F4 v2 (PR #112)** — auto-Bota sección "Tus goleadores":
+- Migration `20260529100000_get_user_top_scorers.sql`: DROP RPC singular
+  `get_user_top_scorer` + CREATE plural `get_user_top_scorers(uuid,uuid,
+  int=3)` RETURNS TABLE(scorer_key, n, rank). Aplicada al remoto por Claude.ai
+  con DELETE manual de `schema_migrations.version 20260528230000` (singular
+  obsoleta, sustituida en el mismo sprint).
+- `eliminatoria-v3.js`: `_v3SuggestGoldenBoot` devuelve array (sin gating de
+  margin), `p_limit:5`, vía `window._porraDb` (no el proxy `db`, que pierde el
+  JWT → la RPC `SECURITY INVOKER` devolvería 0 filas por RLS). Nuevo helper
+  `_buildTopScorersHtml`: filtra por `candidateKeys` de
+  `getAwardCandidates('golden_boot')` + `slice(0,3)`. Sección solo en
+  `openPicker('golden_boot')`; click → `selectAward(key)` guarda en BD. Badge
+  v1 (`.is-suggested` + `.aw-suggestion-badge`) eliminado.
+- `eliminatoria-v3.css`: bloque `.aw-top-scorers*` compact (padding 6/10,
+  header 10px dorado `#d4a017`, row 5/9, name 13px, count 11px, separator 4).
+- **Caveat huérfano cerrado**: scorers no candidatos a Bota (bucket no
+  ofensivo, selección fuera top-30 Elo, países sin `xi_pinned`) filtrados del
+  top; RPC pide 5, cliente recorta a 3 tras filtrar → sin filas no-clicables.
+- 4 commits squash: `bc07bf7` (v1 badge superado) → `baeb539` (sección top 3)
+  → `85bec24` (fix huérfano) → `b3d5a3a` (compact CSS).
+
 ## [28-may-2026] fix/xi-pipeline-abc — endurecer pipeline XI titular (Capas A+B+C)
 
 **Sprint contexto**: tras dispatch #69 productivo de PR #108 (scaling FF a 48
@@ -252,65 +290,3 @@ Sesión grande de polish v3 post-Completion Flow. 4 bloques temáticos + 2 fix p
 
 - **ERR-58** — detalle completo en `errores_conocidos_porra.md`.
 
-## 2026-05-19 — sync-squads: refactor fuentes primarias 5-of-N + parsers reales (PR feat/squads-sources-refactor)
-
-**Branch:** `feat/squads-sources-refactor` (pendiente de merge a main). Sin migración SQL.
-
-Resuelve el bug del 18-may en `--mode=scrape --all-missing`: 3 falsos positivos
-(CRO/NED/POR) con datos de Eurocopa 2024 escritos a BD como "FINAL Mundial 2026".
-**Ya limpiados manualmente con UPDATE** antes de este refactor.
-
-### Cambios
-
-- **Nuevo `--mode=detect`** (default del cron desde este PR): fetch en paralelo
-  de **5 fuentes primarias** — AS / Sport.es / Olympics.com / Eurosport / Marca —
-  y cross-validation 2-of-N + Jaccard ≥ 0.7 sobre nombres normalizados. Solo se
-  marca FINAL si al menos 2 fuentes coinciden con roster en `[22, 30]` jugadores
-  y solape ≥ 0.7. Calendario Olympics se parsea aparte y degrade `high → low`
-  solo si Olympics anuncia "(definitiva)" en fecha FUTURA (semánticamente
-  invertido vs versión inicial del PR).
-- **Parsers reales** (no stub): `olympics.mjs` con orphan continuation
-  (fix BEL 23→26, CUW 28→26), `sport.mjs` con bullet opcional (antes 0 iso3
-  → ahora 48), AS parametrizado para `requireBullet`, calendar greedy
-  longest-match (4 fechas → 8 fechas, 12 iso3s únicos).
-- **FF degradada a fuente secundaria**: ya no se usa para *detectar* nuevas listas,
-  solo para enriquecer XI titular de selecciones ya confirmadas FINAL por las
-  primarias. Esto cierra estructuralmente el vector de ERR-59.
-- **`maxPlayers=30`** en cross-validate: pre-listas largas (ARG/COL/MEX/CZE/QAT
-  con 33-55 jugadores) van a `reject` con razón "pre-lista detectada — esperar
-  cierre oficial".
-- **Workflow YAML v2**: cron 6h ahora ejecuta `--mode=detect` + `--mode=enrich-tm`
-  en serial. Se elimina el conflicto mutuamente excluyente `--refresh-final` vs
-  `--all-missing`. Artifact incluye `cache/squads-calendar.json`.
-- **`--mode=scrape` y `--mode=enrich-tm` conservados** para dispatch manual.
-- **Marca aporta IRN** (Irán) como única fuente publicada para esa selección.
-
-### Archivos
-
-```
-scripts/lib/parsers/_util.mjs           helpers compartidos (htmlToLines, etc.)
-scripts/lib/parsers/as.mjs              parser AS (requireBullet param)
-scripts/lib/parsers/sport.mjs           parser Sport.es
-scripts/lib/parsers/olympics.mjs        parser Olympics + orphan continuation
-scripts/lib/parsers/eurosport.mjs       parser Eurosport (nuevo)
-scripts/lib/parsers/marca.mjs           parser Marca (nuevo)
-scripts/lib/parsers/calendar.mjs        calendar greedy longest-match
-scripts/lib/parsers/country-map.json    nombre país → iso3 (expandido)
-scripts/lib/cross-validate.mjs          Jaccard + 2-of-N + maxPlayers + calendar invertido
-scripts/sync-squads.mjs                 orquestador 5 fuentes
-scripts/lib/parsers/__tests__/          util.test.mjs + sources.test.mjs (28 tests)
-tests/fixtures/squads/                  as.html + sport.html + olympics.html
-.github/workflows/sync-squads.yml       cron detect→enrich-tm en serial v2
-```
-
-### Dry-run validado
-
-19-may con 5 fuentes: `as=48 sport=48 olympics=21 eurosport=47 marca=47`.
-22 iso3 procesables → 17 dry-run (16 high con 4-5 fuentes, 1 low CRO por
-calendario "(definitiva): 1 jun"), 5 rejected pre-lista.
-
-### Detalle ERR-59 + caveats
-
-Ver `errores_conocidos_porra.md` ERR-59 y `.claude/rules/sync-squads.md` §0/§9/§10.
-
-## 2026-05-17 — Sprint Completion Flow F1 + F3 (PR #69)
