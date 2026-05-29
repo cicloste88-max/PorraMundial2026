@@ -87,7 +87,7 @@ export async function getSquadRow(iso3) {
   const { data, error } = await supa
     .from('squads')
     .select(
-      'iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
+      'iso3, formacion, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
     )
     .eq('iso3', iso3)
     .maybeSingle();
@@ -101,11 +101,26 @@ export async function listAllSquads() {
   const { data, error } = await supa
     .from('squads')
     .select(
-      'iso3, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
+      'iso3, formacion, jugadores, jugadores_is_final, jugadores_fuente, jugadores_synced_at, xi_pinned, xi_pinned_at',
     )
     .order('iso3');
   if (error) throw error;
   return data || [];
+}
+
+// Escribe SOLO la columna xi (Pizarra Táctica, Sprint A2 FIX C). Deliberadamente
+// NO toca jugadores/es_titular/fuente/synced_at: el detect 6h sigue siendo dueño
+// del roster y del flag es_titular; xi se construye aparte con --build-xi y es
+// inmune al re-scrape. Devuelve { changed, dryRun }.
+export async function updateSquadXi(iso3, xiArray, { dryRun = false } = {}) {
+  if (dryRun) return { changed: true, dryRun: true };
+  const supa = getClient();
+  const { error } = await supa
+    .from('squads')
+    .update({ xi: xiArray, updated_at: new Date().toISOString() })
+    .eq('iso3', iso3);
+  if (error) throw error;
+  return { changed: true, dryRun: false };
 }
 
 // Comparación deep-equal de arrays jugadores (orden + valores).

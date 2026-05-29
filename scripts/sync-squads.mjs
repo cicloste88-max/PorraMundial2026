@@ -28,12 +28,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { scrapeCountry } from './lib/ff-scraper.mjs';
+import { scrapeCountry, fetchStartingXISlots } from './lib/ff-scraper.mjs';
 import { fetchTmKader, enrichRosterWithTm } from './lib/tm-scraper.mjs';
 import { fetchAllPages } from './lib/tm-worldcup-market-values.mjs';
 import { applyEnrich } from './lib/enrich-merge.mjs';
 import { uploadPlayerPhoto } from './lib/storage-upload.mjs';
-import { getSquadRow, listAllSquads, upsertSquad } from './lib/squads-db.mjs';
+import { getSquadRow, listAllSquads, upsertSquad, updateSquadXi } from './lib/squads-db.mjs';
+import { buildXi } from './lib/xi-slot-map.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
 import * as parserOlympics from './lib/parsers/olympics.mjs';
@@ -53,6 +54,9 @@ const TM_IDS = JSON.parse(
 );
 const COUNTRY_MAP = JSON.parse(
   await fs.readFile(path.join(__dirname, 'lib', 'parsers', 'country-map.json'), 'utf8')
+);
+const FORMATION_COORDS = JSON.parse(
+  await fs.readFile(path.join(__dirname, 'lib', 'formation-coords.json'), 'utf8')
 );
 
 // ─── argv parsing ─────────────────────────────────────────────────────────
@@ -80,6 +84,10 @@ const FORCE = !!argv.force;
 // para preservar el pin manual). One-time: re-siembra el XI borrado por detects
 // previos. NO toca xi_pinned/xi_pinned_at — el pin sigue activo.
 const RESEED_XI = !!argv['reseed-xi'];
+// --build-xi (Sprint A2 FIX C): tras detect, construye squads.xi (XI ordenado
+// por slot, con foto) desde el once-tipo FF + roster. One-time/idempotente; el
+// cron 6h sin este flag NO toca squads.xi.
+const BUILD_XI = !!argv['build-xi'];
 const DELAY = parseInt(argv.delay || '0', 10);
 const SKIP = new Set(
   String(argv.skip || '')
@@ -101,6 +109,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=detect --iso3=FRA,JPN
   node scripts/sync-squads.mjs --mode=detect --no-enrich-xi
   node scripts/sync-squads.mjs --mode=detect --reseed-xi --iso3=ESP  (re-marca XI en pineados)
+  node scripts/sync-squads.mjs --mode=detect --build-xi --iso3=JPN   (construye squads.xi Pizarra)
   node scripts/sync-squads.mjs --mode=scrape --iso3=FRA      [LEGACY]
   node scripts/sync-squads.mjs --mode=scrape --refresh-final [LEGACY]
   node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA   [LEGACY 1-país]
@@ -109,7 +118,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --iso3=FRA,QAT
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --full           (forzar fase B siempre)
 
-Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi
+Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi --build-xi
 `);
 }
 
@@ -560,7 +569,76 @@ async function runDetect(targetsArg) {
     }
   }
 
+  if (BUILD_XI) {
+    await buildXiForTargets(targetsArg);
+  }
+
   return results;
+}
+
+// ─── build-xi: construye squads.xi (Pizarra) desde el once-tipo FF ──────────
+// Sprint A2 FIX C. Targets = --iso3 si se pasó, si no todas las pineadas.
+// Lee el once-tipo del cache Scrapling (poblado por fetch_sources.py en detect),
+// lo mapea a slots por coordenadas y matchea contra el roster con desempate por
+// bucket. Escribe SOLO squads.xi (updateSquadXi) — no toca jugadores/es_titular.
+async function buildXiForTargets(targetsArg) {
+  const all = await listAllSquads();
+  const wanted = targetsArg && targetsArg.length > 0 ? new Set(targetsArg) : null;
+  const rows = wanted
+    ? all.filter((r) => wanted.has(r.iso3))
+    : all.filter((r) => r.xi_pinned === true);
+
+  // Alias dict (Capa B) — mismo patrón lazy que enrich-xi.
+  let aliases = null;
+  try {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, resolve } = await import('node:path');
+    const __d = dirname(fileURLToPath(import.meta.url));
+    aliases = JSON.parse(readFileSync(resolve(__d, 'lib/name-aliases.json'), 'utf-8'));
+  } catch (e) {
+    if (VERBOSE) console.log(`  ! name-aliases.json no cargado: ${e.message.slice(0, 60)}`);
+  }
+
+  console.log(`\n  Paso build-xi — ${rows.length} selección(es)  dry=${DRY_RUN}\n`);
+  for (const row of rows) {
+    const iso3 = row.iso3;
+    if (SKIP.has(iso3)) continue;
+    const slug = ISO3_TO_SLUG[iso3];
+    if (!slug) {
+      console.log(`    ${iso3} — sin slug FF, skip`);
+      continue;
+    }
+    if (!Array.isArray(row.jugadores) || row.jugadores.length === 0) {
+      console.log(`    ${iso3} — sin roster, skip`);
+      continue;
+    }
+    const formacion = row.formacion || '4-3-3';
+    const coords = FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
+    try {
+      const ffSlots = await fetchStartingXISlots(slug, { iso3, verbose: VERBOSE });
+      if (ffSlots.length === 0) {
+        console.log(`    ${iso3} — FF sin once-tipo, skip (xi sin tocar)`);
+        continue;
+      }
+      const { xi, warnings, stats } = buildXi({
+        ffSlots,
+        formacion,
+        coords,
+        roster: row.jugadores,
+        iso3,
+        aliases,
+      });
+      if (!DRY_RUN) await updateSquadXi(iso3, xi, { dryRun: false });
+      console.log(
+        `    ${iso3.padEnd(4)} (${formacion.padEnd(7)}) — xi ${stats.matched}/11 match, ${stats.conFoto} foto, maxDist=${stats.maxDist}${DRY_RUN ? ' [dry-run]' : ''}`,
+      );
+      if (VERBOSE && warnings.length) warnings.forEach((w) => console.log(`      ! ${w}`));
+      await sleep(1500);
+    } catch (err) {
+      console.warn(`    ${iso3} — build-xi falló: ${err.message.slice(0, 80)}`);
+    }
+  }
 }
 
 // ─── modo enrich-tm-mw ────────────────────────────────────────────────────
