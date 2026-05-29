@@ -5,11 +5,11 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `2a71da7` (PR #112, 28-may). **Sprint Combos & Awards CERRADO** (F1+F2+F3 #111 + F4 v2 #112): picker scorer dinámico grupos+KO desde `squads.jugadores`, keys awards unificadas (`Mbappe`), action `update_ia_scorers` (`porra-ia-compute` v14 — backfill bot Zayu 395 scorers; 125 NULL en países sin `xi_pinned`), sección "Tus goleadores" top-3 en picker golden_boot (RPC `get_user_top_scorers`). Previo: squads-pipeline #105-109 — **33/48 a 11/11** via `xi_pinned`, 12 sin lista FF. Cron `cerrar-porras-mundial-2026` activo (jobid 23, 10-jun 21:59 UTC).
+Main HEAD `8119be4` (28-may). **Squads XI+Enrich pipeline EN PR** (`fix/squads-xi-enrich-pipeline`): PL-1 cron usa `enrich-tm-mw` (no depende de `tm-ids.json`; el legacy saltaba selecciones sin tm_id). PL-3 `mergeJugadores` preserva `es_titular` (match `tm_player_id`→nombre) + flag `--reseed-xi` re-marca XI en pineados. Previo: **Sprint Combos & Awards CERRADO** (#111+#112); Squads #105-109 **33/48 a 11/11**. Cron `cerrar-porras-mundial-2026` activo (jobid 23).
 
 ## Top-3 pendientes inmediatos
 
-1. **Sprint Reglamento FIFA** (3 commits): aplicar Art13 head-to-head + Art16 a scoring engine + `v3ComputeStandings`. Refuerzo briefing UX. Placeholder `docs/REGLAMENTO_FIFA_2026.md` reservado; brief específico cuando San active.
+1. **Backfill squads PL-1/PL-3** (tras merge PR `fix/squads-xi-enrich-pipeline`, San vía Actions): `enrich-tm-mw` 7 naciones + `detect reseed_xi=true` 33 pineadas + `detect iso3=ESP` durabilidad. Runbook + tests SQL en el PR.
 2. **Operacional pre-launch 11-jun** (14 días vista): activar `pg_cron update-results`, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked). Squads pipeline ya estabilizado tras #109.
 3. **Pizarra Táctica apellidos invisibles iPhone real**: ver Bugs UI #5 abajo.
 
@@ -30,6 +30,7 @@ Main HEAD `2a71da7` (PR #112, 28-may). **Sprint Combos & Awards CERRADO** (F1+F2
 
 1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
+3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 

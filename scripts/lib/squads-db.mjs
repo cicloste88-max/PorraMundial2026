@@ -5,11 +5,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalize as normalizeName } from './name-matcher.mjs';
 
-// Campos enrich que se preservan al hacer merge contra la fila previa.
-// Si el array nuevo no aporta valor (null/undefined) para uno de estos, se
-// hereda del jugador previo con mismo nombre normalizado. Si lo aporta,
-// el nuevo gana. Cierra la regresión 19-may donde `--mode=detect` pisaba
-// el enrich TM (fotos Storage, tm_player_id, edad, valor_eur, dorsal).
+// Campos que se preservan al hacer merge contra la fila previa con semántica
+// FILL-IF-NULL: si el array nuevo no aporta valor (null/undefined) para uno de
+// estos, se hereda del jugador previo correspondiente; si lo aporta, el nuevo
+// gana. Cierra dos regresiones:
+//  - Enrich TM (19-may): `--mode=detect` pisaba fotos Storage, tm_player_id,
+//    edad, valor_eur, dorsal, dob, posicion_tm.
+//  - es_titular (PL-3): cada detect reconstruía el roster y, al NO preservar
+//    es_titular, borraba el XI pineado. Los 33 squads pineados caían a 0
+//    titulares y get-squad/extractXI devolvía 11 placeholders '—' (Pizarra
+//    vacía). es_titular es boolean: el `undefined` del path detect (los parsers
+//    primarios no emiten el flag) hereda el pin; el `true`/`false` EXPLÍCITO de
+//    enrich-xi / refresh-final / reseed-xi pisa al previo (re-marcado del XI).
 const ENRICH_FIELDS = [
   'tm_player_id',
   'foto_url',
@@ -19,11 +26,14 @@ const ENRICH_FIELDS = [
   'dob',
   'posicion_tm',
 ];
+const PRESERVE_FIELDS = [...ENRICH_FIELDS, 'es_titular'];
 
 /**
  * Merge de jugadores nuevos vs previos:
- *  - Para cada jugador nuevo, busca match por nombre normalizado en el array previo.
- *  - Si hay match, preserva campos enrich del previo cuando el nuevo no los aporta.
+ *  - Para cada jugador nuevo, localiza su previo por tm_player_id (autoritativo)
+ *    y, en su defecto, por nombre normalizado (name-matcher.mjs).
+ *  - Si hay match, preserva PRESERVE_FIELDS (enrich + es_titular) del previo
+ *    cuando el nuevo no los aporta (fill-if-null).
  *  - Jugadores nuevos sin match en previo entran tal cual.
  *  - Jugadores previos sin match en nuevos DESAPARECEN (correcto: convocatoria cambió).
  */
@@ -31,16 +41,20 @@ export function mergeJugadores(beforePlayers, newPlayers) {
   if (!Array.isArray(beforePlayers) || beforePlayers.length === 0) return newPlayers;
   if (!Array.isArray(newPlayers)) return newPlayers;
 
+  const beforeById = new Map();
   const beforeByName = new Map();
   for (const p of beforePlayers) {
+    if (p?.tm_player_id != null) beforeById.set(p.tm_player_id, p);
     if (p?.nombre) beforeByName.set(normalizeName(p.nombre), p);
   }
 
   return newPlayers.map((np) => {
-    const prev = beforeByName.get(normalizeName(np?.nombre || ''));
+    const prev =
+      (np?.tm_player_id != null ? beforeById.get(np.tm_player_id) : undefined) ||
+      beforeByName.get(normalizeName(np?.nombre || ''));
     if (!prev) return np;
     const merged = { ...np };
-    for (const field of ENRICH_FIELDS) {
+    for (const field of PRESERVE_FIELDS) {
       if (merged[field] == null && prev[field] != null) {
         merged[field] = prev[field];
       }
