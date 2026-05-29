@@ -219,6 +219,20 @@ export function parseStartingXISlotsFromHtml(html) {
     const classes = $el.attr('class') || '';
     if (/\bsupl-\d+\b/.test(classes)) return;
 
+    // Coordenadas de pista del once-tipo (data-onceff-x/y, ej. "23%"). FF las
+    // expone en porcentaje con el mismo convenio que FORMATION_COORDS del front
+    // (y alto = portería propia: portero ~87%, x=50 centro). Imprescindibles
+    // para remapear el orden DOM (que NO es orden de slot — el portero aparece
+    // primero en JPN y último en ESP) a índice de slot vía asignación geométrica
+    // en --build-xi. parseFloat tolera "23%"/"23"/null.
+    const parsePct = (v) => {
+      const n = parseFloat(String(v ?? '').replace('%', ''));
+      return Number.isFinite(n) ? n : null;
+    };
+    const x = parsePct($el.attr('data-onceff-x'));
+    const y = parsePct($el.attr('data-onceff-y'));
+    const isGK = /\bportero\b/.test(classes);
+
     // TITULAR — orden de preferencia:
     //   1) img[alt] non-empty: nombre completo "Nico Williams" (vs truncado
     //      "N. Williams" del juggador.pos-0). Validado en HTML real ESP/JPN.
@@ -251,7 +265,9 @@ export function parseStartingXISlotsFromHtml(html) {
     const alternativa = juggadorText($el, 'pos-1') || null;
 
     if (titular) {
-      slots.push(alternativa ? { titular, alternativa } : { titular });
+      const slot = { titular, x, y, isGK };
+      if (alternativa) slot.alternativa = alternativa;
+      slots.push(slot);
     }
   });
 
@@ -292,6 +308,15 @@ async function getFFLineupHtml(slug, { iso3, verbose = false } = {}) {
     }
   }
   return await fetchText(`${FF_BASE}/equipos/${slug}`, { verbose });
+}
+
+// Devuelve sólo los slots del once-tipo (titular + alternativa? + x/y/isGK) sin
+// tocar roster ni matching. Lee del cache Scrapling (ff-<iso3>.html) si iso3
+// está disponible, fallback fetch live. Usado por --build-xi para construir
+// squads.xi con coordenadas sin re-ejecutar el pipeline completo de scrapeCountry.
+export async function fetchStartingXISlots(slug, { iso3 = null, verbose = false } = {}) {
+  const html = await getFFLineupHtml(slug, { iso3, verbose });
+  return parseStartingXISlotsFromHtml(html);
 }
 
 // Pipeline completo para un país: detecta lista, parsea roster, parsea XI, cruza.

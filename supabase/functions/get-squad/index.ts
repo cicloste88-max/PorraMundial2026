@@ -1,4 +1,15 @@
-// supabase/functions/get-squad/index.ts — v7.1
+// supabase/functions/get-squad/index.ts — v7.2
+// Cambios v7.1 → v7.2 (Sprint A2 FIX C, Pizarra XI real, 29-may):
+//   1. XIPlayer += foto_url + tm_player_id (el front Pizarra ya puede pintar
+//      la foto circular del jugador; antes nunca llegaba foto al XI).
+//   2. Nueva fuente autoritativa squads.xi (jsonb, 11 entradas ordenadas por
+//      slot, construidas por sync-squads --build-xi). Si data.xi es un array de
+//      11 → se mapea directamente (resuelve homónimos y el caso 9-10 titulares
+//      que caía a placeholders). Si no → extractXI(jugadores) como antes, ahora
+//      con foto_url poblada desde el propio jugador (renderXIRow). emptyXI sigue
+//      como último fallback.
+//
+// --- v7.1 (anterior) ---
 // Cambios v6 → v7 (Pieza D del sprint 20-may, schema canónico squads.jugadores):
 //   1. PlantillaPlayer alineado al schema canónico: posicion (bucket) +
 //      posicion_tm (específica TM, ej. 'Lateral derecho') + valor_eur
@@ -55,6 +66,8 @@ type XIPlayer = {
   nombre: string
   posicion: string            // código corto de formación (PO/LD/DFC/...)
   posicion_label: string | null  // específica TM ('Lateral derecho') si disponible, null si no
+  foto_url: string | null     // v7.2: foto circular del jugador en la Pizarra
+  tm_player_id: number | null // v7.2: para lookup/badge-fallback en el front
 }
 type PlantillaPlayer = {
   nombre: string
@@ -89,7 +102,28 @@ const POS_BY_FORMATION: Record<string, string[]> = {
 
 function emptyXI(formacion: string): XIPlayer[] {
   const positions = POS_BY_FORMATION[formacion] || POS_BY_FORMATION['4-3-3']
-  return positions.map((pos, i) => ({ dorsal: i + 1, nombre: '—', posicion: pos, posicion_label: null }))
+  return positions.map((pos, i) => ({
+    dorsal: i + 1, nombre: '—', posicion: pos, posicion_label: null, foto_url: null, tm_player_id: null,
+  }))
+}
+
+/**
+ * v7.2 — mapea la columna autoritativa squads.xi (array de 11 entradas
+ * {slot,pos,nombre,dorsal,foto_url,tm_player_id,posicion_label}, ya ordenadas
+ * por slot) a XIPlayer[]. El llamador valida length===11 antes de invocar.
+ */
+function xiFromColumn(xiArr: unknown[]): XIPlayer[] {
+  return xiArr.map((raw, i) => {
+    const j = (raw ?? {}) as Record<string, unknown>
+    return {
+      dorsal: typeof j.dorsal === 'number' ? j.dorsal : (i + 1),
+      nombre: typeof j.nombre === 'string' && j.nombre.length > 0 ? j.nombre : '—',
+      posicion: typeof j.pos === 'string' && j.pos.length > 0 ? j.pos : 'MC',
+      posicion_label: typeof j.posicion_label === 'string' ? j.posicion_label : null,
+      foto_url: typeof j.foto_url === 'string' ? j.foto_url : null,
+      tm_player_id: typeof j.tm_player_id === 'number' ? j.tm_player_id : null,
+    }
+  })
 }
 
 /**
@@ -117,6 +151,10 @@ function renderXIRow(
     nombre: typeof j.nombre === 'string' && j.nombre.length > 0 ? j.nombre : '—',
     posicion: fallbackPos,                    // SIEMPRE código corto (PO/LD/DFC/...)
     posicion_label: posTm || posBucket || null, // específica TM o bucket como info adicional
+    // v7.2: el jugador del roster ya trae foto/tm (enrich TM) → el fallback
+    // extractXI también pinta foto sin lookup extra.
+    foto_url: typeof j.foto_url === 'string' ? j.foto_url : null,
+    tm_player_id: typeof j.tm_player_id === 'number' ? j.tm_player_id : null,
   }
 }
 
@@ -214,7 +252,12 @@ Deno.serve(async (req) => {
     }
 
     const formacion = data.formacion || '4-3-3'
-    const xi = extractXI(data.jugadores, formacion)
+    // v7.2: squads.xi (construida por --build-xi) es la fuente autoritativa del
+    // XI para la Pizarra; si está completa (11) se usa, si no se deriva de
+    // es_titular como antes (ahora con foto vía renderXIRow).
+    const xi = (Array.isArray(data.xi) && data.xi.length === 11)
+      ? xiFromColumn(data.xi)
+      : extractXI(data.jugadores, formacion)
     const plantilla = buildPlantilla(data.jugadores)
 
     const badgeSlug = BADGE_SLUGS[data.iso3]

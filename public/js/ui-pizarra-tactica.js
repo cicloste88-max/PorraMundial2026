@@ -53,78 +53,78 @@
   // x=0 izquierda, x=100 derecha (desde nuestra perspectiva atacando hacia arriba).
   const FORMATION_COORDS = {
     '4-3-3': [
-      [50, 86], // PO
+      [50, 90], // PO
       [82, 75], [62, 76], [38, 76], [18, 75], // 4 def
       [68, 56], [50, 54], [32, 56],            // 3 mc
       [78, 28], [50, 18], [22, 28],            // 3 del (ED, DC, EI)
     ],
     '4-4-2': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [82, 50], [62, 52], [38, 52], [18, 50],
       [60, 22], [40, 22],
     ],
     '4-2-3-1': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [62, 60], [38, 60],                       // doble pivote
       [78, 38], [50, 36], [22, 38],             // 3 mco
       [50, 18],                                 // dc único
     ],
     '3-5-2': [
-      [50, 86],
-      [70, 76], [50, 78], [30, 76],             // 3 cb
+      [50, 90],
+      [70, 76], [50, 72], [30, 76],             // 3 cb
       [88, 56], [62, 54], [50, 60], [38, 54], [12, 56], // 5 mp
       [60, 22], [40, 22],
     ],
     '5-3-2': [
-      [50, 86],
-      [82, 78], [62, 76], [50, 80], [38, 76], [18, 78], // 5 def
+      [50, 90],
+      [82, 78], [62, 76], [50, 74], [38, 76], [18, 78], // 5 def
       [68, 56], [50, 54], [32, 56],
       [60, 22], [40, 22],
     ],
     '4-1-4-1': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [50, 64],                                 // pivote
       [82, 46], [60, 44], [40, 44], [18, 46],
       [50, 22],
     ],
     '4-3-2-1': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [70, 58], [50, 56], [30, 58],
       [62, 38], [38, 38],
       [50, 18],
     ],
     '3-4-3': [
-      [50, 86],
-      [70, 76], [50, 78], [30, 76],
+      [50, 90],
+      [70, 76], [50, 72], [30, 76],
       [82, 56], [62, 54], [38, 54], [18, 56],
       [78, 28], [50, 18], [22, 28],
     ],
     '5-4-1': [
-      [50, 86],
-      [82, 78], [62, 76], [50, 80], [38, 76], [18, 78],
+      [50, 90],
+      [82, 78], [62, 76], [50, 74], [38, 76], [18, 78],
       [82, 52], [62, 50], [38, 50], [18, 52],
       [50, 22],
     ],
     '4-4-1-1': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [82, 50], [62, 52], [38, 52], [18, 50],
       [50, 32],                                 // mediapunta
       [50, 18],
     ],
     '3-4-2-1': [
-      [50, 86],
-      [70, 76], [50, 78], [30, 76],
+      [50, 90],
+      [70, 76], [50, 72], [30, 76],
       [82, 56], [62, 54], [38, 54], [18, 56],
       [62, 36], [38, 36],
       [50, 18],
     ],
     '4-1-3-2': [
-      [50, 86],
+      [50, 90],
       [82, 75], [62, 76], [38, 76], [18, 75],
       [50, 64],
       [70, 44], [50, 42], [30, 44],
@@ -269,12 +269,29 @@
         apellidoHtml = '<span class="fc-pizarra-token-surname">' + surname + '</span>';
       }
 
+      // A2 FIX C: foto circular si get-squad v7.2 la entrega (squads.xi / roster).
+      const hasPhoto = !isPlaceholder && !!j.foto_url;
+      // Dorsal: badge sobre la foto / número centrado sin foto. Omitir si null.
+      const dorsalHtml = (j.dorsal != null && j.dorsal !== '')
+        ? '<span class="fc-pizarra-token-num">' + j.dorsal + '</span>'
+        : '';
+      // Badge-with-flag-fallback: si la foto falla, onerror quita --photo
+      // (revela ficha de color + dorsal centrado como antes) y elimina el img.
+      const photoHtml = hasPhoto
+        ? '<img class="fc-pizarra-token-photo" src="' + j.foto_url + '" alt="" loading="lazy" ' +
+          'onerror="var t=this.closest(\'.fc-pizarra-token\');if(t)t.classList.remove(\'fc-pizarra-token--photo\');this.remove();">'
+        : '';
+      const tokenCls = 'fc-pizarra-token' +
+        (hasPhoto ? ' fc-pizarra-token--photo' : '') +
+        (isGK ? ' fc-pizarra-token--gk' : '');
+
       tokensHtml +=
-        '<div class="fc-pizarra-token" ' +
+        '<div class="' + tokenCls + '" ' +
           'style="left:' + c[0] + '%;top:' + c[1] + '%;' +
                  'background:' + bg + ';color:' + textColor + ';' +
                  'border-color:' + borderColor + '">' +
-          '<span class="fc-pizarra-token-num">' + j.dorsal + '</span>' +
+          photoHtml +
+          dorsalHtml +
           '<span class="fc-pizarra-token-name">' + j.posicion + '</span>' +
           apellidoHtml +
         '</div>';

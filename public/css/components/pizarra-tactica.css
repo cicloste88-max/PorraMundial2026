@@ -238,6 +238,58 @@
   pointer-events: none;
 }
 
+/* ─── A2 FIX C: token con foto del jugador ───────────────────────────── */
+/* Foto circular que rellena el token (object-fit cover). La ficha de color
+   sigue debajo: si la imagen falla, onerror quita .fc-pizarra-token--photo y
+   reaparece el dorsal centrado sobre el color (badge-with-flag-fallback). */
+.fc-pizarra-token-photo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* GK conserva color: la foto se mete 2.5px y el fondo (color_portero) asoma
+   como anillo alrededor de la foto. */
+.fc-pizarra-token--gk .fc-pizarra-token-photo {
+  top: 2.5px;
+  left: 2.5px;
+  width: calc(100% - 5px);
+  height: calc(100% - 5px);
+}
+
+/* Con foto, el dorsal pasa de número centrado a badge en esquina inferior. */
+.fc-pizarra-token--photo .fc-pizarra-token-num {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  z-index: 2;
+}
+
+/* Con foto, el código de posición se minimiza (la foto + apellido mandan). */
+.fc-pizarra-token--photo .fc-pizarra-token-name {
+  font-size: 8px;
+  opacity: 0.85;
+}
+
 /* ─── Footer stats ───────────────────────────────────────────────────── */
 .fc-pizarra-stats {
   display: flex;
