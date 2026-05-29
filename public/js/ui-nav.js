@@ -663,11 +663,11 @@ function initWelcome() {
 // DOMContentLoaded movido al bloque de auth (después del CDN)
 
 
-// Polish v1 B4: parámetro opcional `suggestion` ({ key, count }) para destacar
-// un jugador con badge "💡 Sugerido — N goles previstos" (usado por openPicker
-// para golden_boot via _v3SuggestGoldenBoot). Sin sugerencia, comportamiento
-// idéntico al previo (compatible).
-function renderPickerList(list, selected, suggestion) {
+// Lista de candidatos agrupada por selección, secciones colapsables. La
+// sugerencia de Bota de Oro ya NO se pinta aquí: el rediseño PR #112 la movió a
+// la sección "Tus goleadores" al inicio del scroll (ver openPicker +
+// _buildTopScorersHtml en scoring.js).
+function renderPickerList(list, selected) {
   const scroll = document.getElementById('picker-scroll');
   const byTeam = {};
   const flagByTeam = {};
@@ -676,26 +676,17 @@ function renderPickerList(list, selected, suggestion) {
     byTeam[p.teamName].push(p);
     if (!flagByTeam[p.teamName]) flagByTeam[p.teamName] = p.flag;
   });
-  // F-03: secciones colapsables selección→jugadores. Si hay pick previo o
-  // sugerencia en una selección, esa queda expandida por defecto; el resto
-  // colapsado.
+  // F-03: secciones colapsables selección→jugadores. Si hay pick previo en una
+  // selección, esa queda expandida por defecto; el resto colapsado.
   const selectedTeam = selected ? selected.teamName : null;
-  const suggestionTeam = suggestion
-    ? (list.find(p => p.key === suggestion.key) || {}).teamName
-    : null;
   scroll.innerHTML = Object.entries(byTeam).map(([teamName, players]) => {
-    const expanded = (teamName === selectedTeam) || (teamName === suggestionTeam);
+    const expanded = (teamName === selectedTeam);
     const flag = flagByTeam[teamName];
     const rows = players.map(p => {
       const isActive = selected && selected.key === p.key ? 'active' : '';
-      const isSuggested = suggestion && suggestion.key === p.key;
-      // F4: badge dorado "tu goleador" sobre el líder de scorers del usuario.
-      const badge = isSuggested
-        ? `<span class="aw-suggestion-badge">tu goleador</span>`
-        : '';
-      return `<div class="aw-player-row ${isActive} ${isSuggested ? 'is-suggested' : ''}" onclick="selectAward('${p.key}')">
+      return `<div class="aw-player-row ${isActive}" onclick="selectAward('${p.key}')">
         <div class="aw-player-info">
-          <div class="aw-player-pname">${p.name}${badge}</div>
+          <div class="aw-player-pname">${p.name}</div>
           <div class="aw-player-team">
             <div class="aw-player-tf"><img src="${SB}/flags/${flag}.png" alt=""/></div>
             ${teamName}

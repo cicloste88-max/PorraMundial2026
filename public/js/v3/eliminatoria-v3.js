@@ -1204,27 +1204,23 @@ function v3RenderAwardsCard() {
 }
 window.v3RenderAwardsCard = v3RenderAwardsCard;
 
-// F4 (auto-Bota de Oro) — sugerencia server-side vía RPC get_user_top_scorer.
-// Sustituye el tally client-side (Polish v1 B4): cuenta scorer en predictions
-// (grupos) + ko_predictions del usuario/liga en BD y solo sugiere si hay un
-// líder claro (n >= 3 picks Y margin >= 2 sobre el 2º). Devuelve { key, count }
-// para renderPickerList (matching + badge "tu goleador"); null si BD no
-// disponible, sin sesión/liga, o sin líder claro. Async: openPicker la await-ea.
-// Globals user/liga: currentUser.id + getActiveLeagueId() (patrón del fichero).
+// F4 (rediseño PR #112) — top 3 goleadores del usuario para la sección "Tus
+// goleadores" del picker golden_boot (sustituye el badge interno por una
+// sección destacada arriba con click-to-select). Devuelve array
+// [{scorer_key, n, rank}] (hasta 3) vía RPC get_user_top_scorers; [] si no hay
+// sesión/liga, error, o sin scorers. Sin gating de margin: el usuario decide.
+// Async: openPicker la await-ea. window._porraDb = cliente auth (RLS necesita
+// el JWT del usuario; el proxy `db` enruta al query client sin sesión).
 async function _v3SuggestGoldenBoot() {
-  if (typeof db === 'undefined' || !db) return null;
-  var uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
+  var uid = currentUser?.id;
   var leagueId = (typeof getActiveLeagueId === 'function') ? getActiveLeagueId() : null;
-  if (!uid || !leagueId) return null;
+  if (!uid || !leagueId || !window._porraDb) return [];
   try {
-    const { data, error } = await db.rpc('get_user_top_scorer', {
-      p_user_id: uid, p_league_id: leagueId
+    const { data, error } = await window._porraDb.rpc('get_user_top_scorers', {
+      p_user_id: uid, p_league_id: leagueId, p_limit: 3
     });
-    if (error || !data || !data.length) return null;
-    const row = data[0];
-    if (row.n < 3 || row.margin < 2) return null;
-    return { key: row.scorer_key, count: row.n };
-  } catch (_e) { return null; }
+    return (error || !data) ? [] : data;
+  } catch (_e) { return []; }
 }
 window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
 

@@ -1510,25 +1510,38 @@ body.fc-shell-active #page-elim > #modal {
 }
 
 /* ============================================================
-   F4 (auto-Bota de Oro) — Badge dorado "tu goleador"
-   Aplicado en .aw-player-row.is-suggested via renderPickerList
-   cuando openPicker('golden_boot') recibe sugerencia de
-   _v3SuggestGoldenBoot (RPC get_user_top_scorer, n>=3 & margin>=2).
-   Evoluciona el badge azul "Sugerido" de Polish v1 B4 → dorado.
+   F4 (rediseño PR #112) — Sección "Tus goleadores" (top 3)
+   Inyectada al inicio del picker golden_boot por openPicker +
+   _buildTopScorersHtml (scoring.js). Cada fila → selectAward
+   (selecciona + cierra picker). Sustituye el badge interno
+   "tu goleador" de la 1ª iteración F4.
    ============================================================ */
-.aw-suggestion-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, #d4a017, #f5c842);
-  color: #1a1a1a;
-  font-size: 10px;
+.aw-top-scorers {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(212, 160, 23, 0.08), rgba(245, 200, 66, 0.08));
+  border-left: 3px solid #d4a017;
+  margin-bottom: 10px;
+}
+.aw-top-scorers-header {
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-  letter-spacing: 0.02em;
-  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #d4a017;
+  margin-bottom: 6px;
 }
-.aw-player-row.is-suggested {
-  background: rgba(212, 160, 23, 0.08);
-  border-left: 2px solid #d4a017;
+.aw-top-scorer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin: 4px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 160, 23, 0.3);
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: background 0.15s;
 }
+.aw-top-scorer-row:hover { background: rgba(212, 160, 23, 0.12); }
+.aw-top-scorer-count { font-weight: 700; color: #d4a017; font-size: 13px; }
+.aw-top-scorers-separator { height: 1px; background: rgba(0, 0, 0, 0.08); margin: 6px 0; }
