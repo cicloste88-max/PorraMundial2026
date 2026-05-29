@@ -1716,19 +1716,25 @@ async function openPicker(award) {
     scroll.insertAdjacentHTML('afterbegin', _buildTopScorersHtml(topScorers, candidates));
   }
 }
-// F4 (rediseño PR #112): HTML de la sección "Tus goleadores" (top 3) que se
-// inyecta al inicio del picker de golden_boot. displayName vía reverse-lookup
-// en candidates (getAwardCandidates('golden_boot') = c.name); fallback al key
-// crudo si el scorer no es candidato (huérfano de país sin xi_pinned — en ese
-// caso selectAward no lo encontrará en cache y avisará sin romper). Click →
-// selectAward(key), el mismo handler que las filas normales.
+// F4 (rediseño PR #112 + fix huérfano): HTML de la sección "Tus goleadores"
+// (top 3) inyectada al inicio del picker golden_boot. Filtra los scorers a
+// candidatos válidos de Bota (un goleador de selección fuera del top-30 Elo o
+// sin bucket ofensivo no es seleccionable, y clicarlo no haría nada) y recorta
+// a 3 — la RPC pide top 5 para tener margen. Si no queda ninguno válido,
+// devuelve '' (sin sección). displayName = c.name del candidato. Click →
+// selectAward(key) (selecciona + cierra picker), igual que las filas normales.
 function _buildTopScorersHtml(topScorers, candidates) {
   const nameByKey = {};
-  (candidates || []).forEach(c => { nameByKey[c.key] = c.name; });
+  const candidateKeys = new Set();
+  (candidates || []).forEach(c => { nameByKey[c.key] = c.name; candidateKeys.add(c.key); });
+  const filteredTop = (topScorers || [])
+    .filter(t => candidateKeys.has(t.scorer_key))
+    .slice(0, 3);
+  if (!filteredTop.length) return '';
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const escAttr = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const rows = topScorers.map((t) => {
+  const rows = filteredTop.map((t) => {
     const display = nameByKey[t.scorer_key] || t.scorer_key;
     const goles = t.n + (t.n === 1 ? ' gol' : ' goles');
     return `<div class="aw-top-scorer-row" onclick="selectAward('${escAttr(t.scorer_key)}')">

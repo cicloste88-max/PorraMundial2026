@@ -1207,8 +1207,9 @@ window.v3RenderAwardsCard = v3RenderAwardsCard;
 // F4 (rediseño PR #112) — top 3 goleadores del usuario para la sección "Tus
 // goleadores" del picker golden_boot (sustituye el badge interno por una
 // sección destacada arriba con click-to-select). Devuelve array
-// [{scorer_key, n, rank}] (hasta 3) vía RPC get_user_top_scorers; [] si no hay
-// sesión/liga, error, o sin scorers. Sin gating de margin: el usuario decide.
+// [{scorer_key, n, rank}] (top 5, con margen). El render (_buildTopScorersHtml)
+// filtra a candidatos válidos de Bota y recorta a 3. [] si no hay sesión/liga,
+// error, o sin scorers. Sin gating de margin: el usuario decide.
 // Async: openPicker la await-ea. window._porraDb = cliente auth (RLS necesita
 // el JWT del usuario; el proxy `db` enruta al query client sin sesión).
 async function _v3SuggestGoldenBoot() {
@@ -1217,7 +1218,7 @@ async function _v3SuggestGoldenBoot() {
   if (!uid || !leagueId || !window._porraDb) return [];
   try {
     const { data, error } = await window._porraDb.rpc('get_user_top_scorers', {
-      p_user_id: uid, p_league_id: leagueId, p_limit: 3
+      p_user_id: uid, p_league_id: leagueId, p_limit: 5
     });
     return (error || !data) ? [] : data;
   } catch (_e) { return []; }
