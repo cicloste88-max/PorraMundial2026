@@ -1514,28 +1514,29 @@ body.fc-shell-active #page-elim > #modal {
    Inyectada al inicio del picker golden_boot por openPicker +
    _buildTopScorersHtml (scoring.js). Cada fila → selectAward
    (selecciona + cierra picker). Sustituye el badge interno
-   "tu goleador" de la 1ª iteración F4.
+   "tu goleador" de la 1ª iteración F4. Valores compactos validados en
+   smoke en vivo (San).
    ============================================================ */
 .aw-top-scorers {
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, rgba(212, 160, 23, 0.08), rgba(245, 200, 66, 0.08));
   border-left: 3px solid #d4a017;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .aw-top-scorers-header {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #d4a017;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .aw-top-scorer-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
-  margin: 4px 0;
+  padding: 5px 9px;
+  margin: 3px 0;
   border-radius: 6px;
   border: 1px solid rgba(212, 160, 23, 0.3);
   background: rgba(0, 0, 0, 0.02);
@@ -1543,5 +1544,6 @@ body.fc-shell-active #page-elim > #modal {
   transition: background 0.15s;
 }
 .aw-top-scorer-row:hover { background: rgba(212, 160, 23, 0.12); }
-.aw-top-scorer-count { font-weight: 700; color: #d4a017; font-size: 13px; }
-.aw-top-scorers-separator { height: 1px; background: rgba(0, 0, 0, 0.08); margin: 6px 0; }
+.aw-top-scorer-name { font-size: 13px; }
+.aw-top-scorer-count { font-weight: 700; color: #d4a017; font-size: 11px; }
+.aw-top-scorers-separator { height: 1px; background: rgba(0, 0, 0, 0.08); margin: 4px 0; }
