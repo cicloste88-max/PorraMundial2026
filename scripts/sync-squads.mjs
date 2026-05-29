@@ -75,6 +75,11 @@ const MODE = argv.mode;
 const VERBOSE = !!argv.verbose;
 const DRY_RUN = !!argv['dry-run'];
 const FORCE = !!argv.force;
+// --reseed-xi (PL-3 backfill): en detect, fuerza el re-marcado de es_titular vía
+// FF también en squads pineados (que por defecto se saltan en el paso enrich-xi
+// para preservar el pin manual). One-time: re-siembra el XI borrado por detects
+// previos. NO toca xi_pinned/xi_pinned_at — el pin sigue activo.
+const RESEED_XI = !!argv['reseed-xi'];
 const DELAY = parseInt(argv.delay || '0', 10);
 const SKIP = new Set(
   String(argv.skip || '')
@@ -95,6 +100,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=detect                 (cron por defecto desde 18-may-2026)
   node scripts/sync-squads.mjs --mode=detect --iso3=FRA,JPN
   node scripts/sync-squads.mjs --mode=detect --no-enrich-xi
+  node scripts/sync-squads.mjs --mode=detect --reseed-xi --iso3=ESP  (re-marca XI en pineados)
   node scripts/sync-squads.mjs --mode=scrape --iso3=FRA      [LEGACY]
   node scripts/sync-squads.mjs --mode=scrape --refresh-final [LEGACY]
   node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA   [LEGACY 1-país]
@@ -103,7 +109,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --iso3=FRA,QAT
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --full           (forzar fase B siempre)
 
-Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full
+Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi
 `);
 }
 
@@ -505,9 +511,15 @@ async function runDetect(targetsArg) {
         // es_titular (preserva trabajo manual). El roster (jugadores) sigue
         // mutable por detect/enrich-tm vía preserveEnrichment — sólo el flag
         // es_titular se congela.
-        if (row.xi_pinned === true) {
+        // --reseed-xi (PL-3 backfill): bypassa el skip para RE-sembrar el XI
+        // que los detects previos borraban (antes del FIX A en mergeJugadores).
+        // NO altera xi_pinned/xi_pinned_at — sólo repuebla es_titular vía FF.
+        if (row.xi_pinned === true && !RESEED_XI) {
           if (VERBOSE) console.log(`    ${r.iso3} — xi_pinned=true, salto enrich-XI`);
           continue;
+        }
+        if (row.xi_pinned === true && RESEED_XI && VERBOSE) {
+          console.log(`    ${r.iso3} — xi_pinned=true, --reseed-xi: re-marcando XI`);
         }
         const scrape = await scrapeCountry(slug, {
           verbose: VERBOSE,

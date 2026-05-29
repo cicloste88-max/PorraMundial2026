@@ -3,7 +3,11 @@ name: Sync Squads
 on:
   schedule:
     # Cada 6h UTC: detecta nuevas listas FINAL vía AS+Sport+Olympics (--mode=detect)
-    # + enriquece valor/edad vía Transfermarkt (--mode=enrich-tm) en pasada serial.
+    # + enriquece valor/edad/foto vía Transfermarkt (--mode=enrich-tm-mw) en pasada
+    # serial. enrich-tm-mw (FIWC masivo A + kader fallback B) NO depende de
+    # tm-ids.json y por eso enriquece selecciones con 0 tm_player_id desde cero
+    # (legacy enrich-tm las saltaba con 'no-tmid' — ver PL-1). Sin --full: la fase
+    # B sólo corre por país con baja cobertura, así el job entra en timeout 15m.
     # Cron de GitHub Actions puede retrasarse ~30min en horas pico (aceptable).
     - cron: '0 */6 * * *'
   workflow_dispatch:
@@ -29,6 +33,10 @@ on:
         description: '[detect only] enriquecer XI titular vía FF tras detect'
         type: boolean
         default: true
+      reseed_xi:
+        description: '[detect only] re-marcar XI vía FF también en squads pineados (PL-3 backfill one-time)'
+        type: boolean
+        default: false
       refresh_final:
         description: '[scrape only, LEGACY] aplicar --refresh-final'
         type: boolean
@@ -125,6 +133,7 @@ jobs:
           ISO3_FILTER: ${{ inputs.iso3_filter }}
           VERBOSE: ${{ inputs.verbose }}
           ENRICH_XI: ${{ inputs.enrich_xi }}
+          RESEED_XI: ${{ inputs.reseed_xi }}
           REFRESH_FINAL: ${{ inputs.refresh_final }}
           FULL: ${{ inputs.full }}
           DRY_RUN: ${{ inputs.dry_run }}
@@ -135,6 +144,7 @@ jobs:
           ISO3_FILTER="${ISO3_FILTER:-}"
           VERBOSE="${VERBOSE:-true}"
           ENRICH_XI="${ENRICH_XI:-true}"
+          RESEED_XI="${RESEED_XI:-false}"
           REFRESH_FINAL="${REFRESH_FINAL:-false}"
           FULL="${FULL:-false}"
           DRY_RUN="${DRY_RUN:-false}"
@@ -161,6 +171,9 @@ jobs:
 
           if [ "${ENRICH_XI}" != "true" ]; then
             DETECT_FLAGS="${DETECT_FLAGS} --no-enrich-xi"
+          fi
+          if [ "${RESEED_XI}" = "true" ]; then
+            DETECT_FLAGS="${DETECT_FLAGS} --reseed-xi"
           fi
           if [ "${REFRESH_FINAL}" = "true" ]; then
             SCRAPE_FLAGS="${SCRAPE_FLAGS} --refresh-final"
@@ -196,7 +209,7 @@ jobs:
           echo "  tm flags:     ${TM_FLAGS}"
           echo "  tm-mw flags:  ${TMMW_FLAGS}"
 
-      # Step principal del cron: detect primero, enrich-tm a continuación.
+      # Step principal del cron: detect primero, enrich-tm-mw a continuación.
       # En workflow_dispatch con mode != detect, el primer step se salta.
       - name: Run detect (primary sources)
         if: ${{ steps.flags.outputs.mode == 'detect' }}
@@ -206,15 +219,17 @@ jobs:
         if: ${{ steps.flags.outputs.mode == 'scrape' }}
         run: npm run sync-squads -- ${{ steps.flags.outputs.scrape }} 2>&1 | tee -a sync-squads.log
 
-      - name: Run enrich-tm
-        # Cron: corre tras detect. Manual mode=enrich-tm: corre directamente.
-        # Manual mode=scrape | enrich-tm-mw: NO corre (otro step lo hace).
-        if: ${{ steps.flags.outputs.mode == 'detect' || steps.flags.outputs.mode == 'enrich-tm' }}
+      - name: Run enrich-tm [legacy, manual only]
+        # LEGACY: ID-first sobre tm-ids.json — salta selecciones sin tm_id con
+        # 'no-tmid' (PL-1). Ya NO corre en el cron; sólo en dispatch manual
+        # explícito mode=enrich-tm. Candidato a borrar tras validar enrich-tm-mw.
+        if: ${{ steps.flags.outputs.mode == 'enrich-tm' }}
         run: npm run sync-squads -- ${{ steps.flags.outputs.tm }} 2>&1 | tee -a sync-squads.log
 
       - name: Run enrich-tm-mw
-        # Sólo en workflow_dispatch con mode=enrich-tm-mw.
-        if: ${{ steps.flags.outputs.mode == 'enrich-tm-mw' }}
+        # Cron: corre tras detect (paso de enriquecimiento por defecto desde PL-1).
+        # Manual mode=enrich-tm-mw: corre directamente.
+        if: ${{ steps.flags.outputs.mode == 'detect' || steps.flags.outputs.mode == 'enrich-tm-mw' }}
         run: npm run sync-squads -- ${{ steps.flags.outputs.tmmw }} 2>&1 | tee -a sync-squads.log
 
       - name: Upload log + calendar artifact
