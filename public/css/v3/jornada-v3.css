@@ -91,6 +91,25 @@
   letter-spacing: .04em;
 }
 
+/* ── JO-1a: header de ronda KO (sin flechas de navegación) ──
+   El header de grupos coloca <prev> · <title flex:1> · <next> con gap.
+   El KO solo tiene <title>; lo centramos con flex:1 + text-align:center
+   en el title, sin tocar el header de grupos. */
+.jv2-jornada-header--ko {
+  justify-content: center;
+}
+.jv2-jornada-header--ko .jv2-jornada-title {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+/* Tarjeta KO: sin row de boost ni "Ver tarjeta" — esqueleto puro.
+   La opacidad ligera del marcador "— : —" sugiere visualmente que el
+   slot está pendiente de datos. */
+.jv2-card--ko .jv2-score {
+  opacity: .55;
+}
+
 /* ── Bloque "Resultados · subtítulo" ──────────────────────── */
 .jv2-results-block {
   padding: 0 4px 12px;

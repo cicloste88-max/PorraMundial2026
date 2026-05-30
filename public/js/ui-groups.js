@@ -13,6 +13,140 @@ function _joParseMatchDate(s) {
   return new Date(/([Zz]|[+-]\d{2}:?\d{2})$/.test(s) ? s : s + '+02:00');
 }
 
+// JO-1a: esqueleto KO en pantalla Jornada.
+// Etiquetas cortas por ronda (P3a). El CSS .jv2-jornada-name aplica
+// text-transform:uppercase, así que basta capital case en el origen.
+var _JO_KO_SHORT = {
+  r32:   '16avos · KO',
+  r16:   'Octavos · KO',
+  qf:    'Cuartos · KO',
+  sf:    'Semifinales · KO',
+  third: '3er y 4º · KO',
+  final: 'Final · KO',
+};
+
+// Etiqueta para un slot del bracket. Si está resuelto (predicciones del
+// usuario en Fase Final → resolvedSlots), devuelve el nombre real del
+// equipo. Si no, "Por definir" (esqueleto puro — sin labels inventados
+// tipo "1º Gr.A" o "G. Partido 89", decisión de San).
+function _joKOSlotLabel(slot) {
+  if (typeof resolvedSlots === 'object' && resolvedSlots && resolvedSlots[slot]) {
+    return resolvedSlots[slot];
+  }
+  return 'Por definir';
+}
+
+// Equipo EQUIPOS{name,flag,...} para un slot resuelto. null si sin resolver
+// o no encontrado en EQUIPOS (selección no del Mundial — no debería pasar
+// pero defensive). Reutiliza getTeam() de ko.js si existe.
+function _joKOTeamFromSlot(slot) {
+  if (typeof resolvedSlots !== 'object' || !resolvedSlots) return null;
+  var name = resolvedSlots[slot];
+  if (!name) return null;
+  if (typeof getTeam === 'function') return getTeam(name);
+  if (typeof EQUIPOS === 'undefined') return null;
+  return EQUIPOS.find(function (e) { return e.name === name; }) || null;
+}
+
+// Tarjeta KO esqueleto. Misma estructura visual que _buildJCard pero sin
+// pronóstico (P1b — KO esqueleto puro), sin chips (no hay live), sin boost
+// row y sin "Ver tarjeta". Hora exacta no disponible hasta ~28-jun: solo
+// pintamos día corto. Si match.date falta, omitimos el bloque cuando-pinta.
+function _buildJKOCard(match) {
+  var hSlot = match.home, aSlot = match.away;
+  var hName = _joKOSlotLabel(hSlot);
+  var aName = _joKOSlotLabel(aSlot);
+  var hTeam = _joKOTeamFromSlot(hSlot);
+  var aTeam = _joKOTeamFromSlot(aSlot);
+
+  // Bandera rectangular del bucket miniatures (ISO2) cuando hay team.
+  // Reutilizamos ISO3_TO_ISO2 que ya está en top-level de este fichero.
+  var SB_LOCAL = (typeof SB !== 'undefined') ? SB : '';
+  var hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
+  var aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
+  var hFlagRectStyle = hIso2 ? ' style="--flag-rect-url:url(\'' + SB_LOCAL + '/miniatures/flags-sm/' + hIso2 + '.webp\')"' : '';
+  var aFlagRectStyle = aIso2 ? ' style="--flag-rect-url:url(\'' + SB_LOCAL + '/miniatures/flags-sm/' + aIso2 + '.webp\')"' : '';
+  var hFlagFallback  = hTeam ? (SB_LOCAL + '/flags/' + hTeam.flag + '.png') : '';
+  var aFlagFallback  = aTeam ? (SB_LOCAL + '/flags/' + aTeam.flag + '.png') : '';
+
+  // Card top: venue + día (formato CEST). Sin hora — no existe aún para KO.
+  var venue = match.venue || '';
+  var dayLabel = '';
+  if (match.date) {
+    var dt = _joParseMatchDate(match.date);
+    var dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+    var dayNum = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
+    var monthShort = dt.toLocaleDateString('es-ES', { month: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+    dayLabel = dayShort + ' · ' + dayNum + ' ' + monthShort;
+  }
+
+  return (
+    '<div class="jv2-card jv2-card--ko">' +
+      '<div class="jv2-card-top">' +
+        (venue ? '<div class="jv2-card-stadium">🏟️ ' + venue + '</div>' : '<div class="jv2-card-stadium"></div>') +
+        (dayLabel ? '<div class="jv2-card-when">' + dayLabel + '</div>' : '<div class="jv2-card-when"></div>') +
+      '</div>' +
+      '<div class="jv2-card-mid">' +
+        '<div class="jv2-team">' +
+          '<div class="jv2-flag"' + hFlagRectStyle + '>' +
+            (hFlagFallback ? '<img src="' + hFlagFallback + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+          '</div>' +
+          '<div class="jv2-team-code" title="' + hName + '">' + hName + '</div>' +
+        '</div>' +
+        '<div class="jv2-score">' +
+          '<span class="jv2-score-num">—</span>' +
+          '<span class="jv2-score-sep">:</span>' +
+          '<span class="jv2-score-num">—</span>' +
+        '</div>' +
+        '<div class="jv2-team">' +
+          '<div class="jv2-flag"' + aFlagRectStyle + '>' +
+            (aFlagFallback ? '<img src="' + aFlagFallback + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+          '</div>' +
+          '<div class="jv2-team-code" title="' + aName + '">' + aName + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// Sección KO completa para una ronda de ROUND_CONFIG. Devuelve string vacío
+// si BRACKET[cfg.key] no existe (defensa contra race u olvido).
+function _buildJKOSection(cfg) {
+  if (typeof BRACKET !== 'object' || !BRACKET || !Array.isArray(BRACKET[cfg.key])) return '';
+  var matches = BRACKET[cfg.key];
+  var name = _JO_KO_SHORT[cfg.key] || cfg.name || cfg.key;
+  // cfg.sub ya viene con rango fechas + n partidos ("16 partidos · 28 jun – 3 jul").
+  var sub = cfg.sub || '';
+
+  var cardsHtml = matches.map(_buildJKOCard).join('');
+
+  return (
+    '<div class="jv2-section jv2-section--ko" id="jornada-ko-' + cfg.key + '">' +
+      '<div class="jv2-jornada-header jv2-jornada-header--ko">' +
+        '<div class="jv2-jornada-title">' +
+          '<div class="jv2-jornada-name">' + name + '</div>' +
+          (sub ? '<div class="jv2-jornada-date">' + sub + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      cardsHtml +
+    '</div>'
+  );
+}
+
+// Devuelve el bloque HTML con las 6 secciones KO concatenadas. Vacío si
+// las globals de ko.js no están disponibles (defensa contra orden de carga
+// si renderVistaJornada se llamara antes de tiempo). Refresca resolvedSlots
+// antes de iterar (mismo patrón que eliminatoria-v3.js para que las cards
+// reflejen el bracket post-pronósticos sin esperar a navegar a Fase Final).
+function _buildJKOSectionsHtml() {
+  if (typeof ROUND_CONFIG !== 'object' || !Array.isArray(ROUND_CONFIG)) return '';
+  if (typeof BRACKET !== 'object' || !BRACKET) return '';
+  if (typeof resolveAllSlots === 'function') {
+    try { resolveAllSlots(); } catch (e) { console.warn('[JO-1a] resolveAllSlots:', e); }
+  }
+  return ROUND_CONFIG.map(_buildJKOSection).join('');
+}
+
 // ========== INICIALIZACIÓN ==========
   // ─────────────────────────────────────────────────────────────
   /*
@@ -373,10 +507,15 @@ function renderVistaJornada() {
       '</div>';
   });
 
+  // JO-1a: esqueleto KO (16avos → Final). 6 secciones debajo de las jornadas
+  // de grupos, mismo estilo .jv2-section + tarjetas con clases jv2-*. Lectura
+  // pura (sin pronóstico KO, sin clicks) — pronósticos viven en Fase Final.
+  var koSectionsHtml = _buildJKOSectionsHtml();
+
   // Layout: columna de jornadas + sidebar única sticky
   container.innerHTML =
     '<div class="jornada-wrap">' +
-      '<div class="jornada-main jv2-main">' + sectionsHtml + '</div>' +
+      '<div class="jornada-main jv2-main">' + sectionsHtml + koSectionsHtml + '</div>' +
       '<div class="jornada-sidebar">' + sidebarHtml + '</div>' +
     '</div>';
 
