@@ -3,6 +3,16 @@
 // renderMatchCard, openModal, updateCardUI, renderGroupTableCard, refreshGroupTables.
 // Deps: data.js, scoring.js, auth.js, leagues.js
 
+// JO-4: las fechas de PARTIDOS llegan ISO local naive ("2026-06-11T15:00:00").
+// El calendario FIFA Mundial 2026 (11 jun → 19 jul) está íntegro en CEST
+// (UTC+2). Anclamos el parse a +02:00 cuando falta TZ explícita y forzamos
+// timeZone:'Europe/Madrid' en cada toLocaleXxx para que la hora oficial
+// española se vea igual en cualquier dispositivo (Madrid, Londres, NY…).
+function _joParseMatchDate(s) {
+  if (!s) return null;
+  return new Date(/([Zz]|[+-]\d{2}:?\d{2})$/.test(s) ? s : s + '+02:00');
+}
+
 // ========== INICIALIZACIÓN ==========
   // ─────────────────────────────────────────────────────────────
   /*
@@ -111,7 +121,7 @@ function renderBoostTicker() {
   // Pastillas de jornadas pendientes (próximas, no hoy)
   const pendientesSinHoy = pendientes.filter(d => d !== today);
   pendientesSinHoy.slice(0,3).forEach(d => {
-    const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'short'});
+    const dayLabel = _joParseMatchDate(d + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'short', timeZone:'Europe/Madrid'});
     const nMatches = jornadasMap[d].length;
     html += `<button type="button" class="jv2-boost-chip is-pending" onclick="tickerExpandJornada('${d}')">🔥 ${dayLabel} (${nMatches})</button>`;
   });
@@ -151,9 +161,9 @@ window.scrollToMatchCard = scrollToMatchCard;
 function _buildMatchButtons(date, onClickFn) {
   const matchesOfDay = PARTIDOS.filter(m => m.date?.substring(0,10) === date);
   const boostedKey = boostPicks[date];
-  const hora = (m) => new Date(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const hora = (m) => _joParseMatchDate(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Madrid'});
   const jNum = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))].sort().indexOf(date) + 1;
-  const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short'});
+  const dayLabel = _joParseMatchDate(date + 'T12:00:00').toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short', timeZone:'Europe/Madrid'});
 
   const header = '<div style="width:100%;display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
     '<span style="font-size:10px;font-weight:700;color:#fb923c;background:rgba(124,45,18,.4);padding:2px 8px;border-radius:20px;border:1px solid rgba(234,88,12,.3)">J' + jNum + '</span>' +
@@ -318,9 +328,9 @@ function renderVistaJornada() {
     });
 
     // Fecha humana corta para el header (rango si la jornada cubre >1 día — aquí siempre 1 día por agrupación).
-    const dateObj = new Date(date + 'T12:00:00');
-    const dayLabel = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    const dateShort = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).toUpperCase();
+    const dateObj = _joParseMatchDate(date + 'T12:00:00');
+    const dayLabel = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' });
+    const dateShort = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' }).toUpperCase();
 
     const subTitle = matchesOfDay.length + ' partido' + (matchesOfDay.length === 1 ? '' : 's') +
                      ' · ' + finalizados.length + ' finalizado' + (finalizados.length === 1 ? '' : 's') +
@@ -442,9 +452,9 @@ function _buildJCard(m, idx, date, boostKey, live) {
   }
 
   // Hora y estadio
-  const dt = new Date(m.date);
-  const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '').toUpperCase();
+  const dt = _joParseMatchDate(m.date);
+  const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
+  const dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
   const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
 
   // Chips de acierto + pts ganados — solo si finalizado y tenemos resultado real numérico.
@@ -670,13 +680,14 @@ function _showJcardModal(matchKey, opts) {
     const stadium = match.stadium || '';
     let whenLabel = '';
     if (match.date) {
-      const d = new Date(match.date);
-      const dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
-      const day = d.getDate();
-      const monthShort = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      whenLabel = `${dow} · ${day} ${monthShort} · ${hh}:${mm}`;
+      const d = _joParseMatchDate(match.date);
+      const TZ = 'Europe/Madrid';
+      const dow = d.toLocaleDateString('es-ES', { weekday: 'short', timeZone: TZ }).toUpperCase().replace('.', '');
+      // JO-4: getDate() devuelve hora local del dispositivo; usar Intl con TZ Madrid.
+      const day = d.toLocaleDateString('es-ES', { day: 'numeric', timeZone: TZ });
+      const monthShort = d.toLocaleDateString('es-ES', { month: 'short', timeZone: TZ }).toUpperCase().replace('.', '');
+      const hhmm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TZ });
+      whenLabel = `${dow} · ${day} ${monthShort} · ${hhmm}`;
     }
 
     // Score predicho (puede estar vacío si el usuario no guardó nada)
