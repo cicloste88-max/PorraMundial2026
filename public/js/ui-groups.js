@@ -25,27 +25,23 @@ var _JO_KO_SHORT = {
   final: 'Final · KO',
 };
 
-// Etiqueta para un slot del bracket. Si está resuelto (predicciones del
-// usuario en Fase Final → resolvedSlots), devuelve el nombre real del
-// equipo. Si no, "Por definir" (esqueleto puro — sin labels inventados
-// tipo "1º Gr.A" o "G. Partido 89", decisión de San).
+// Etiqueta para un slot del bracket. HOTFIX JO-1a: Jornada muestra el
+// calendario/competición REAL, no las predicciones del usuario, así que el
+// esqueleto se ve siempre vacío hasta que haya resultados oficiales.
+// TODO: resolver por resultado real de grupos (PARTIDOS realHome/realAway
+// + ko_results) cuando exista el pipeline live (post 27-jun 2026).
+// NUNCA leer `resolvedSlots` aquí — eso refleja las predicciones del usuario,
+// no la competición real.
 function _joKOSlotLabel(slot) {
-  if (typeof resolvedSlots === 'object' && resolvedSlots && resolvedSlots[slot]) {
-    return resolvedSlots[slot];
-  }
   return 'Por definir';
 }
 
-// Equipo EQUIPOS{name,flag,...} para un slot resuelto. null si sin resolver
-// o no encontrado en EQUIPOS (selección no del Mundial — no debería pasar
-// pero defensive). Reutiliza getTeam() de ko.js si existe.
+// Equipo EQUIPOS{name,flag,...} para un slot. HOTFIX JO-1a: devuelve null
+// mientras no haya resultados reales (ver _joKOSlotLabel). Sin equipo
+// resuelto → sin bandera (`.jv2-flag` cae al gris ink-700 por defecto).
+// TODO: derivar de resultados oficiales cuando el pipeline esté activo.
 function _joKOTeamFromSlot(slot) {
-  if (typeof resolvedSlots !== 'object' || !resolvedSlots) return null;
-  var name = resolvedSlots[slot];
-  if (!name) return null;
-  if (typeof getTeam === 'function') return getTeam(name);
-  if (typeof EQUIPOS === 'undefined') return null;
-  return EQUIPOS.find(function (e) { return e.name === name; }) || null;
+  return null;
 }
 
 // Tarjeta KO esqueleto. Misma estructura visual que _buildJCard pero sin
@@ -70,14 +66,23 @@ function _buildJKOCard(match) {
   var aFlagFallback  = aTeam ? (SB_LOCAL + '/flags/' + aTeam.flag + '.png') : '';
 
   // Card top: venue + día (formato CEST). Sin hora — no existe aún para KO.
+  // HOTFIX JO-1a: BRACKET de ko.js trae fechas solo-día ("2026-06-28"); el
+  // helper _joParseMatchDate aplicaría "+02:00" sobre eso y produciría
+  // Invalid Date. Anclamos mediodía si falta 'T' (mismo patrón que ya usan
+  // _buildMatchButtons + renderVistaJornada con date + 'T12:00:00'). Si tras
+  // parsear el Date sigue inválido, omitimos el bloque día en vez de pintar
+  // "INVALID DATE".
   var venue = match.venue || '';
   var dayLabel = '';
   if (match.date) {
-    var dt = _joParseMatchDate(match.date);
-    var dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
-    var dayNum = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
-    var monthShort = dt.toLocaleDateString('es-ES', { month: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
-    dayLabel = dayShort + ' · ' + dayNum + ' ' + monthShort;
+    var rawDate = match.date.indexOf('T') === -1 ? match.date + 'T12:00:00' : match.date;
+    var dt = _joParseMatchDate(rawDate);
+    if (dt && !isNaN(dt.getTime())) {
+      var dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+      var dayNum = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
+      var monthShort = dt.toLocaleDateString('es-ES', { month: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+      dayLabel = dayShort + ' · ' + dayNum + ' ' + monthShort;
+    }
   }
 
   return (
@@ -135,15 +140,14 @@ function _buildJKOSection(cfg) {
 
 // Devuelve el bloque HTML con las 6 secciones KO concatenadas. Vacío si
 // las globals de ko.js no están disponibles (defensa contra orden de carga
-// si renderVistaJornada se llamara antes de tiempo). Refresca resolvedSlots
-// antes de iterar (mismo patrón que eliminatoria-v3.js para que las cards
-// reflejen el bracket post-pronósticos sin esperar a navegar a Fase Final).
+// si renderVistaJornada se llamara antes de tiempo).
+// HOTFIX JO-1a: NO llamamos resolveAllSlots() — esa función rellena
+// `resolvedSlots` a partir de las predicciones del usuario, y Jornada
+// muestra calendario/competición REAL. Las cards quedan en "Por definir"
+// hasta que el pipeline de resultados reales esté activo (post 27-jun).
 function _buildJKOSectionsHtml() {
   if (typeof ROUND_CONFIG !== 'object' || !Array.isArray(ROUND_CONFIG)) return '';
   if (typeof BRACKET !== 'object' || !BRACKET) return '';
-  if (typeof resolveAllSlots === 'function') {
-    try { resolveAllSlots(); } catch (e) { console.warn('[JO-1a] resolveAllSlots:', e); }
-  }
   return ROUND_CONFIG.map(_buildJKOSection).join('');
 }
 
