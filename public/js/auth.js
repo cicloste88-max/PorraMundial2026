@@ -139,6 +139,11 @@ async function loadUserData(userId) {
   if (preds && preds.length > 0) {
     preds.forEach(p => { predictions[p.match_id] = { l:p.local, v:p.visitante, gol:p.scorer, saved:true, lockedByUser:true }; });
     try { localStorage.setItem('porra_predictions', JSON.stringify(predictions)); } catch(e) {}
+    // FG-1: avisar a listeners (board v3 Grupos en grupos-v3.js:1248) de que
+    // predictions[] ya está hidratado. Sin esto, si el usuario aterriza en la
+    // pestaña Grupos antes de que loadUserData termine, v3GruposMount() pinta
+    // el board con predictions vacías y se queda stale hasta navegar fuera.
+    document.dispatchEvent(new CustomEvent('mundial:predictions-changed', { detail: { source: 'auth-load' } }));
     // Re-renderizar tarjetas y tablas tras DOM listo (100ms para que initGrupos haya terminado)
     setTimeout(() => {
       PARTIDOS.forEach((match, idx) => {
