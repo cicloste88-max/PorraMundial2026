@@ -427,6 +427,10 @@ function _buildJCard(m, idx, date, boostKey, live) {
   const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
   const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
   const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
+  // JO-2: la card muestra el nombre completo de la selección (no el ISO3).
+  // Fallback al nombre del PARTIDOS si no resolvemos el equipo en EQUIPOS.
+  const hName = hTeam ? hTeam.name : (m.home || hCode);
+  const aName = aTeam ? aTeam.name : (m.away || aCode);
 
   // Rectangular flags planas (sprint Jornada Flags Rect) — URL del bucket
   // miniatures/flags-sm/<ISO2>.webp. Se inyecta como CSS var --flag-rect-url
@@ -509,7 +513,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
       '<div class="jv2-card-mid">' +
         '<div class="jv2-team">' +
           '<div class="jv2-flag"' + hFlagRectStyle + '><img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
-          '<div class="jv2-team-code">' + hCode + '</div>' +
+          '<div class="jv2-team-code" title="' + hName + '">' + hName + '</div>' +
         '</div>' +
         '<div class="jv2-score">' +
           '<span class="jv2-score-num">' + scoreL + '</span>' +
@@ -518,7 +522,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
         '</div>' +
         '<div class="jv2-team">' +
           '<div class="jv2-flag"' + aFlagRectStyle + '><img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'"></div>' +
-          '<div class="jv2-team-code">' + aCode + '</div>' +
+          '<div class="jv2-team-code" title="' + aName + '">' + aName + '</div>' +
         '</div>' +
       '</div>' +
       (chipsHtml || goldChipHtml
@@ -719,7 +723,8 @@ function _showJcardModal(matchKey, opts) {
       '<div class="jcard-compact-teams">' +
         '<div class="jcard-compact-team">' +
           (hFlagUrl ? '<div class="jcard-compact-flag" style="background-image:url(\'' + hFlagUrl + '\')"></div>' : '<div class="jcard-compact-flag"></div>') +
-          '<div class="jcard-compact-team-code">' + (hTeam ? (hTeam.code || hTeam.flag || match.home) : match.home) + '</div>' +
+          // JO-2: nombre completo (no ISO3). Fallback a match.home si no resolvemos el equipo.
+          '<div class="jcard-compact-team-code" title="' + (hTeam ? hTeam.name : match.home) + '">' + (hTeam ? hTeam.name : match.home) + '</div>' +
         '</div>' +
         '<div class="jcard-compact-score">' +
           '<div class="jcard-compact-score-label">Tu predicción</div>' +
@@ -731,7 +736,7 @@ function _showJcardModal(matchKey, opts) {
         '</div>' +
         '<div class="jcard-compact-team">' +
           (aFlagUrl ? '<div class="jcard-compact-flag" style="background-image:url(\'' + aFlagUrl + '\')"></div>' : '<div class="jcard-compact-flag"></div>') +
-          '<div class="jcard-compact-team-code">' + (aTeam ? (aTeam.code || aTeam.flag || match.away) : match.away) + '</div>' +
+          '<div class="jcard-compact-team-code" title="' + (aTeam ? aTeam.name : match.away) + '">' + (aTeam ? aTeam.name : match.away) + '</div>' +
         '</div>' +
       '</div>' +
       (scorer ? (

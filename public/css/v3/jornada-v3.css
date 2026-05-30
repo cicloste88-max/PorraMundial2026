@@ -214,10 +214,19 @@
 }
 .jv2-team-code {
   font-family: var(--font-display);
-  font-size: 10px;
+  /* JO-2: ahora muestra nombre completo (ej. "Bosnia y Herzegovina"). Tracking
+     reducido + ellipsis para que casos extremos no rompan el grid 1fr auto 1fr. */
+  font-size: 11px;
   font-weight: 800;
   color: var(--ink-200);
-  letter-spacing: .08em;
+  letter-spacing: .02em;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .jv2-score {
@@ -578,6 +587,8 @@
 }
 .jcard-compact-team {
   text-align: center;
+  /* JO-2: permite shrink del grid 1fr child para que el ellipsis del nombre largo funcione. */
+  min-width: 0;
 }
 .jcard-compact-flag {
   width: 56px;
@@ -591,10 +602,18 @@
 }
 .jcard-compact-team-code {
   font-family: var(--font-display);
-  font-size: 11px;
+  /* JO-2: nombre completo. Mismo patrón ellipsis que .jv2-team-code. */
+  font-size: 12px;
   font-weight: 800;
   color: var(--ink-200, #e5e7eb);
-  letter-spacing: .10em;
+  letter-spacing: .02em;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .jcard-compact-score {
