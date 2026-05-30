@@ -88,6 +88,11 @@ const RESEED_XI = !!argv['reseed-xi'];
 // por slot, con foto) desde el once-tipo FF + roster. One-time/idempotente; el
 // cron 6h sin este flag NO toca squads.xi.
 const BUILD_XI = !!argv['build-xi'];
+// --kader-stragglers (fix fotos XI): en enrich-tm-mw, fuerza la fase B (kader TM)
+// para cualquier selección con jugadores aún sin tm_player_id tras la fase A,
+// recogiendo rezagados no presentes en las páginas FIWC. OFF por defecto: el
+// cron 6h (que NO pasa este flag) conserva el trigger conservador y su latencia.
+const KADER_STRAGGLERS = !!argv['kader-stragglers'];
 const DELAY = parseInt(argv.delay || '0', 10);
 const SKIP = new Set(
   String(argv.skip || '')
@@ -118,7 +123,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --iso3=FRA,QAT
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --full           (forzar fase B siempre)
 
-Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi --build-xi
+Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi --build-xi --kader-stragglers
 `);
 }
 
@@ -694,6 +699,16 @@ async function runEnrichTmMw({ iso3Filter, full }) {
   console.log('  iso3 | tm  | val | foto| club| logo| dob | dor | A   | B  ');
   console.log('  -----+-----+-----+-----+-----+-----+-----+-----+-----+----');
 
+  // Aliases roster→TM (tm-name-aliases.json) para el matcher de enrich. SEPARADO
+  // de name-aliases.json (FF→roster) para no degradar el matching FF. Lazy + tolerante.
+  let tmAliases = null;
+  try {
+    const { readFileSync } = await import('node:fs');
+    tmAliases = JSON.parse(readFileSync(path.join(__dirname, 'lib', 'tm-name-aliases.json'), 'utf-8'));
+  } catch (e) {
+    if (VERBOSE) console.log(`  ! tm-name-aliases.json no cargado: ${e.message.slice(0, 60)}`);
+  }
+
   const allSquads = await listAllSquads();
   const targetSet = iso3Filter ? new Set(iso3Filter) : null;
   const reportRows = [];
@@ -714,14 +729,19 @@ async function runEnrichTmMw({ iso3Filter, full }) {
     const totalRoster = roster.length;
 
     // ── 2a: Pieza A applyEnrich ──
-    const aResult = applyEnrich(roster, byTmId, { iso3: squad.iso3, sourceLabel: 'A' });
+    const aResult = applyEnrich(roster, byTmId, { iso3: squad.iso3, sourceLabel: 'A', aliases: tmAliases });
     roster = aResult.roster;
     const fromA = aResult.stats.matched;
 
     // ── 2b: Pieza B fallback si A baja cobertura o faltan dob/dorsal ──
     const coverageA = fromA / totalRoster;
     const missingDobDorsal = roster.filter((p) => p.dob == null || p.dorsal == null).length;
-    const shouldRunB = full || coverageA < 0.5 || missingDobDorsal > totalRoster * 0.3;
+    // --kader-stragglers: además, si tras la fase A queda algún jugador sin
+    // tm_player_id, fuerza el kader para recogerlo (rezagados fuera de FIWC).
+    // Gated por flag → el cron 6h no incurre en la latencia extra.
+    const hasStragglers = KADER_STRAGGLERS && roster.some((p) => p.tm_player_id == null);
+    const shouldRunB =
+      full || coverageA < 0.5 || missingDobDorsal > totalRoster * 0.3 || hasStragglers;
 
     let fromB = 0;
     if (shouldRunB && byNation.has(squad.iso3)) {
@@ -740,6 +760,7 @@ async function runEnrichTmMw({ iso3Filter, full }) {
         const bResult = applyEnrich(roster, tmKaderMap, {
           iso3: squad.iso3,
           sourceLabel: 'B',
+          aliases: tmAliases,
         });
         roster = bResult.roster;
         fromB = bResult.stats.matched;
@@ -807,6 +828,20 @@ async function runEnrichTmMw({ iso3Filter, full }) {
     console.log(
       `  ${squad.iso3.padEnd(4)} | ${pad(stats.with_tm_id, 3)} | ${pad(stats.with_value, 3)} | ${pad(stats.with_photo, 3)} | ${pad(stats.with_club, 3)} | ${pad(stats.with_logo, 3)} | ${pad(stats.with_dob, 3)} | ${pad(stats.with_dorsal, 3)} | ${pad(fromA, 3)} | ${pad(fromB, 3)}`
     );
+
+    // Log diagnóstico (fix fotos XI): revela por qué falta cada foto.
+    //  - sin tm_player_id → no casó contra FIWC/kader (kader ausente o grafía
+    //    divergente; añadir a tm-name-aliases.json si la grafía es el blocker).
+    //  - con tm_player_id pero sin foto → pipeline de foto (id no presente en
+    //    los datos TM de este run, p.ej. AUT Alaba 59016 / EGY 1307898 / HAI 1061046).
+    if (VERBOSE) {
+      const noTm = roster.filter((p) => p.tm_player_id == null).map((p) => p.nombre);
+      const noFoto = roster
+        .filter((p) => p.tm_player_id != null && p.foto_url == null)
+        .map((p) => `${p.nombre}(${p.tm_player_id})`);
+      if (noTm.length) console.log(`    ${squad.iso3} sin tm_player_id (${noTm.length}): ${noTm.join(', ')}`);
+      if (noFoto.length) console.log(`    ${squad.iso3} con tmid sin foto (${noFoto.length}): ${noFoto.join(', ')}`);
+    }
 
     results.push({ iso3: squad.iso3, status: DRY_RUN ? 'dry-run' : 'updated', ...stats });
   }

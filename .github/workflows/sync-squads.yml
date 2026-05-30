@@ -49,6 +49,10 @@ on:
         description: '[enrich-tm-mw] forzar fase B siempre (rellena dob+dorsal incluso en países con buena cobertura A)'
         type: boolean
         default: false
+      kader_stragglers:
+        description: '[enrich-tm-mw] forzar fase B (kader) si quedan jugadores sin tm_player_id tras fase A (recoge rezagados fuera de FIWC)'
+        type: boolean
+        default: false
       dry_run:
         description: 'Dry-run: NO aplica UPDATE a BD, solo loguea diff propuesto. Higiene operativa para validar antes de productivo.'
         type: boolean
@@ -141,6 +145,7 @@ jobs:
           BUILD_XI: ${{ inputs.build_xi }}
           REFRESH_FINAL: ${{ inputs.refresh_final }}
           FULL: ${{ inputs.full }}
+          KADER_STRAGGLERS: ${{ inputs.kader_stragglers }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           # En schedule los inputs llegan vacíos; ${VAR:-default} aplica el default
@@ -153,6 +158,7 @@ jobs:
           BUILD_XI="${BUILD_XI:-false}"
           REFRESH_FINAL="${REFRESH_FINAL:-false}"
           FULL="${FULL:-false}"
+          KADER_STRAGGLERS="${KADER_STRAGGLERS:-false}"
           DRY_RUN="${DRY_RUN:-false}"
 
           # Sanity check del input libre.
@@ -191,6 +197,9 @@ jobs:
           fi
           if [ "${FULL}" = "true" ]; then
             TMMW_FLAGS="${TMMW_FLAGS} --full"
+          fi
+          if [ "${KADER_STRAGGLERS}" = "true" ]; then
+            TMMW_FLAGS="${TMMW_FLAGS} --kader-stragglers"
           fi
           if [ "${VERBOSE}" = "true" ]; then
             DETECT_FLAGS="${DETECT_FLAGS} --verbose"
