@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "_doc": "Aliases ROSTER -> grafía Transfermarkt, SOLO para el matcher de enrich-tm-mw (applyEnrich). SEPARADO de name-aliases.json A PROPÓSITO: aquel es FF->roster y reusarlo aquí rompería el matching FF (p.ej. BRA 'Vinicius Jr'->'Vinicius Junior' tiraría el match FF actual de 100). Formato: { iso3: { 'roster name': 'TM spelling' } }. Búsqueda case-sensitive sobre el string trimmed. SOLO casos con score-0 confirmados por test local del matcher (no diacríticos —esos los cubre la normalización ø/æ— ni los que ya puntúan 85-100, que fallan por kader ausente, no por grafía).",
+    "_versioned": "ampliar tras inspeccionar el log verbose 'unmatched tras enrich' con las grafías reales del kader TM."
+  },
+  "BRA": {
+    "Vinicius Jr": "Vinicius Junior"
+  },
+  "HAI": {
+    "Jean-Jacques Danley": "Danley Jean Jacques"
+  }
+}

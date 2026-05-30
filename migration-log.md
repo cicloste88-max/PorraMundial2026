@@ -2218,3 +2218,19 @@ Aire neto estimado post-fix: ~23-25px (casi doble del HF-14).
 [16:45] T4 — front+css: token con foto circular (object-fit cover) + dorsal en badge + apellido + código de posición minimizado; isGK conserva color (foto inset 2.5px → anillo color_portero); onerror = badge-with-flag-fallback. FORMATION_COORDS de-overlap PO↔central: PO→[50,90] (12 formaciones); central de 3→[50,72]; central de 5→[50,74]. Verificado: build OK + selectores `.fc-pizarra-token-photo/--photo` en dist (ERR-22) + coords front↔json idénticas 12/12.
 
 [16:50] PENDIENTE (San, GitHub Actions; + deploy EF get-squad v7.2 por Code tras merge). Runbook en el PR. Baseline acceptance #5 (Supabase MCP): 33 pineadas, 0 con `xi` (columna recién creada). Post `--build-xi`: 33×11. NOTA: `tests/parsers/cross-validate.test.mjs` tiene 1 fallo PRE-EXISTENTE en main (`degrade a low`), no relacionado con A2.
+
+## 2026-05-30 — Fix fotos XI: matcher TM↔roster (fix/fotos-xi-aliases, PR)
+
+[10:20] DIAGNÓSTICO (test local del matcher sobre las 12 grafías SIN_FOTO): solo 4/12 son fallos del matcher. (a) NOR Sørloth/Bjørkan: `ø` no es NFD-descomponible → el strip lo vuelve espacio (`sorloth`→`rloth s`), score 0. (b) BRA Vinicius Jr→Junior: score 0 (`jr`≠`junior`). (c) HAI Jean-Jacques Danley→Danley Jean Jacques: score 0 (guion-une vs espacio). Los otros ~9 (KOR Son/Kim, KSA Dawsari/Khaibari/Tambakti, COD Mpasi, CPV Pina/Josimar, EGY Attia) puntúan 85-100 contra la grafía canónica → NO son fallo de matcher: su candidato TM no llega al matcher (no están en FIWC + fase B kader se salta en re-runs por cobertura ≥50% y dob/dorsal ya presentes).
+
+[10:25] F1 — `name-matcher.mjs rawTokens`: transliteración de latinas no-NFD (ø→o, æ→ae, œ→oe, ß→ss, ð→d, þ→th, ł→l, đ→d, ı→i, ħ→h, ŋ→n) tras toLowerCase. Simétrico (ambos lados) → arregla NOR Sørloth/Bjørkan (0→100) sin alias.
+
+[10:30] F2 — `enrich-merge.mjs applyEnrich`: nuevo param `aliases`; Pass 2 ahora llama `matchAgainstRoster(dbNames, candNames, { iso3, aliases })` (antes vacío) → umbral 0.70 para no-latinos (KOR/KSA) + resolución de alias en la fase de enrich TM.
+
+[10:35] F3 — `scripts/lib/tm-name-aliases.json` (NUEVO, roster→TM): BRA "Vinicius Jr"→"Vinicius Junior", HAI "Jean-Jacques Danley"→"Danley Jean Jacques". SEPARADO de name-aliases.json (FF→roster) a propósito: reusarlo rompería el matching FF (demostrado). `runEnrichTmMw` lo carga (lazy) y lo pasa a applyEnrich A y B.
+
+[10:40] Trigger fase B endurecido (opción b) + flag `--kader-stragglers` / input `kader_stragglers`: corre kader si tras fase A queda algún jugador sin `tm_player_id`. GATED por flag → el cron 6h (que NO lo pasa) conserva su latencia. Log verbose 'unmatched tras enrich' por selección: lista (a) jugadores sin `tm_player_id` y (b) con tmid pero sin foto (Categoría B). NO toco get-squad ni front.
+
+[10:45] CATEGORÍA B (AUT Alaba 59016, EGY Mohamed Alaa 1307898, HAI Keeto Thermoncy 1061046): tienen tm_player_id pero foto=0 — es el pipeline de FOTO, no el matcher. Causa: su id no está en los datos TM de ESTE run (no en FIWC top + fase B saltada) → `foto_url_tm` nunca se asigna → no hay upload. NO es bug separado de código: se resuelve cuando corre fase B (kader trae el retrato por id). El `enrich --full` del re-run lo cubre (el flag `--kader-stragglers` NO, porque ya tienen id). Solo logueado, no forzado (per mandato).
+
+[10:50] Verificación: `tests/tm-enrich-aliases.test.mjs` 8/8 (`node --test`); suite completa sin regresión (cross-validate sigue con su 1 fallo PRE-EXISTENTE ajeno). PENDIENTE: San relanza `enrich-tm-mw --full` (o `kader_stragglers=true`) de las 11 + re-build + verifica fotos. El log verbose revelará quién sigue sin casar (kader ausente vs grafía real divergente → ampliar tm-name-aliases.json).

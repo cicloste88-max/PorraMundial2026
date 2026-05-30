@@ -42,7 +42,7 @@ export const ENRICH_FIELDS = [
  *   nombre a esa nación; sourceLabel ('A' | 'B') sólo para logging externo.
  * @returns {{ roster: Array<object>, stats: object }}
  */
-export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel } = {}) {
+export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel, aliases = null } = {}) {
   // Lookup secundario por nombre+iso3 desde tmByIdMap.
   const tmByNameInNation = new Map();
   const tmCandidatesInNation = []; // para fuzzy fallback
@@ -104,7 +104,10 @@ export function applyEnrich(roster, tmByIdMap, { iso3, sourceLabel } = {}) {
     if (availableCandidates.length > 0) {
       const dbNames = fuzzyPending.map((x) => x.p.nombre);
       const candNames = availableCandidates.map((c) => c.name);
-      const { matches } = matchAgainstRoster(dbNames, candNames);
+      // iso3 → umbral Levenshtein 0.70 para no-latinos (KOR/KSA…); aliases →
+      // resolver grafías roster→TM (tm-name-aliases.json) antes de puntuar.
+      // Antes iban vacíos: la fase B no aplicaba ni el umbral ni los alias.
+      const { matches } = matchAgainstRoster(dbNames, candNames, { iso3, aliases });
       for (const { candidate, matchIdx } of matches) {
         const pendingIdx = fuzzyPending.findIndex((x) => x.p.nombre === candidate);
         if (pendingIdx < 0) continue;

@@ -55,12 +55,26 @@ const ARABIC_FIRSTNAME_MAP = {
   muhammed: 'mohamed',
 };
 
+// Latinas extendidas NO descomponibles por NFD (no son letra-base + diacrítico
+// combinante). Sin esto, el strip `[^a-z0-9\s]` las convierte en ESPACIO,
+// partiendo el token: 'Sørloth' → 's rloth' (≠ 'sorloth'), 'Bjørkan' →
+// 'bj rkan'. Mapeamos a su transliteración latina estándar. Simétrico (se
+// aplica a ambos lados de scorePair) → roster 'Sorloth' y TM 'Sørloth'
+// colapsan ambos a 'sorloth'. Cubre escandinavo (ø/æ), alemán (ß), nórdico/
+// islandés (ð/þ), eslavo/polaco (ł/đ) y turco (ı). Referencia: fix fotos XI.
+const LATIN_EXT_MAP = {
+  'ø': 'o', 'æ': 'ae', 'œ': 'oe', 'ß': 'ss', 'ð': 'd',
+  'þ': 'th', 'ł': 'l', 'đ': 'd', 'ı': 'i', 'ħ': 'h', 'ŋ': 'n',
+};
+const LATIN_EXT_RE = /[øæœßðþłđıħŋ]/g;
+
 function rawTokens(s) {
   if (!s) return [];
   return String(s)
     .normalize('NFD')
     .replace(DIACRITICS_RE, '')
     .toLowerCase()
+    .replace(LATIN_EXT_RE, (c) => LATIN_EXT_MAP[c] || c) // ø→o, æ→ae, ß→ss… (no-NFD)
     .replace(APOSTROPHES_RE, '')
     .replace(/\b(?:al|el)-/g, '')          // R1: strip Al-/El- prefix
     .replace(HYPHENS_RE, '')
