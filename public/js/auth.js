@@ -128,7 +128,21 @@ async function loadUserData(userId) {
     leagueId
       ? db.from('league_members').select('groups_saved').eq('user_id', userId).eq('league_id', leagueId).maybeSingle()
       : Promise.resolve({ data: null }),
-    loadIAPredictions(),
+    // ERR-78 iter 3 (mejora UX, NO fix del blank): race contra timeout de
+    // 6s. loadIAPredictions ya tiene catch interno → {} on error, pero NO
+    // protege contra fetch colgado (sin throw). Si IA tarda >6s el
+    // Promise.all sigue con iaMap={} sin esperar. El fetch real sigue
+    // corriendo en background — IA simplemente no aparece esta sesión.
+    // Acortar la ventana de espera reduce probabilidad de caer en
+    // fallback path (que aunque ya navega bien con el fix del lock,
+    // es preferible no llegar a él).
+    Promise.race([
+      loadIAPredictions(),
+      new Promise(resolve => setTimeout(() => {
+        console.warn('[ia] timeout 6s en bootstrap; iaMap={} para no bloquear.');
+        resolve({});
+      }, 6000))
+    ]),
   ]);
 
   // Fusionar predicciones IA en el store global.
@@ -458,6 +472,21 @@ const runAuthInit = async () => {
     if (el && el.parentNode) el.parentNode.removeChild(el);
   };
 
+  // ERR-78 iter 3: helper para fallback a welcome. SIEMPRE quita el lock
+  // `#restore-lock-css` (inyectado inline en index.html cuando hay
+  // porra_lastPage en localStorage) ANTES de llamar showPage('welcome').
+  // El lock hace early-return en showPage('welcome'); si no lo quitamos
+  // antes, el showPage retorna sin renderizar nada y la app queda en
+  // blank. Causa raíz REAL del bug post-refresh (iter 1+2 atacaban
+  // consecuencias — listener race, IA timeout — pero no el lock que
+  // bloqueaba todos los fallback welcome).
+  const _navigateFallbackWelcome = () => {
+    _hideBootstrapLoader();
+    const _lock = document.getElementById('restore-lock-css');
+    if (_lock && _lock.parentNode) _lock.parentNode.removeChild(_lock);
+    try { if (typeof showPage === 'function') showPage('welcome'); } catch (e) {}
+  };
+
   // ERR-78 v2: loader + watchdog armados SIEMPRE al inicio de runAuthInit,
   // FUERA del onAuthStateChange handler. El gating previo por
   // `sessionStorage.porra_token` era frágil: ese token se ESCRIBE dentro
@@ -471,11 +500,27 @@ const runAuthInit = async () => {
   // incondicionalmente; se auto-ocultan apenas la primera navegación los
   // limpie (vía _bootstrapSession o welcome path).
   _showBootstrapLoader();
+  // ERR-78 iter 3: watchdog redesignado. El trigger anterior ("loader
+  // sigue visible") era frágil — `_hideBootstrapLoader()` se llama en
+  // TODOS los caminos de fallback (incluido el path getSession sin
+  // sesión), así que cuando el bug del lock aparece el loader ya está
+  // oculto y el watchdog NUNCA disparaba. Verificado por San en
+  // preview: durante el blank el #_auth-bootstrap-loader no existe.
+  //
+  // Trigger semántico nuevo: "¿hay alguna #page-* visible?". Si tras
+  // 12s ninguna #page-* tiene display:block, la app está blank — sea
+  // cual sea el camino que nos trajo aquí. Acción: _navigateFallbackWelcome
+  // (quita lock + welcome). Cubre todos los caminos de fallback
+  // presentes y futuros sin enumerarlos.
   setTimeout(function () {
-    if (document.getElementById('_auth-bootstrap-loader')) {
-      console.warn('[auth.bootstrap] watchdog 12s: ningún path navegó. Forzando welcome.');
-      _hideBootstrapLoader();
-      try { if (typeof showPage === 'function') showPage('welcome'); } catch (e) {}
+    const _PAGES = ['welcome','grupos','jornada','directo','predictor','elim','score','admin'];
+    const anyVisible = _PAGES.some(function (p) {
+      const el = document.getElementById('page-' + p);
+      return el && el.style.display !== 'none' && el.style.display !== '';
+    });
+    if (!anyVisible) {
+      console.warn('[auth.bootstrap] watchdog 12s: ninguna #page-* visible. Forzando welcome (quita lock).');
+      _navigateFallbackWelcome();
     }
   }, 12000);
 
@@ -605,7 +650,18 @@ const runAuthInit = async () => {
           const finalPage = (target === 'admin' && !currentUser.is_admin)
             ? 'welcome'
             : (target || 'welcome');
-          setTimeout(() => { _hideBootstrapLoader(); showPage(finalPage); }, 100);
+          // ERR-78 iter 3: si finalPage === 'welcome' (target null o admin
+          // rechazado por no-admin), el lock activo bloquearía showPage.
+          // _navigateFallbackWelcome quita el lock antes. Para non-welcome
+          // el showPage normal ya quita el lock en ui-nav.js:508.
+          setTimeout(() => {
+            if (finalPage === 'welcome') {
+              _navigateFallbackWelcome();
+            } else {
+              _hideBootstrapLoader();
+              showPage(finalPage);
+            }
+          }, 100);
           _markNavigated();
         }
       } finally {
@@ -613,7 +669,9 @@ const runAuthInit = async () => {
         // del try sin haber navegado → forzar welcome navegable.
         if (!_navigated) {
           console.warn('[auth.bootstrap] _bootstrapSession no navegó; forzando welcome (red final).');
-          setTimeout(() => { _hideBootstrapLoader(); showPage('welcome'); }, 100);
+          // ERR-78 iter 3: helper en lugar de showPage directo — el lock
+          // estaría activo si _pendingPageRestore se setó al cargar.
+          setTimeout(() => _navigateFallbackWelcome(), 100);
         }
       }
     } finally {
@@ -653,10 +711,12 @@ const runAuthInit = async () => {
       try { sessionStorage.removeItem('porra_token'); } catch (e) {}
       _hideBootstrapLoader();
       // v2.7: si skipeamos welcome esperando restaurar y no hay sesion valida, mostrar welcome ahora
+      // ERR-78 iter 3: usar helper para quitar lock antes (si _pendingPageRestore
+      // estaba seteado, el lock está activo y bloquearía showPage('welcome')).
       if (window._pendingPageRestore) {
         window._pendingPageRestore = null;
-        showPage('welcome');
-        initWelcome();
+        _navigateFallbackWelcome();
+        try { if (typeof initWelcome === 'function') initWelcome(); } catch (e) {}
       }
       renderAuthBar();
       updateCTAs();
@@ -682,9 +742,14 @@ const runAuthInit = async () => {
     // expiró entre tab close y reopen). El branch sin sesión del listener
     // cubría esto cuando el listener fire, pero ahora puede no hacerlo
     // (race que motivó este fix). Garantizamos welcome navegable.
+    // ERR-78 iter 3: usar helper para quitar el lock antes del showPage.
+    // Sin esto el lock (inyectado en index.html cuando hay porra_lastPage)
+    // hacía early-return en showPage('welcome') → app blank permanente.
+    // Este era el camino más frecuente del bug — getSession timeout o
+    // sesión expirada caía aquí, blocked, blank.
     if (window._pendingPageRestore) {
       window._pendingPageRestore = null;
-      try { if (typeof showPage === 'function') showPage('welcome'); } catch (e) {}
+      _navigateFallbackWelcome();
       try { if (typeof initWelcome === 'function') initWelcome(); } catch (e) {}
     }
   };

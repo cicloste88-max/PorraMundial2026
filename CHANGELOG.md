@@ -96,11 +96,74 @@ persistente. Login fresco normal. Background return sin bucle de
 showPage. Lección reforzada de PR#124 y de iter 1 de este mismo ERR:
 nada de test standalone sustituye al QA en browser.
 
-**Stats:** 1 fichero tocado en iter 2 (`public/js/auth.js`, refactor
-cohesivo). Total acumulado en la rama: `public/js/auth.js` (+~270/-~85
-sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`. ERR-78
-reescrito con la causa real (race de listener tardío, no transient de
-leagueLoadMyLeagues).
+**Stats iter 2:** 1 fichero tocado (`public/js/auth.js`, refactor
+cohesivo). ERR-78 reescrito con causa atribuida a race de listener
+tardío.
+
+**Iteración 3 (este commit):** causa raíz REAL identificada vía QA en
+preview Vercel con Chrome MCP + DOM inspection. Iter 2 NO resolvía
+el bug. Diagnóstico definitivo:
+
+`#restore-lock-css` (inyectado inline en `index.html` cuando hay
+`porra_lastPage`) bloquea TODOS los fallback `showPage('welcome')` del
+bootstrap. Y el watchdog estaba gateado por presencia del loader, que
+se oculta en TODOS los caminos de fallback antes del watchdog disparar
+→ watchdog nunca activaba.
+
+Cadena causal real: usuario tiene sesión + página guardada → lock se
+inyecta en parse time → bootstrap intenta restaurar; si CUALQUIER
+camino acaba en fallback welcome (getSession timeout, sesión nula,
+excepción inesperada, admin rejected, etc.), `showPage('welcome')`
+hace early-return por el lock → ninguna `#page-*` queda en
+`display:block` → blank permanente porque ningún `showPage(non-welcome)`
+ejecuta para quitar el lock.
+
+Iter 1 y 2 atacaban consecuencias correctas (listener tardío, fetch
+hangs, retry) pero NO la causa raíz. Verificado por San:
+`document.getElementById('restore-lock-css')` existe durante el blank;
+test causal `lock.remove(); showPage('grupos')` recupera la app.
+
+**Fix iter 3:**
+
+- **Helper `_navigateFallbackWelcome()`**: quita `#restore-lock-css`
+  ANTES de `showPage('welcome')` (evita el early-return). Sustituye
+  la combinación `_hideBootstrapLoader + showPage('welcome')` en los
+  4 sitios críticos: fall-through Path 2, red final del try/finally,
+  listener no-session branch, `_onNoSessionFromGetSession`.
+- **Watchdog redesignado** con trigger semántico ("¿hay alguna
+  `#page-*` con `style.display !== 'none'`?"). Sustituye el trigger
+  frágil (presencia del loader). Cubre TODOS los caminos de fallback
+  presentes y futuros sin enumerarlos. Acción:
+  `_navigateFallbackWelcome` (quita lock + welcome).
+- **(Opcional, secundario)** `loadIAPredictions` envuelto en
+  `Promise.race(..., setTimeout({}, 6000))` dentro de `loadUserData`'s
+  `Promise.all`. NO es el fix del blank (la IA NO bloqueaba showPage
+  en ningún camino verificable) — solo acorta la ventana de espera
+  cuando IA cuelga (red lenta).
+
+Descartado: B (auto-expire del lock en index.html inline). Discutido
+con San. Razón: quitar el lock sin re-renderizar no recupera la app
+(el `showPage('welcome')` que estaba bloqueado ya retornó early). El
+watchdog redesignado absorbe el rol de B con un trigger
+estructuralmente correcto.
+
+Preservado intacto de iter 2: helpers `_withTimeout`,
+`_bootstrapSession` extraído, `db.auth.getSession()` explícito,
+guards `TOKEN_REFRESHED/USER_UPDATED` y
+`currentUser.id===session.user.id`, retry+backoff sobre
+`leagueLoadMyLeagues`, flag `_navigated` + try/finally.
+
+**Verificación pendiente (San en preview Vercel):** refresh con
+sesión persistida + `porra_lastPage='grupos'` + IA lenta (simular
+6s+ timeout) → debe acabar mostrando grupos o welcome, NUNCA blank.
+`#restore-lock-css` debe quitarse y alguna `#page-*` debe quedar
+visible. Refresh happy path sin regresión. Refresh anónimo sin lock.
+
+**Stats iter 3:** 1 fichero (`public/js/auth.js`, +60/-15 sobre iter
+2). Total acumulado en la rama: `public/js/auth.js` (~+330/-100 sobre
+main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh` (PR #125).
+ERR-78 reescrito con causa raíz real (lock + watchdog gateado),
+incluye recap de las 3 iteraciones y lecciones acumuladas.
 
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 
