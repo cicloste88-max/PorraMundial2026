@@ -13,6 +13,16 @@ function _joParseMatchDate(s) {
   return new Date(/([Zz]|[+-]\d{2}:?\d{2})$/.test(s) ? s : s + '+02:00');
 }
 
+// JO-3: estado de colapso por sección Jornada (acordeón multi-abierto).
+// Keys: "date:YYYY-MM-DD" para jornadas de grupos, "ko:<cfg.key>" para KO.
+// Valor: true = colapsada, false = abierta. Estado en memoria de módulo
+// (sin localStorage) → pervive en la sesión, se resetea al recargar.
+// _joCollapseInit asegura que los defaults (jornada viva expandida, resto
+// colapsadas) solo se aplican la primera vez; los clicks del usuario en
+// renders posteriores se respetan.
+var _joSectionCollapsed = {};
+var _joCollapseInit = false;
+
 // JO-1a: esqueleto KO en pantalla Jornada.
 // Etiquetas cortas por ronda (P3a). El CSS .jv2-jornada-name aplica
 // text-transform:uppercase, así que basta capital case en el origen.
@@ -116,6 +126,8 @@ function _buildJKOCard(match) {
 
 // Sección KO completa para una ronda de ROUND_CONFIG. Devuelve string vacío
 // si BRACKET[cfg.key] no existe (defensa contra race u olvido).
+// JO-3: header clickable (acordeón). KO siempre colapsado por defecto;
+// _joSectionCollapsed['ko:<key>'] respeta clicks posteriores del usuario.
 function _buildJKOSection(cfg) {
   if (typeof BRACKET !== 'object' || !BRACKET || !Array.isArray(BRACKET[cfg.key])) return '';
   var matches = BRACKET[cfg.key];
@@ -125,11 +137,21 @@ function _buildJKOSection(cfg) {
 
   var cardsHtml = matches.map(_buildJKOCard).join('');
 
+  var collapseKey = 'ko:' + cfg.key;
+  // Si nunca se ha tocado y los defaults aún no se inicializaron, KO arranca
+  // colapsado. Si _joCollapseInit ya corrió, leemos lo que haya (default
+  // true para KO, o lo que el usuario decidió).
+  var isCollapsed = (_joSectionCollapsed[collapseKey] !== false);
+  var sectionCls = 'jv2-section jv2-section--ko' + (isCollapsed ? ' is-collapsed' : '');
+  var ariaExpanded = isCollapsed ? 'false' : 'true';
+
   return (
-    '<div class="jv2-section jv2-section--ko" id="jornada-ko-' + cfg.key + '">' +
-      '<div class="jv2-jornada-header jv2-jornada-header--ko">' +
+    '<div class="' + sectionCls + '" id="jornada-ko-' + cfg.key + '" data-collapse-key="' + collapseKey + '">' +
+      '<div class="jv2-jornada-header jv2-jornada-header--ko" role="button" tabindex="0" aria-expanded="' + ariaExpanded + '">' +
         '<div class="jv2-jornada-title">' +
-          '<div class="jv2-jornada-name">' + name + '</div>' +
+          '<div class="jv2-jornada-name">' + name +
+            ' <span class="jv2-section__chev" aria-hidden="true">▾</span>' +
+          '</div>' +
           (sub ? '<div class="jv2-jornada-date">' + sub + '</div>' : '') +
         '</div>' +
       '</div>' +
@@ -447,6 +469,39 @@ function renderVistaJornada() {
   // Wrapper con sidebar única a la derecha
   const sidebarHtml = _buildJornadaRanking();
 
+  // JO-3: jornada "viva" = primer día (cronológico) con algún partido aún
+  // no finalizado. Pre-Mundial sin _liveScoresByMatchKey, todos cuentan
+  // como por jugar → aliveDate = dias[0] (= J1 11-jun). Si TODAS las
+  // jornadas están finalizadas (fin de torneo), aliveDate queda null y
+  // el bloque init dejará todo colapsado por defecto. Solo se busca entre
+  // jornadas de grupos; las 6 secciones KO arrancan siempre colapsadas.
+  const _joLiveByKey = window._liveScoresByMatchKey || {};
+  let aliveDate = null;
+  for (let i = 0; i < dias.length; i++) {
+    const _d = dias[i];
+    const hasPorJugar = jornadasMap[_d].some(function (entry) {
+      const dk = (typeof window.matchKeyFor === 'function') ? window.matchKeyFor(entry.m) : null;
+      const live = dk ? _joLiveByKey[dk] : null;
+      return !(live && live.status === 'finished');
+    });
+    if (hasPorJugar) { aliveDate = _d; break; }
+  }
+
+  // JO-3: aplicar defaults SOLO la primera vez. Después respetamos clicks
+  // del usuario. Si una sección nueva aparece en re-renders posteriores
+  // (poco probable, calendario fijo), por defecto queda colapsada.
+  if (!_joCollapseInit) {
+    dias.forEach(function (d) {
+      _joSectionCollapsed['date:' + d] = (d !== aliveDate);
+    });
+    if (typeof ROUND_CONFIG !== 'undefined' && Array.isArray(ROUND_CONFIG)) {
+      ROUND_CONFIG.forEach(function (cfg) {
+        _joSectionCollapsed['ko:' + cfg.key] = true;
+      });
+    }
+    _joCollapseInit = true;
+  }
+
   let sectionsHtml = '';
   dias.forEach((date, dIdx) => {
     const jNum = dIdx + 1;
@@ -493,12 +548,21 @@ function renderVistaJornada() {
       });
     }
 
+    // JO-3: estado de colapso para esta jornada. Default ya aplicado en el
+    // bloque init de arriba; aquí solo leemos.
+    const _collapseKey = 'date:' + date;
+    const _isCollapsed = (_joSectionCollapsed[_collapseKey] === true);
+    const _sectionCls = 'jv2-section' + (_isCollapsed ? ' is-collapsed' : '');
+    const _ariaExpanded = _isCollapsed ? 'false' : 'true';
+
     sectionsHtml +=
-      '<div class="jv2-section" id="jornada-' + date + '">' +
-        '<div class="jv2-jornada-header">' +
+      '<div class="' + _sectionCls + '" id="jornada-' + date + '" data-collapse-key="' + _collapseKey + '">' +
+        '<div class="jv2-jornada-header" role="button" tabindex="0" aria-expanded="' + _ariaExpanded + '">' +
           '<button class="jv2-nav-arrow" type="button" ' + prevAttr + ' aria-label="Jornada anterior">‹</button>' +
           '<div class="jv2-jornada-title">' +
-            '<div class="jv2-jornada-name">JORNADA ' + jNum + ' · GRUPOS</div>' +
+            '<div class="jv2-jornada-name">JORNADA ' + jNum + ' · GRUPOS' +
+              ' <span class="jv2-section__chev" aria-hidden="true">▾</span>' +
+            '</div>' +
             '<div class="jv2-jornada-date">' + dateShort + ' · ' + dayLabel + '</div>' +
           '</div>' +
           '<button class="jv2-nav-arrow" type="button" ' + nextAttr + ' aria-label="Jornada siguiente">›</button>' +
@@ -530,6 +594,36 @@ function renderVistaJornada() {
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+
+  // JO-3: handler delegado para toggle colapsar/expandir. Registro
+  // idempotente con flag en el container — sobrevive a renderVistaJornada
+  // (innerHTML replace en el container no destruye listeners propios del
+  // container). Guards: clicks en .jv2-nav-arrow no disparan el toggle.
+  if (!container._joCollapseDelegated) {
+    container.addEventListener('click', function (ev) {
+      if (ev.target.closest && ev.target.closest('.jv2-nav-arrow')) return;
+      const header = ev.target.closest && ev.target.closest('.jv2-jornada-header');
+      if (!header) return;
+      const section = header.closest('.jv2-section');
+      if (!section) return;
+      const key = section.dataset.collapseKey;
+      if (!key) return;
+      const nowCollapsed = !section.classList.contains('is-collapsed');
+      section.classList.toggle('is-collapsed', nowCollapsed);
+      header.setAttribute('aria-expanded', String(!nowCollapsed));
+      _joSectionCollapsed[key] = nowCollapsed;
+    });
+    // Keyboard a11y: Enter/Space en el header dispara el toggle.
+    container.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      if (ev.target.closest && ev.target.closest('.jv2-nav-arrow')) return;
+      const header = ev.target.closest && ev.target.closest('.jv2-jornada-header');
+      if (!header) return;
+      ev.preventDefault();
+      header.click();
+    });
+    container._joCollapseDelegated = true;
+  }
 
   // Cinta usuario móvil
   _renderUserStrip();

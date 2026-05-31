@@ -110,6 +110,35 @@
   opacity: .55;
 }
 
+/* ── JO-3: acordeón de secciones (grupos + KO) ──────────────
+   El header es clickable; .is-collapsed en la sección oculta cards
+   + bloque resultados + section-label, dejando solo el header visible.
+   Sin animación max-height (no escala bien para r32 16 cards). */
+.jv2-jornada-header {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.jv2-jornada-header:focus-visible {
+  outline: 2px solid var(--fifa-gold);
+  outline-offset: -2px;
+}
+.jv2-section__chev {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--ink-400);
+  transition: transform .15s ease;
+  vertical-align: middle;
+}
+.jv2-section.is-collapsed .jv2-section__chev {
+  transform: rotate(-90deg);
+}
+.jv2-section.is-collapsed > .jv2-card,
+.jv2-section.is-collapsed > .jv2-results-block,
+.jv2-section.is-collapsed > .jv2-section-label {
+  display: none;
+}
+
 /* ── Bloque "Resultados · subtítulo" ──────────────────────── */
 .jv2-results-block {
   padding: 0 4px 12px;
