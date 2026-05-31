@@ -327,7 +327,7 @@ Se exponen como `window.__QA_EMAIL` / `window.__QA_PASS` sólo en modo dev.
 - Scoreboard en tiempo real
 - Migración a Vite (5 módulos extraídos de `main.js`)
 - Boost x2 diario con Canvas de fuego
-- Vista Jornada (pestaña, tarjetas compactas, sidebar)
+- Vista Jornada (pestaña, tarjetas compactas, sidebar, esqueleto KO bajo grupos + acordeón colapsar/expandir por sección)
 - Sistema live scores con actor Webshare (~$13 torneo completo)
 - Notificaciones WhatsApp (goles, descanso, fin…)
 - Bracket de resultados reales (timeline vertical + live hero)
