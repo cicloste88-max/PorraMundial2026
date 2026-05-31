@@ -88,97 +88,152 @@ async function sbLoad(forceRefresh = false) {
   }
 }
 
-function sbRender(rows) {
-  document.getElementById('sb-loading').style.display = 'none';
+// PR-1 Capa 3 — render "Trofeo".
+// Helpers locales: avatar color determinista, iniciales, esc HTML, trend.
+// (Fusión del cuerpo de scoreboard-v3.render.js entregado por San.)
+const _SB_AV = [
+  'linear-gradient(135deg,#2851E1,#1A3AAE)',
+  'linear-gradient(135deg,#C9A961,#9A7B3A)',
+  'linear-gradient(135deg,#3A6E5A,#1F4A3A)',
+  'linear-gradient(135deg,#7A4FA8,#4A2E78)',
+  'linear-gradient(135deg,#C26A4A,#8A3F28)',
+  'linear-gradient(135deg,#4A5163,#2A3142)',
+  'linear-gradient(135deg,#2E8AA8,#1A5A70)',
+  'linear-gradient(135deg,#A8546E,#702E48)',
+];
+function _sbAvColor(seed) {
+  seed = seed || '?';
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return _SB_AV[h % _SB_AV.length];
+}
+function _sbInitials(name) {
+  const p = (name || '?').trim().split(/\s+/);
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
+function _sbEsc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s);
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+function _sbTrendInfo(t) {
+  if (typeof t !== 'number') return null;
+  if (t > 0) return { cls: 'up', sym: '▲', n: t };
+  if (t < 0) return { cls: 'down', sym: '▼', n: Math.abs(t) };
+  return { cls: 'flat', sym: '—', n: '' };
+}
 
-  if (!rows.length) {
-    document.getElementById('sb-empty').style.display = 'block';
+function sbRender(rows) {
+  const loading = document.getElementById('sb-loading');
+  if (loading) loading.style.display = 'none';
+
+  if (!rows || !rows.length) {
+    const empty = document.getElementById('sb-empty');
+    if (empty) empty.style.display = 'block';
     return;
   }
 
-  const maxPts  = rows[0]?.total || 0;
-  const myId    = currentUser?.id;
+  const myId = (window.currentUser || {}).id;
 
-  // ── Podio top 3 ──
+  // ── HERO PODIO (top-3 con orden visual 2 · 1 · 3) ────────
   const podiumEl = document.getElementById('sb-podium');
   const top3 = rows.slice(0, 3);
-  const medals = ['🥇','🥈','🥉'];
-  const rankCls = ['rank-1','rank-2','rank-3'];
-  const crowns  = ['👑','',''];
+  let order, meta, rowCls;
+  if (top3.length >= 3) {
+    order = [top3[1], top3[0], top3[2]];
+    meta = [{ cls: 'tf-pod--2', medal: '2' }, { cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--3', medal: '3' }];
+    rowCls = '';
+  } else if (top3.length === 2) {
+    order = [top3[0], top3[1]];
+    meta = [{ cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--2', medal: '2' }];
+    rowCls = ' duo';
+  } else {
+    order = [top3[0]];
+    meta = [{ cls: 'tf-pod--1', medal: '1' }];
+    rowCls = ' solo';
+  }
 
-  // Reordenar: 2º · 1º · 3º para el podio visual
-  const podiumOrder = top3.length >= 3
-    ? [top3[1], top3[0], top3[2]]
-    : top3.length === 2 ? [top3[1], top3[0]] : [top3[0]];
-  const podiumRanks = top3.length >= 3 ? [1, 0, 2] : top3.length === 2 ? [1, 0] : [0];
-
-  podiumEl.innerHTML = podiumOrder.map((u, i) => {
-    const realRank = podiumRanks[i];
-    const ini = (u.nombre || '?').charAt(0).toUpperCase();
-    return `<div class="sb-podium-card ${rankCls[realRank]}">
-      ${crowns[realRank] ? `<div class="sb-podium-crown">${crowns[realRank]}</div>` : ''}
-      <div class="sb-podium-rank">${medals[realRank]}</div>
-      <div class="sb-podium-avatar">${ini}</div>
-      <div class="sb-podium-name">${escapeHtml(u.nombre)}</div>
-      <div class="sb-podium-pts">${u.total}<span>pts</span></div>
-    </div>`;
+  const pods = order.map((u, i) => {
+    const m = meta[i];
+    const tr = _sbTrendInfo(u.trend);
+    const first = (u.nombre || '?').split(' ')[0];
+    return '' +
+      '<div class="tf-pod ' + m.cls + '">' +
+        '<div class="tf-pod__medal">' + m.medal + '</div>' +
+        '<div class="tf-pod__ring">' +
+          (m.cls === 'tf-pod--1' ? '<div class="tf-pod__crown">👑</div>' : '') +
+          '<div class="tf-pod__av" style="background:' + _sbAvColor(u.nombre) + '">' + _sbEsc(_sbInitials(u.nombre)) + '</div>' +
+        '</div>' +
+        '<div class="tf-pod__name">' + _sbEsc(first) + '</div>' +
+        '<div class="tf-pod__pts">' + u.total + '<span>pts</span></div>' +
+        (tr ? '<div class="tf-pod__trend ' + tr.cls + '">' + tr.sym + (tr.n !== '' ? ' ' + tr.n : ' =') + '</div>' : '') +
+      '</div>';
   }).join('');
-  podiumEl.style.display = 'grid';
 
-  // ── Tabla completa ──
+  podiumEl.innerHTML = '<div class="tf-hero"><div class="tf-hero__spark"></div><div class="tf-pod-row' + rowCls + '">' + pods + '</div></div>';
+  podiumEl.style.display = 'block';
+
+  // ── LISTA completa ────────────────────────────────────────
   const rowsEl = document.getElementById('sb-rows');
   rowsEl.innerHTML = rows.map((u, i) => {
-    const rank   = i + 1;
-    const isMe   = u.uid === myId;
-    const ini    = (u.nombre || '?').charAt(0).toUpperCase();
-    const rankCl = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
-    const ptsCl  = u.total === maxPts ? 'pts-total best' : 'pts-total';
-    return `<div class="sb-row${isMe ? ' is-me' : ''}">
-      <div class="sb-rank-badge ${rankCl}">${rank}</div>
-      <div class="sb-row-user">
-        <div class="sb-row-avatar">${ini}</div>
-        <div>
-          <div class="sb-row-name">${escapeHtml(u.nombre)}${isMe ? ' <span style="font-size:9px;color:#3b82f6;font-weight:700">TÚ</span>' : ''}</div>
-        </div>
-      </div>
-      <div class="sb-cell">${u.grpPts}</div>
-      <div class="sb-cell">${u.koPts}</div>
-      <div class="sb-cell">${u.awPts}</div>
-      <div class="sb-cell ${ptsCl}">${u.total}</div>
-    </div>`;
+    const rank = i + 1;
+    const isMe = u.uid === myId;
+    const topCls = rank === 1 ? ' top1' : rank === 2 ? ' top2' : rank === 3 ? ' top3' : '';
+    const tr = _sbTrendInfo(u.trend);
+    let badges = '';
+    if (typeof u.boosts === 'number') badges += '<span class="tf-badge">🔥 <b>' + u.boosts + '</b></span>';
+    if (typeof u.exa === 'number') badges += '<span class="tf-badge">🎯 <b>' + u.exa + '</b> exactos</span>';
+    return '' +
+      '<div class="tf-row' + topCls + (isMe ? ' is-me' : '') + '">' +
+        '<div class="tf-row__rank">' + rank + '</div>' +
+        '<div class="tf-row__l">' +
+          '<div class="tf-av" style="background:' + _sbAvColor(u.nombre) + '">' + _sbEsc(_sbInitials(u.nombre)) + '</div>' +
+          '<div class="tf-row__info">' +
+            '<div class="tf-row__name">' + _sbEsc(u.nombre) + (isMe ? '<span class="tf-tag-me">TÚ</span>' : '') + '</div>' +
+            '<div class="tf-row__badges">' + badges + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tf-row__r">' +
+          (tr ? '<div class="tf-row__trend ' + tr.cls + '">' + tr.sym + '<small>' + (tr.n !== '' ? tr.n : '') + '</small></div>' : '') +
+          '<div class="tf-row__total">' + u.total + '<span>pts</span></div>' +
+        '</div>' +
+      '</div>';
   }).join('');
   document.getElementById('sb-table-wrap').style.display = 'block';
 
-  // ── Mi desglose ──
+  // ── MI DESGLOSE (4 cards: Grupos · Elim. · Premios · Total) ──
+  // PR-1 Capa 3: la card "Premios" es TAPPABLE sólo con porra abierta —
+  // abre el picker via window.PorraPred._openTrophyModal (re-home del
+  // botón trofeo del Predictor). Post-cierre queda display only.
   if (myId) {
     const me = rows.find(r => r.uid === myId);
     if (me) {
-      // PR-1 Capa 3: re-home del picker de premios desde el botón trofeo
-      // del Predictor (que ahora abre page-score). La tarjeta "Premios" es
-      // tappable SOLO con porra abierta — post-cierre queda display only.
       const porraAbierta = !window._porraCerrada;
       const cards = [
-        { label: 'Grupos',        val: me.grpPts, sub: 'pts de fase de grupos' },
-        { label: 'Eliminatorias', val: me.koPts,  sub: 'pts KO + avance' },
-        { label: 'Premios',       val: me.awPts,  sub: 'awards individuales', action: 'open-trophy' },
-        { label: 'Total',         val: me.total,  sub: 'puntos acumulados' },
+        { lbl: 'Grupos',  val: me.grpPts },
+        { lbl: 'Elim.',   val: me.koPts },
+        { lbl: 'Premios', val: me.awPts, action: 'open-trophy' },
+        { lbl: 'Total',   val: me.total, total: true },
       ];
       document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c => {
         const isClickable = c.action === 'open-trophy' && porraAbierta;
-        const cls = 'sb-breakdown-card' + (isClickable ? ' sb-breakdown-card--clickable' : '');
+        let cls = 'clz-bd-card';
+        if (c.total) cls += ' clz-bd-card--total';
+        if (isClickable) cls += ' clz-bd-card--clickable';
         const attrs = isClickable
           ? ` role="button" tabindex="0" data-sb-action="${c.action}" aria-label="Cambiar mis premios individuales"`
           : '';
-        return `<div class="${cls}"${attrs}>
-          <div class="sb-breakdown-label">${c.label}</div>
-          <div class="sb-breakdown-val">${c.val}</div>
-          <div class="sb-breakdown-sub">${c.sub}</div>
-        </div>`;
+        return '<div class="' + cls + '"' + attrs + '>' +
+                 '<div class="clz-bd-card__lbl">' + c.lbl + '</div>' +
+                 '<div class="clz-bd-card__val">' + c.val + '</div>' +
+               '</div>';
       }).join('');
       document.getElementById('sb-my-breakdown').style.display = 'block';
 
-      // Handler delegado idempotente: click/Enter/Space en la card Premios
-      // abre el _openTrophyModal expuesto por PorraPred (ui-pred-shell.js).
+      // Handler delegado idempotente: click / Enter / Space en la card
+      // Premios → _openTrophyModal.
       const breakdownEl = document.getElementById('sb-breakdown-cards');
       if (breakdownEl && !breakdownEl._sbBreakdownDelegated) {
         breakdownEl.addEventListener('click', function (ev) {
@@ -198,6 +253,7 @@ function sbRender(rows) {
     }
   }
 }
+window.sbRender = sbRender;
 
 // Abre el picker de premios desde la card Premios del desglose. Reusa
 // _openTrophyModal expuesto por ui-pred-shell.js en window.PorraPred.
