@@ -2,6 +2,228 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [31-may-2026] Fix auth bootstrap: app congelada vacía tras refresh
+
+**Bug (prod, iPhone + Android):** tras F5 / recarga del navegador (o con
+carga lenta), la app queda "congelada": header visible (ADMIN, usuario,
+"Cerrar sesión") pero el contenedor principal vacío (azul liso, sin grupos
+ni nav funcional). Workaround del usuario: logout + login. Reproducido por
+Claude.ai vía Chrome MCP en producción.
+
+**Causa:** en `runAuthInit > onAuthStateChange` (`public/js/auth.js`), branch
+`INITIAL_SESSION` (refresh con sesión persistida), el flujo encadena
+`leagueLoadMyLeagues() → _myLeagues.find(savedLeagueId) → leagueSelectById
+→ leagueSelect → showPage`. Tres fallos compuestos producían el shell mudo:
+
+1. **`leagueLoadMyLeagues()` sin retry** — la query Supabase con
+   `window._porraToken` fallaba o tardaba transitoriamente al arranque;
+   `_myLeagues` quedaba `[]`, `.find()` devolvía `undefined`, NO entraba en
+   `leagueSelectById`, `getActiveLeagueId()` quedaba null, y ninguna página
+   se activaba. El shell `.fc-pred-shell` montado pero TODOS los hijos a
+   `height:0` → pantalla vacía.
+2. **Sin timeout en los `await`s** — `db.from(...).select(...)` no expone
+   `signal` de cancelación nativo. Un fetch transitoriamente colgado dejaba
+   el handler en estado "pending" para siempre, sin llegar a `showPage`.
+   Re-ejecutar manualmente `window.leagueLoadMyLeagues()` en la consola
+   resolvía en 862ms y restauraba los 7 cards — prueba de que la red
+   funciona, solo el primer intento se ahogaba sin reintento.
+3. **`if (found) {...; return;}` early-return** — si `leagueSelectById`
+   throwba o se colgaba entre `find()` y `leagueSelect`, el handler salía
+   sin que NINGÚN `showPage` se hubiera llamado.
+
+**Fix (rama `fix/auth-bootstrap-frozen-refresh`, NO toca guards
+TOKEN_REFRESHED/USER_UPDATED ni `currentUser.id === session.user.id` —
+imprescindibles contra bucles al volver de segundo plano):**
+
+- **Retry con backoff** sobre `leagueLoadMyLeagues()` — 4 intentos (0, 400,
+  800, 1600ms entre fallos) hasta encontrar `savedLeagueId` en `_myLeagues`.
+- **`_withTimeout` helper** (Promise.race) envolviendo los 4 awaits del
+  bootstrap: `profile fetch` (8s), `leagueLoadMyLeagues` (8s), `leagueSelectById`
+  (8s), `loadUserData` (10s). Timeout → throw → `try/catch` registra warn
+  pero el flujo continúa hacia `showPage`.
+- **`_navigated` flag + try/finally**: garantiza que `showPage` se llame
+  en TODOS los caminos (liga restaurada, no encontrada, error, timeout,
+  excepción inesperada). Final `finally` fuerza `showPage('welcome')` como
+  red de seguridad.
+- **Preservar `savedLeagueId`** si tras 4 intentos `_myLeagues` sigue vacío
+  (posible transient; próximo refresh podría tener mejor suerte). Solo
+  limpia si `_myLeagues` tiene ligas pero la guardada no está (stale id
+  legítimo: usuario kickeado / liga borrada).
+- **Loader visible** (`#_auth-bootstrap-loader`, fixed center, inline CSS)
+  durante el bootstrap si hay token persistido o `_pendingPageRestore` —
+  "lento" no parece "roto". Removido tras la primera navegación.
+- **Watchdog 12s** que fuerza `showPage('welcome')` + oculta loader si nada
+  navega (red extrema para el caso donde TODOS los timeouts individuales
+  fallan).
+
+**Verificación pendiente:** QA en preview Vercel (San) reproduciendo el
+refresh múltiples veces. Lección PR#124: el test standalone no basta para
+validar timing real de fetch — el QA en browser es obligatorio.
+
+**Iteración 1 (commit `5405ebc`):** retry + timeout + `_navigated` flag +
+watchdog DENTRO del handler de `onAuthStateChange`. QA en preview Vercel
+reveló que el bug PERSISTE: el handler nunca se ejecuta porque
+supabase-js ya emitió `INITIAL_SESSION` durante `createClient` /
+restauración persistida ANTES de que `auth.js` cargue y registre su
+listener (auth.js está al final de la cadena `loadScript`). Toda la
+robustez añadida vive dentro de un handler huérfano.
+
+**Iteración 2 (este commit):** refactor estructural atacando la causa
+raíz — race de listener tardío.
+
+- **`_bootstrapSession(session, eventType)` extraído** a función
+  reutilizable con TODO el flujo (profile fetch, retry, loadUserData,
+  showPage). Invocada desde DOS puntos: el handler de `onAuthStateChange`
+  (cambios futuros) Y `db.auth.getSession()` explícito tras el registro
+  del listener (snapshot de sesión ya existente).
+- **Guard `window._bootstrapInFlight`** evita doble ejecución cuando
+  ambas vías compiten. Más el guard preservado de
+  `currentUser.id === session.user.id`.
+- **Loader + watchdog 12s armados INCONDICIONALMENTE** al inicio de
+  `runAuthInit`, fuera del handler. Antes el gating por
+  `sessionStorage.porra_token` era circular (token solo se escribía
+  desde el handler que no corría).
+- **`_withTimeout` aplicado también a `db.auth.getSession()`** (8s) —
+  protege contra hangs del cliente Supabase en la llamada explícita.
+- **Edge case**: si `getSession()` devuelve sin sesión pero
+  `_pendingPageRestore` estaba seteado (sesión expirada entre tab close
+  y reopen), limpiar pending y mostrar welcome.
+
+**Verificación pendiente (San en preview Vercel):** refresh con sesión
+persistida + `_pendingPageRestore='grupos'` debe acabar mostrando grupos.
+Refresh normal sin regresión. Refresh anónimo sin flash de loader
+persistente. Login fresco normal. Background return sin bucle de
+showPage. Lección reforzada de PR#124 y de iter 1 de este mismo ERR:
+nada de test standalone sustituye al QA en browser.
+
+**Stats iter 2:** 1 fichero tocado (`public/js/auth.js`, refactor
+cohesivo). ERR-78 reescrito con causa atribuida a race de listener
+tardío.
+
+**Iteración 3 (este commit):** causa raíz REAL identificada vía QA en
+preview Vercel con Chrome MCP + DOM inspection. Iter 2 NO resolvía
+el bug. Diagnóstico definitivo:
+
+`#restore-lock-css` (inyectado inline en `index.html` cuando hay
+`porra_lastPage`) bloquea TODOS los fallback `showPage('welcome')` del
+bootstrap. Y el watchdog estaba gateado por presencia del loader, que
+se oculta en TODOS los caminos de fallback antes del watchdog disparar
+→ watchdog nunca activaba.
+
+Cadena causal real: usuario tiene sesión + página guardada → lock se
+inyecta en parse time → bootstrap intenta restaurar; si CUALQUIER
+camino acaba en fallback welcome (getSession timeout, sesión nula,
+excepción inesperada, admin rejected, etc.), `showPage('welcome')`
+hace early-return por el lock → ninguna `#page-*` queda en
+`display:block` → blank permanente porque ningún `showPage(non-welcome)`
+ejecuta para quitar el lock.
+
+Iter 1 y 2 atacaban consecuencias correctas (listener tardío, fetch
+hangs, retry) pero NO la causa raíz. Verificado por San:
+`document.getElementById('restore-lock-css')` existe durante el blank;
+test causal `lock.remove(); showPage('grupos')` recupera la app.
+
+**Fix iter 3:**
+
+- **Helper `_navigateFallbackWelcome()`**: quita `#restore-lock-css`
+  ANTES de `showPage('welcome')` (evita el early-return). Sustituye
+  la combinación `_hideBootstrapLoader + showPage('welcome')` en los
+  4 sitios críticos: fall-through Path 2, red final del try/finally,
+  listener no-session branch, `_onNoSessionFromGetSession`.
+- **Watchdog redesignado** con trigger semántico ("¿hay alguna
+  `#page-*` con `style.display !== 'none'`?"). Sustituye el trigger
+  frágil (presencia del loader). Cubre TODOS los caminos de fallback
+  presentes y futuros sin enumerarlos. Acción:
+  `_navigateFallbackWelcome` (quita lock + welcome).
+- **(Opcional, secundario)** `loadIAPredictions` envuelto en
+  `Promise.race(..., setTimeout({}, 6000))` dentro de `loadUserData`'s
+  `Promise.all`. NO es el fix del blank (la IA NO bloqueaba showPage
+  en ningún camino verificable) — solo acorta la ventana de espera
+  cuando IA cuelga (red lenta).
+
+Descartado: B (auto-expire del lock en index.html inline). Discutido
+con San. Razón: quitar el lock sin re-renderizar no recupera la app
+(el `showPage('welcome')` que estaba bloqueado ya retornó early). El
+watchdog redesignado absorbe el rol de B con un trigger
+estructuralmente correcto.
+
+Preservado intacto de iter 2: helpers `_withTimeout`,
+`_bootstrapSession` extraído, `db.auth.getSession()` explícito,
+guards `TOKEN_REFRESHED/USER_UPDATED` y
+`currentUser.id===session.user.id`, retry+backoff sobre
+`leagueLoadMyLeagues`, flag `_navigated` + try/finally.
+
+**Verificación pendiente (San en preview Vercel):** refresh con
+sesión persistida + `porra_lastPage='grupos'` + IA lenta (simular
+6s+ timeout) → debe acabar mostrando grupos o welcome, NUNCA blank.
+`#restore-lock-css` debe quitarse y alguna `#page-*` debe quedar
+visible. Refresh happy path sin regresión. Refresh anónimo sin lock.
+
+**Stats iter 3:** 1 fichero (`public/js/auth.js`, +60/-15 sobre iter
+2). ERR-78 reescrito con causa raíz real (lock + watchdog gateado),
+incluye recap de las 3 iteraciones y lecciones acumuladas.
+
+**Iteración 4 (este commit):** fix regresión UX descubierta en QA de
+iter 3. El blank está resuelto, pero tras F5 con sesión + liga + 
+`porra_lastPage='grupos'`, la app aterrizaba en welcome en lugar de
+restaurar grupos. Medido (Chrome MCP): `visible_pages=['page-welcome']`,
+`getActiveLeagueId()=null`, `match_cards=0`, todas las queries
+Supabase 200 (las ligas SÍ cargan).
+
+**Causa raíz iter 4** (combinación de dos issues):
+
+1. **Listener fire premature INITIAL_SESSION sin sesión**: supabase-js
+   v2 a veces emite el evento ANTES de terminar de restaurar la sesión
+   persistida desde localStorage. El handler en iter 3 trataba todo
+   null como "no hay sesión" → nullificaba `_pendingPageRestore` y
+   mostraba welcome.
+
+2. **`leagueSelectById` redundante con timeout vulnerable**: cuando
+   `getSession()` explícito later resolvía con sesión válida y Path 1
+   se ejecutaba con `_foundLeague=true`, el `await
+   _withTimeout(leagueSelectById, 8000)` internamente hacía un
+   SEGUNDO `await leagueLoadMyLeagues()` redundante (la retry loop YA
+   había populado `_myLeagues`). Ese segundo fetch podía colgarse
+   (network jitter) → timeout 8s → catch → fall-through a Path 2.
+   Path 2 leía `target = _pendingPageRestore` que ya estaba null
+   (nullificado por issue 1) → `finalPage='welcome'` → showPage('welcome').
+   `_activeLeague=null` porque `leagueSelect` nunca corrió.
+
+**Fix iter 4:**
+
+- **A) Listener: distinguir eventos prematuros vs acción explícita.**
+  Solo `SIGNED_OUT` y `USER_DELETED` disparan clear+welcome. Otros
+  eventos sin sesión (INITIAL_SESSION sin sesión, USER_UPDATED con
+  null) se ignoran con `console.debug`. `getSession()` explícito
+  (que SÍ espera la restauración persistida) es la fuente
+  autoritativa.
+
+- **B) Path 1 llama `leagueSelect(_foundLeague)` directo**, eliminando
+  el `await leagueSelectById` y el segundo `leagueLoadMyLeagues`
+  redundante. `leagueSelect` es síncrono — sin timeout, sin riesgo
+  de hang. `_foundLeague` ya fue validado contra `_myLeagues`
+  populado por la retry loop arriba.
+
+Cualquiera de los dos por separado podría dejar el bug expuesto en
+ciertos timings. Juntos blindan la restauración desde dos ángulos.
+
+Preservado intacto de iter 3: `_navigateFallbackWelcome` con
+quita-lock, watchdog semántico, helpers `_withTimeout` /
+`_bootstrapSession` / `_onNoSessionFromGetSession`, retry+backoff,
+flag `_navigated` + try/finally, IA timeout 6s.
+
+**Verificación pendiente (San en preview Vercel):** F5 con sesión +
+liga + `porra_lastPage='grupos'` → restaura grupos (page-grupos
+visible, cards>0, `getActiveLeagueId` no null). NO welcome.
+Refresh anónimo / login fresco / logout real / background return →
+sin regresiones. Sin blank en ningún caso (iter 3 preservado).
+
+**Stats iter 4:** 1 fichero (`public/js/auth.js`, +35/-7 sobre iter
+3). Total acumulado en la rama: `public/js/auth.js` (~+365/-107
+sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`
+(PR #125). ERR-78 extendido con iter 4 + lecciones acumuladas
+(4 iteraciones).
+
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 
 **Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
