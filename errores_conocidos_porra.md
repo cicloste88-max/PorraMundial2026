@@ -1213,3 +1213,167 @@ apuestas como proxy "decorativo" — confunde al usuario.
 Aplicado en: `ui-groups.js` (PR#119, JO-1a hotfix). El mismo principio
 aplica a cualquier futura vista de calendario, ficha o resumen del torneo
 que iteramos sobre el bracket.
+
+## ERR-77 — `renderPanelPais`: match estricto `name_en === nameEn` rompe el roster en 5 selecciones con naming divergente
+
+**Síntoma:** en el overlay del globo 3D (`window._openGloboOverlay()`), al
+pulsar el botón "Plantilla" sobre Cape Verde, Czech Republic, Ivory Coast,
+Korea o Turkey, el modal de roster se abre vacío con el mensaje "Datos de
+plantilla aún no disponibles para esta selección" — aunque la tabla `squads`
+tiene los 26 jugadores reales y la query del cliente funciona logueado.
+Las otras 43 selecciones funcionan. En consola, `console.warn('[roster] iso3
+vacío — no se puede consultar squads')`.
+
+**Causa:** `renderPanelPais(wikiData, nombrePais, nameEn)` en
+`public/js/ui-globo-equipos.js` derivaba `iso3` con match estricto:
+
+```js
+var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; });
+if (eq) iso3 = eq.flag || '';
+```
+
+El 3er argumento `nameEn` es la **key canónica WIKI** (resuelta por
+`getWikiKey()` desde `ALIAS_WIKI`), no el `EQUIPOS.name_en`. Para 43
+selecciones ambos coinciden, pero 5 divergen:
+
+| WIKI key (nameEn) | EQUIPOS.name_en  | EQUIPOS.name        | flag |
+|-------------------|------------------|---------------------|------|
+| `Cape Verde`      | `Cabo Verde`     | `Cabo Verde`        | CPV  |
+| `Czech Republic`  | `Czechia`        | `República Checa`   | CZE  |
+| `Ivory Coast`     | `Côte d'Ivoire`  | `Costa de Marfil`   | CIV  |
+| `Korea`           | `South Korea`    | `República de Corea`| KOR  |
+| `Turkey`          | `Türkiye`        | `Turquía`           | TUR  |
+
+`find()` devuelve `undefined` → `iso3=''` → el botón
+`.fc-globo-detail__btn-roster` se renderiza con `data-iso3=""` →
+`openRosterScreen()` corta en `if (!iso3)` y nunca consulta `squads`. El
+fallback es el bloque `<div class="fc-roster-empty">Datos de plantilla aún
+no disponibles…</div>`, que el usuario interpreta como "BBDD vacía" cuando
+en realidad es un fallo de resolución cliente.
+
+**Fix (2 iteraciones sobre la rama `fix/globo-roster-iso3-naming`):**
+
+### Iteración 1 (commit `f92c1af`) — cascada NFD tolerante
+
+Primera aproximación: cascada NFD probando los 3 campos de EQUIPOS
+(`name_en`, `name`, `slug`) contra `nameEn` y `nombrePais`, preservando
+match exact-match como step 0. QA en preview Vercel reveló que arreglaba
+solo **3/5**:
+
+- ✅ Cape Verde / Korea / Turkey casaban — `EQUIPOS.name` (es) o `slug`
+  coincide con la WIKI key tras `_norm`.
+- ❌ Czech Republic / Ivory Coast fallaban en el escenario donde el
+  GeoJSON NE 50m devuelve directamente la WIKI key en `properties.NAME`
+  (p.ej. `NAME="Czech Republic"`, `NAME="Ivory Coast"`). En esa rama
+  tanto `nameEn` como `nombrePais` llegan iguales a la WIKI key, y
+  ningún campo de EQUIPOS contiene esas cadenas tras normalización:
+  - CZE: `name_en="Czechia"`, `slug="czech"` — nunca casa con `"czechrepublic"`.
+  - CIV: `name_en="Côte d'Ivoire"`, `slug="ivory-coast"` — sin colapsar
+    el guión, `_norm("ivory-coast")="ivory-coast"` ≠ `_norm("Ivory Coast")="ivory coast"`.
+  
+  Además, mi test inicial dio falso positivo (10/10) porque asumió que el
+  polygon path siempre pasa `nombrePais` = NE NAME (no la WIKI key); en
+  realidad la versión del NE GeoJSON puede devolver el nombre canónico ya
+  resuelto en `properties.NAME`, eliminando el "alias hop" intermedio.
+
+### Iteración 2 (este commit) — alias map explícito + cascada como red
+
+Diseño defensivo en 2 capas:
+
+**Vía PRINCIPAL** — mapa explícito `WIKIKEY_TO_ISO3` con las 5 divergencias
+conocidas. Conjunto cerrado y conocido (no crece sin nuevas selecciones al
+Mundial). Garantiza 5/5 independientemente del path de invocación, del
+contenido de NE GeoJSON, o de variaciones futuras en `_norm`:
+
+```js
+var WIKIKEY_TO_ISO3 = {
+  'Cape Verde':     'CPV',
+  'Czech Republic': 'CZE',
+  'Ivory Coast':    'CIV',
+  'Korea':          'KOR',
+  'Turkey':         'TUR'
+};
+if (nameEn && WIKIKEY_TO_ISO3[nameEn]) {
+  iso3 = WIKIKEY_TO_ISO3[nameEn];
+}
+```
+
+**Vía FALLBACK** — cascada NFD con `_norm` mejorado que también colapsa
+separadores comunes (`/[\s\-_'.]/g`). Step 0 preserva exact-match (cero
+regresión en las 43 ya operativas); el colapso de separadores blinda
+slugs con guiones (`ivory-coast` ↔ `ivorycoast`) y casos similares futuros:
+
+```js
+var _DIAC_RE = new RegExp('[\\u0300-\\u036f]', 'g');
+var _SEP_RE  = /[\s\-_'.]/g;
+var _norm = function (s) {
+  return (s || '').normalize('NFD').replace(_DIAC_RE, '')
+    .toLowerCase().replace(_SEP_RE, '').trim();
+};
+// ... cascada igual que iteración 1, preservando step 0 exact-match.
+```
+
+Por qué NO heurística de subcadena (descartada): `'korea'⊂'southkorea'`
+genera colisiones falsas — `EQUIPOS.find(t => t.name_en.includes('korea'))`
+también casaría con North Korea si existiera, y similar para "China" vs
+"South China" etc. El alias explícito evita ambigüedad.
+
+**Verificación (iteración 2):** script standalone parseando EQUIPOS REAL
+de `data.js` (no datos asumidos). **15/15 escenarios** para los 5 países
+divergentes — worst-case (`nameEn === nombrePais` = WIKI key) +
+polygon-path (NE name raw) + flag-button-path (Spanish name como
+`nombrePais`). Round-trip **48/48** con `EQUIPOS.name_en` raw + **48/48**
+simulando `getWikiKey()` (la forma real de invocación en producción).
+Cero regresiones.
+
+**Patrón:** cuando una función recibe nombres canónicos derivados de aliases
+(WIKI keys, NE polygon names, ISO labels, etc.) y los compara contra
+estructuras que usan otros canónicos (EQUIPOS.name_en es un canónico
+distinto al WIKI key), NUNCA confiar en `===` estricto, y **NO depender
+solo de NFD-normalize tolerante** si el conjunto de divergencias es
+cerrado y conocido. Diseño en dos capas:
+
+1. **Mapa explícito `<canónico-input> → <canónico-store>`** como vía
+   principal para divergencias conocidas. Garantiza correctness sin
+   depender de heurísticas que pueden romperse con cambios futuros en
+   `_norm` o en los datos upstream (GeoJSON NE versions).
+2. **Cascada NFD + colapso de separadores** como fallback defensivo.
+   Cubre los casos no-divergentes (exact-match step 0) y blinda contra
+   variantes ligeras (`ivory-coast` ↔ `ivory coast`, acentos, mayúsculas).
+
+Auditar sitios vulnerables:
+
+- `EQUIPOS.find(t => t.name_en === X)` → vulnerable si X viene de
+  `getWikiKey()`, `ALIAS_NE[]`, o cualquier otro espacio de naming.
+- `EQUIPOS.find(t => t.name === X)` → vulnerable si X es un texto inglés.
+- Patrones seguros existentes en repo: comparación contra `e.flag === iso3`
+  (iso3 es canónico estable) o `e.slug === slug` (con slug previamente
+  derivado del propio EQUIPOS).
+
+Aplicado en: `ui-globo-equipos.js:310-360` (rama `fix/globo-roster-iso3-naming`,
+PR #124, 31-may-2026). Único site detectado vía
+`grep "name_en === nameEn" public/js`. Otros `EQUIPOS.find` del repo usan
+`e.name`, `e.flag` o `e.slug` y no replican el patrón.
+
+### Pendiente separado — TUR `squads` vacío
+
+Tras este fix, la WIKI key "Turkey" resuelve correctamente al ISO3 "TUR",
+pero la tabla `squads` para `iso3='TUR'` tiene **0 jugadores** (las
+otras 4 selecciones del fix tienen pleno: CPV 26 · CZE 30 · CIV 26 ·
+KOR 26). El modal de plantilla seguirá saliendo vacío para Turquía con
+el mensaje "Datos de plantilla aún no disponibles" — pero esta vez por
+falta real de datos, no por bug de resolución cliente.
+
+Causa probable: la lista oficial de Turquía aún no se ha publicado en
+las fuentes que rastrea `scripts/sync-squads.mjs` (`--mode=detect` con
+cross-validate 2-of-N), o el detect rechazó las publicaciones por
+roster < 22. Acción recomendada cuando la convocatoria se anuncie:
+
+```bash
+npm run sync-squads -- --mode=scrape --iso3=TUR --verbose
+npm run sync-squads -- --mode=enrich-tm --iso3=TUR --verbose
+```
+
+(Ver regla `.claude/rules/sync-squads.md` §"--refresh-final" para el orden
+correcto cuando hay enrichment TM previo.) NO requiere cambios de código
+en el front — el resolver ya queda correcto.

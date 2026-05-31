@@ -307,10 +307,54 @@
         '<p class="fc-globo-detail__bio-text">' + b.bio_espn + '</p>' +
       '</details>';
     }
-    // F-10b: deriva iso3 desde EQUIPOS por name_en para el botón "Plantilla".
+    // F-10b: deriva iso3 desde EQUIPOS para el botón "Plantilla". Ver ERR-77.
+    //
+    // Match estricto `t.name_en === nameEn` (versión inicial) fallaba en 5
+    // selecciones cuyo EQUIPOS.name_en diverge de la WIKI key que llega al
+    // panel: Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic ·
+    // Côte d'Ivoire ≠ Ivory Coast · South Korea ≠ Korea · Türkiye ≠ Turkey.
+    // Sin match → iso3='' → openRosterScreen() corta en `if (!iso3)` y el
+    // modal sale "Datos de plantilla aún no disponibles" pese a haber
+    // jugadores en `squads`.
+    //
+    // QA en browser sobre la preview de Vercel demostró que una cascada
+    // NFD pura no basta: con un GeoJSON donde feat.properties.NAME ya
+    // devuelve la WIKI key (p.ej. NAME="Czech Republic" / "Ivory Coast"),
+    // tanto `nameEn` como `nombrePais` llegan iguales a la WIKI key y
+    // ningún campo de EQUIPOS contiene esa cadena (name_en="Czechia",
+    // slug="czech"; name_en="Côte d'Ivoire", slug="ivory-coast"). Por eso:
+    //
+    // 1) Vía PRINCIPAL — mapa explícito WIKI key → ISO3 para las 5
+    //    divergencias conocidas. Conjunto cerrado, garantiza 5/5 en todo
+    //    path de invocación independientemente de NE/_norm.
+    // 2) Vía FALLBACK — cascada NFD con _norm que también colapsa
+    //    separadores (`/[\s\-_'.]/g`) para que slugs con guiones casen
+    //    contra display names sin ellos. Step 0 preserva exact-match.
+    var WIKIKEY_TO_ISO3 = {
+      'Cape Verde':     'CPV',
+      'Czech Republic': 'CZE',
+      'Ivory Coast':    'CIV',
+      'Korea':          'KOR',
+      'Turkey':         'TUR'
+    };
     var iso3 = '';
-    if (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS) && nameEn) {
-      var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; });
+    if (nameEn && WIKIKEY_TO_ISO3[nameEn]) {
+      iso3 = WIKIKEY_TO_ISO3[nameEn];
+    } else if (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS) && (nameEn || nombrePais)) {
+      var _DIAC_RE = new RegExp('[\\u0300-\\u036f]', 'g');
+      var _SEP_RE  = /[\s\-_'.]/g;
+      var _norm = function (s) {
+        return (s || '').normalize('NFD').replace(_DIAC_RE, '').toLowerCase().replace(_SEP_RE, '').trim();
+      };
+      var nEn = _norm(nameEn);
+      var nEs = _norm(nombrePais);
+      var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name_en) === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name)    === nEs; })
+            || EQUIPOS.find(function (t) { return _norm(t.name)    === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name_en) === nEs; })
+            || EQUIPOS.find(function (t) { return _norm(t.slug)    === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.slug)    === nEs; });
       if (eq) iso3 = eq.flag || '';
     }
     var btnPlantilla = (
