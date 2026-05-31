@@ -1378,178 +1378,235 @@ npm run sync-squads -- --mode=enrich-tm --iso3=TUR --verbose
 correcto cuando hay enrichment TM previo.) NO requiere cambios de código
 en el front — el resolver ya queda correcto.
 
-## ERR-78 — Bootstrap auth congelado: `INITIAL_SESSION` sin retry/timeout/fallback deja la app vacía tras refresh
+## ERR-78 — Bootstrap auth congelado tras refresh: race de listener tardío + ausencia de `getSession()` explícito
 
-**Síntoma:** tras `F5` o recarga del navegador (o con red lenta), la app
-queda "congelada": el header global se ve (ADMIN, nombre, "Cerrar sesión"),
-pero el resto está vacío — azul liso, sin grupos, sin nav funcional, sin
-overlay de login. Reproducido en iPhone y Android. Pasa SOLO cuando el
-usuario tiene sesión persistida (login previo); usuarios anónimos ven
-welcome correctamente. Workaround del usuario: logout + login → cura
-porque reejecuta el flujo por la rama `SIGNED_IN` (no la `INITIAL_SESSION`).
+**Síntoma:** tras `F5` o recarga del navegador, la app queda "congelada":
+el header global se ve (ADMIN, nombre, "Cerrar sesión"), pero el resto
+está vacío — azul liso, sin grupos, sin nav funcional, sin overlay de
+login. Reproducido en iPhone y Android. Pasa SOLO cuando el usuario tiene
+sesión persistida (login previo); usuarios anónimos ven welcome
+correctamente. Workaround del usuario: logout + login → cura porque
+reejecuta el flujo por la rama `SIGNED_IN` (que se emite DESPUÉS del
+registro del listener, no la `INITIAL_SESSION` original).
 
 En consola: NO hay error visible. `_myLeagues` queda `[]`, `getActiveLeagueId()`
-devuelve `null`. Reejecutar manualmente `window.leagueLoadMyLeagues()` en
-la consola resuelve en ~862ms y devuelve 3 ligas; reejecutar
-`window.leagueSelectById('<id-guardado>')` restaura la página completa
-con sus 7 cards. Diagnóstico: fallo transitorio del primer fetch SIN
-reintento NI fallback.
+devuelve `null`. **Pero el dato clave** del diagnóstico definitivo (sesión
+en preview Vercel + Chrome MCP): suscribir un listener NUEVO Y llamar a
+`db.auth.getSession()` manualmente devuelve `{hasSession:true}` con todos
+los campos correctos. La sesión EXISTE; solo nadie la procesa.
 
-**Causa:** en `runAuthInit > db.auth.onAuthStateChange` (`public/js/auth.js`),
-branch `INITIAL_SESSION` (refresh con sesión existente), el flujo
-encadenaba:
+**Causa REAL (revisada tras QA en preview Vercel):** RACE DE REGISTRO TARDÍO
+del listener, NO el fallo transitorio de `leagueLoadMyLeagues` que asumía
+la iteración inicial del fix. La iteración inicial (commit `5405ebc`) añadía
+retry + timeout + `_navigated` + watchdog DENTRO del handler de
+`db.auth.onAuthStateChange` — pero **el handler nunca se ejecutaba** para
+el evento `INITIAL_SESSION` en el escenario reproducido, así que ninguna
+de esas mejoras corría.
 
-```js
-if (savedLeagueId && typeof leagueLoadMyLeagues === 'function') {
-  await leagueLoadMyLeagues();                    // (1) puede fallar / colgar
-  const found = _myLeagues.find(l => l.id === savedLeagueId);
-  if (found) {
-    await leagueSelectById(savedLeagueId);        // (2) puede fallar / colgar
-    renderAuthBar(); updateCTAs();
-    return;                                       // early return
-  }
-  localStorage.removeItem('porra_active_league_id'); // (3) borra incluso en transient
-}
-await loadUserData(session.user.id);              // (4) puede fallar / colgar
-setTimeout(() => showPage(finalPage), 100);
-```
+Por qué el listener no recibe el evento:
 
-Tres fallos compuestos:
+1. `auth.js` se carga al FINAL de la cadena `loadScript` (es de los últimos
+   classic scripts en ejecutarse). Antes de él, supabase-js ya ha sido
+   inicializado (`createClient(...)` con `persistSession: true`).
+2. Durante `createClient` / restauración de la sesión persistida en
+   `localStorage`, supabase-js emite `INITIAL_SESSION` automáticamente.
+3. En ese momento NADIE está suscrito (auth.js todavía no ha llegado a
+   registrar su `onAuthStateChange`).
+4. Cuando auth.js finalmente ejecuta `db.auth.onAuthStateChange(handler)`,
+   el evento `INITIAL_SESSION` YA pasó. supabase-js NO reemite eventos
+   pasados a listeners nuevos. El handler del bootstrap queda huérfano:
+   nunca se invoca para el evento que lo activaría.
+5. Consecuencia: retry, timeout, `_navigated`, watchdog — TODO vive dentro
+   del handler. Si el handler no corre, ninguno protege. La app queda
+   indefinidamente con el shell montado pero hijos a `height:0`.
 
-1. **`leagueLoadMyLeagues()` sin retry.** El cliente Supabase con
-   `window._porraToken` (creado tras `signIn`) a veces no está completamente
-   listo al primer fetch del bootstrap — race condition entre `INITIAL_SESSION`
-   y la propagación del token. La función ya tiene path graceful
-   `if (mErr) { console.warn(...); return []; }` que devuelve `[]` en error
-   silencioso. `.find()` sobre `[]` → `undefined` → no se entra en
-   `leagueSelectById`.
+Por qué logout+login lo cura: `SIGNED_IN` se emite DESPUÉS de
+`signInWithPassword`, en un momento donde el listener YA está registrado.
+El handler corre, el bootstrap navega, todo bien.
 
-2. **Sin timeout en los `await`s.** `db.from(...).select(...)` de Supabase
-   no expone `signal: AbortSignal` nativo. Un fetch transitoriamente
-   colgado deja el `await` en pending para siempre — el handler nunca
-   completa, ningún `showPage` se llama, y como el código previo en
-   `runAuthInit` evita pintar welcome si hay `_pendingPageRestore` (línea
-   510 original), la pantalla queda mostrando solo el header global (que
-   sí se renderizó al cargar `index.html`).
+Prueba definitiva en preview Vercel con Chrome MCP:
+- Suscribir un listener NUEVO en consola después del refresh → no recibe
+  nada (el `INITIAL_SESSION` ya pasó).
+- Llamar `db.auth.getSession()` manualmente → devuelve `{data:{session:{...}}}`
+  con sesión válida.
+- Llamar `leagueLoadMyLeagues()` manualmente → resuelve en ~862ms con
+  3 ligas. La red funciona perfectamente; solo nadie la llama.
 
-3. **`if (found) {...; return;}` early-return.** Si `leagueSelectById`
-   throwba o se colgaba entre el `find()` y el `leagueSelect` (timing
-   con `_loadInFlight` dedup), el handler salía con `return` sin que
-   ningún `showPage` se hubiera llamado. Sin la red de seguridad de un
-   `finally`.
+Tres fallos compuestos del diseño original (que en conjunto producen el
+síntoma vacío) — todos relevantes, pero solo (4) es la causa raíz:
+
+1. **`leagueLoadMyLeagues()` sin retry** — añadiría robustez si el handler
+   corriera, pero no corre.
+2. **Sin timeout en los `await`s** — mismo: relevante solo si el handler
+   ejecuta.
+3. **Early-return `if (found) {...; return;}`** — mismo.
+4. **CAUSA RAÍZ: `INITIAL_SESSION` se emite ANTES de que el listener
+   esté suscrito** — el handler nunca ejecuta, así que ninguna de las
+   mejoras anteriores tiene efecto.
 
 Adicionalmente: el `localStorage.removeItem('porra_active_league_id')`
 en el path "no encontrado" se ejecutaba INCLUSO si la ausencia era
 transient — borrando datos legítimos del usuario y forzando recovery
 manual aunque la red volviera al siguiente refresh.
 
-**Fix (rama `fix/auth-bootstrap-frozen-refresh`):**
+**Fix (rama `fix/auth-bootstrap-frozen-refresh`, 2 iteraciones):**
 
-Refactor del branch `SIGNED_IN`/`INITIAL_SESSION` preservando intactos
-los guards de la línea 431 (`TOKEN_REFRESHED`/`USER_UPDATED`) y la línea
-445 (`currentUser.id === session.user.id`). Esos dos guards previenen
-bucles de `showPage` al volver de segundo plano; el fix convive con
-ellos sin pisarlos.
+### Iteración 1 (commit `5405ebc`) — retry + timeout + watchdog DENTRO del handler
 
-**A) Helper `_withTimeout(promise, ms, label)`** — `Promise.race` que
-rechaza si la promesa no resuelve en `ms`. Aplicado a los 4 awaits
-críticos del bootstrap:
+Primera aproximación: añadir robustez al handler asumiendo que se invocaba
+pero que sus awaits internos colgaban. Componentes: `_withTimeout`, retry
+con backoff sobre `leagueLoadMyLeagues`, flag `_navigated` + try/finally,
+loader gated por `sessionStorage.porra_token`, watchdog de 12s dentro de
+un `if (_potentialSession)`.
 
-- `profile fetch` → 8000ms
-- `leagueLoadMyLeagues` → 8000ms (por intento)
-- `leagueSelectById` → 8000ms
-- `loadUserData` → 10000ms
+QA en preview Vercel reveló que **el handler nunca se ejecutaba** en el
+escenario problemático. Pasaron MINUTOS sin que el watchdog rescatara,
+porque el watchdog también vivía dentro del bloque que dependía de
+`sessionStorage.porra_token` (token que solo escribe el HANDLER cuando
+ejecuta — circular).
 
-Timeout dispara `throw` → `try/catch` registra `console.warn` y el flujo
-continúa. NO bloquea el bootstrap.
+### Iteración 2 (este commit) — `getSession()` explícito + bootstrap extraído + watchdog incondicional
 
-**B) Retry con backoff** sobre `leagueLoadMyLeagues()`:
+Refactor estructural que ataca la causa raíz (race de listener tardío):
+
+**A) `_bootstrapSession(session, eventType)` extraído** — función reutilizable
+con TODO el flujo de bootstrap (profile fetch, retry leagueLoadMyLeagues,
+loadUserData, showPage) que se invoca desde DOS puntos de entrada:
+
+1. `onAuthStateChange` handler — cubre cambios FUTUROS (login fresco
+   `SIGNED_IN`, o `INITIAL_SESSION` si supabase decide emitirlo después
+   del registro — caso teórico).
+2. `db.auth.getSession()` EXPLÍCITO tras registrar el listener — cubre
+   el race original. El patrón canónico Supabase v2 es:
+
+   ```js
+   // Snapshot inicial — cubre sesión ya restaurada
+   const { data: { session } } = await supabase.auth.getSession();
+   if (session?.user) bootstrap(session, 'INITIAL_SESSION');
+   // Listener — cubre cambios futuros
+   supabase.auth.onAuthStateChange((event, session) => { ... });
+   ```
+
+   En esta codebase el orden es invertido (listener primero, getSession
+   después) por consistencia con el handler delegante, pero la semántica
+   es la misma: getSession sincroniza el bootstrap con la sesión EXISTENTE
+   al cargar, independiente de qué eventos haya emitido supabase antes.
+
+**B) Guard idempotente `window._bootstrapInFlight`** — si `_bootstrapSession`
+ya está en vuelo cuando se invoca de nuevo (ambas vías compiten en algunos
+timings), la segunda llamada retorna inmediatamente. Más el guard preservado
+de `currentUser.id === session.user.id` (mismo usuario ya hidratado →
+solo refresca UI bar).
+
+**C) Loader + watchdog 12s armados INCONDICIONALMENTE al inicio de
+`runAuthInit`**, FUERA del handler. Antes el gating por
+`sessionStorage.porra_token` era circular (el token solo se escribía
+desde el handler que no corría). Ahora:
 
 ```js
-const _delays = [400, 800, 1600]; // 4 intentos totales
-for (let _attempt = 0; _attempt <= _delays.length; _attempt++) {
-  try { await _withTimeout(leagueLoadMyLeagues(), 8000, '...'); }
-  catch (err) { console.warn(...); }
-  const _myLg = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
-  _foundLeague = _myLg.find(l => l.id === savedLeagueId);
-  if (_foundLeague) break;
-  if (_attempt < _delays.length) await new Promise(r => setTimeout(r, _delays[_attempt]));
-}
-```
-
-Worst-case total con timeouts en cascada: 4×8000ms + 400+800+1600 ≈ 35s
-antes de rendirse — pero típicamente el 2º intento ya casa (la consola
-manual del reporte resolvía en 862ms).
-
-**C) `_navigated` flag + `try/finally`** garantiza `showPage` en TODOS
-los caminos:
-
-```js
-let _navigated = false;
-const _markNavigated = () => { _navigated = true; _hideBootstrapLoader(); };
-try {
-  // ... retry block, leagueSelectById, fall-through loadUserData+showPage ...
-  if (!_navigated) { /* fall-through */ setTimeout(() => showPage(finalPage), 100); _markNavigated(); }
-} finally {
-  if (!_navigated) {
-    console.warn('[auth.bootstrap] handler no navegó; forzando welcome (red final).');
-    setTimeout(() => showPage('welcome'), 100);
+_showBootstrapLoader();
+setTimeout(function () {
+  if (document.getElementById('_auth-bootstrap-loader')) {
+    console.warn('[auth.bootstrap] watchdog 12s: ningún path navegó. Forzando welcome.');
+    _hideBootstrapLoader();
+    try { if (typeof showPage === 'function') showPage('welcome'); } catch (e) {}
   }
-}
+}, 12000);
 ```
 
-**D) Preservar `savedLeagueId`** si tras 4 intentos `_myLeagues` sigue
-vacío (probable transient — el próximo refresh tendrá otra oportunidad).
-Solo limpia si `_myLeagues.length > 0` pero la guardada no aparece
-(stale id legítimo: usuario kickeado, liga borrada por admin, etc.).
+El loader es harmless para usuarios anónimos (welcome path lo oculta
+inmediatamente al renderizar). El watchdog rescata cualquier escenario
+extremo donde todas las capas fallan.
 
-**E) Loader visible durante bootstrap.** Inyecta `#_auth-bootstrap-loader`
-(fixed center, inline CSS, sin dependencia de `.css` externo) si hay
-token persistido en `sessionStorage` o `_pendingPageRestore` — escenarios
-donde `runAuthInit` evita pintar welcome inicial y la pantalla quedaría
-vacía mientras el handler corre. Removido al primer `_markNavigated()`
-o tras 12s de watchdog.
+**D) Helper `_withTimeout(promise, ms, label)`** — preservado del commit
+anterior. `Promise.race` aplicado a profile fetch (8s),
+`leagueLoadMyLeagues` (8s por intento), `leagueSelectById` (8s),
+`loadUserData` (10s), Y al nuevo `db.auth.getSession()` (8s — protege
+también contra hangs del cliente Supabase).
 
-**F) Watchdog 12s.** `setTimeout` que fuerza `showPage('welcome')` +
-oculta loader si nada navega. Red EXTREMA para el caso donde todos los
-timeouts individuales fallan en cascada y aun así no se queda navegado.
+**E) Retry con backoff** preservado del commit anterior — 4 intentos
+con delays 0/400/800/1600ms sobre `leagueLoadMyLeagues()`.
+
+**F) Flag `_navigated` + try/finally** preservado del commit anterior —
+garantiza `showPage` en TODOS los caminos internos del bootstrap.
+
+**G) Preservar `savedLeagueId`** preservado del commit anterior — solo
+limpia si `_myLeagues.length > 0` pero la guardada no aparece (stale id
+legítimo).
+
+**H) Fallback para getSession sin sesión + `_pendingPageRestore`** — edge
+case nuevo: si `getSession()` devuelve null pero `_pendingPageRestore`
+estaba seteado (sesión expirada entre tab close y reopen), el `.then`
+limpia el pending y navega a welcome.
 
 **Verificación pendiente:** QA en preview Vercel reproduciendo el
-refresh múltiples veces. Lección PR#124 (caso roster iso3): el test
-standalone con asunciones de timing/datos no captura la realidad del
-navegador — el QA en browser es el único definitivo.
+refresh real (sesión persistida + F5 donde `INITIAL_SESSION` se emitió
+antes del registro del listener). El test que importa NO es "simular
+el evento del listener" — ese es justo el que falla y no se invoca.
+El test definitivo es: tras refresh, comprobar que `db.auth.getSession()`
+explícito arranca igualmente el flow (showPage llamado, shell con
+altura, jugadores visibles).
 
-Casos a cubrir:
+Lección PR#124 (caso roster iso3) reforzada: el test standalone con
+asunciones de timing/eventos NO captura la realidad del navegador.
+Adicionalmente lección de la iteración 1 de este mismo ERR: validar
+que el handler del listener REALMENTE se invoca antes de poner toda
+la lógica de robustez dentro de él.
 
-- Simular `leagueLoadMyLeagues` que falla la 1ª vez y resuelve en la 2ª
-  (red lenta) → la app debe acabar mostrando grupos (página guardada).
-- Refresh normal (red sana) → restaura la última página (`_pendingPageRestore`)
-  como hasta ahora, sin regresión.
-- Caso sin liga activa (`savedLeagueId=null`) → welcome, como hoy.
-- Caso `SIGNED_IN` (login fresco) → welcome, como hoy. El bloque de
-  retry está dentro de `if (event === 'INITIAL_SESSION')`, no afecta
-  el path SIGNED_IN.
-- Volver de segundo plano → guard `currentUser.id === session.user.id`
-  sigue intacto, evita bucle de `showPage`.
+Casos a cubrir en QA:
 
-**Patrón:** cualquier bootstrap async que dependa de awaits en cadena
-necesita las 3 capas:
+- **Refresh con sesión persistida + `_pendingPageRestore='grupos'`** —
+  caso original del bug. La app debe acabar mostrando grupos.
+- **Refresh normal sin `_pendingPageRestore`** — welcome aparece
+  inmediatamente; getSession resuelve, _bootstrapSession navega a
+  grupos sobreescribiendo welcome. Sin regresión.
+- **Refresh anónimo (sin sesión persistida)** — welcome aparece;
+  getSession resuelve sin sesión, loader oculto, app navegable.
+- **Sesión expirada con `_pendingPageRestore` obsoleto** — fallback
+  H del fix limpia pending y muestra welcome.
+- **Login fresco (`SIGNED_IN`)** — listener handler dispara
+  _bootstrapSession con eventType='SIGNED_IN' → welcome. Sin regresión.
+- **Volver de segundo plano (re-emisión SIGNED_IN)** — guard
+  `currentUser.id === session.user.id` en _bootstrapSession captura
+  esto: _hideBootstrapLoader + renderAuthBar + return. Evita bucle.
+- **Race: listener Y getSession ambos disparan _bootstrapSession** —
+  guard `_bootstrapInFlight` garantiza solo una ejecución real.
 
-1. **Retry con backoff** para transients (red lenta, token no propagado, etc.).
-2. **Timeout individual** por await (`Promise.race`) para no colgar
-   indefinidamente cuando un fetch sin `signal` se atasca.
-3. **Garantía de finalización visible** (flag + `try/finally` + watchdog
-   global) para que el usuario SIEMPRE vea algo navegable, incluso si
-   todas las capas anteriores fallan.
+**Patrón:** todo bootstrap async basado en suscripción a eventos
+necesita TRES capas, pero la ORDEN importa:
 
-Auditar otros bootstraps que sigan este patrón vulnerable:
+1. **Snapshot inicial vía getter explícito** (`db.auth.getSession()`).
+   Cubre la sesión YA EXISTENTE al momento en que se carga el código,
+   independiente de si el evento original se emitió antes del registro
+   del listener. **Esta es la capa más importante** — sin ella, las
+   otras dos solo aplican a cambios futuros.
 
-- `mundial-shell-v3.js` listener `mundial:leagues-loaded` — depende de
-  `leagueLoadMyLeagues()` también. Pero al ser reactivo (no bloqueante),
-  baja prioridad.
-- `loadUserData` interno (no auditado en este PR) — si hace varios fetches
-  encadenados sin timeout, puede dejar predicciones sin cargar. Backlog
-  futuro.
+2. **Listener de cambios** (`onAuthStateChange`) — cubre eventos
+   posteriores al snapshot. Login fresco, logout, token refresh,
+   sesión expirada por el servidor, etc.
 
-Aplicado en: `public/js/auth.js` (`runAuthInit` + `onAuthStateChange`,
-rama `fix/auth-bootstrap-frozen-refresh`, 31-may-2026).
+3. **Robustez interna del bootstrap** — retry, timeout, try/finally,
+   watchdog. Cubre fallos transitorios DENTRO del flujo de bootstrap
+   una vez se invoca.
+
+Sin (1), las capas (2) y (3) son inútiles cuando el evento de interés
+ya pasó antes del registro. La iteración 1 de este fix (commit
+`5405ebc`) demostró esta lección de manera dolorosa: tenía (2) y (3)
+pero no (1), y el bug persistía.
+
+Auditar otros bootstraps que sigan el patrón vulnerable "solo listener
+sin snapshot":
+
+- `mundial-shell-v3.js` listener `mundial:leagues-loaded` — dispara
+  desde leagueLoadMyLeagues. Como el shell se renderiza tras auth,
+  baja prioridad (auth dispara leagueLoadMyLeagues que dispara el
+  event); pero si se cambia el orden de carga, se rompería.
+- `loadUserData` interno (no auditado en este PR) — si hace varios
+  fetches encadenados sin timeout, puede dejar predicciones sin cargar.
+  Backlog futuro.
+
+Aplicado en: `public/js/auth.js` (`runAuthInit` con `_bootstrapSession`
+extraído + `db.auth.getSession()` explícito tras `onAuthStateChange`,
+rama `fix/auth-bootstrap-frozen-refresh`, 31-may-2026, 2 iteraciones:
+`5405ebc` (retry/timeout/watchdog dentro del handler — insuficiente) +
+iter 2 (extract + getSession + watchdog incondicional — root cause fix)).

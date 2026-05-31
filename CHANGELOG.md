@@ -60,8 +60,47 @@ imprescindibles contra bucles al volver de segundo plano):**
 refresh múltiples veces. Lección PR#124: el test standalone no basta para
 validar timing real de fetch — el QA en browser es obligatorio.
 
-**Stats:** 1 fichero tocado (`public/js/auth.js`). Rama
-`fix/auth-bootstrap-frozen-refresh`. Nuevo ERR-78.
+**Iteración 1 (commit `5405ebc`):** retry + timeout + `_navigated` flag +
+watchdog DENTRO del handler de `onAuthStateChange`. QA en preview Vercel
+reveló que el bug PERSISTE: el handler nunca se ejecuta porque
+supabase-js ya emitió `INITIAL_SESSION` durante `createClient` /
+restauración persistida ANTES de que `auth.js` cargue y registre su
+listener (auth.js está al final de la cadena `loadScript`). Toda la
+robustez añadida vive dentro de un handler huérfano.
+
+**Iteración 2 (este commit):** refactor estructural atacando la causa
+raíz — race de listener tardío.
+
+- **`_bootstrapSession(session, eventType)` extraído** a función
+  reutilizable con TODO el flujo (profile fetch, retry, loadUserData,
+  showPage). Invocada desde DOS puntos: el handler de `onAuthStateChange`
+  (cambios futuros) Y `db.auth.getSession()` explícito tras el registro
+  del listener (snapshot de sesión ya existente).
+- **Guard `window._bootstrapInFlight`** evita doble ejecución cuando
+  ambas vías compiten. Más el guard preservado de
+  `currentUser.id === session.user.id`.
+- **Loader + watchdog 12s armados INCONDICIONALMENTE** al inicio de
+  `runAuthInit`, fuera del handler. Antes el gating por
+  `sessionStorage.porra_token` era circular (token solo se escribía
+  desde el handler que no corría).
+- **`_withTimeout` aplicado también a `db.auth.getSession()`** (8s) —
+  protege contra hangs del cliente Supabase en la llamada explícita.
+- **Edge case**: si `getSession()` devuelve sin sesión pero
+  `_pendingPageRestore` estaba seteado (sesión expirada entre tab close
+  y reopen), limpiar pending y mostrar welcome.
+
+**Verificación pendiente (San en preview Vercel):** refresh con sesión
+persistida + `_pendingPageRestore='grupos'` debe acabar mostrando grupos.
+Refresh normal sin regresión. Refresh anónimo sin flash de loader
+persistente. Login fresco normal. Background return sin bucle de
+showPage. Lección reforzada de PR#124 y de iter 1 de este mismo ERR:
+nada de test standalone sustituye al QA en browser.
+
+**Stats:** 1 fichero tocado en iter 2 (`public/js/auth.js`, refactor
+cohesivo). Total acumulado en la rama: `public/js/auth.js` (+~270/-~85
+sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`. ERR-78
+reescrito con la causa real (race de listener tardío, no transient de
+leagueLoadMyLeagues).
 
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 
