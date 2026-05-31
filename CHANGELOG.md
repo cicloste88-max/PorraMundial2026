@@ -2,6 +2,39 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
+
+**Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
+Czech Republic, Ivory Coast, Korea o Turkey abría el modal con el mensaje
+"Datos de plantilla aún no disponibles para esta selección" pese a que la
+tabla `squads` tiene los 26 jugadores. Las otras 43 selecciones funcionaban.
+Detectado por Claude.ai vía MCP + Chrome en sesión paralela.
+
+**Causa:** `renderPanelPais` (`public/js/ui-globo-equipos.js:313`) derivaba
+`iso3` con match estricto `EQUIPOS.find(t => t.name_en === nameEn)`. El 3er
+argumento `nameEn` que llega al panel es la key WIKI canónica (resuelta por
+`getWikiKey()`), que para 5 selecciones diverge del `EQUIPOS.name_en`:
+Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic · Côte d'Ivoire ≠ Ivory
+Coast · South Korea ≠ Korea · Türkiye ≠ Turkey. Sin match → `iso3=''` → el
+botón `.fc-globo-detail__btn-roster` recibía `data-iso3=""` → `openRosterScreen`
+cortaba en `if (!iso3)` con `console.warn('[roster] iso3 vacío')` y nunca
+consultaba `squads`.
+
+**Fix:** cascada tolerante con normalización NFD (strip combining marks +
+lowercase + trim) probando los 3 campos disponibles en EQUIPOS (`name_en`,
+`name`, `slug`) contra `nameEn` y `nombrePais`. Preserva la rama exact-match
+como step 0 (sin regresión para las 43 que ya casaban). El `slug` se añade
+al final para cubrir Turkey, donde NFD no salva la distancia "Türkiye" → "Turkey"
+(la `ü` decompone a `u+̈` pero la `i` extra del nombre turco persiste);
+`t.slug="turkey"` cierra el caso.
+
+**Verificación:** script standalone con los 48 EQUIPOS reales — 10/10 escenarios
+de los 5 países rotos (paths polygon + flag) resuelven al iso3 correcto;
+round-trip 48/48 sin regresiones. Cero cambios en BBDD, EF u otros ficheros.
+
+**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`, +17/-2). Rama
+`fix/globo-roster-iso3-naming`. Nuevo ERR-77.
+
 ## [31-may-2026] Saga JO Jornada — 6 PRs #116→#121 (CERRADA)
 
 Sesión enfocada 100% en la pantalla Jornada y sus interacciones con login y

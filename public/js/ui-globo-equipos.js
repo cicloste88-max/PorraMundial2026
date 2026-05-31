@@ -308,9 +308,30 @@
       '</details>';
     }
     // F-10b: deriva iso3 desde EQUIPOS por name_en para el botón "Plantilla".
+    // Match estricto `t.name_en === nameEn` fallaba en 5 selecciones cuyo
+    // EQUIPOS.name_en diverge del key WIKI/NE que llega al panel:
+    //   Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic ·
+    //   Côte d'Ivoire ≠ Ivory Coast · South Korea ≠ Korea · Türkiye ≠ Turkey
+    // Sin match → iso3='' → openRosterScreen() corta en `if (!iso3)` y el
+    // modal sale "Datos de plantilla aún no disponibles" pese a haber 26
+    // jugadores en `squads`. Fix: cascada tolerante con normalización NFD
+    // contra los 3 campos disponibles en EQUIPOS (name_en, name, slug)
+    // usando nameEn y nombrePais como fuentes. Ver ERR-77.
     var iso3 = '';
-    if (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS) && nameEn) {
-      var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; });
+    if (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS) && (nameEn || nombrePais)) {
+      var _DIAC_RE = new RegExp('[\\u0300-\\u036f]', 'g');
+      var _norm = function (s) {
+        return (s || '').normalize('NFD').replace(_DIAC_RE, '').toLowerCase().trim();
+      };
+      var nEn = _norm(nameEn);
+      var nEs = _norm(nombrePais);
+      var eq = EQUIPOS.find(function (t) { return t.name_en === nameEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name_en) === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name)    === nEs; })
+            || EQUIPOS.find(function (t) { return _norm(t.name)    === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.name_en) === nEs; })
+            || EQUIPOS.find(function (t) { return _norm(t.slug)    === nEn; })
+            || EQUIPOS.find(function (t) { return _norm(t.slug)    === nEs; });
       if (eq) iso3 = eq.flag || '';
     }
     var btnPlantilla = (
