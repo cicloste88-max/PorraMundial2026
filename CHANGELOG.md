@@ -7,7 +7,8 @@ Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 **Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
 Czech Republic, Ivory Coast, Korea o Turkey abría el modal con el mensaje
 "Datos de plantilla aún no disponibles para esta selección" pese a que la
-tabla `squads` tiene los 26 jugadores. Las otras 43 selecciones funcionaban.
+tabla `squads` tiene los jugadores (CPV 26 · CZE 30 · CIV 26 · KOR 26;
+TUR 0 — ver pendiente separado). Las otras 43 selecciones funcionaban.
 Detectado por Claude.ai vía MCP + Chrome en sesión paralela.
 
 **Causa:** `renderPanelPais` (`public/js/ui-globo-equipos.js:313`) derivaba
@@ -20,20 +21,42 @@ botón `.fc-globo-detail__btn-roster` recibía `data-iso3=""` → `openRosterScr
 cortaba en `if (!iso3)` con `console.warn('[roster] iso3 vacío')` y nunca
 consultaba `squads`.
 
-**Fix:** cascada tolerante con normalización NFD (strip combining marks +
-lowercase + trim) probando los 3 campos disponibles en EQUIPOS (`name_en`,
-`name`, `slug`) contra `nameEn` y `nombrePais`. Preserva la rama exact-match
-como step 0 (sin regresión para las 43 que ya casaban). El `slug` se añade
-al final para cubrir Turkey, donde NFD no salva la distancia "Türkiye" → "Turkey"
-(la `ü` decompone a `u+̈` pero la `i` extra del nombre turco persiste);
-`t.slug="turkey"` cierra el caso.
+**Fix (2 commits sobre la rama `fix/globo-roster-iso3-naming`):**
 
-**Verificación:** script standalone con los 48 EQUIPOS reales — 10/10 escenarios
-de los 5 países rotos (paths polygon + flag) resuelven al iso3 correcto;
-round-trip 48/48 sin regresiones. Cero cambios en BBDD, EF u otros ficheros.
+- **Commit 1 (`f92c1af`)** — cascada NFD tolerante (`name_en`/`name`/`slug` ×
+  `nameEn`/`nombrePais`). QA en preview Vercel reveló que arreglaba solo 3/5:
+  con un GeoJSON donde `feat.properties.NAME` ya devuelve la WIKI key directa
+  (p.ej. `NAME="Czech Republic"`, `NAME="Ivory Coast"`), tanto `nameEn` como
+  `nombrePais` llegaban iguales y ningún campo de EQUIPOS contenía esas
+  cadenas (`name_en="Czechia"`/`slug="czech"`; `name_en="Côte d'Ivoire"`/`slug="ivory-coast"`).
+  Cape Verde / Korea / Turkey casaban porque EQUIPOS.name (es) o slug coincide
+  con la WIKI key; Czech Republic e Ivory Coast no.
 
-**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`, +17/-2). Rama
-`fix/globo-roster-iso3-naming`. Nuevo ERR-77.
+- **Commit 2 (este)** — diseño defensivo en 2 capas:
+  1. **Vía principal**: mapa explícito `WIKIKEY_TO_ISO3` con las 5 divergencias
+     conocidas (`Cape Verde`→`CPV`, `Czech Republic`→`CZE`, `Ivory Coast`→`CIV`,
+     `Korea`→`KOR`, `Turkey`→`TUR`). Conjunto cerrado y conocido — garantiza
+     5/5 independientemente de variaciones futuras en NE / `_norm`.
+  2. **Vía fallback**: cascada NFD con `_norm` mejorado que ahora también
+     colapsa separadores (`/[\s\-_'.]/g`). Step 0 preserva exact-match.
+     Blinda contra slugs con guiones (`ivory-coast` ↔ `ivorycoast`) y casos
+     similares futuros.
+
+**Verificación:** script standalone parseando EQUIPOS REAL de `data.js`
+(no datos asumidos) — 15/15 escenarios para las 5 divergentes (worst-case
+`nameEn === nombrePais` + polygon-path + flag-button-path) + round-trip
+48/48 con `EQUIPOS.name_en` raw + round-trip 48/48 simulando `getWikiKey()`.
+Cero regresiones. Cero cambios en BBDD, EF u otros ficheros.
+
+**Hallazgo independiente (no incluido en este PR):** `squads` para TUR
+(ISO3=TUR) tiene 0 jugadores; las otras 4 tienen pleno (CPV 26 · CZE 30 ·
+CIV 26 · KOR 26). Aunque el iso3 de Turquía ya quede bien resuelto, su
+modal saldrá vacío por falta de datos. Es problema del sync de plantillas
+(`scripts/sync-squads.mjs` + workflow), no del front. Anotado en
+`errores_conocidos_porra.md` ERR-77 como pendiente separado.
+
+**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`). Rama
+`fix/globo-roster-iso3-naming` (PR #124). Nuevo ERR-77 (revisado).
 
 ## [31-may-2026] Saga JO Jornada — 6 PRs #116→#121 (CERRADA)
 
