@@ -43,11 +43,13 @@ async function sbLoad(forceRefresh = false) {
   document.getElementById('sb-my-breakdown').style.display = 'none';
 
   try {
-    // 1. Todos los profiles
-    const { data: profiles, error: pe } = await db.from('profiles').select('id,nombre');
-    if (pe) throw pe;
-
-    // 2. Predictions filtradas por liga activa
+    // PR-1 Capa 2: el cómputo ahora vive en la Edge Function
+    // `get-league-standings`. Reemplaza las 4 lecturas de tablas + el cálculo
+    // cliente con 1 invocación. La EF aplica el motor _shared/scoring.mjs
+    // (parity 1:1 con public/js/scoring.js, validado por tests) y devuelve
+    // SOLO totales agregados — los picks ajenos NUNCA llegan al cliente,
+    // así que no necesitamos relajar las RLS de predictions/ko_predictions/
+    // award_picks. Ver supabase/functions/get-league-standings/index.ts.
     const _sbLeagueId = getActiveLeagueId();
     if (!_sbLeagueId) {
       document.getElementById('sb-loading').style.display = 'none';
@@ -57,120 +59,20 @@ async function sbLoad(forceRefresh = false) {
       if (refreshBtn) refreshBtn.classList.remove('spinning');
       return;
     }
-    const { data: preds, error: pre } = await db.from('predictions').select('*').eq('league_id', _sbLeagueId);
-    if (pre) throw pre;
 
-    // 3. Ko_predictions filtradas por liga activa
-    const { data: koPreds, error: koe } = await db.from('ko_predictions').select('*').eq('league_id', _sbLeagueId);
-    if (koe) throw koe;
-
-    // 4. Award_picks filtrados por liga activa
-    const { data: awards, error: ae } = await db.from('award_picks').select('*').eq('league_id', _sbLeagueId);
-    if (ae) throw ae;
-
-    // Guardia RLS: si profiles viene vacío, avisar con mensaje claro
-    if (!profiles || profiles.length === 0) {
-      document.getElementById('sb-loading').style.display = 'none';
-      const emptyEl = document.getElementById('sb-empty');
-      emptyEl.style.display = 'block';
-      emptyEl.querySelector('.sb-empty-text').innerHTML =
-        'Sin acceso a datos de participantes.<br>' +
-        '<span style="font-size:11px;color:#374151;margin-top:6px;display:block">' +
-        'Ejecuta las políticas RLS públicas en Supabase para el scoreboard.</span>';
-      if (refreshBtn) refreshBtn.classList.remove('spinning');
-      return;
+    const { data, error } = await db.functions.invoke('get-league-standings', {
+      body: { league_id: _sbLeagueId },
+    });
+    if (error) throw error;
+    if (!data || !Array.isArray(data.rows)) {
+      throw new Error('respuesta inválida (sin rows)');
     }
 
-    // 5. Resultados reales (si existe la tabla)
-    let realMatchResults   = null;
-    let realKoResults      = null;
-    let realAwardWinners   = null;
-    let realClassification = null;
-    try {
-      const { data: res } = await db.from('results').select('*').single();
-      if (res) {
-        realMatchResults   = res.match_results   ? JSON.parse(res.match_results)   : null;
-        realKoResults      = res.ko_results       ? JSON.parse(res.ko_results)       : null;
-        realAwardWinners   = res.award_winners    ? JSON.parse(res.award_winners)    : null;
-        realClassification = res.classification   ? JSON.parse(res.classification)   : null;
-      }
-    } catch(_) { /* tabla results aún no existe o vacía — modo simulación */ }
-
-    // 6. Agrupar datos por usuario
-    const predsByUser  = {};
-    const koPredsByUser = {};
-    const awardsByUser = {};
-
-    preds.forEach(p => {
-      if (!predsByUser[p.user_id]) predsByUser[p.user_id] = {};
-      // Reconstruir clave match_id → { l, v, gol, saved }
-      // La clave en memoria es "GROUP_home_away"; en DB está como match_id string
-      predsByUser[p.user_id][p.match_id] = { l: p.local, v: p.visitante, gol: p.scorer, saved: true };
-    });
-
-    koPreds.forEach(p => {
-      if (!koPredsByUser[p.user_id]) koPredsByUser[p.user_id] = {};
-      koPredsByUser[p.user_id][p.match_id] = { l: p.local, v: p.visitante, gol: p.scorer, classifier: p.classifier, saved: true };
-    });
-
-    awards.forEach(a => { awardsByUser[a.user_id] = a; });
-
-    // 7. Calcular puntos por usuario
-    const rows = profiles.map(profile => {
-      const uid        = profile.id;
-      const userPreds  = predsByUser[uid]  || {};
-      const userKoPreds= koPredsByUser[uid] || {};
-      const userAwards = awardsByUser[uid]  || null;
-
-      // --- Puntos grupos ---
-      let grpPts = 0;
-      PARTIDOS.forEach(m => {
-        const key  = getMatchKey(m);
-        const pred = userPreds[key];
-        const real = realMatchResults?.[key];
-        if (pred && real) grpPts += calcMatchPoints(pred, real.l, real.v, key);
-      });
-
-      // --- Puntos KO ---
-      let koPts = 0;
-      const KO_ROUNDS_SB = [
-        { matches: BRACKET.r32,   round: 'r32' },
-        { matches: BRACKET.r16,   round: 'r16' },
-        { matches: BRACKET.qf,    round: 'qf'  },
-        { matches: BRACKET.sf,    round: 'sf'  },
-        { matches: BRACKET.third, round: 'third'},
-        { matches: BRACKET.final, round: 'final'},
-      ];
-      KO_ROUNDS_SB.forEach(({ matches, round }) => {
-        matches.forEach(m => {
-          const pred = userKoPreds[m.id] || userKoPreds[String(m.id)];
-          const real = realKoResults?.[m.id];
-          if (pred && real) koPts += calcKOMatchPoints(pred, real.l, real.v, round);
-        });
-      });
-
-      // --- Premios awards ---
-      let awPts = 0;
-      if (userAwards && realAwardWinners) {
-        awPts = calcAwardPoints(
-          { golden_ball: userAwards.golden_ball, golden_boot: userAwards.golden_boot,
-            golden_glove: userAwards.golden_glove, young_player: userAwards.young_player },
-          realAwardWinners
-        );
-      }
-
-      const total = grpPts + koPts + awPts;
-      const hasPreds = Object.keys(userPreds).length > 0 || Object.keys(userKoPreds).length > 0;
-
-      return { uid, nombre: profile.nombre || '—', grpPts, koPts, awPts, total, hasPreds };
-    })
-    .filter(r => r.hasPreds)
-    .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
-
+    const rows = data.rows;
     _sbData = rows;
     window._sbData = rows; // exponer para vista jornada
     _sbLoaded = true;
-    sbRender(rows, realMatchResults);
+    sbRender(rows);
 
   } catch (err) {
     console.error('[scoreboard] Error:', err);
@@ -186,7 +88,7 @@ async function sbLoad(forceRefresh = false) {
   }
 }
 
-function sbRender(rows, realMatchResults) {
+function sbRender(rows) {
   document.getElementById('sb-loading').style.display = 'none';
 
   if (!rows.length) {
@@ -251,20 +153,80 @@ function sbRender(rows, realMatchResults) {
   if (myId) {
     const me = rows.find(r => r.uid === myId);
     if (me) {
+      // PR-1 Capa 3: re-home del picker de premios desde el botón trofeo
+      // del Predictor (que ahora abre page-score). La tarjeta "Premios" es
+      // tappable SOLO con porra abierta — post-cierre queda display only.
+      const porraAbierta = !window._porraCerrada;
       const cards = [
-        { label: 'Grupos', val: me.grpPts, sub: 'pts de fase de grupos' },
-        { label: 'Eliminatorias', val: me.koPts, sub: 'pts KO + avance' },
-        { label: 'Premios', val: me.awPts, sub: 'awards individuales' },
-        { label: 'Total', val: me.total, sub: 'puntos acumulados' },
+        { label: 'Grupos',        val: me.grpPts, sub: 'pts de fase de grupos' },
+        { label: 'Eliminatorias', val: me.koPts,  sub: 'pts KO + avance' },
+        { label: 'Premios',       val: me.awPts,  sub: 'awards individuales', action: 'open-trophy' },
+        { label: 'Total',         val: me.total,  sub: 'puntos acumulados' },
       ];
-      document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c =>
-        `<div class="sb-breakdown-card">
+      document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c => {
+        const isClickable = c.action === 'open-trophy' && porraAbierta;
+        const cls = 'sb-breakdown-card' + (isClickable ? ' sb-breakdown-card--clickable' : '');
+        const attrs = isClickable
+          ? ` role="button" tabindex="0" data-sb-action="${c.action}" aria-label="Cambiar mis premios individuales"`
+          : '';
+        return `<div class="${cls}"${attrs}>
           <div class="sb-breakdown-label">${c.label}</div>
           <div class="sb-breakdown-val">${c.val}</div>
           <div class="sb-breakdown-sub">${c.sub}</div>
-        </div>`
-      ).join('');
+        </div>`;
+      }).join('');
       document.getElementById('sb-my-breakdown').style.display = 'block';
+
+      // Handler delegado idempotente: click/Enter/Space en la card Premios
+      // abre el _openTrophyModal expuesto por PorraPred (ui-pred-shell.js).
+      const breakdownEl = document.getElementById('sb-breakdown-cards');
+      if (breakdownEl && !breakdownEl._sbBreakdownDelegated) {
+        breakdownEl.addEventListener('click', function (ev) {
+          const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+          if (!card) return;
+          _sbOpenTrophyFromBreakdown();
+        });
+        breakdownEl.addEventListener('keydown', function (ev) {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+          if (!card) return;
+          ev.preventDefault();
+          _sbOpenTrophyFromBreakdown();
+        });
+        breakdownEl._sbBreakdownDelegated = true;
+      }
     }
   }
+}
+
+// Abre el picker de premios desde la card Premios del desglose. Reusa
+// _openTrophyModal expuesto por ui-pred-shell.js en window.PorraPred.
+// awPicks es const top-level de scoring.js — accesible en el global scope.
+function _sbOpenTrophyFromBreakdown() {
+  if (window._porraCerrada) return; // doble guard runtime
+  const open = window.PorraPred && window.PorraPred._openTrophyModal;
+  if (typeof open !== 'function') {
+    console.warn('[scoreboard] _openTrophyModal no disponible aún');
+    return;
+  }
+  // awPicks puede traer {key, name} o el key directo según el flujo previo;
+  // _openTrophyModal espera el formato flat con keys/strings.
+  const picks = (typeof awPicks === 'object' && awPicks) ? awPicks : {};
+  const flat = {
+    golden_ball:  (picks.golden_ball  && picks.golden_ball.key)  || picks.golden_ball  || null,
+    golden_boot:  (picks.golden_boot  && picks.golden_boot.key)  || picks.golden_boot  || null,
+    golden_glove: (picks.golden_glove && picks.golden_glove.key) || picks.golden_glove || null,
+    young_player: (picks.young_player && picks.young_player.key) || picks.young_player || null,
+  };
+  const leagueName = (window.currentLeague && window.currentLeague.nombre) || '';
+  open(flat, {
+    porraAbierta: !window._porraCerrada,
+    league: { name: leagueName },
+    onChangeAward: function (awardKey) {
+      const modalEl = document.getElementById('modal');
+      if (modalEl) modalEl.classList.remove('open');
+      if (typeof window.openPicker === 'function') window.openPicker(awardKey);
+    },
+    onClose: null,
+  });
 }

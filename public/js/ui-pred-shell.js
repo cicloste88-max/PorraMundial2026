@@ -972,29 +972,12 @@
         if (typeof showPage === 'function') showPage(goElim ? 'elim' : 'grupos');
       },
       onTrophyTap: function () {
-        var awards = (typeof awardPicks === 'object' && awardPicks) ? awardPicks : {};
-        var leagueObj = (typeof currentLeague === 'object' && currentLeague)
-          ? { name: currentLeague.nombre || '' } : { name: '' };
-        var ctx = {
-          porraAbierta: !window._porraCerrada,
-          league: leagueObj,
-          onChangeAward: function (awardKey) {
-            var modalEl = document.getElementById('modal');
-            if (modalEl) modalEl.classList.remove('open');
-            if (typeof window.openPicker === 'function') {
-              window.openPicker(awardKey);
-            } else if (typeof openPicker === 'function') {
-              openPicker(awardKey);
-            }
-          },
-          onClose: null
-        };
-        _openTrophyModal({
-          golden_ball:  awards.golden_ball  || null,
-          golden_boot:  awards.golden_boot  || null,
-          golden_glove: awards.golden_glove || null,
-          young_player: awards.young_player || null
-        }, ctx);
+        // PR-1 Capa 3: el botón trofeo del Predictor abre ahora la pantalla
+        // Clasificación de liga (page-score, leaderboard multi-jugador). El
+        // picker de premios sigue accesible desde la tarjeta "Premios" del
+        // desglose dentro de page-score (re-home, solo cuando porra abierta)
+        // y desde la card de awards de Fase Final (ko.js, ya existente).
+        if (typeof showPage === 'function') showPage('score');
       },
       onFilterChange: function (key) {
         _state.activeFilter = key;
