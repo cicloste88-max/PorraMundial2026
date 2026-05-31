@@ -1377,3 +1377,179 @@ npm run sync-squads -- --mode=enrich-tm --iso3=TUR --verbose
 (Ver regla `.claude/rules/sync-squads.md` §"--refresh-final" para el orden
 correcto cuando hay enrichment TM previo.) NO requiere cambios de código
 en el front — el resolver ya queda correcto.
+
+## ERR-78 — Bootstrap auth congelado: `INITIAL_SESSION` sin retry/timeout/fallback deja la app vacía tras refresh
+
+**Síntoma:** tras `F5` o recarga del navegador (o con red lenta), la app
+queda "congelada": el header global se ve (ADMIN, nombre, "Cerrar sesión"),
+pero el resto está vacío — azul liso, sin grupos, sin nav funcional, sin
+overlay de login. Reproducido en iPhone y Android. Pasa SOLO cuando el
+usuario tiene sesión persistida (login previo); usuarios anónimos ven
+welcome correctamente. Workaround del usuario: logout + login → cura
+porque reejecuta el flujo por la rama `SIGNED_IN` (no la `INITIAL_SESSION`).
+
+En consola: NO hay error visible. `_myLeagues` queda `[]`, `getActiveLeagueId()`
+devuelve `null`. Reejecutar manualmente `window.leagueLoadMyLeagues()` en
+la consola resuelve en ~862ms y devuelve 3 ligas; reejecutar
+`window.leagueSelectById('<id-guardado>')` restaura la página completa
+con sus 7 cards. Diagnóstico: fallo transitorio del primer fetch SIN
+reintento NI fallback.
+
+**Causa:** en `runAuthInit > db.auth.onAuthStateChange` (`public/js/auth.js`),
+branch `INITIAL_SESSION` (refresh con sesión existente), el flujo
+encadenaba:
+
+```js
+if (savedLeagueId && typeof leagueLoadMyLeagues === 'function') {
+  await leagueLoadMyLeagues();                    // (1) puede fallar / colgar
+  const found = _myLeagues.find(l => l.id === savedLeagueId);
+  if (found) {
+    await leagueSelectById(savedLeagueId);        // (2) puede fallar / colgar
+    renderAuthBar(); updateCTAs();
+    return;                                       // early return
+  }
+  localStorage.removeItem('porra_active_league_id'); // (3) borra incluso en transient
+}
+await loadUserData(session.user.id);              // (4) puede fallar / colgar
+setTimeout(() => showPage(finalPage), 100);
+```
+
+Tres fallos compuestos:
+
+1. **`leagueLoadMyLeagues()` sin retry.** El cliente Supabase con
+   `window._porraToken` (creado tras `signIn`) a veces no está completamente
+   listo al primer fetch del bootstrap — race condition entre `INITIAL_SESSION`
+   y la propagación del token. La función ya tiene path graceful
+   `if (mErr) { console.warn(...); return []; }` que devuelve `[]` en error
+   silencioso. `.find()` sobre `[]` → `undefined` → no se entra en
+   `leagueSelectById`.
+
+2. **Sin timeout en los `await`s.** `db.from(...).select(...)` de Supabase
+   no expone `signal: AbortSignal` nativo. Un fetch transitoriamente
+   colgado deja el `await` en pending para siempre — el handler nunca
+   completa, ningún `showPage` se llama, y como el código previo en
+   `runAuthInit` evita pintar welcome si hay `_pendingPageRestore` (línea
+   510 original), la pantalla queda mostrando solo el header global (que
+   sí se renderizó al cargar `index.html`).
+
+3. **`if (found) {...; return;}` early-return.** Si `leagueSelectById`
+   throwba o se colgaba entre el `find()` y el `leagueSelect` (timing
+   con `_loadInFlight` dedup), el handler salía con `return` sin que
+   ningún `showPage` se hubiera llamado. Sin la red de seguridad de un
+   `finally`.
+
+Adicionalmente: el `localStorage.removeItem('porra_active_league_id')`
+en el path "no encontrado" se ejecutaba INCLUSO si la ausencia era
+transient — borrando datos legítimos del usuario y forzando recovery
+manual aunque la red volviera al siguiente refresh.
+
+**Fix (rama `fix/auth-bootstrap-frozen-refresh`):**
+
+Refactor del branch `SIGNED_IN`/`INITIAL_SESSION` preservando intactos
+los guards de la línea 431 (`TOKEN_REFRESHED`/`USER_UPDATED`) y la línea
+445 (`currentUser.id === session.user.id`). Esos dos guards previenen
+bucles de `showPage` al volver de segundo plano; el fix convive con
+ellos sin pisarlos.
+
+**A) Helper `_withTimeout(promise, ms, label)`** — `Promise.race` que
+rechaza si la promesa no resuelve en `ms`. Aplicado a los 4 awaits
+críticos del bootstrap:
+
+- `profile fetch` → 8000ms
+- `leagueLoadMyLeagues` → 8000ms (por intento)
+- `leagueSelectById` → 8000ms
+- `loadUserData` → 10000ms
+
+Timeout dispara `throw` → `try/catch` registra `console.warn` y el flujo
+continúa. NO bloquea el bootstrap.
+
+**B) Retry con backoff** sobre `leagueLoadMyLeagues()`:
+
+```js
+const _delays = [400, 800, 1600]; // 4 intentos totales
+for (let _attempt = 0; _attempt <= _delays.length; _attempt++) {
+  try { await _withTimeout(leagueLoadMyLeagues(), 8000, '...'); }
+  catch (err) { console.warn(...); }
+  const _myLg = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
+  _foundLeague = _myLg.find(l => l.id === savedLeagueId);
+  if (_foundLeague) break;
+  if (_attempt < _delays.length) await new Promise(r => setTimeout(r, _delays[_attempt]));
+}
+```
+
+Worst-case total con timeouts en cascada: 4×8000ms + 400+800+1600 ≈ 35s
+antes de rendirse — pero típicamente el 2º intento ya casa (la consola
+manual del reporte resolvía en 862ms).
+
+**C) `_navigated` flag + `try/finally`** garantiza `showPage` en TODOS
+los caminos:
+
+```js
+let _navigated = false;
+const _markNavigated = () => { _navigated = true; _hideBootstrapLoader(); };
+try {
+  // ... retry block, leagueSelectById, fall-through loadUserData+showPage ...
+  if (!_navigated) { /* fall-through */ setTimeout(() => showPage(finalPage), 100); _markNavigated(); }
+} finally {
+  if (!_navigated) {
+    console.warn('[auth.bootstrap] handler no navegó; forzando welcome (red final).');
+    setTimeout(() => showPage('welcome'), 100);
+  }
+}
+```
+
+**D) Preservar `savedLeagueId`** si tras 4 intentos `_myLeagues` sigue
+vacío (probable transient — el próximo refresh tendrá otra oportunidad).
+Solo limpia si `_myLeagues.length > 0` pero la guardada no aparece
+(stale id legítimo: usuario kickeado, liga borrada por admin, etc.).
+
+**E) Loader visible durante bootstrap.** Inyecta `#_auth-bootstrap-loader`
+(fixed center, inline CSS, sin dependencia de `.css` externo) si hay
+token persistido en `sessionStorage` o `_pendingPageRestore` — escenarios
+donde `runAuthInit` evita pintar welcome inicial y la pantalla quedaría
+vacía mientras el handler corre. Removido al primer `_markNavigated()`
+o tras 12s de watchdog.
+
+**F) Watchdog 12s.** `setTimeout` que fuerza `showPage('welcome')` +
+oculta loader si nada navega. Red EXTREMA para el caso donde todos los
+timeouts individuales fallan en cascada y aun así no se queda navegado.
+
+**Verificación pendiente:** QA en preview Vercel reproduciendo el
+refresh múltiples veces. Lección PR#124 (caso roster iso3): el test
+standalone con asunciones de timing/datos no captura la realidad del
+navegador — el QA en browser es el único definitivo.
+
+Casos a cubrir:
+
+- Simular `leagueLoadMyLeagues` que falla la 1ª vez y resuelve en la 2ª
+  (red lenta) → la app debe acabar mostrando grupos (página guardada).
+- Refresh normal (red sana) → restaura la última página (`_pendingPageRestore`)
+  como hasta ahora, sin regresión.
+- Caso sin liga activa (`savedLeagueId=null`) → welcome, como hoy.
+- Caso `SIGNED_IN` (login fresco) → welcome, como hoy. El bloque de
+  retry está dentro de `if (event === 'INITIAL_SESSION')`, no afecta
+  el path SIGNED_IN.
+- Volver de segundo plano → guard `currentUser.id === session.user.id`
+  sigue intacto, evita bucle de `showPage`.
+
+**Patrón:** cualquier bootstrap async que dependa de awaits en cadena
+necesita las 3 capas:
+
+1. **Retry con backoff** para transients (red lenta, token no propagado, etc.).
+2. **Timeout individual** por await (`Promise.race`) para no colgar
+   indefinidamente cuando un fetch sin `signal` se atasca.
+3. **Garantía de finalización visible** (flag + `try/finally` + watchdog
+   global) para que el usuario SIEMPRE vea algo navegable, incluso si
+   todas las capas anteriores fallan.
+
+Auditar otros bootstraps que sigan este patrón vulnerable:
+
+- `mundial-shell-v3.js` listener `mundial:leagues-loaded` — depende de
+  `leagueLoadMyLeagues()` también. Pero al ser reactivo (no bloqueante),
+  baja prioridad.
+- `loadUserData` interno (no auditado en este PR) — si hace varios fetches
+  encadenados sin timeout, puede dejar predicciones sin cargar. Backlog
+  futuro.
+
+Aplicado en: `public/js/auth.js` (`runAuthInit` + `onAuthStateChange`,
+rama `fix/auth-bootstrap-frozen-refresh`, 31-may-2026).

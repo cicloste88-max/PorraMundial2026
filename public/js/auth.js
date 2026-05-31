@@ -422,6 +422,60 @@ const runAuthInit = async () => {
     if (kp) { koPredictions = JSON.parse(kp); normKoPredictions(); }
   } catch(e) {}
 
+  // ERR-78: helper Promise.race con timeout para envolver awaits críticos
+  // del bootstrap (Supabase fetch no expone signal de cancelación). Sin
+  // esto, un fetch transitoriamente colgado dejaba el handler en pending
+  // para siempre, sin llegar a showPage(), y la app quedaba con el shell
+  // montado pero sin página activa (todos los hijos a height:0).
+  const _withTimeout = (promise, ms, label) => {
+    let timer;
+    const timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error('timeout: ' + (label || 'op') + ' (' + ms + 'ms)'));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]).finally(function () { clearTimeout(timer); });
+  };
+
+  // ERR-78: loader del bootstrap. Visible si hay potencial sesión persistida
+  // (token en sessionStorage) o página pendiente de restaurar — escenarios
+  // donde el welcome inicial NO se pinta y la pantalla quedaría azul lisa
+  // mientras el handler corre. Removido tras la primera navegación o tras
+  // 12s de watchdog (extremo). NO se muestra en arranque anónimo (welcome
+  // ya cubre ese caso).
+  const _showBootstrapLoader = () => {
+    if (document.getElementById('_auth-bootstrap-loader') || !document.body) return;
+    const el = document.createElement('div');
+    el.id = '_auth-bootstrap-loader';
+    el.setAttribute('aria-live', 'polite');
+    el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+      'z-index:99999;color:#a5b4fc;font:14px/1.4 Inter,system-ui,sans-serif;' +
+      'text-align:center;padding:14px 22px;background:rgba(15,23,42,.88);' +
+      'border:1px solid rgba(99,102,241,.45);border-radius:10px;pointer-events:none;';
+    el.innerHTML = '<div style="font-size:20px;margin-bottom:6px">⚽</div><div>Cargando…</div>';
+    document.body.appendChild(el);
+  };
+  const _hideBootstrapLoader = () => {
+    const el = document.getElementById('_auth-bootstrap-loader');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  };
+  try {
+    const _potentialSession = (sessionStorage.getItem('porra_token') || window._pendingPageRestore);
+    if (_potentialSession) {
+      _showBootstrapLoader();
+      // Watchdog: si nada navega en 12s, ocultar loader y mostrar welcome
+      // como red de seguridad. Cubre el caso extremo donde TODOS los awaits
+      // del handler escapan al timeout individual y aun así no se navega.
+      setTimeout(function () {
+        if (document.getElementById('_auth-bootstrap-loader')) {
+          console.warn('[auth.bootstrap] watchdog 12s: forzando welcome');
+          _hideBootstrapLoader();
+          try { if (typeof showPage === 'function') showPage('welcome'); } catch (e) {}
+        }
+      }, 12000);
+    }
+  } catch (e) {}
+
   // Registrar listener AHORA que todos los scripts están cargados
   db.auth.onAuthStateChange(async (event, session) => {
     // TOKEN_REFRESHED / USER_UPDATED — solo refrescar token en memoria.
@@ -443,57 +497,138 @@ const runAuthInit = async () => {
       // Algunos escenarios de Supabase v2 reemiten SIGNED_IN al volver de
       // segundo plano; sin este guard entrabamos en bucle de showPage.
       if (currentUser && currentUser.id === session.user.id) {
+        _hideBootstrapLoader();
         renderAuthBar();
         updateCTAs();
         return;
       }
 
-      const { data: profile } = await db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single();
-      currentUser = { id:session.user.id, email:session.user.email, nombre:profile?.nombre||session.user.email.split('@')[0], is_admin:profile?.is_admin||false };
+      // ERR-78: profile fetch con timeout. Sin esto, un fetch transitoriamente
+      // colgado bloqueaba TODO el bootstrap antes incluso de llegar al branch
+      // de restauración de liga.
+      let _profile = null;
+      try {
+        const _res = await _withTimeout(
+          db.from('profiles').select('nombre,is_admin').eq('id', session.user.id).single(),
+          8000, 'profile fetch'
+        );
+        _profile = _res?.data;
+      } catch (err) {
+        console.warn('[auth.bootstrap] profile fetch falló:', err.message);
+      }
+      currentUser = { id:session.user.id, email:session.user.email, nombre:_profile?.nombre||session.user.email.split('@')[0], is_admin:_profile?.is_admin||false };
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        // HF-Reset-Bootstrap: en INITIAL_SESSION (refresh con sesión existente),
-        // restaurar la última liga activa antes de loadUserData. Previene el
-        // edge case donde getActiveLeagueId() devuelve null tras F5 y los saves
-        // fallan silenciosamente (savePredictions/saveKO/savePicksToDB hacen
-        // return temprano sin error visible).
-        // Solo INITIAL_SESSION: login fresco (SIGNED_IN) mantiene "→ welcome".
-        if (event === 'INITIAL_SESSION') {
-          let savedLeagueId = null;
-          try { savedLeagueId = localStorage.getItem('porra_active_league_id'); } catch (e) {}
-          if (savedLeagueId && typeof leagueLoadMyLeagues === 'function') {
-            await leagueLoadMyLeagues();
-            const myLeagues = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
-            const found = myLeagues.find(l => l.id === savedLeagueId);
-            if (found) {
-              // leagueSelectById → leagueSelect → loadUserData(uid) con leagueId activo.
-              // leagueSelect lee window._pendingPageRestore para navegar correctamente.
-              await leagueSelectById(savedLeagueId);
-              renderAuthBar(); updateCTAs();
-              return;
+        // HF-Reset-Bootstrap + ERR-78: refactor robustez del bootstrap.
+        //
+        // Original tenía 3 fallos que causaban app congelada vacía tras F5:
+        //  1) `await leagueLoadMyLeagues()` sin retry — si el fetch caía o
+        //     tardaba >Xs, `_myLeagues` quedaba [] y la liga guardada nunca
+        //     se restauraba.
+        //  2) Sin timeout en los awaits — un fetch colgado dejaba el handler
+        //     en "pending" para siempre, sin llegar a showPage(). Workaround
+        //     del usuario: logout+login.
+        //  3) Branch `if (found) {...; return;}` hacía early return; si algo
+        //     entre find() y leagueSelect fallaba, el handler salía sin que
+        //     ningún showPage se hubiera llamado.
+        //
+        // Fix:
+        //  - Retry con backoff 0/400/800/1600ms (4 intentos) sobre leagueLoadMyLeagues.
+        //  - Promise.race con timeout (8-10s) en TODOS los awaits del bootstrap.
+        //  - Flag `_navigated` + try/finally para garantizar showPage en
+        //    TODOS los caminos (liga restaurada, no encontrada, error, hang).
+        //  - Si tras retries _myLeagues sigue vacío con savedLeagueId presente,
+        //    NO limpiar el id silenciosamente (podría ser transient); caer a
+        //    welcome navegable preservándolo.
+        //
+        // Guards preservados intactos: TOKEN_REFRESHED/USER_UPDATED early-return
+        // (línea 431) + currentUser.id===session.user.id (línea 445). Esos
+        // evitan bucles de showPage al volver de segundo plano; este fix
+        // convive con ellos sin pisarlos.
+        let _navigated = false;
+        const _markNavigated = () => { _navigated = true; _hideBootstrapLoader(); };
+
+        try {
+          if (event === 'INITIAL_SESSION') {
+            let savedLeagueId = null;
+            try { savedLeagueId = localStorage.getItem('porra_active_league_id'); } catch (e) {}
+
+            if (savedLeagueId && typeof leagueLoadMyLeagues === 'function') {
+              const _delays = [400, 800, 1600];
+              let _foundLeague = null;
+              for (let _attempt = 0; _attempt <= _delays.length; _attempt++) {
+                try {
+                  await _withTimeout(leagueLoadMyLeagues(), 8000, 'leagueLoadMyLeagues#' + (_attempt + 1));
+                } catch (err) {
+                  console.warn('[auth.bootstrap] leagueLoadMyLeagues intent ' + (_attempt + 1) + ' falló:', err.message);
+                }
+                const _myLg = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
+                _foundLeague = _myLg.find(l => l.id === savedLeagueId);
+                if (_foundLeague) break;
+                if (_attempt < _delays.length) {
+                  await new Promise(r => setTimeout(r, _delays[_attempt]));
+                }
+              }
+
+              if (_foundLeague) {
+                try {
+                  // leagueSelectById → leagueSelect → loadUserData(uid) +
+                  // showPage interno que respeta _pendingPageRestore.
+                  await _withTimeout(leagueSelectById(savedLeagueId), 8000, 'leagueSelectById');
+                  _markNavigated();
+                } catch (err) {
+                  console.warn('[auth.bootstrap] leagueSelectById falló:', err.message);
+                  // Cae al fall-through con loadUserData+showPage.
+                }
+              } else {
+                // Tras 4 intentos sin encontrar la liga:
+                //  - _myLeagues no vacío → stale id (kickeado / liga borrada). Limpiar.
+                //  - _myLeagues vacío → posible transient. Preservar savedLeagueId
+                //    para que el próximo refresh tenga otra oportunidad. Caer a welcome.
+                const _myLg = (typeof _myLeagues !== 'undefined' && _myLeagues) ? _myLeagues : [];
+                if (_myLg.length > 0) {
+                  try { localStorage.removeItem('porra_active_league_id'); } catch (e) {}
+                } else {
+                  console.warn('[auth.bootstrap] leagueLoadMyLeagues vacío tras 4 intentos; preservo savedLeagueId=' + savedLeagueId + ' (posible transient).');
+                }
+              }
             }
-            // Stale id (user kickeado / liga borrada) → limpiar y caer al flow normal.
-            try { localStorage.removeItem('porra_active_league_id'); } catch (e) {}
+          }
+
+          if (!_navigated) {
+            try {
+              await _withTimeout(loadUserData(session.user.id), 10000, 'loadUserData');
+            } catch (err) {
+              console.warn('[auth.bootstrap] loadUserData falló:', err.message);
+            }
+
+            // Restaurar última página SOLO en refresh (INITIAL_SESSION).
+            // En login fresco (SIGNED_IN) vamos a welcome por semántica.
+            let target = null;
+            if (event === 'INITIAL_SESSION') {
+              target = window._pendingPageRestore;
+              window._pendingPageRestore = null;
+            }
+
+            const finalPage = (target === 'admin' && !currentUser.is_admin)
+              ? 'welcome'
+              : (target || 'welcome');
+            setTimeout(() => { _hideBootstrapLoader(); showPage(finalPage); }, 100);
+            _markNavigated();
+          }
+        } finally {
+          // Red de seguridad final: si una excepción sincrónica inesperada
+          // escapó del try sin haber navegado (no debería ocurrir, pero
+          // belt-and-suspenders), forzar welcome navegable.
+          if (!_navigated) {
+            console.warn('[auth.bootstrap] handler no navegó; forzando welcome (red final).');
+            setTimeout(() => { _hideBootstrapLoader(); showPage('welcome'); }, 100);
           }
         }
-
-        await loadUserData(session.user.id);
-
-        // Restaurar última página SOLO en refresh (INITIAL_SESSION).
-        // En login fresco (SIGNED_IN) vamos a welcome por semántica.
-        let target = null;
-        if (event === 'INITIAL_SESSION') {
-          target = window._pendingPageRestore;
-          window._pendingPageRestore = null;
-        }
-
-        const finalPage = (target === 'admin' && !currentUser.is_admin)
-          ? 'welcome'
-          : (target || 'welcome');
-        setTimeout(() => showPage(finalPage), 100);
       }
     } else {
       currentUser = null;
       window._porraToken = null; sessionStorage.removeItem("porra_token");
+      _hideBootstrapLoader();
       // v2.7: si skipeamos welcome esperando restaurar y no hay sesion valida, mostrar welcome ahora
       if (window._pendingPageRestore) {
         window._pendingPageRestore = null;

@@ -2,6 +2,67 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [31-may-2026] Fix auth bootstrap: app congelada vacía tras refresh
+
+**Bug (prod, iPhone + Android):** tras F5 / recarga del navegador (o con
+carga lenta), la app queda "congelada": header visible (ADMIN, usuario,
+"Cerrar sesión") pero el contenedor principal vacío (azul liso, sin grupos
+ni nav funcional). Workaround del usuario: logout + login. Reproducido por
+Claude.ai vía Chrome MCP en producción.
+
+**Causa:** en `runAuthInit > onAuthStateChange` (`public/js/auth.js`), branch
+`INITIAL_SESSION` (refresh con sesión persistida), el flujo encadena
+`leagueLoadMyLeagues() → _myLeagues.find(savedLeagueId) → leagueSelectById
+→ leagueSelect → showPage`. Tres fallos compuestos producían el shell mudo:
+
+1. **`leagueLoadMyLeagues()` sin retry** — la query Supabase con
+   `window._porraToken` fallaba o tardaba transitoriamente al arranque;
+   `_myLeagues` quedaba `[]`, `.find()` devolvía `undefined`, NO entraba en
+   `leagueSelectById`, `getActiveLeagueId()` quedaba null, y ninguna página
+   se activaba. El shell `.fc-pred-shell` montado pero TODOS los hijos a
+   `height:0` → pantalla vacía.
+2. **Sin timeout en los `await`s** — `db.from(...).select(...)` no expone
+   `signal` de cancelación nativo. Un fetch transitoriamente colgado dejaba
+   el handler en estado "pending" para siempre, sin llegar a `showPage`.
+   Re-ejecutar manualmente `window.leagueLoadMyLeagues()` en la consola
+   resolvía en 862ms y restauraba los 7 cards — prueba de que la red
+   funciona, solo el primer intento se ahogaba sin reintento.
+3. **`if (found) {...; return;}` early-return** — si `leagueSelectById`
+   throwba o se colgaba entre `find()` y `leagueSelect`, el handler salía
+   sin que NINGÚN `showPage` se hubiera llamado.
+
+**Fix (rama `fix/auth-bootstrap-frozen-refresh`, NO toca guards
+TOKEN_REFRESHED/USER_UPDATED ni `currentUser.id === session.user.id` —
+imprescindibles contra bucles al volver de segundo plano):**
+
+- **Retry con backoff** sobre `leagueLoadMyLeagues()` — 4 intentos (0, 400,
+  800, 1600ms entre fallos) hasta encontrar `savedLeagueId` en `_myLeagues`.
+- **`_withTimeout` helper** (Promise.race) envolviendo los 4 awaits del
+  bootstrap: `profile fetch` (8s), `leagueLoadMyLeagues` (8s), `leagueSelectById`
+  (8s), `loadUserData` (10s). Timeout → throw → `try/catch` registra warn
+  pero el flujo continúa hacia `showPage`.
+- **`_navigated` flag + try/finally**: garantiza que `showPage` se llame
+  en TODOS los caminos (liga restaurada, no encontrada, error, timeout,
+  excepción inesperada). Final `finally` fuerza `showPage('welcome')` como
+  red de seguridad.
+- **Preservar `savedLeagueId`** si tras 4 intentos `_myLeagues` sigue vacío
+  (posible transient; próximo refresh podría tener mejor suerte). Solo
+  limpia si `_myLeagues` tiene ligas pero la guardada no está (stale id
+  legítimo: usuario kickeado / liga borrada).
+- **Loader visible** (`#_auth-bootstrap-loader`, fixed center, inline CSS)
+  durante el bootstrap si hay token persistido o `_pendingPageRestore` —
+  "lento" no parece "roto". Removido tras la primera navegación.
+- **Watchdog 12s** que fuerza `showPage('welcome')` + oculta loader si nada
+  navega (red extrema para el caso donde TODOS los timeouts individuales
+  fallan).
+
+**Verificación pendiente:** QA en preview Vercel (San) reproduciendo el
+refresh múltiples veces. Lección PR#124: el test standalone no basta para
+validar timing real de fetch — el QA en browser es obligatorio.
+
+**Stats:** 1 fichero tocado (`public/js/auth.js`). Rama
+`fix/auth-bootstrap-frozen-refresh`. Nuevo ERR-78.
+
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 
 **Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
