@@ -1160,3 +1160,56 @@ fuente oficial y aplicará pin manual cuando confirme.
 convocatoria — es una predicción. Cuando colisiona con la convocatoria
 oficial, manda la convocatoria. El fallback pos-1 es heurístico
 pero suficiente para los casos comunes.
+
+
+## ERR-76 — Vistas de competición real NO leen `resolvedSlots` (son predicciones del usuario)
+
+**Síntoma:** la primera versión del esqueleto KO en la pantalla Jornada
+(PR#118, JO-1a) rellenaba las 32 tarjetas del bracket (16avos→Final) con
+nombres de selecciones reales si el usuario había pronosticado los grupos
+y/o KO en Fase Final. Para un usuario con bracket pronosticado completo
+hasta la Final, la pantalla Jornada mostraba "México vs Sudáfrica" en
+16avos, "Brasil vs Inglaterra" en cuartos, etc. — pero esas eran SUS
+apuestas, no la competición real. Para San (revisando la screen Jornada
+del Mundial) eso era un fallo de diseño grave: confundía pronóstico con
+realidad.
+
+**Causa:** `_buildJKOCard` reutilizaba `resolvedSlots[slot]` de `ko.js`
+con la intención de "ya que el dato existe, lo aprovecho". `resolvedSlots`
+se rellena vía `resolveAllSlots()` que itera `predictions` y
+`koPredictions` (apuestas del usuario en Fase Final). El primer render
+incluso llamaba `resolveAllSlots()` antes de iterar para tener el mapa
+fresco. La confusión venía de tratar `resolvedSlots` como si fuera el
+bracket REAL en lugar de la PROYECCIÓN del usuario.
+
+**Fix (PR#119):**
+- `_joKOSlotLabel(slot)` devuelve constante `'Por definir'` (sin leer
+  `resolvedSlots`).
+- `_joKOTeamFromSlot(slot)` devuelve `null` (sin lookup en EQUIPOS, sin
+  bandera — el `.jv2-flag` cae al gris `--ink-700` por defecto).
+- `_buildJKOSectionsHtml()` deja de llamar `resolveAllSlots()`.
+- TODO en código: cuando exista pipeline live (post 27-jun 2026), las dos
+  funciones se conectarán a resultados oficiales — `PARTIDOS.realHome`/
+  `realAway` para deducir clasificados de grupos + `ko_results` para
+  ganadores KO. NUNCA a `resolvedSlots`.
+
+**Patrón:** cualquier vista que muestre el calendario/competición REAL
+del torneo NO debe leer estructuras que reflejan apuestas del usuario.
+Auditar antes de reutilizar:
+- `predictions` / `koPredictions` → SIEMPRE apuestas del usuario.
+- `resolvedSlots` (derivado de las dos anteriores vía `resolveAllSlots`)
+  → SIEMPRE apuestas del usuario.
+- `boostPicks` → apuestas del usuario (boost ×2).
+- `awPicks` → apuestas del usuario (4 premios).
+- Fuentes REALES de competición (todas pre-launch pendientes):
+  - `PARTIDOS[].realHome` / `realAway` (grupos, vía `update-results`).
+  - `live_scores` (todos, vía Apify webhook).
+  - `ko_results` (KO, JSON con clasificados, post 27-jun 2026).
+
+Si una funcionalidad muestra el bracket real, debe degradarse a placeholder
+("Por definir", "—") hasta que el dato REAL esté disponible. NO usar las
+apuestas como proxy "decorativo" — confunde al usuario.
+
+Aplicado en: `ui-groups.js` (PR#119, JO-1a hotfix). El mismo principio
+aplica a cualquier futura vista de calendario, ficha o resumen del torneo
+que iteramos sobre el bracket.

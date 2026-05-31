@@ -5,17 +5,17 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `8c3079a` (PL-1/PL-3 #113 merged). **Pizarra XI real EN PR** (`feat/pizarra-xi-real`, A2 FIX C): columna `squads.xi` (XI por slot + foto, intocable por detect) vía `sync-squads --build-xi` (remap geométrico FF + desempate homónimos); `get-squad` v7.2 sirve `foto_url`; tokens con foto + de-overlap PO. Previo (#113): PL-1 cron `enrich-tm-mw`, PL-3 `es_titular` en merge. Cron cierre porras activo.
+Main HEAD `3a03413` (PR#121). **Saga JO Jornada COMPLETA** (31-may, PRs #116→#121): FG-1 board stale + JO-4 CEST (`_joParseMatchDate` + `Europe/Madrid` en `ui-groups.js`) + JO-2 nombres completos + JO-1a esqueleto KO display-only (`'Por definir'` hasta resultados reales post-27jun) + JO-3 acordeón (viva expandida) + JO-7 header limpio. JO-5 no-bug. Squads pin XI estabilizado tras PR#115. Detalle: `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Squads backfills + deploys pendientes** (Actions San / MCP Code): (a) `enrich-tm-mw` 7 naciones + `detect reseed_xi=true` 33 (PL-1/PL-3 #113); (b) `detect build_xi=true` 33 tras mergear `feat/pizarra-xi-real` (A2); (c) deploy `get-squad` v7.2. Runbooks en los PRs.
-2. **Operacional pre-launch 11-jun** (14 días vista): activar `pg_cron update-results`, enrich-tm edad Joven, Resend email cierre, IDs SofaScore KO (~28 jun), WhatsApp Meta Business (63016 parked). Squads pipeline ya estabilizado tras #109.
-3. **Pizarra Táctica apellidos invisibles iPhone real**: ver Bugs UI #5 abajo.
+1. **JO-6 ficha lenta** — debug rendimiento ficha jugador (perfil/predictor): identificar bottleneck (query Supabase / render / stats).
+2. **PR-1 clasificación liga** — en diseño por San. Tabla pos. por liga con scoring acumulado, refresh tras live updates.
+3. **PR-3 ver pronósticos otros** — post-cierre 10-jun: consultar pronósticos resto liga (read-only).
 
 ## Pendientes — Bugs UI
 
-1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra — apellidos `.fc-pizarra-token-surname` invisibles en iPhone real tras PR #86 (QA Playwright sí los renderizó). Investigar: contraste text-shadow / font-size 10px en 3x / clip por field aplanado / `nombre` vacío en EF v7.1.** Detalle: Top-3 #3 + `CHANGELOG.md`.
+1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real (QA Playwright los renderizó). Causas a investigar en `CHANGELOG.md`.**
 
 ## Pendientes — Antes del 11 junio 2026
 
@@ -31,6 +31,7 @@ Main HEAD `8c3079a` (PL-1/PL-3 #113 merged). **Pizarra XI real EN PR** (`feat/pi
 1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
+4. **JO-1a — resolver KO por resultado real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` (`ui-groups.js`) devuelven `'Por definir'`. Inyectar lookup desde resultados oficiales (`PARTIDOS.realHome/realAway` + `ko_results`); **NUNCA** `resolvedSlots` (ERR-76: son predicciones). TODO en código.
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
@@ -103,7 +104,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..58: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, simuladores, sync-squads, RLS (51,58), HF Pack v3 (52-57).
+ERR-01..76: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, simuladores, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real vs predicciones (76).
 
 ### Otros ficheros de contexto
 
