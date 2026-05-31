@@ -523,7 +523,6 @@ function renderVistaJornada() {
     // Fecha humana corta para el header (rango si la jornada cubre >1 día — aquí siempre 1 día por agrupación).
     const dateObj = _joParseMatchDate(date + 'T12:00:00');
     const dayLabel = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' });
-    const dateShort = dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' }).toUpperCase();
 
     const subTitle = matchesOfDay.length + ' partido' + (matchesOfDay.length === 1 ? '' : 's') +
                      ' · ' + finalizados.length + ' finalizado' + (finalizados.length === 1 ? '' : 's') +
@@ -563,7 +562,7 @@ function renderVistaJornada() {
             '<div class="jv2-jornada-name">JORNADA ' + jNum + ' · GRUPOS' +
               ' <span class="jv2-section__chev" aria-hidden="true">▾</span>' +
             '</div>' +
-            '<div class="jv2-jornada-date">' + dateShort + ' · ' + dayLabel + '</div>' +
+            '<div class="jv2-jornada-date">' + dayLabel + ' · ' + matchesOfDay.length + ' partido' + (matchesOfDay.length === 1 ? '' : 's') + '</div>' +
           '</div>' +
           '<button class="jv2-nav-arrow" type="button" ' + nextAttr + ' aria-label="Jornada siguiente">›</button>' +
         '</div>' +
