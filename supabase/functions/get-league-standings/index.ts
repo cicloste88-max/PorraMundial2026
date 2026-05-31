@@ -1,6 +1,10 @@
 // supabase/functions/get-league-standings/index.ts
 // PR-1 · Pantalla Clasificación de liga (leaderboard multi-jugador)
-// Versión 1.0.0 — 31-may-2026
+// Versión 1.0.1 — 31-may-2026
+//   v1.0.1: BUG-fix mapeo scorer→gol en predsByUser/koByUser. La v1.0.0
+//   montaba `scorer: row.scorer` pero el motor _shared/scoring.mjs lee
+//   `pred.gol` — el +2 de goleador NUNCA sumaba. Test de ensamblado
+//   añadido en tests/scoring.test.mjs.
 //
 // Sustituye el cómputo cliente de scoreboard.js (que solo veía las
 // predicciones del usuario logueado por RLS) por un cómputo server-side
@@ -230,24 +234,30 @@ serve(async (req: Request) => {
   }
 
   // ─── Index predictions / ko / awards por user_id ──────────────────
-  const predsByUser: Record<string, Record<string, { l: number; v: number; scorer: string | null; saved: true }>> = {};
+  // BUG-fix: el motor _shared/scoring.mjs lee `pred.gol` (espejo del
+  // browser). En BD la columna se llama `scorer` — aquí la mapeamos a
+  // `gol` para que calcMatchPoints / calcKOMatchPoints sumen el +2 de
+  // goleador. Si esto se rompe, los tests del motor puro NO lo cazan
+  // (usan `gol` directamente). Ver test "EF assembly: gol acertado +2"
+  // en tests/scoring.test.mjs.
+  const predsByUser: Record<string, Record<string, { l: number; v: number; gol: string | null; saved: true }>> = {};
   for (const p of preds ?? []) {
     if (!predsByUser[p.user_id]) predsByUser[p.user_id] = {};
     predsByUser[p.user_id][p.match_id] = {
       l: p.local,
       v: p.visitante,
-      scorer: p.scorer,
+      gol: p.scorer,
       saved: true,
     };
   }
 
-  const koByUser: Record<string, Record<number, { l: number; v: number; scorer: string | null; classifier: string | null; saved: true }>> = {};
+  const koByUser: Record<string, Record<number, { l: number; v: number; gol: string | null; classifier: string | null; saved: true }>> = {};
   for (const k of koPreds ?? []) {
     if (!koByUser[k.user_id]) koByUser[k.user_id] = {};
     koByUser[k.user_id][k.match_id] = {
       l: k.local,
       v: k.visitante,
-      scorer: k.scorer,
+      gol: k.scorer,
       classifier: k.classifier,
       saved: true,
     };
@@ -328,7 +338,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.0.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.0.1" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

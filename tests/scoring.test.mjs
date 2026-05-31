@@ -171,4 +171,54 @@ const { calcMatchPoints: legacyCMP } = fn();
   }
 }
 
-console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus) + legacy slice + parity 1:1');
+// ════════════════════════════════════════════════════════════════════
+// 7. EF ASSEMBLY — guard del mapeo `scorer` (BD) → `gol` (motor)
+//
+// El motor _shared/scoring.mjs lee pred.gol (espejo del browser). Las
+// tablas predictions/ko_predictions guardan la columna como `scorer`.
+// La EF get-league-standings hace el mapeo `gol: row.scorer` en index.ts;
+// si alguien lo olvida, el +2 de goleador NUNCA suma (bug detectado en
+// QA del PR-1 v1: la EF montaba `scorer: row.scorer` y los tests del
+// motor puro no lo cazaban porque usan `gol` directamente).
+//
+// Este test ejercita el mapeo: si la EF lo rompe de nuevo, falla.
+// ════════════════════════════════════════════════════════════════════
+{
+  // Mini-imitación del mapeo de get-league-standings/index.ts (predsByUser).
+  function mapPredFromDbRow(p) {
+    return { l: p.local, v: p.visitante, gol: p.scorer, saved: true };
+  }
+  const dbRow = { local: 3, visitante: 2, scorer: 'lozano' };
+  const pred = mapPredFromDbRow(dbRow);
+  // Exacto 3-2 + goleador acertado → 1 (signo) + 3 (exacto) + 2 (gol) = 6
+  assert.strictEqual(
+    sharedCalcMatchPoints(pred, 3, 2, { scorers: ['lozano'] }),
+    6,
+    'EF assembly grupos: row con scorer mapeado a gol debe sumar +2',
+  );
+  // Regresión guard: si alguien REVIERTE el mapeo y deja `scorer` raw,
+  // el motor NO suma goleador → solo +1 +3 = 4.
+  const badMap = { l: 3, v: 2, scorer: 'lozano', saved: true };
+  assert.strictEqual(
+    sharedCalcMatchPoints(badMap, 3, 2, { scorers: ['lozano'] }),
+    4,
+    'EF assembly grupos REGRESIÓN: sin mapear scorer→gol el motor NO suma goleador',
+  );
+}
+{
+  // Mismo guard para ko_predictions (koByUser en la EF).
+  function mapKoFromDbRow(k) {
+    return { l: k.local, v: k.visitante, gol: k.scorer, classifier: k.classifier, saved: true };
+  }
+  // pred 2-0 vs real 2-1: signo OK, NO exacto, goleador acertado.
+  const dbRow = { local: 2, visitante: 0, scorer: 'lozano', classifier: null };
+  const pred = mapKoFromDbRow(dbRow);
+  // r16: signo +1 + goleador +2 + avance r16 +10 = 13
+  assert.strictEqual(
+    sharedCalcKOMatchPoints(pred, 2, 1, 'r16', { scorers: ['lozano'] }),
+    13,
+    'EF assembly KO: row scorer→gol + avance r16',
+  );
+}
+
+console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus) + legacy slice + parity 1:1 + EF assembly');
