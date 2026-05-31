@@ -1806,4 +1806,161 @@ con timeout 6s, rama `fix/auth-bootstrap-frozen-refresh`, 31-may-2026,
 insuficiente, handler no corría) → iter 2 `1b25ef1` (extract +
 getSession + watchdog incondicional — handler ya corría pero fallbacks
 bloqueados por lock) → iter 3 (lock quitado en cada fallback +
-watchdog con trigger semántico — root cause real)).
+watchdog con trigger semántico — blank resuelto pero regresión UX:
+app aterriza en welcome en lugar de restaurar grupos).
+
+### Iteración 4 (commit nuevo) — fix regresión UX: app aterriza en welcome en lugar de restaurar la última página
+
+QA de San en preview Vercel (Chrome MCP) iter 3 resolvió el blank
+correctamente (`#restore-lock-css` se quita, `#page-welcome` queda
+visible). PERO introdujo regresión de UX: tras F5 con sesión + liga
+activa + `porra_lastPage='grupos'`, la app SIEMPRE aterriza en
+welcome en lugar de restaurar grupos. Medido:
+
+- Pre-refresh: `_activeLeague=8017e591-...`, `#page-grupos` visible
+  con 7 cards, `porra_lastPage='grupos'`.
+- Post-refresh: `visible_pages=['page-welcome']`, `getActiveLeagueId()=null`,
+  `match_cards=0`, `porra_lastPage=null` (cleared por
+  showPage('welcome')).
+- TODAS las queries Supabase 200 (incluidas `ia_predictions`,
+  `league_members`, `leagues`). NO es timing de fetch — las ligas SÍ
+  cargan, pero la restauración a grupos no se completa → cae al
+  fallback welcome.
+
+**Causa raíz** (combinación de dos issues):
+
+#### 1) Listener fire premature INITIAL_SESSION sin sesión
+
+`supabase-js v2` a veces emite `INITIAL_SESSION` al registrar el
+listener ANTES de terminar de restaurar la sesión persistida desde
+`localStorage`. El evento llega con `session=null`. El handler en
+iter 3:
+
+```js
+if (!session?.user) {
+  currentUser = null;
+  window._porraToken = null;
+  try { sessionStorage.removeItem('porra_token'); } catch (e) {}
+  _hideBootstrapLoader();
+  if (window._pendingPageRestore) {
+    window._pendingPageRestore = null;          // <-- BUG: nullify prematuro
+    _navigateFallbackWelcome();                 // <-- BUG: welcome prematuro
+    try { if (typeof initWelcome === 'function') initWelcome(); } catch (e) {}
+  }
+  renderAuthBar();
+  updateCTAs();
+}
+```
+
+Trata el null como "no hay sesión", nullifica `_pendingPageRestore`
+y muestra welcome. PERO la sesión SÍ existe — supabase aún no la ha
+cargado del storage.
+
+#### 2) `leagueSelectById` redundante con timeout vulnerable
+
+Cuando `getSession()` explícito LATER resuelve con sesión válida y
+`_bootstrapSession` Path 1 corre con `_foundLeague=true`, el código
+de iter 3 hacía:
+
+```js
+await _withTimeout(leagueSelectById(savedLeagueId), 8000, '...');
+```
+
+`leagueSelectById` internamente (`leagues.js:75`) hace un SEGUNDO
+`await leagueLoadMyLeagues()` — redundante porque la retry loop
+arriba YA populó `_myLeagues` y `_foundLeague` YA fue validado.
+Ese segundo fetch puede colgarse en network jitter → `_withTimeout`
+rechaza tras 8s → catch → fall-through a Path 2.
+
+Path 2 lee `target = window._pendingPageRestore`. **Si el listener
+prematuro lo nullificó (issue #1), `target=null` → `finalPage='welcome'`
+→ `showPage('welcome')`**. App aterriza en welcome aunque tenía
+sesión válida + savedLeagueId válido + ligas cargadas.
+
+`_activeLeague=null` porque `leagueSelect` nunca se llamó dentro de
+`leagueSelectById` (timed out antes).
+
+#### Fix iter 4 (dos cambios coordinados)
+
+**A) Listener: distinguir eventos prematuros vs acción explícita**
+
+Solo SIGNED_OUT y USER_DELETED disparan clear+welcome. Otros eventos
+sin sesión (INITIAL_SESSION sin sesión, USER_UPDATED sin sesión) se
+ignoran con `console.debug`. `getSession()` explícito (y
+`_onNoSessionFromGetSession`) es la fuente autoritativa de "¿hay
+sesión?" — supabase-js v2 `getSession()` SÍ espera a que la
+restauración persistida termine antes de resolver, así que su
+respuesta es confiable.
+
+```js
+if (!session?.user) {
+  if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+    // clear + welcome
+  } else {
+    console.debug('[auth] evento sin sesión ignorado (esperando getSession): ' + event);
+  }
+}
+```
+
+**B) Path 1 llama `leagueSelect` directo (no `leagueSelectById`)**
+
+`_foundLeague` YA fue validado contra `_myLeagues` poblado por la
+retry loop. No hay razón para hacer otro `leagueLoadMyLeagues` dentro
+de `leagueSelectById`. Llamamos `leagueSelect(_foundLeague)`
+directamente — síncrono, sin timeout, sin riesgo de hang.
+
+```js
+if (_foundLeague) {
+  try {
+    leagueSelect(_foundLeague);  // síncrono, sin _withTimeout
+    _markNavigated();
+  } catch (err) {
+    console.warn('[auth.bootstrap] leagueSelect falló:', err.message);
+  }
+}
+```
+
+**Por qué la combinación A+B**: cualquiera de los dos por separado
+podría dejar el bug expuesto en ciertos timings. A elimina el null
+prematuro de `_pendingPageRestore`; B elimina la ventana de fallo
+del segundo `leagueLoadMyLeagues`. Juntos, blindan la restauración
+desde dos ángulos.
+
+#### Verificación pendiente (San en preview)
+
+- F5 con sesión + liga + `porra_lastPage='grupos'` → restaura grupos
+  (`page-grupos` visible, cards>0, `getActiveLeagueId()` no null).
+  **NO welcome**.
+- F5 con IA lenta / fetch simulado timeout → fallback welcome SIN
+  blank (preserva fix iter 3, no regresión del lock removal).
+- Anónimo (sin `porra_lastPage`) → welcome correcto, sin lock.
+- Login fresco (`SIGNED_IN` con sesión) → welcome por semántica
+  (sin regresión).
+- Logout real (`SIGNED_OUT`) → clear + welcome (sin regresión).
+- Background return (re-emisión SIGNED_IN para mismo user) → guard
+  `currentUser.id===session.user.id` evita bucle (sin regresión).
+- Sin blank en ningún caso (iter 3 preservado).
+
+#### Lección iter 4
+
+**No todos los eventos de "no hay sesión" son iguales**. Distinguir:
+- **Eventos definitivos** (SIGNED_OUT, USER_DELETED, sesión expirada
+  confirmada): el usuario ya no está autenticado → clear + navegar
+  a welcome.
+- **Eventos prematuros** (INITIAL_SESSION sin sesión, USER_UPDATED
+  sin sesión durante arranque): el cliente aún no ha terminado de
+  restaurar la sesión persistida → ignorar, esperar a la fuente
+  autoritativa (`getSession()` explícito).
+
+Tratar todos los nulls como "no hay sesión" es una sobre-interpretación
+del evento que puede causar navegaciones prematuras a estados que
+luego compiten con el bootstrap real.
+
+**Lección adicional**: eliminar awaits redundantes. Si un dato ya
+está en memoria (`_myLeagues` poblado por la retry loop), no
+re-fetchearlo abre una ventana de timing para fallar. `leagueSelect`
+directo es siempre preferible cuando ya tenemos el objeto league.
+
+Aplicado en: `public/js/auth.js` (listener no-session filter +
+`leagueSelect` directo en Path 1, rama `fix/auth-bootstrap-frozen-refresh`,
+31-may-2026, 4 iteraciones acumuladas).

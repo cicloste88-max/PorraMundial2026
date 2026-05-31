@@ -160,10 +160,69 @@ sesión persistida + `porra_lastPage='grupos'` + IA lenta (simular
 visible. Refresh happy path sin regresión. Refresh anónimo sin lock.
 
 **Stats iter 3:** 1 fichero (`public/js/auth.js`, +60/-15 sobre iter
-2). Total acumulado en la rama: `public/js/auth.js` (~+330/-100 sobre
-main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh` (PR #125).
-ERR-78 reescrito con causa raíz real (lock + watchdog gateado),
+2). ERR-78 reescrito con causa raíz real (lock + watchdog gateado),
 incluye recap de las 3 iteraciones y lecciones acumuladas.
+
+**Iteración 4 (este commit):** fix regresión UX descubierta en QA de
+iter 3. El blank está resuelto, pero tras F5 con sesión + liga + 
+`porra_lastPage='grupos'`, la app aterrizaba en welcome en lugar de
+restaurar grupos. Medido (Chrome MCP): `visible_pages=['page-welcome']`,
+`getActiveLeagueId()=null`, `match_cards=0`, todas las queries
+Supabase 200 (las ligas SÍ cargan).
+
+**Causa raíz iter 4** (combinación de dos issues):
+
+1. **Listener fire premature INITIAL_SESSION sin sesión**: supabase-js
+   v2 a veces emite el evento ANTES de terminar de restaurar la sesión
+   persistida desde localStorage. El handler en iter 3 trataba todo
+   null como "no hay sesión" → nullificaba `_pendingPageRestore` y
+   mostraba welcome.
+
+2. **`leagueSelectById` redundante con timeout vulnerable**: cuando
+   `getSession()` explícito later resolvía con sesión válida y Path 1
+   se ejecutaba con `_foundLeague=true`, el `await
+   _withTimeout(leagueSelectById, 8000)` internamente hacía un
+   SEGUNDO `await leagueLoadMyLeagues()` redundante (la retry loop YA
+   había populado `_myLeagues`). Ese segundo fetch podía colgarse
+   (network jitter) → timeout 8s → catch → fall-through a Path 2.
+   Path 2 leía `target = _pendingPageRestore` que ya estaba null
+   (nullificado por issue 1) → `finalPage='welcome'` → showPage('welcome').
+   `_activeLeague=null` porque `leagueSelect` nunca corrió.
+
+**Fix iter 4:**
+
+- **A) Listener: distinguir eventos prematuros vs acción explícita.**
+  Solo `SIGNED_OUT` y `USER_DELETED` disparan clear+welcome. Otros
+  eventos sin sesión (INITIAL_SESSION sin sesión, USER_UPDATED con
+  null) se ignoran con `console.debug`. `getSession()` explícito
+  (que SÍ espera la restauración persistida) es la fuente
+  autoritativa.
+
+- **B) Path 1 llama `leagueSelect(_foundLeague)` directo**, eliminando
+  el `await leagueSelectById` y el segundo `leagueLoadMyLeagues`
+  redundante. `leagueSelect` es síncrono — sin timeout, sin riesgo
+  de hang. `_foundLeague` ya fue validado contra `_myLeagues`
+  populado por la retry loop arriba.
+
+Cualquiera de los dos por separado podría dejar el bug expuesto en
+ciertos timings. Juntos blindan la restauración desde dos ángulos.
+
+Preservado intacto de iter 3: `_navigateFallbackWelcome` con
+quita-lock, watchdog semántico, helpers `_withTimeout` /
+`_bootstrapSession` / `_onNoSessionFromGetSession`, retry+backoff,
+flag `_navigated` + try/finally, IA timeout 6s.
+
+**Verificación pendiente (San en preview Vercel):** F5 con sesión +
+liga + `porra_lastPage='grupos'` → restaura grupos (page-grupos
+visible, cards>0, `getActiveLeagueId` no null). NO welcome.
+Refresh anónimo / login fresco / logout real / background return →
+sin regresiones. Sin blank en ningún caso (iter 3 preservado).
+
+**Stats iter 4:** 1 fichero (`public/js/auth.js`, +35/-7 sobre iter
+3). Total acumulado en la rama: `public/js/auth.js` (~+365/-107
+sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`
+(PR #125). ERR-78 extendido con iter 4 + lecciones acumuladas
+(4 iteraciones).
 
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 

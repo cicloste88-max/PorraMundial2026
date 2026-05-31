@@ -613,12 +613,23 @@ const runAuthInit = async () => {
 
             if (_foundLeague) {
               try {
-                // leagueSelectById → leagueSelect → loadUserData(uid) +
-                // showPage interno que respeta _pendingPageRestore.
-                await _withTimeout(leagueSelectById(savedLeagueId), 8000, 'leagueSelectById');
+                // ERR-78 iter 4: llamar leagueSelect DIRECTAMENTE en lugar de
+                // leagueSelectById. Razón: leagueSelectById internamente hace
+                // `await leagueLoadMyLeagues()` (leagues.js:75) — un segundo
+                // fetch REDUNDANTE porque la retry loop arriba YA populó
+                // _myLeagues y _foundLeague YA fue validado contra esos datos.
+                // Ese segundo fetch puede colgarse (network jitter) y dar
+                // timeout 8s → catch → fall-through a Path 2 con target=null
+                // (si listener premature null lo nullificó vía iter 3) →
+                // finalPage='welcome' → app aterriza en welcome EN LUGAR DE
+                // grupos. Eliminándolo, eliminamos esa ventana de fallo
+                // específica que QA de San en iter 3 reveló (regresión UX
+                // descubierta tras cerrar el blank).
+                // leagueSelect es síncrono — sin timeout necesario.
+                leagueSelect(_foundLeague);
                 _markNavigated();
               } catch (err) {
-                console.warn('[auth.bootstrap] leagueSelectById falló:', err.message);
+                console.warn('[auth.bootstrap] leagueSelect falló:', err.message);
                 // Cae al fall-through con loadUserData+showPage.
               }
             } else {
@@ -706,20 +717,42 @@ const runAuthInit = async () => {
     }
 
     if (!session?.user) {
-      currentUser = null;
-      window._porraToken = null;
-      try { sessionStorage.removeItem('porra_token'); } catch (e) {}
-      _hideBootstrapLoader();
-      // v2.7: si skipeamos welcome esperando restaurar y no hay sesion valida, mostrar welcome ahora
-      // ERR-78 iter 3: usar helper para quitar lock antes (si _pendingPageRestore
-      // estaba seteado, el lock está activo y bloquearía showPage('welcome')).
-      if (window._pendingPageRestore) {
-        window._pendingPageRestore = null;
-        _navigateFallbackWelcome();
-        try { if (typeof initWelcome === 'function') initWelcome(); } catch (e) {}
+      // ERR-78 iter 4: distinguir entre eventos que confirman ausencia de
+      // sesión (SIGNED_OUT, USER_DELETED — acción explícita del usuario o
+      // del servidor) vs eventos prematuros (INITIAL_SESSION sin sesión
+      // antes de que supabase-js termine de restaurar desde localStorage).
+      //
+      // ANTES de iter 4: TODO evento sin sesión nullificaba _pendingPageRestore
+      // y llamaba _navigateFallbackWelcome → showPage('welcome'). Problema:
+      // supabase-js v2 a veces emite INITIAL_SESSION sin sesión durante
+      // arranque (race con persistSession async). Con _pendingPageRestore
+      // nullificado, cuando getSession() explícito resuelve LATER con
+      // sesión válida y _bootstrapSession Path 1 sufre cualquier hipo
+      // (e.g., timeout del segundo leagueLoadMyLeagues dentro de
+      // leagueSelectById), Path 2 lee target=null y aterriza en welcome
+      // EN LUGAR DE grupos. Bug observado en iter 3 QA.
+      //
+      // En iter 4: ignoramos eventos sin sesión que NO sean acción explícita.
+      // getSession() explícito (y _onNoSessionFromGetSession) es la fuente
+      // de verdad para "¿hay sesión?". Eventos posteriores (SIGNED_IN tras
+      // restauración tardía, SIGNED_OUT real, etc.) sí actúan normal.
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        currentUser = null;
+        window._porraToken = null;
+        try { sessionStorage.removeItem('porra_token'); } catch (e) {}
+        _hideBootstrapLoader();
+        if (window._pendingPageRestore) {
+          window._pendingPageRestore = null;
+          _navigateFallbackWelcome();
+          try { if (typeof initWelcome === 'function') initWelcome(); } catch (e) {}
+        }
+        renderAuthBar();
+        updateCTAs();
+      } else {
+        // INITIAL_SESSION sin sesión / USER_UPDATED sin sesión / otros —
+        // ignorar. getSession() explícito decidirá si hay sesión real.
+        console.debug('[auth] evento sin sesión ignorado (esperando getSession): ' + event);
       }
-      renderAuthBar();
-      updateCTAs();
     }
   });
 
