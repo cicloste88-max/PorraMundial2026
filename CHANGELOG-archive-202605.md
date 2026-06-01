@@ -942,3 +942,107 @@ en 4 probes (`26279588881`, `26281337027`, `26293035353`, `26293757651`):
 
 **Países sin XI publicado**: FF sirve `/alineaciones/0.jpg` placeholder. `parseStartingXIFromHtml` lo detecta y retorna `[]`. Coste: ~30s wasted por país no-FINAL pero sin daño. A medida que países publiquen su lista oficial, el cron 6h poblará XI 11/11 automáticamente sin tocar código.
 
+## [28-may-2026] Sprint Combos & Awards (CERRADO 28-may-2026): F1+F2+F3 PR#111 + F4 v2 PR#112
+
+Cierre completo del sprint de scorers/combos y premios individuales.
+
+**F1+F2+F3 (PR #111)** — picker scorer dinámico + keys unificadas:
+- **F1**: picker de goleador en grupos + KO poblado dinámicamente desde
+  `squads.jugadores` (ya no arrays hardcoded).
+- **F2**: keys de awards card v3 unificadas con el picker de scorer
+  (`Mbappe` vs `Kylian_Mbappe`). Helpers en `window`: `playerToShortKey`,
+  `resolveKeysForSquad`, `getScorerCandidates`, `getAwardCandidates`.
+- **F3**: action `update_ia_scorers` en `porra-ia-compute` v14. Backfill del
+  bot IA Zayu: **395 scorers** (260 grupos + 135 KO); 125 NULL residuales en
+  países sin `xi_pinned` (ALG ARG AUS CAN ECU IRN MEX QAT TUR URU).
+- SQL: migration `award_picks` con 4 rows raros normalizados por Claude.ai
+  (`Kylian_Mbappe`→`Mbappe` ×2, `Nico_Wiliams`→`Nico`, `Borja_Iglesias`→
+  `B. Iglesias`).
+
+**F4 v2 (PR #112)** — auto-Bota sección "Tus goleadores":
+- Migration `20260529100000_get_user_top_scorers.sql`: DROP RPC singular
+  `get_user_top_scorer` + CREATE plural `get_user_top_scorers(uuid,uuid,
+  int=3)` RETURNS TABLE(scorer_key, n, rank). Aplicada al remoto por Claude.ai
+  con DELETE manual de `schema_migrations.version 20260528230000` (singular
+  obsoleta, sustituida en el mismo sprint).
+- `eliminatoria-v3.js`: `_v3SuggestGoldenBoot` devuelve array (sin gating de
+  margin), `p_limit:5`, vía `window._porraDb` (no el proxy `db`, que pierde el
+  JWT → la RPC `SECURITY INVOKER` devolvería 0 filas por RLS). Nuevo helper
+  `_buildTopScorersHtml`: filtra por `candidateKeys` de
+  `getAwardCandidates('golden_boot')` + `slice(0,3)`. Sección solo en
+  `openPicker('golden_boot')`; click → `selectAward(key)` guarda en BD. Badge
+  v1 (`.is-suggested` + `.aw-suggestion-badge`) eliminado.
+- `eliminatoria-v3.css`: bloque `.aw-top-scorers*` compact (padding 6/10,
+  header 10px dorado `#d4a017`, row 5/9, name 13px, count 11px, separator 4).
+- **Caveat huérfano cerrado**: scorers no candidatos a Bota (bucket no
+  ofensivo, selección fuera top-30 Elo, países sin `xi_pinned`) filtrados del
+  top; RPC pide 5, cliente recorta a 3 tras filtrar → sin filas no-clicables.
+- 4 commits squash: `bc07bf7` (v1 badge superado) → `baeb539` (sección top 3)
+  → `85bec24` (fix huérfano) → `b3d5a3a` (compact CSS).
+
+## [28-may-2026] fix/xi-pipeline-abc — endurecer pipeline XI titular (Capas A+B+C)
+
+**Sprint contexto**: tras dispatch #69 productivo de PR #108 (scaling FF a 48
+países), San auditó manualmente las 48 squads via MCP y dejó 33/48 a 11/11
+titulares. La auditoría reveló 4 causas raíz que el próximo cron habría
+sobrescrito. Las 3 capas resuelven el problema completo en un único PR.
+
+**Capa A — Parser robusto** (`scripts/lib/parsers/_util.mjs`):
+`parsePlayer` reescrito para tolerar 5 patrones reales de corrupción
+observados en BD: EGY 'Ade (Pyramids FC)l' (letra cortada), ENG '(Tottenham)'
+(nombre vacío), KOR 'Lee Jjae-Sung )Mainz 05)' (paréntesis invertido),
+SCO 'Stewart (Southampton)Stewart' (apellido duplicado), SWE 'Brujas)'
+(club pegado). Dos paths: well-formed sin regresión + robust fallback con
+strip secuencial + dedupe de apellido repetido. NUNCA devuelve nombre
+vacío ni el string corrupto. 8 tests nuevos cubriendo los 5 casos reales.
+
+**Capa B — Matcher reforzado** (`scripts/lib/name-matcher.mjs` +
+`scripts/lib/name-aliases.json`):
+- **Alias dict per-iso3** consultado ANTES de Levenshtein. Semilla con
+  MAR Bono → Yassine Bounou, CPV Vozinha → Josimar Dias, HAI Deedson L. →
+  Louicius Deedson, NOR Sorloth → Alexander Sorloth, KOR Tae-hyeon →
+  Tae-Hwan, EGY Fattouh → Ahmed Fotouh, JOR Al Nadi → Mohammad Abualnadi.
+- **Threshold adaptativo**: `scorePair` acepta `simThreshold` (default 0.75).
+  `matchAgainstRoster` baja a 0.70 cuando `iso3 ∈ NON_LATIN_ISO3`
+  {KOR,EGY,KSA,MAR,IRN,IRQ,JOR,SEN,GHA,CIV,COD,TUN,ALG,BIH} (transliteración
+  inestable; BIH por colisiones balcánicas -ic/-vic).
+- **Anti-colisión** `ambiguityMargin=5`: si top-2 candidatos del roster
+  están a <5 puntos sobre 100 Y secondBest>0 → NO marcar (devuelve
+  unmatched). Evita falso positivo con apellidos compartidos.
+- **Candidate groups** `string[][]`: cada slot puede ser pos-0 + pos-1
+  desde FF. Si pos-0 no matchea, fallback a pos-1. Resuelve caso TUN
+  Laidouni (FF) no convocado → match con Rani Khedira (pos-1 FF).
+
+**FF parser pos-1**: `parseStartingXISlotsFromHtml` añadido en
+`ff-scraper.mjs`. Selector `a.juggador.pos-{0,1}` (clase 'juggador' con
+doble-g, typo literal de FF). Detección robusta vs ESP-style con
+`.truncate-name` y JPN-style con texto directo. Validado con HTML real
+JPN (11 slots, 3 alternativas confirmadas: Watanabe/Sugawara/Maeda).
+
+**Capa C — Pin de estabilidad** (migración
+`20260528170000_squads_xi_pinned.sql`):
+`squads.xi_pinned boolean DEFAULT false` + `xi_pinned_at timestamptz`.
+`sync-squads.mjs` Paso 2 detect + scrape `--refresh-final` chequean
+`xi_pinned===true` y saltan recálculo de es_titular. El resto del roster
+(nombres, club, edad, valor, dorsal, dob) sigue actualizable por
+preserveEnrichment — sólo el flag se congela. Permite a Capa A corregir
+los 5 nombres corruptos del roster aunque el XI esté pineado.
+
+**Coreografía post-merge**:
+1. PR merged (ya aplicada la migración via MCP antes del merge).
+2. San pinea inmediato los 33 países corregidos:
+   `UPDATE squads SET xi_pinned=true, xi_pinned_at=NOW() WHERE iso3 IN (...)`.
+3. Próximo cron 6h: salta los 33 pineados (es_titular preservado), corrige
+   los 5 nombres corruptos via Capa A, mejora match de tier B/C via Capa B.
+
+**Tests**: 146/146 pass (8 nuevos parser, 17 nuevos matcher, 4 nuevos FF
+pos-1, 117 regresión).
+
+**3 dudosos** registrados en `errores_conocidos_porra.md` ERR-75 para
+verificación manual de San con fuente oficial (no se forza match): IRN
+Kanaanizadegan, GHA Kohn, JOR Layla portero.
+
+**Documentación**: ERR-71 (parser corruptos), ERR-72 (Levenshtein
+adaptativo), ERR-73 (anti-colisión), ERR-74 (pin estabilidad), ERR-75
+(FF dudosos + pos-1 fallback).
+

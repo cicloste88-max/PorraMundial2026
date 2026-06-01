@@ -5,12 +5,12 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `6e7c966` (PR#125, 01-jun). **Sagas cerradas**: JO Jornada (31-may, PRs #116→#121) + refresh congelado / app blank tras F5 (PR#125, iter3+4 mergeados; iter5 descartado tras QA — culprit falso, `showPage('grupos')` ni se llamaba). Restaurar pantalla tras F5 = feature futuro NO bug (ERR-78). Squads pin XI tras PR#115. Detalle: `CHANGELOG.md`.
+Main HEAD `a1e3da9` (01-jun). **Sagas cerradas**: JO Jornada (#116-#121) + refresh F5 (#125 iter3+4; iter5 descartado, ERR-78) + **PR-1 leaderboard** (#123: EF v1.0.1 + render Trofeo + re-home picker; ERR-79/80/81). Pin XI tras #115. Detalle: `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
 1. **JO-6 ficha lenta** — debug rendimiento ficha jugador (perfil/predictor): identificar bottleneck (query Supabase / render / stats).
-2. **PR-1 clasificación liga** — en diseño por San. Tabla pos. por liga con scoring acumulado, refresh tras live updates.
+2. **QA post-cierre PR-1 picker premios** — validar en simulacro 10-jun que la card "Premios" queda display-only tras `_porraCerrada=true`. NO verificable con porra abierta.
 3. **PR-3 ver pronósticos otros** — post-cierre 10-jun: consultar pronósticos resto liga (read-only).
 
 ## Pendientes — Bugs UI
@@ -105,7 +105,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..79: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), mapeo BD→motor (79).
+ERR-01..81: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), mapeo BD→motor (79), window scope (80), clip overflow (81).
 
 ### Otros ficheros de contexto
 

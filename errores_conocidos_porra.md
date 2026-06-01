@@ -2118,3 +2118,131 @@ Acción pendiente: pasar la tabla a `docs/scoring-engine.md`, confirmar
 cada fila con `tests/scoring.test.mjs` añadiendo casos que cubran cada
 suceso individual + combinaciones realistas, y dejar los dos motores
 sincronizados al 100%.
+
+
+## ERR-80 — `window.currentUser` no expuesto: `let` top-level no crea propiedad en window (myId undefined)
+
+**Síntoma:** PR-1 — la pantalla Clasificación (`page-score`) mostraba el
+podio + 9 filas pero el bloque `#sb-my-breakdown` quedaba con
+`display:none` y `#sb-breakdown-cards` vacío. Como consecuencia, la
+tarjeta "Premios" del desglose nunca se renderizaba → el re-home del
+picker de premios desde el botón trofeo del Predictor quedaba sin
+entrada accesible con la porra abierta.
+
+**Causa:** en `sbRender` (`public/js/scoreboard.js:138`), el render
+Trofeo entregado por San leía `(window.currentUser || {}).id`. Pero
+`currentUser` se declara como `let currentUser = null` top-level en
+`auth.js:51`. La regla ERR-02 dice que **`let`/`const` top-level en
+classic scripts NO se exponen como propiedad de `window`** (sólo `var`
+o asignación explícita lo hacen). Grep confirmó que `window.currentUser
+=` nunca se asigna en el repo. Resultado runtime:
+`window.currentUser → undefined`, `(undefined || {}).id → undefined`,
+`myId = undefined`. El bloque `if (myId) { if (me) { ... } }` saltaba
+entero — el desglose nunca se pintaba.
+
+Bug oculto adicional: la tabla seguía mostrando la fila propia con
+`is-me` por residuo de un render anterior (innerHTML del listado se
+sustituye en cada render, pero el resaltado había venido de una sesión
+previa con cache del browser). Inducía a pensar que `myId` funcionaba.
+
+**Fix:** Opción B aprobada por San (lookup + degradación elegante).
+- `scoreboard.js:138` ahora usa el patrón ya presente en
+  `ui-groups-mobile.js:490` y `data.js:256`:
+  ```js
+  const myId = (typeof currentUser !== 'undefined' && currentUser
+    ? currentUser.id : null)
+    || (window.currentUser && window.currentUser.id)
+    || null;
+  ```
+  Lee la variable global del scope compartido de classic scripts; el
+  fallback a `window.currentUser` cubre el caso de que algún día se
+  exponga explícitamente.
+- Degradación: el bloque `if (myId) { if (me) { ... } }` queda
+  eliminado. El desglose se pinta **siempre** con porra abierta —
+  `me = (myId && rows.find(...)) || { grpPts:0, koPts:0, awPts:0, total:0 }`.
+  Para usuarios sin pronósticos (`hasPreds=false` → la EF filtra del
+  payload), el desglose muestra 0/0/0/0 — display puro, no engañoso. La
+  tarjeta "Premios" sigue siendo tappable cuando `!window._porraCerrada`.
+
+**Patrón:** en classic scripts (no module), **NUNCA** asumir que un
+`let`/`const` top-level de OTRO fichero está en `window`. Verificar
+con grep `window\.<nombre>\s*=` antes de leer. Si el `let` debe estar
+disponible globalmente desde una función concreta:
+1. Patrón seguro: leer la variable directamente (vive en el scope global
+   compartido de classic scripts) con guard `typeof x !== 'undefined'`.
+2. Patrón explícito: asignación `window.x = x` tras la declaración.
+3. **Antipatrón**: `window.x` confiando en que el `let` se expone (no
+   se expone).
+
+Aplica también a `const` (ERR-02). Si el código viene de un entregable
+externo (mockup, fichero de diseño aislado) que asume DOM/window
+estándar, conviene auditarlo contra la regla ERR-02 al integrarlo —
+fue el origen de este bug en PR-1 (el render Trofeo entregado por San
+usaba `window.currentUser` esperando que existiera).
+
+
+## ERR-81 — Clipping de esquinas + box-shadow exterior por `overflow:hidden` en contenedor ancestor
+
+**Síntoma:** PR-1 — la fila #1 (`.tf-row.top1` con borde dorado, o
+`.tf-row.is-me` con borde lime) de la "Clasificación completa" mostraba
+sus **esquinas superiores recortadas** en todas las ligas. El box-shadow
+exterior del resaltado también aparecía truncado en el borde superior.
+Diagnóstico inicial mal apuntado a `.tf-hero` (podio top-3) por similitud
+visual + a un solape del `.sb-table-header` legacy + a un trazo inset
+rectangular incompatible con `border-radius:16px`. Las 3 iteraciones
+previas resolvieron problemas tangenciales pero NO el clipping.
+
+**Causa real (runtime QA San):** el contenedor `.sb-table` (legacy del
+admin.css scoreboard original) tenía `overflow:hidden` heredado:
+```css
+.sb-table { background:#111827; border:1px solid #1f2937;
+            border-radius:16px; overflow:hidden; }
+```
+La primera `.tf-row` quedaba pegada al borde superior del `.sb-table`
+(sin aire arriba). Como `overflow:hidden` recorta TODO lo que sobresale
+del rectángulo padre, las esquinas redondeadas (`border-radius:11px`) y
+el `box-shadow` exterior de la fila se cortaban en la línea superior del
+contenedor. No era un problema de color/gradiente ni de un selector
+hijo — era CONTEXTO del ancestor.
+
+**Fix (CSS, `clasificacion-v3.css`):**
+```css
+#page-score .sb-table { background:none; border:0; padding:0;
+                        overflow:visible; }
+#page-score #sb-rows { padding-top:4px; }
+```
+- `overflow:visible` override del `overflow:hidden` legacy: el contorno
+  redondeado + box-shadow exterior dejan de pertenecer al wrapper
+  recortado y se pintan completos.
+- 4px de `padding-top` en `#sb-rows` da aire arriba para que la esquina
+  + box-shadow de la primera fila no se solapen con el borde del
+  contenedor (aunque el clip ya no aplique, el píxel de gap visual
+  ayuda).
+- `gap:6px` entre filas NO se toca.
+
+**Patrón / lección de diagnóstico:** `getComputedStyle(elemento).border`
+y `.boxShadow` **NO** revelan si el ancestor está clipando ese mismo
+borde/sombra. El selector hijo declara su estilo correcto pero el
+ancestor lo recorta silenciosamente en runtime. Diagnóstico correcto:
+1. Auditar el **ancestor chain** del elemento con `overflow` ≠ `visible`:
+   ```js
+   let el = target;
+   while (el) {
+     const o = getComputedStyle(el).overflow;
+     if (o !== 'visible') console.log('clip culprit:', el, o);
+     el = el.parentElement;
+   }
+   ```
+2. Usar `document.elementFromPoint(x, y)` sobre el píxel exacto del
+   borde "fantasma" — devuelve el elemento que realmente ocupa ese
+   píxel (el ancestor recortando, no el hijo declarado).
+3. NO sumar opacity/grosor/inset shadows al hijo para "tapar" el
+   recorte — eso oculta el síntoma, deja el bug latente en cualquier
+   otro elemento que herede el mismo ancestor clipper.
+
+Aplicado en `public/css/clasificacion-v3.css` (PR-1 iter 4, commit
+`cc4d2c5`). Iteraciones falsas previas: `4770d18` (border `.tf-hero` a
+`#c9a961`, NO era el elemento), `55de970` (eliminar `.sb-table-header`
+markup, pista parcial), `cf7567c` (border `.tf-hero` + inset shadow
+rectangular, incompatible con radius). Sólo el QA caliente en preview
+reveló el clipper real.
