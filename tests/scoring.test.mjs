@@ -1,13 +1,17 @@
 // Smoke test scoring — Porra Mundial 2026.
 //
-// Cubre 3 capas:
-//   1. Canónicos sobre el módulo compartido `_shared/scoring.mjs` (la
-//      fuente de verdad semántica usada por la EF get-league-standings).
-//   2. Canónicos sobre el slice legacy `public/js/scoring.js` (browser,
-//      classic script — eval del slice para aislar calcMatchPoints).
-//   3. Parity test: ambos motores deben dar los MISMOS pts ante los
-//      mismos inputs. Si alguien edita uno y olvida el otro, falla aquí.
-//      Riesgo nº 1 del sprint PR-1 (San).
+// Cubre 4 capas:
+//   1. Canónicos sobre el módulo compartido `_shared/scoring.mjs` (fuente de
+//      verdad semántica de la EF get-league-standings): calcMatchPoints + KO +
+//      awards + iaBonus, incluyendo boost ×2.
+//   2. Carga del motor legacy `public/js/scoring.js` por MARCADORES DE FUNCIÓN
+//      (NO por nº de línea — antes `slice(0,104)`, frágil ante cualquier
+//      edición arriba del fichero). Extrae calcMatchPoints + calcKOMatchPoints
+//      + calcAwardPoints.
+//   3. Parity 1:1 shared↔legacy para las TRES funciones (incluye boost e IA).
+//      Si alguien edita un motor y olvida el otro, pita aquí. Riesgo nº 1 del
+//      sprint PR-1 (San).
+//   4. EF assembly: guard del mapeo `scorer` (BD) → `gol` (motor).
 //
 // Reglas (ERR-67, San 21-may-2026):
 //   +1 signo · +3 exacto APILA · +2 goleador · +1 bonus IA · cap 7 · boost ×2.
@@ -22,7 +26,7 @@ import {
 } from '../supabase/functions/_shared/scoring.mjs';
 
 // ════════════════════════════════════════════════════════════════════
-// 1. SHARED MODULE — canónicos calcMatchPoints
+// 1. SHARED MODULE — canónicos calcMatchPoints (incl. boost + iaBonus)
 // ════════════════════════════════════════════════════════════════════
 {
   const t1 = sharedCalcMatchPoints({ saved: true, l: 2, v: 0, gol: null }, 3, 1);
@@ -56,6 +60,18 @@ import {
   // saved=false ignora todo
   const t8 = sharedCalcMatchPoints({ saved: false, l: 3, v: 0, gol: null }, 3, 0);
   assert.strictEqual(t8, 0, 'shared #8: saved=false → 0');
+
+  // NUEVO (B2/T3): cap 7 ANTES del boost; exacto+gol+IA = 7, ×2 = 14 (máx).
+  const t9 = sharedCalcMatchPoints(
+    { saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, { scorers: ['lozano'], iaBonus: true, boost: true }
+  );
+  assert.strictEqual(t9, 14, 'shared #9: (cap 7) × boost = 14 (máximo por partido)');
+
+  // NUEVO (B2/T3): boost NO dobla sin exacto aunque haya gol acertado.
+  const t10 = sharedCalcMatchPoints(
+    { saved: true, l: 2, v: 1, gol: 'lozano' }, 3, 1, { scorers: ['lozano'], boost: true }
+  );
+  assert.strictEqual(t10, 3, 'shared #10: signo+gol=3, boost no aplica (no exacto)');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -117,56 +133,157 @@ import {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 5. LEGACY SLICE — calcMatchPoints de public/js/scoring.js
-//    (mantiene el smoke test original que ya cubría los 4 canónicos)
+// 5. LEGACY ENGINE — carga por MARCADORES DE FUNCIÓN (no por nº de línea)
+//
+// Antes: `fullSrc.split('\n').slice(0, 104)` — frágil: cualquier línea
+// añadida arriba de calcMatchPoints corrompía el slice. Ahora se extrae el
+// bloque del motor puro por identificadores estables de código (la constante
+// de puntos KO hasta la función agregadora UI-coupled, que NO evaluamos).
 // ════════════════════════════════════════════════════════════════════
+
+// Globals que el motor legacy referencia en runtime (resuelven contra
+// globalThis dentro del `new Function`):
 globalThis.iaBonusWillApply = () => false;
 globalThis.PARTIDOS = [];
-globalThis.getMatchKey = () => null;
+globalThis.getMatchKey = (m) => `${m.group}_${m.home}_${m.away}`;  // espejo data.js:310
 globalThis.boostPicks = {};
-globalThis.EQUIPOS = [];
+globalThis.EQUIPOS = [];                  // _hf09FallbackScorers → [] (sin +2 espurio)
+globalThis.AWARDS_CFG = {                 // calcAwardPoints legacy itera AWARDS_CFG[k].pts
+  golden_ball:  { pts: 15 },
+  golden_boot:  { pts: 15 },
+  golden_glove: { pts: 15 },
+  young_player: { pts: 20 },
+};
 
-const fullSrc = readFileSync('public/js/scoring.js', 'utf8');
-const slice = fullSrc.split('\n').slice(0, 104).join('\n');
-const fn = new Function(slice + '\nreturn { calcMatchPoints };');
-const { calcMatchPoints: legacyCMP } = fn();
+function loadLegacyEngine() {
+  const src = readFileSync('public/js/scoring.js', 'utf8');
+  // Marcadores estables: desde la constante de puntos KO hasta la función
+  // agregadora UI-coupled (calcTotalUserPoints, que itera PARTIDOS y NO
+  // queremos evaluar). Robusto ante shifts de línea.
+  const START = 'const KO_ROUND_PTS';
+  const END   = 'function calcTotalUserPoints';
+  const start = src.indexOf(START);
+  const end   = src.indexOf(END);
+  assert.ok(start !== -1, 'legacy: marcador START (const KO_ROUND_PTS) no encontrado en scoring.js');
+  assert.ok(end !== -1 && end > start, 'legacy: marcador END (function calcTotalUserPoints) no encontrado en scoring.js');
+  const slice = src.slice(start, end);
+  const fn = new Function(
+    slice + '\nreturn { calcMatchPoints, calcKOMatchPoints, calcAwardPoints };'
+  );
+  return fn();
+}
 
+const {
+  calcMatchPoints:   legacyCMP,
+  calcKOMatchPoints: legacyCKO,
+  calcAwardPoints:   legacyCAW,
+} = loadLegacyEngine();
+
+// Canónicos legacy calcMatchPoints (los 4 originales).
 {
-  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: null }, 3, 1, null, []), 1, 'legacy #1');
-  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 1, gol: null }, 3, 1, null, []), 4, 'legacy #2');
-  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, null, ['lozano']), 6, 'legacy #3');
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: null }, 3, 1, null, []), 1, 'legacy CMP #1');
+  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 1, gol: null }, 3, 1, null, []), 4, 'legacy CMP #2');
+  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, null, ['lozano']), 6, 'legacy CMP #3');
   globalThis.iaBonusWillApply = () => true;
-  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, 'mock-key', ['lozano']), 7, 'legacy #4');
+  assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, 'mock-key', ['lozano']), 7, 'legacy CMP #4');
   globalThis.iaBonusWillApply = () => false;
 }
 
+// Canónicos legacy calcKOMatchPoints (NUEVO — antes no se ejercía aislado).
+{
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', null), 14, 'legacy CKO r16 exacto+avance');
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 1, gol: null }, 3, 1, 'sf', null), 46, 'legacy CKO sf signo+avance+final');
+  assert.strictEqual(legacyCKO({ saved: true, l: 1, v: 1, classifier: 'home', gol: null }, 2, 1, 'r32', null), 5, 'legacy CKO r32 empate-classifier');
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'final', null), 4, 'legacy CKO final sin avance extra');
+}
+
+// Canónicos legacy calcAwardPoints (NUEVO).
+{
+  const picks   = { golden_ball: 'Yamal', golden_boot: 'Mbappe', golden_glove: 'Bono',       young_player: 'Mainoo' };
+  const winners = { golden_ball: 'Yamal', golden_boot: 'Mbappe', golden_glove: 'Donnarumma', young_player: 'Mainoo' };
+  assert.strictEqual(legacyCAW(picks, winners), 50, 'legacy CAW 3/4 = 50');
+  assert.strictEqual(legacyCAW(null, winners), 0, 'legacy CAW picks=null → 0');
+  assert.strictEqual(legacyCAW(picks, null),   0, 'legacy CAW winners=null → 0');
+}
+
 // ════════════════════════════════════════════════════════════════════
-// 6. PARITY — shared vs legacy: mismos inputs → mismos pts.
+// 6. PARITY shared↔legacy — calcMatchPoints (incl. boost + IA)
 //    Si alguien edita un motor y olvida el otro, esto pita.
 // ════════════════════════════════════════════════════════════════════
 {
-  // Tabla de casos: cada uno se ejerce contra ambos motores.
-  // Mock de iaBonusWillApply para el legacy: true cuando matchKey === 'IA_ON'.
+  // Estado global para el legacy: un partido boosteado ('Z_AAA_BBB' el
+  // 2026-06-20) + IA por matchKey ('IA_ON').
   globalThis.iaBonusWillApply = (mk) => mk === 'IA_ON';
+  globalThis.getMatchKey = (m) => `${m.group}_${m.home}_${m.away}`;
+  globalThis.PARTIDOS = [{ group: 'Z', home: 'AAA', away: 'BBB', date: '2026-06-20T20:00:00Z' }];
+  globalThis.boostPicks = { '2026-06-20': 'Z_AAA_BBB' };
 
   const cases = [
-    { name: 'solo signo',        pred: { saved: true, l: 2, v: 0, gol: null },          rl: 3, rv: 1, scorers: null,        ia: false, mk: null    },
-    { name: 'exacto sin gol',    pred: { saved: true, l: 3, v: 1, gol: null },          rl: 3, rv: 1, scorers: null,        ia: false, mk: null    },
-    { name: 'exacto + gol',      pred: { saved: true, l: 3, v: 2, gol: 'lozano' },      rl: 3, rv: 2, scorers: ['lozano'],  ia: false, mk: null    },
-    { name: 'exacto + gol + IA', pred: { saved: true, l: 3, v: 2, gol: 'lozano' },      rl: 3, rv: 2, scorers: ['lozano'],  ia: true,  mk: 'IA_ON' },
-    { name: 'empate X-X',        pred: { saved: true, l: 0, v: 0, gol: null },          rl: 1, rv: 1, scorers: null,        ia: false, mk: null    },
-    { name: 'saved=false',       pred: { saved: false, l: 3, v: 0, gol: null },         rl: 3, rv: 0, scorers: null,        ia: false, mk: null    },
-    { name: 'signo + gol-fail',  pred: { saved: true, l: 2, v: 1, gol: 'wrong' },       rl: 3, rv: 1, scorers: ['lozano'],  ia: false, mk: null    },
-    { name: 'falla todo',        pred: { saved: true, l: 0, v: 3, gol: 'wrong' },       rl: 3, rv: 0, scorers: ['lozano'],  ia: false, mk: null    },
+    { name: 'solo signo',        pred: { saved: true,  l: 2, v: 0, gol: null },     rl: 3, rv: 1, scorers: null,       ia: false, boost: false, mk: null        },
+    { name: 'exacto sin gol',    pred: { saved: true,  l: 3, v: 1, gol: null },     rl: 3, rv: 1, scorers: null,       ia: false, boost: false, mk: null        },
+    { name: 'exacto + gol',      pred: { saved: true,  l: 3, v: 2, gol: 'lozano' }, rl: 3, rv: 2, scorers: ['lozano'], ia: false, boost: false, mk: null        },
+    { name: 'exacto + gol + IA', pred: { saved: true,  l: 3, v: 2, gol: 'lozano' }, rl: 3, rv: 2, scorers: ['lozano'], ia: true,  boost: false, mk: 'IA_ON'     },
+    { name: 'empate X-X',        pred: { saved: true,  l: 0, v: 0, gol: null },     rl: 1, rv: 1, scorers: null,       ia: false, boost: false, mk: null        },
+    { name: 'saved=false',       pred: { saved: false, l: 3, v: 0, gol: null },     rl: 3, rv: 0, scorers: null,       ia: false, boost: false, mk: null        },
+    { name: 'signo + gol-fail',  pred: { saved: true,  l: 2, v: 1, gol: 'wrong' },  rl: 3, rv: 1, scorers: ['lozano'], ia: false, boost: false, mk: null        },
+    { name: 'falla todo',        pred: { saved: true,  l: 0, v: 3, gol: 'wrong' },  rl: 3, rv: 0, scorers: ['lozano'], ia: false, boost: false, mk: null        },
+    { name: 'boost exacto',      pred: { saved: true,  l: 2, v: 1, gol: null },     rl: 2, rv: 1, scorers: null,       ia: false, boost: true,  mk: 'Z_AAA_BBB' },
   ];
 
   for (const c of cases) {
-    const sharedPts = sharedCalcMatchPoints(c.pred, c.rl, c.rv, { scorers: c.scorers, iaBonus: c.ia });
+    const sharedPts = sharedCalcMatchPoints(c.pred, c.rl, c.rv, { scorers: c.scorers, iaBonus: c.ia, boost: c.boost });
     const legacyPts = legacyCMP(c.pred, c.rl, c.rv, c.mk, c.scorers);
     assert.strictEqual(
-      sharedPts,
-      legacyPts,
-      `PARITY FAIL [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
+      sharedPts, legacyPts,
+      `PARITY CMP [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 6b. PARITY shared↔legacy — calcKOMatchPoints
+//     Legacy invoca calcMatchPoints con matchKey=null → sin IA ni boost;
+//     shared recibe { iaBonus:false, boost:false } para igualar.
+// ════════════════════════════════════════════════════════════════════
+{
+  const koCases = [
+    { name: 'r16 exacto+avance', pred: { saved: true, l: 2, v: 0, gol: null },                     rl: 2, rv: 0, round: 'r16',   scorers: null        },
+    { name: 'sf signo+final',    pred: { saved: true, l: 2, v: 1, gol: null },                     rl: 3, rv: 1, round: 'sf',    scorers: null        },
+    { name: 'r32 empate-class',  pred: { saved: true, l: 1, v: 1, classifier: 'home', gol: null }, rl: 2, rv: 1, round: 'r32',   scorers: null        },
+    { name: 'qf exacto+avance',  pred: { saved: true, l: 1, v: 0, gol: null },                     rl: 1, rv: 0, round: 'qf',    scorers: null        },
+    { name: 'final exacto',      pred: { saved: true, l: 2, v: 0, gol: null },                     rl: 2, rv: 0, round: 'final', scorers: null        },
+    { name: 'third exacto',      pred: { saved: true, l: 1, v: 0, gol: null },                     rl: 1, rv: 0, round: 'third', scorers: null        },
+    { name: 'gol-fail r16',      pred: { saved: true, l: 2, v: 0, gol: 'wrong' },                  rl: 2, rv: 1, round: 'r16',   scorers: ['lozano']  },
+  ];
+  for (const c of koCases) {
+    const sharedPts = sharedCalcKOMatchPoints(c.pred, c.rl, c.rv, c.round, { scorers: c.scorers, iaBonus: false, boost: false });
+    const legacyPts = legacyCKO(c.pred, c.rl, c.rv, c.round, c.scorers);
+    assert.strictEqual(
+      sharedPts, legacyPts,
+      `PARITY CKO [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 6c. PARITY shared↔legacy — calcAwardPoints
+// ════════════════════════════════════════════════════════════════════
+{
+  const awCases = [
+    { name: '3/4',        picks:   { golden_ball: 'Yamal', golden_boot: 'Mbappe', golden_glove: 'Bono', young_player: 'Mainoo' },
+                          winners: { golden_ball: 'Yamal', golden_boot: 'Mbappe', golden_glove: 'Donnarumma', young_player: 'Mainoo' } },
+    { name: '0/4',        picks:   { golden_ball: 'A', golden_boot: 'B', golden_glove: 'C', young_player: 'D' },
+                          winners: { golden_ball: 'W', golden_boot: 'X', golden_glove: 'Y', young_player: 'Z' } },
+    { name: 'solo joven', picks:   { golden_ball: null, golden_boot: null, golden_glove: null, young_player: 'Mainoo' },
+                          winners: { golden_ball: 'Yamal', golden_boot: 'Mbappe', golden_glove: 'Bono', young_player: 'Mainoo' } },
+    { name: 'picks null', picks: null, winners: { golden_ball: 'Yamal' } },
+  ];
+  for (const c of awCases) {
+    const sharedPts = sharedCalcAwardPoints(c.picks, c.winners);
+    const legacyPts = legacyCAW(c.picks, c.winners);
+    assert.strictEqual(
+      sharedPts, legacyPts,
+      `PARITY CAW [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
     );
   }
 }
@@ -221,4 +338,35 @@ const { calcMatchPoints: legacyCMP } = fn();
   );
 }
 
-console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus) + legacy slice + parity 1:1 + EF assembly');
+// ════════════════════════════════════════════════════════════════════
+// 8. EF ASSEMBLY — boost ×2 grupos-only (B2/T1)
+//
+// La EF construye boostByUser[uid]=Set(match_id) desde boost_picks y pasa
+// boost: boostByUser[uid]?.has(matchId) a calcMatchPoints SOLO en grupos.
+// Imitamos ese ensamblado para cazar regresiones del wiring del boost.
+// ════════════════════════════════════════════════════════════════════
+{
+  const boostByUser = { u1: new Set(['A_Mex_Cro', 'B_Esp_Por']) };
+  const has = (uid, mid) => boostByUser[uid]?.has(mid) ?? false;
+
+  // u1 con boost en A_Mex_Cro y exacto → 4 × 2 = 8.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: null }, 2, 1, { boost: has('u1', 'A_Mex_Cro') }),
+    8,
+    'EF assembly boost: match boosteado + exacto → ×2',
+  );
+  // u1 sin boost en match no boosteado → 4 (sin doblar).
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: null }, 2, 1, { boost: has('u1', 'C_Bra_Mar') }),
+    4,
+    'EF assembly boost: match NO boosteado → sin ×2',
+  );
+  // user sin boost_picks → boost false siempre.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: null }, 2, 1, { boost: has('u2', 'A_Mex_Cro') }),
+    4,
+    'EF assembly boost: user sin picks → false',
+  );
+}
+
+console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW) + EF assembly (scorer→gol + boost)');
