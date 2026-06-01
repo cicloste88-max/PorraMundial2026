@@ -1717,11 +1717,18 @@ window._renderGruposCarousel = _renderGruposCarousel;
 function _renderGruposStandings(letra) {
   if (typeof calcGroupTableAdvanced !== 'function') return null;
   var rows = calcGroupTableAdvanced(letra) || [];
+  // FX-01: el verde de clasificación solo con resultados reales. La tabla se
+  // deriva de predictions (calcGroupTableAdvanced lee predictions[key]); sin
+  // pipeline de resultados reales el realce de "clasificado" sería engañoso.
+  // Sentinel realHome/realAway igual que el board v3 (0-0 = placeholder).
+  var _hasRealLeg = (typeof PARTIDOS !== 'undefined') && PARTIDOS.some(function (m) {
+    return m.group === letra && m.realHome != null && m.realAway != null && !(m.realHome === 0 && m.realAway === 0);
+  });
   var rowsHtml = rows.slice(0, 4).map(function (t, idx) {
     var team = (typeof EQUIPOS !== 'undefined') ? EQUIPOS.find(function (e) { return e.name === t.name || e.slug === t.slug; }) : null;
     var code = (team && team.flag) ? team.flag : (t.name || '').slice(0, 3).toUpperCase();
     var src = (team && team.flag && typeof SB !== 'undefined') ? (SB + '/flags/' + team.flag + '.png') : '';
-    var qualifClass = idx < 2 ? ' fc-grupos-standings__row--qualif' : '';
+    var qualifClass = (_hasRealLeg && idx < 2) ? ' fc-grupos-standings__row--qualif' : '';
     var gd = t.gd != null ? t.gd : ((t.gf || 0) - (t.gc || 0));
     var gdLabel = gd > 0 ? '+' + gd : String(gd);
     return (

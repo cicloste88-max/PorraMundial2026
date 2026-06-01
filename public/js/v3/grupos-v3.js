@@ -155,6 +155,20 @@ function v3ComputeStandings(letter) {
   return result;
 }
 
+// FX-01: ¿el grupo tiene algún resultado REAL? Las standings v3 se calculan
+// desde `predictions` (aún no hay pipeline de resultados reales en el board),
+// así que el realce verde de "clasificado" NO debe aparecer hasta que existan
+// resultados reales (decisión San). Mismo sentinel que v3CalcMatchPointsGrupos:
+// realHome/realAway null = sin resultado; 0-0 = placeholder no jugado.
+function v3GroupHasRealResults(letter) {
+  if (typeof PARTIDOS === 'undefined') return false;
+  return PARTIDOS.some(function (m) {
+    return m.group === letter
+      && m.realHome != null && m.realAway != null
+      && !(m.realHome === 0 && m.realAway === 0);
+  });
+}
+
 // F3-I1.6.5: cache de los 8 mejores terceros. Se computa al inicio
 // de v3RenderBoardGrupos y se invalida en cada render.
 var _v3BestThirdsCache = null;
@@ -230,6 +244,8 @@ function v3RenderGroup(grupo) {
 
   if (isComplete) {
     var standings = v3ComputeStandings(grupo.letra);
+    // FX-01: el realce verde de clasificación solo con resultados reales.
+    var _hasReal = v3GroupHasRealResults(grupo.letra);
     standings.forEach((row, idx) => {
       var equipo = v3FindEquipoByName(row.name);
       var r = document.createElement('div');
@@ -238,9 +254,10 @@ function v3RenderGroup(grupo) {
       // está en los 8 mejores terceros (Set _v3BestThirdsCache computado
       // por v3RenderBoardGrupos). Si la cache es null o vacía (no todos
       // los grupos están completos), el 3º NO se marca.
-      if (idx < 2) {
+      // FX-01: gateado además por _hasReal — sin resultados reales no hay verde.
+      if (_hasReal && idx < 2) {
         r.classList.add('is-qualified');
-      } else if (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name)) {
+      } else if (_hasReal && idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name)) {
         r.classList.add('is-qualified');
       }
 
@@ -597,11 +614,14 @@ function v3RenderStandingsTable(grupo) {
     + '<div class="v3-st-pts" title="Puntos">PTS</div>'
     + '</div>';
 
+  // FX-01: realce verde solo con resultados reales (la tabla se deriva de
+  // predictions; sin pipeline de resultados reales el verde sería engañoso).
+  var _hasRealStd = v3GroupHasRealResults(grupo.letra);
   standings.forEach((row, idx) => {
     var equipo = v3FindEquipoByName(row.name);
     // HF-BUG-12: aplicar mismo criterio de clasificacion que el board principal.
     // idx<2 siempre clasifica; idx===2 clasifica si esta en los 8 mejores terceros.
-    var _stIsQualif = idx < 2 || (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name));
+    var _stIsQualif = _hasRealStd && (idx < 2 || (idx === 2 && _v3BestThirdsCache && _v3BestThirdsCache.has(row.name)));
     html += '<div class="v3-standings-row ' + (_stIsQualif ? 'is-qualified' : '') + '">'
       + '<div class="v3-st-pos">' + (idx+1) + '</div>'
       + '<div class="v3-st-team">'
