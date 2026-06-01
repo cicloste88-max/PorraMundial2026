@@ -77,9 +77,14 @@
    "Mi desglose" (que ya tiene aire del podio). */
 #page-score #sb-table-wrap .sb-section-title { margin-top:18px; }
 /* Trofeo no usa cabecera de columnas — .sb-table-header eliminada del
-   markup en iter 3 (solapaba el borde superior de .tf-row.top1 a pesar
-   de su display:none, por el resto del flow del .sb-table legacy). */
-#page-score .sb-table { background:none; border:0; padding:0; }
+   markup en iter 3. La causa REAL del borde superior recortado en la
+   fila #1 (.tf-row.top1 / .is-me) era el contenedor .sb-table legacy
+   con overflow:hidden de admin.css clipando las esquinas redondeadas
+   y el box-shadow exterior del resaltado. Override a overflow:visible
+   + 4px de aire arriba en #sb-rows para que el contorno completo se
+   vea en las 4 esquinas (dorado y lime). */
+#page-score .sb-table { background:none; border:0; padding:0; overflow:visible; }
+#page-score #sb-rows { padding-top:4px; }
 
 /* ════════════ HERO PODIO (inyectado en #sb-podium) ════════ */
 /* El render controla la visibilidad con style.display inline
