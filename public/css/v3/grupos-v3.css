@@ -967,8 +967,15 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;   /* momentum iOS */
   overscroll-behavior: contain;        /* no chained-scroll al body */
-  max-height: calc(100vh - 56px);      /* fallback */
-  max-height: calc(100dvh - 56px);     /* 32px padding panel + 24px margin inner */
+  /* FX-13 addendum: el scroller debe TERMINAR sobre la tabbar fija inferior
+     (.fc-tabbar, z-index --fc-z-tabbar=300 > 130 del picker → la tabbar pinta
+     por encima y tapaba el último jugador, p.ej. el 23º de RSA). Restamos la
+     altura REAL de la tabbar (var, no hardcode: --fc-tab-h + --fc-safe-bottom,
+     que incluye el home indicator) + el chrome propio del picker (16px padding
+     del panel + 12px margin del inner = 28px de offset superior).
+     Criterio de aceptación: scroller.bottom <= tabbar.top. */
+  max-height: calc(100vh  - var(--fc-tab-h) - var(--fc-safe-bottom) - 28px); /* fallback */
+  max-height: calc(100dvh - var(--fc-tab-h) - var(--fc-safe-bottom) - 28px);
 }
 
 .v3-squad-picker-overlay.is-open ~ .v3-squad-picker-panel .v3-squad-picker-panel__inner {
@@ -1013,9 +1020,10 @@
 }
 
 .v3-squad-picker-body {
-  /* FX-13: safe-area inset inferior para que el último jugador no quede bajo
-     el home indicator del iPhone al hacer scroll hasta el fondo. */
-  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  /* FX-13 addendum: el safe-area ya lo descuenta el max-height del __inner (vía
+     la altura de la tabbar, que incluye el home indicator). Aquí solo un
+     padding-bottom pequeño para que se vea el final de la lista sobre la tabbar. */
+  padding: 14px 16px 20px;
 }
 
 .v3-squad-picker-body__title {
