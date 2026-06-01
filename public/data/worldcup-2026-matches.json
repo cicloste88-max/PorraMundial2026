@@ -6,6 +6,8 @@
     "away_en": "South Africa",
     "home_es": "México",
     "away_es": "Sudáfrica",
+    "home_iso3": "MEX",
+    "away_iso3": "RSA",
     "teams_swapped": false,
     "date_utc": "2026-06-11T19:00",
     "round": 1
@@ -17,6 +19,8 @@
     "away_en": "Czechia",
     "home_es": "República de Corea",
     "away_es": "República Checa",
+    "home_iso3": "KOR",
+    "away_iso3": "CZE",
     "teams_swapped": false,
     "date_utc": "2026-06-12T02:00",
     "round": 1
@@ -28,6 +32,8 @@
     "away_en": "Bosnia & Herzegovina",
     "home_es": "Canadá",
     "away_es": "Bosnia y Herzegovina",
+    "home_iso3": "CAN",
+    "away_iso3": "BIH",
     "teams_swapped": false,
     "date_utc": "2026-06-12T19:00",
     "round": 1
@@ -39,6 +45,8 @@
     "away_en": "Paraguay",
     "home_es": "Estados Unidos",
     "away_es": "Paraguay",
+    "home_iso3": "USA",
+    "away_iso3": "PAR",
     "teams_swapped": false,
     "date_utc": "2026-06-13T01:00",
     "round": 1
@@ -50,6 +58,8 @@
     "away_en": "Switzerland",
     "home_es": "Catar",
     "away_es": "Suiza",
+    "home_iso3": "QAT",
+    "away_iso3": "SUI",
     "teams_swapped": false,
     "date_utc": "2026-06-13T19:00",
     "round": 1
@@ -61,6 +71,8 @@
     "away_en": "Morocco",
     "home_es": "Brasil",
     "away_es": "Marruecos",
+    "home_iso3": "BRA",
+    "away_iso3": "MAR",
     "teams_swapped": false,
     "date_utc": "2026-06-13T22:00",
     "round": 1
@@ -72,6 +84,8 @@
     "away_en": "Scotland",
     "home_es": "Haití",
     "away_es": "Escocia",
+    "home_iso3": "HAI",
+    "away_iso3": "SCO",
     "teams_swapped": false,
     "date_utc": "2026-06-14T01:00",
     "round": 1
@@ -83,6 +97,8 @@
     "away_en": "Türkiye",
     "home_es": "Australia",
     "away_es": "Turquía",
+    "home_iso3": "AUS",
+    "away_iso3": "TUR",
     "teams_swapped": false,
     "date_utc": "2026-06-14T04:00",
     "round": 1
@@ -94,6 +110,8 @@
     "away_en": "Curaçao",
     "home_es": "Alemania",
     "away_es": "Curazao",
+    "home_iso3": "GER",
+    "away_iso3": "CUW",
     "teams_swapped": false,
     "date_utc": "2026-06-14T17:00",
     "round": 1
@@ -105,6 +123,8 @@
     "away_en": "Japan",
     "home_es": "Países Bajos",
     "away_es": "Japón",
+    "home_iso3": "NED",
+    "away_iso3": "JPN",
     "teams_swapped": false,
     "date_utc": "2026-06-14T20:00",
     "round": 1
@@ -116,6 +136,8 @@
     "away_en": "Ecuador",
     "home_es": "Costa de Marfil",
     "away_es": "Ecuador",
+    "home_iso3": "CIV",
+    "away_iso3": "ECU",
     "teams_swapped": false,
     "date_utc": "2026-06-14T23:00",
     "round": 1
@@ -127,6 +149,8 @@
     "away_en": "Tunisia",
     "home_es": "Suecia",
     "away_es": "Túnez",
+    "home_iso3": "SWE",
+    "away_iso3": "TUN",
     "teams_swapped": false,
     "date_utc": "2026-06-15T02:00",
     "round": 1
@@ -138,6 +162,8 @@
     "away_en": "Cabo Verde",
     "home_es": "España",
     "away_es": "Cabo Verde",
+    "home_iso3": "ESP",
+    "away_iso3": "CPV",
     "teams_swapped": false,
     "date_utc": "2026-06-15T16:00",
     "round": 1
@@ -149,6 +175,8 @@
     "away_en": "Egypt",
     "home_es": "Bélgica",
     "away_es": "Egipto",
+    "home_iso3": "BEL",
+    "away_iso3": "EGY",
     "teams_swapped": false,
     "date_utc": "2026-06-15T19:00",
     "round": 1
@@ -160,6 +188,8 @@
     "away_en": "Uruguay",
     "home_es": "Arabia Saudí",
     "away_es": "Uruguay",
+    "home_iso3": "KSA",
+    "away_iso3": "URU",
     "teams_swapped": false,
     "date_utc": "2026-06-15T22:00",
     "round": 1
@@ -171,6 +201,8 @@
     "away_en": "New Zealand",
     "home_es": "RI de Irán",
     "away_es": "Nueva Zelanda",
+    "home_iso3": "IRN",
+    "away_iso3": "NZL",
     "teams_swapped": false,
     "date_utc": "2026-06-16T01:00",
     "round": 1
@@ -182,6 +214,8 @@
     "away_en": "Senegal",
     "home_es": "Francia",
     "away_es": "Senegal",
+    "home_iso3": "FRA",
+    "away_iso3": "SEN",
     "teams_swapped": false,
     "date_utc": "2026-06-16T19:00",
     "round": 1
@@ -193,6 +227,8 @@
     "away_en": "Norway",
     "home_es": "Irak",
     "away_es": "Noruega",
+    "home_iso3": "IRQ",
+    "away_iso3": "NOR",
     "teams_swapped": false,
     "date_utc": "2026-06-16T22:00",
     "round": 1
@@ -204,6 +240,8 @@
     "away_en": "Algeria",
     "home_es": "Argentina",
     "away_es": "Argelia",
+    "home_iso3": "ARG",
+    "away_iso3": "ALG",
     "teams_swapped": false,
     "date_utc": "2026-06-17T01:00",
     "round": 1
@@ -215,6 +253,8 @@
     "away_en": "Jordan",
     "home_es": "Austria",
     "away_es": "Jordania",
+    "home_iso3": "AUT",
+    "away_iso3": "JOR",
     "teams_swapped": false,
     "date_utc": "2026-06-17T04:00",
     "round": 1
@@ -226,6 +266,8 @@
     "away_en": "DR Congo",
     "home_es": "Portugal",
     "away_es": "RD Congo",
+    "home_iso3": "POR",
+    "away_iso3": "COD",
     "teams_swapped": false,
     "date_utc": "2026-06-17T17:00",
     "round": 1
@@ -237,6 +279,8 @@
     "away_en": "Croatia",
     "home_es": "Inglaterra",
     "away_es": "Croacia",
+    "home_iso3": "ENG",
+    "away_iso3": "CRO",
     "teams_swapped": false,
     "date_utc": "2026-06-17T20:00",
     "round": 1
@@ -248,6 +292,8 @@
     "away_en": "Panama",
     "home_es": "Ghana",
     "away_es": "Panamá",
+    "home_iso3": "GHA",
+    "away_iso3": "PAN",
     "teams_swapped": false,
     "date_utc": "2026-06-17T23:00",
     "round": 1
@@ -259,6 +305,8 @@
     "away_en": "Colombia",
     "home_es": "Uzbekistán",
     "away_es": "Colombia",
+    "home_iso3": "UZB",
+    "away_iso3": "COL",
     "teams_swapped": false,
     "date_utc": "2026-06-18T02:00",
     "round": 1
@@ -270,6 +318,8 @@
     "away_en": "South Africa",
     "home_es": "República Checa",
     "away_es": "Sudáfrica",
+    "home_iso3": "CZE",
+    "away_iso3": "RSA",
     "teams_swapped": false,
     "date_utc": "2026-06-18T16:00",
     "round": 2
@@ -281,6 +331,8 @@
     "away_en": "Bosnia & Herzegovina",
     "home_es": "Suiza",
     "away_es": "Bosnia y Herzegovina",
+    "home_iso3": "SUI",
+    "away_iso3": "BIH",
     "teams_swapped": false,
     "date_utc": "2026-06-18T19:00",
     "round": 2
@@ -292,6 +344,8 @@
     "away_en": "Qatar",
     "home_es": "Canadá",
     "away_es": "Catar",
+    "home_iso3": "CAN",
+    "away_iso3": "QAT",
     "teams_swapped": false,
     "date_utc": "2026-06-18T22:00",
     "round": 2
@@ -303,6 +357,8 @@
     "away_en": "South Korea",
     "home_es": "México",
     "away_es": "República de Corea",
+    "home_iso3": "MEX",
+    "away_iso3": "KOR",
     "teams_swapped": false,
     "date_utc": "2026-06-19T01:00",
     "round": 2
@@ -314,6 +370,8 @@
     "away_en": "Australia",
     "home_es": "Estados Unidos",
     "away_es": "Australia",
+    "home_iso3": "USA",
+    "away_iso3": "AUS",
     "teams_swapped": false,
     "date_utc": "2026-06-19T19:00",
     "round": 2
@@ -325,6 +383,8 @@
     "away_en": "Morocco",
     "home_es": "Escocia",
     "away_es": "Marruecos",
+    "home_iso3": "SCO",
+    "away_iso3": "MAR",
     "teams_swapped": false,
     "date_utc": "2026-06-19T22:00",
     "round": 2
@@ -336,6 +396,8 @@
     "away_en": "Haiti",
     "home_es": "Brasil",
     "away_es": "Haití",
+    "home_iso3": "BRA",
+    "away_iso3": "HAI",
     "teams_swapped": false,
     "date_utc": "2026-06-20T00:30",
     "round": 2
@@ -347,6 +409,8 @@
     "away_en": "Paraguay",
     "home_es": "Turquía",
     "away_es": "Paraguay",
+    "home_iso3": "TUR",
+    "away_iso3": "PAR",
     "teams_swapped": false,
     "date_utc": "2026-06-20T03:00",
     "round": 2
@@ -358,6 +422,8 @@
     "away_en": "Sweden",
     "home_es": "Países Bajos",
     "away_es": "Suecia",
+    "home_iso3": "NED",
+    "away_iso3": "SWE",
     "teams_swapped": false,
     "date_utc": "2026-06-20T17:00",
     "round": 2
@@ -369,6 +435,8 @@
     "away_en": "Côte d'Ivoire",
     "home_es": "Alemania",
     "away_es": "Costa de Marfil",
+    "home_iso3": "GER",
+    "away_iso3": "CIV",
     "teams_swapped": false,
     "date_utc": "2026-06-20T20:00",
     "round": 2
@@ -380,6 +448,8 @@
     "away_en": "Curaçao",
     "home_es": "Ecuador",
     "away_es": "Curazao",
+    "home_iso3": "ECU",
+    "away_iso3": "CUW",
     "teams_swapped": false,
     "date_utc": "2026-06-21T00:00",
     "round": 2
@@ -391,6 +461,8 @@
     "away_en": "Japan",
     "home_es": "Túnez",
     "away_es": "Japón",
+    "home_iso3": "TUN",
+    "away_iso3": "JPN",
     "teams_swapped": false,
     "date_utc": "2026-06-21T04:00",
     "round": 2
@@ -402,6 +474,8 @@
     "away_en": "Saudi Arabia",
     "home_es": "España",
     "away_es": "Arabia Saudí",
+    "home_iso3": "ESP",
+    "away_iso3": "KSA",
     "teams_swapped": false,
     "date_utc": "2026-06-21T16:00",
     "round": 2
@@ -413,6 +487,8 @@
     "away_en": "Iran",
     "home_es": "Bélgica",
     "away_es": "RI de Irán",
+    "home_iso3": "BEL",
+    "away_iso3": "IRN",
     "teams_swapped": false,
     "date_utc": "2026-06-21T19:00",
     "round": 2
@@ -424,6 +500,8 @@
     "away_en": "Cabo Verde",
     "home_es": "Uruguay",
     "away_es": "Cabo Verde",
+    "home_iso3": "URU",
+    "away_iso3": "CPV",
     "teams_swapped": false,
     "date_utc": "2026-06-21T22:00",
     "round": 2
@@ -435,6 +513,8 @@
     "away_en": "Egypt",
     "home_es": "Nueva Zelanda",
     "away_es": "Egipto",
+    "home_iso3": "NZL",
+    "away_iso3": "EGY",
     "teams_swapped": false,
     "date_utc": "2026-06-22T01:00",
     "round": 2
@@ -446,6 +526,8 @@
     "away_en": "Austria",
     "home_es": "Argentina",
     "away_es": "Austria",
+    "home_iso3": "ARG",
+    "away_iso3": "AUT",
     "teams_swapped": false,
     "date_utc": "2026-06-22T17:00",
     "round": 2
@@ -457,6 +539,8 @@
     "away_en": "Iraq",
     "home_es": "Francia",
     "away_es": "Irak",
+    "home_iso3": "FRA",
+    "away_iso3": "IRQ",
     "teams_swapped": false,
     "date_utc": "2026-06-22T21:00",
     "round": 2
@@ -468,6 +552,8 @@
     "away_en": "Senegal",
     "home_es": "Noruega",
     "away_es": "Senegal",
+    "home_iso3": "NOR",
+    "away_iso3": "SEN",
     "teams_swapped": false,
     "date_utc": "2026-06-23T00:00",
     "round": 2
@@ -479,6 +565,8 @@
     "away_en": "Algeria",
     "home_es": "Jordania",
     "away_es": "Argelia",
+    "home_iso3": "JOR",
+    "away_iso3": "ALG",
     "teams_swapped": false,
     "date_utc": "2026-06-23T03:00",
     "round": 2
@@ -490,6 +578,8 @@
     "away_en": "Uzbekistan",
     "home_es": "Portugal",
     "away_es": "Uzbekistán",
+    "home_iso3": "POR",
+    "away_iso3": "UZB",
     "teams_swapped": false,
     "date_utc": "2026-06-23T17:00",
     "round": 2
@@ -501,6 +591,8 @@
     "away_en": "Ghana",
     "home_es": "Inglaterra",
     "away_es": "Ghana",
+    "home_iso3": "ENG",
+    "away_iso3": "GHA",
     "teams_swapped": false,
     "date_utc": "2026-06-23T20:00",
     "round": 2
@@ -512,6 +604,8 @@
     "away_en": "Croatia",
     "home_es": "Panamá",
     "away_es": "Croacia",
+    "home_iso3": "PAN",
+    "away_iso3": "CRO",
     "teams_swapped": false,
     "date_utc": "2026-06-23T23:00",
     "round": 2
@@ -523,6 +617,8 @@
     "away_en": "DR Congo",
     "home_es": "Colombia",
     "away_es": "RD Congo",
+    "home_iso3": "COL",
+    "away_iso3": "COD",
     "teams_swapped": false,
     "date_utc": "2026-06-24T02:00",
     "round": 2
@@ -534,6 +630,8 @@
     "away_en": "Qatar",
     "home_es": "Bosnia y Herzegovina",
     "away_es": "Catar",
+    "home_iso3": "BIH",
+    "away_iso3": "QAT",
     "teams_swapped": false,
     "date_utc": "2026-06-24T19:00",
     "round": 3
@@ -545,6 +643,8 @@
     "away_en": "Canada",
     "home_es": "Suiza",
     "away_es": "Canadá",
+    "home_iso3": "SUI",
+    "away_iso3": "CAN",
     "teams_swapped": false,
     "date_utc": "2026-06-24T19:00",
     "round": 3
@@ -556,6 +656,8 @@
     "away_en": "Haiti",
     "home_es": "Marruecos",
     "away_es": "Haití",
+    "home_iso3": "MAR",
+    "away_iso3": "HAI",
     "teams_swapped": false,
     "date_utc": "2026-06-24T22:00",
     "round": 3
@@ -567,6 +669,8 @@
     "away_en": "Brazil",
     "home_es": "Brasil",
     "away_es": "Escocia",
+    "home_iso3": "BRA",
+    "away_iso3": "SCO",
     "teams_swapped": true,
     "date_utc": "2026-06-24T22:00",
     "round": 3
@@ -578,6 +682,8 @@
     "away_en": "Mexico",
     "home_es": "República Checa",
     "away_es": "México",
+    "home_iso3": "CZE",
+    "away_iso3": "MEX",
     "teams_swapped": false,
     "date_utc": "2026-06-25T01:00",
     "round": 3
@@ -589,6 +695,8 @@
     "away_en": "South Korea",
     "home_es": "Sudáfrica",
     "away_es": "República de Corea",
+    "home_iso3": "RSA",
+    "away_iso3": "KOR",
     "teams_swapped": false,
     "date_utc": "2026-06-25T01:00",
     "round": 3
@@ -600,6 +708,8 @@
     "away_en": "Côte d'Ivoire",
     "home_es": "Curazao",
     "away_es": "Costa de Marfil",
+    "home_iso3": "CUW",
+    "away_iso3": "CIV",
     "teams_swapped": false,
     "date_utc": "2026-06-25T20:00",
     "round": 3
@@ -611,6 +721,8 @@
     "away_en": "Germany",
     "home_es": "Ecuador",
     "away_es": "Alemania",
+    "home_iso3": "ECU",
+    "away_iso3": "GER",
     "teams_swapped": false,
     "date_utc": "2026-06-25T20:00",
     "round": 3
@@ -622,6 +734,8 @@
     "away_en": "Sweden",
     "home_es": "Japón",
     "away_es": "Suecia",
+    "home_iso3": "JPN",
+    "away_iso3": "SWE",
     "teams_swapped": false,
     "date_utc": "2026-06-25T23:00",
     "round": 3
@@ -633,6 +747,8 @@
     "away_en": "Netherlands",
     "home_es": "Túnez",
     "away_es": "Países Bajos",
+    "home_iso3": "TUN",
+    "away_iso3": "NED",
     "teams_swapped": false,
     "date_utc": "2026-06-25T23:00",
     "round": 3
@@ -644,6 +760,8 @@
     "away_en": "Australia",
     "home_es": "Paraguay",
     "away_es": "Australia",
+    "home_iso3": "PAR",
+    "away_iso3": "AUS",
     "teams_swapped": false,
     "date_utc": "2026-06-26T02:00",
     "round": 3
@@ -655,6 +773,8 @@
     "away_en": "USA",
     "home_es": "Turquía",
     "away_es": "Estados Unidos",
+    "home_iso3": "TUR",
+    "away_iso3": "USA",
     "teams_swapped": false,
     "date_utc": "2026-06-26T02:00",
     "round": 3
@@ -666,6 +786,8 @@
     "away_en": "France",
     "home_es": "Noruega",
     "away_es": "Francia",
+    "home_iso3": "NOR",
+    "away_iso3": "FRA",
     "teams_swapped": false,
     "date_utc": "2026-06-26T19:00",
     "round": 3
@@ -677,6 +799,8 @@
     "away_en": "Iraq",
     "home_es": "Senegal",
     "away_es": "Irak",
+    "home_iso3": "SEN",
+    "away_iso3": "IRQ",
     "teams_swapped": false,
     "date_utc": "2026-06-26T19:00",
     "round": 3
@@ -688,6 +812,8 @@
     "away_en": "Saudi Arabia",
     "home_es": "Cabo Verde",
     "away_es": "Arabia Saudí",
+    "home_iso3": "CPV",
+    "away_iso3": "KSA",
     "teams_swapped": false,
     "date_utc": "2026-06-27T00:00",
     "round": 3
@@ -699,6 +825,8 @@
     "away_en": "Spain",
     "home_es": "Uruguay",
     "away_es": "España",
+    "home_iso3": "URU",
+    "away_iso3": "ESP",
     "teams_swapped": false,
     "date_utc": "2026-06-27T00:00",
     "round": 3
@@ -710,6 +838,8 @@
     "away_en": "Iran",
     "home_es": "Egipto",
     "away_es": "RI de Irán",
+    "home_iso3": "EGY",
+    "away_iso3": "IRN",
     "teams_swapped": false,
     "date_utc": "2026-06-27T03:00",
     "round": 3
@@ -721,6 +851,8 @@
     "away_en": "Belgium",
     "home_es": "Nueva Zelanda",
     "away_es": "Bélgica",
+    "home_iso3": "NZL",
+    "away_iso3": "BEL",
     "teams_swapped": false,
     "date_utc": "2026-06-27T03:00",
     "round": 3
@@ -732,6 +864,8 @@
     "away_en": "Ghana",
     "home_es": "Croacia",
     "away_es": "Ghana",
+    "home_iso3": "CRO",
+    "away_iso3": "GHA",
     "teams_swapped": false,
     "date_utc": "2026-06-27T21:00",
     "round": 3
@@ -743,6 +877,8 @@
     "away_en": "England",
     "home_es": "Panamá",
     "away_es": "Inglaterra",
+    "home_iso3": "PAN",
+    "away_iso3": "ENG",
     "teams_swapped": false,
     "date_utc": "2026-06-27T21:00",
     "round": 3
@@ -754,6 +890,8 @@
     "away_en": "Portugal",
     "home_es": "Colombia",
     "away_es": "Portugal",
+    "home_iso3": "COL",
+    "away_iso3": "POR",
     "teams_swapped": false,
     "date_utc": "2026-06-27T23:30",
     "round": 3
@@ -765,6 +903,8 @@
     "away_en": "Uzbekistan",
     "home_es": "RD Congo",
     "away_es": "Uzbekistán",
+    "home_iso3": "COD",
+    "away_iso3": "UZB",
     "teams_swapped": false,
     "date_utc": "2026-06-27T23:30",
     "round": 3
@@ -776,6 +916,8 @@
     "away_en": "Austria",
     "home_es": "Argelia",
     "away_es": "Austria",
+    "home_iso3": "ALG",
+    "away_iso3": "AUT",
     "teams_swapped": false,
     "date_utc": "2026-06-28T02:00",
     "round": 3
@@ -787,6 +929,8 @@
     "away_en": "Argentina",
     "home_es": "Jordania",
     "away_es": "Argentina",
+    "home_iso3": "JOR",
+    "away_iso3": "ARG",
     "teams_swapped": false,
     "date_utc": "2026-06-28T02:00",
     "round": 3
