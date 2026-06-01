@@ -6,9 +6,9 @@ Sistema de notificaciones WhatsApp en fase **Twilio sandbox**. Los usuarios se s
 
 Edge Functions implicadas (descripciones extendidas en `docs/architecture.md`):
 
-- `porra-whatsapp-send` v1 — envío via Twilio (form-urlencoded fetch).
-- `porra-whatsapp-webhook` v4 — webhook entrada WhatsApp.
-- `porra-apify-webhook` v7 — detecta cambios en partidos y dispara notificaciones Twilio directas.
+- `porra-whatsapp-send` v2 — envío via Twilio (form-urlencoded fetch).
+- `porra-whatsapp-webhook` v5 — webhook entrada WhatsApp.
+- `porra-apify-webhook` v8 — detecta cambios en partidos y dispara notificaciones Twilio directas.
 
 ## Notificaciones configuradas
 

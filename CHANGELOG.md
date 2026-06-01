@@ -2,6 +2,74 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [01-jun-2026] Jornada motor + entrada + puente live (B1 #128 · B2 #127 · P1 · P3 · #126)
+
+Sesión multi-lane (Code + Claude.ai). Code commitea docs/datos/tests; Claude.ai
+opera runtime (migraciones + deploys EF) vía MCP. `main` cierra en `b89a5c9`.
+
+### B2 — Ensamblado scoring server-side (PR#127 `ceb7be1`)
+
+EF `get-league-standings` **v1.0.1→v1.1.0** (deploy version 3). El motor
+`_shared/scoring.mjs` NO se toca — era correcto (**ERR-79 reformulado**: el bug
+siempre fue de ENSAMBLADO). Cambios en `index.ts`:
+- **Reader type-tolerant `asObj()`** sustituye los 3 `JSON.parse` → acepta TEXT u
+  objeto ya parseado, sobrevive a la migración `results`→jsonb sin acoplarse.
+- **Boost ×2 grupos** desde `boost_picks` (`boostByUser[uid]` Set por `match_id`).
+  KO sigue sin boost (pendiente backend).
+- **Merge de `results.overrides`** ENCIMA del canónico de grupos por clave.
+
+`update-results` traída al repo desde el deploy v5 (escribe objetos jsonb; NO
+computa puntos). `tests/scoring.test.mjs` extendido: paridad shared↔legacy a las
+3 funciones + boost exacto + iaBonus + wiring de ensamblado; carga del legacy por
+marcadores de función (no `slice` por nº de línea).
+
+### B1 — Entrada UI Tier-0 (PR#128 `8791775`, validado en device real de San)
+
+- **FX-13** scroll del picker de goleador (móvil): el `__inner` pasa a ser el
+  scroller (`overflow-y:auto` + momentum iOS + `overscroll-behavior:contain`),
+  `max-height: calc(100dvh - var(--fc-tab-h) - var(--fc-safe-bottom) - 28px)` con
+  tokens en `public/css/components/tokens.css`. Causa raíz del recorte: tabbar
+  `z-index` 300 > picker 130 (ERR-65/66).
+- **FX-14** quitar porteros del picker (`getScorerCandidates` filtra
+  `j.posicion !== 'Portero'`; fallback sin XI conserva plantilla). Clave de
+  posición = `posicion` (NO `posicion_bucket`).
+- **FX-01** verde indebido en grupos: selector CSS sin `.is-qualified` eliminado
+  + gate `v3GroupHasRealResults()` (realce solo con resultados reales).
+
+### P1 — `results` text→jsonb (runtime, lane Claude.ai/MCP)
+
+Tabla `results` migrada a 6 columnas **jsonb** (contrato F3:
+`match_results`/`ko_results`/`award_winners`/`classification`/`overrides`/`log`);
+`ko_results` normalizada array→objeto. `get-league-standings` v1.1.0 desplegada.
+
+### P3 — Puente `live_scores → results` (datos #129 + runtime bridge)
+
+- **P3c (PR#129 `b89a5c9`)**: `home_iso3`/`away_iso3` en las 72 entradas de
+  `public/data/worldcup-2026-matches.json` (144 valores, 0 nulls, todos ∈
+  `squads.iso3`).
+- **Runtime (lane Claude.ai/MCP)**: EF nueva **`porra-bridge-results` v3** +
+  tablas `wc_matches` (72) y `equipos_players` (48), espejo de los JSON del repo.
+  Lee `live_scores` finished + `wc_matches` → `results.match_results` vía
+  `jsonb_set`, normaliza goleador (`extractScorers` + `playerToShortKey`, ignora
+  `ownGoal`), aplica `teams_swapped`. Detalle en `docs/live-scoring.md` §Puente.
+  ⚠️ Recargar `wc_matches`/`equipos_players` si cambian los JSON fuente.
+
+### #126 — CI + sync (`b065f63`)
+
+Cron Sync Squads `timeout-minutes` 15→30 (el run se cancelaba a 15m antes de
+escribir BD). `country-map.json`: alias `catar`→QAT (Qatar se descartaba de las
+fuentes primarias españolas).
+
+### Docs (este sprint, rama `feat/docs-sync-01jun`)
+
+Tabla EF canónica refrescada a 21 EFs ACTIVE en `docs/architecture.md` +
+`README.md` (drift previo: `porra-match-live` v17, `admin-actions` v8,
+`porra-ia-compute` v14, `get-squad` v8… + altas `get-league-standings` /
+`porra-bridge-results` + 5 EF placeholder pendientes). Nuevas tablas en
+`docs/db-schema.md` (`results`/`wc_matches`/`equipos_players`). Puente en
+`docs/live-scoring.md`. ERR-79 reformulado. Squads (MCP): 48 filas, 46 FINAL, 2
+vacías pendientes ~2-jun (TUR, UZB); QAT cerró FINAL (26) en la sesión.
+
 ## [01-jun-2026] PR-1 leaderboard liga — EF get-league-standings + render Trofeo (PR#123, `a1e3da9`)
 
 Sprint pantalla "Clasificación de liga" cerrado. Arquitectura A
@@ -460,34 +528,3 @@ modal saldrá vacío por falta de datos. Es problema del sync de plantillas
 
 **Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`). Rama
 `fix/globo-roster-iso3-naming` (PR #124). Nuevo ERR-77 (revisado).
-
-## [31-may-2026] Saga JO Jornada — 6 PRs #116→#121 (CERRADA)
-
-Sesión enfocada 100% en la pantalla Jornada y sus interacciones con login y
-con el bracket KO. 6 PRs squash a main, todos solo frontend (sin DDL).
-
-**PR#116 (`95f50a2`) — FG-1 (board stale post-login) + JO-4 (horarios CEST)**
-- FG-1: `auth.js` `loadUserData` emite `CustomEvent('mundial:predictions-changed',{detail:{source:'auth-load'}})` tras hidratar `predictions[]` desde Supabase. El listener en `grupos-v3.js:1248` ya existía; sin el dispatch, el board v3 quedaba en orden inicial si el usuario aterrizaba en Grupos antes de que loadUserData terminara.
-- JO-4: helper `_joParseMatchDate(s)` en `ui-groups.js` ancla fechas naive (`'2026-06-11T15:00:00'`) a `+02:00` (CEST, válido para todo el Mundial 11-jun→19-jul). `timeZone:'Europe/Madrid'` añadido a los 6 `toLocale{Time,Date}String` de la vista (incl. `_buildJCard`, `renderVistaJornada`, `_buildMatchButtons`, `renderBoostTicker`, modal `_showJcardModal`). En el modal `getHours()/getDate()` (siempre TZ del dispositivo) sustituidos por `Intl.toLocaleTimeString` con TZ Madrid.
-
-**PR#117 (`0f884ad`) — JO-2 nombres completos en cards y modal compact**
-- `_buildJCard` y `_showJcardModal`: ISO3 (`MEX`, `RSA`, `BIH`) sustituido por nombre completo (`hTeam.name`/`aTeam.name`) con fallback a `match.home/match.away`. Atributo `title` HTML duplicado para tooltip de nombres truncados en móvil.
-- CSS `.jv2-team-code` y `.jcard-compact-team-code`: tracking reducido `.08em→.02em`, `text-overflow:ellipsis` + `white-space:nowrap` + `max-width:100%` para que "Bosnia y Herzegovina" / "República de Corea" no rompan el grid `1fr auto 1fr`. `.jcard-compact-team` recibe `min-width:0` (grid item shrink, necesario para ellipsis).
-
-**PR#118 (`052109e`) + PR#119 hotfix (`972f3d6`) — JO-1a esqueleto KO**
-- PR#118 añade 6 secciones nuevas debajo de las jornadas de grupos en `renderVistaJornada`: 16avos · Octavos · Cuartos · Semifinales · 3er y 4º · Final. Reutiliza `ROUND_CONFIG` + `BRACKET[cfg.key]` + clases `.jv2-*`. Nuevas funciones en `ui-groups.js`: `_buildJKOCard`, `_buildJKOSection`, `_buildJKOSectionsHtml`, mapa `_JO_KO_SHORT`. Sin pronóstico, sin clicks. Etiquetas P3a ("16AVOS · KO", etc.).
-- **HOTFIX crítico PR#119**: la primera versión leía `resolvedSlots` (predicciones del usuario) y mostraba "INVALID DATE". Correcciones: `_joKOSlotLabel`→`'Por definir'` constante; `_joKOTeamFromSlot`→`null` constante; `resolveAllSlots()` removido de `_buildJKOSectionsHtml`. Fechas solo-día del BRACKET (`'2026-06-28'`) se anclan a `'T12:00:00'` antes de `_joParseMatchDate` + guard `isNaN(dt.getTime())`. **Principio (ERR-76)**: pantalla Jornada muestra calendario/competición REAL, NUNCA `resolvedSlots` (eso son predicciones). TODO documentado en código para conectar a resultados oficiales post-27jun.
-
-**PR#120 (`33f0328`) — JO-3 acordeón de secciones**
-- Cada `.jv2-section` (grupos + KO) pasa a colapsable. Estado en memoria `_joSectionCollapsed{}` keyed por `"date:YYYY-MM-DD"` (grupos) y `"ko:<cfg.key>"` (KO). Flag `_joCollapseInit` aplica defaults solo la primera vez; clicks posteriores del usuario se respetan en sesión.
-- "Jornada viva" = primer día (cronológico) con algún partido aún no finalizado. Pre-Mundial sin `live_scores` → `aliveDate = J1 11-jun`. Defensivo: si todos finalizados (fin torneo), aliveDate=null y todo arranca colapsado. KO siempre arranca colapsado.
-- Handler delegado en `jornada-container` idempotente con flag `_joCollapseDelegated`. Guards: `.jv2-nav-arrow` no dispara toggle (preserva navegación prev/next), `Enter`/`Space` sí (a11y). Patrón propio `.is-collapsed` + `display:none` (no `.collap` legacy con `max-height:1200px` — no escala a 16 cards de r32). Chev `▾` inline con rotación `-90deg`. `role="button"` + `tabindex="0"` + `aria-expanded` + `focus-visible` outline.
-
-**PR#121 (`3a03413`) — JO-7 fecha redundante en header de grupos**
-- Header mostraba `'11 JUN · Jueves, 11 De Junio'`. Sustitución de `dateShort` por contador de partidos (`matchesOfDay.length` ya en scope): `'Jueves, 11 De Junio · 2 partidos'`. Const `dateShort` eliminada (sin uso). Header KO intacto (usa `cfg.sub` de `ROUND_CONFIG`).
-
-**JO-5 confirmado NO-bug**: `_buildJCard` ya muestra score real si `live.status==='finished'`. La razón de que pre-Mundial se vea la predicción es que `live_scores` está vacía. Se resolverá al activar pipeline live (Apify webhook + `update-results`) el 11-jun. Sin cambios de código.
-
-**Bugs/errores nuevos**: ERR-76 — "Vistas de competición real NO leen `resolvedSlots`" (catalogado tras el hotfix #119).
-
-**Stats**: 6 PRs squash, 6 ficheros tocados (`auth.js`, `ui-groups.js`, `jornada-v3.css`). Sin migraciones SQL. Sin tocar `vercel.json`, Pizarra, Grupos v3, Fase Final, Predictor.

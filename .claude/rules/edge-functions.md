@@ -56,6 +56,17 @@ const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
 
 Mismo patrón aplica para `FOOTBALL_DATA_API_KEY` en `update-results`.
 
+## Tablas de runtime espejo de JSON del repo (recarga obligatoria)
+
+Algunas EFs leen tablas que son **espejo 1:1 de ficheros JSON versionados en el repo**, cargadas vía MCP (sin migration file):
+
+| Tabla | Filas | Fuente repo | EF consumidora |
+|---|---|---|---|
+| `wc_matches` | 72 | `public/data/worldcup-2026-matches.json` | `porra-bridge-results` |
+| `equipos_players` | 48 | `public/data/equipos-players.json` | `porra-bridge-results` |
+
+**Regla**: editar el JSON en el repo **NO** actualiza la tabla. Tras cualquier cambio en el JSON fuente (p.ej. el sync de squads enriquece `equipos-players.json`, o se añaden campos a `worldcup-2026-matches.json` como en P3c), hay que **RECARGAR la tabla** vía MCP (`UPDATE … FROM jsonb_each(...)`). Si no, la EF queda leyendo datos viejos silenciosamente. Esquema en `docs/db-schema.md`; flujo del puente en `docs/live-scoring.md` §Puente.
+
 ## Migration log obligatorio
 
 Toda EF nueva o cambio de versión requiere entrada en `migration-log.md` con:

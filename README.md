@@ -109,20 +109,22 @@ RLS habilitado en todas las tablas. Audit de seguridad completo aplicado 28-29ab
 
 | Función | Versión | Descripción |
 |---------|---------|-------------|
-| `admin-actions` | v7 | Gestión admin. Requiere JWT admin |
-| `update-results` | v4 | Sync football-data.org → `results`. Activar pg_cron el 11 jun |
-| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → `orchestrator_jobs` |
-| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub |
-| `porra-fix-encoding` | v6 | Inspect/write ficheros GitHub via API |
-| `porra-match-live` | v16 | Live scores async + webhook |
-| `porra-apify-webhook` | v7 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
-| `porra-whatsapp-send` | v1 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
-| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp |
-| `create-league` | v2 | Crear liga (cualquier usuario, max 3 no-admin). verify_jwt=false |
-| `porra-ia-compute` | v10 | Motor IA Predictor (ELO+H2H+form+host). Genera ia_snapshots + ia_predictions |
-| `get-squad` | v* | Sirve datos de `squads` (XI + roster + entrenador) a la Pizarra Táctica |
+| `admin-actions` | v8 | Gestión admin. Requiere JWT admin |
+| `update-results` | v5 | Sync football-data.org → `results`. NO computa puntos (los deriva `get-league-standings` on-read). Activar pg_cron el 11 jun |
+| `get-league-standings` | v1.1.0 | Leaderboard liga server-side (motor `_shared/scoring.mjs`). Ver ERR-79 |
+| `porra-bridge-results` | v3 | Puente `live_scores`→`results` (goleador + `teams_swapped`). Ver `docs/live-scoring.md` |
+| `porra-orchestrator` | v4 | N agentes Haiku en paralelo → `orchestrator_jobs` |
+| `porra-patch-deploy` | v5 | Patches search/replace + commit GitHub |
+| `porra-fix-encoding` | v7 | Inspect/write ficheros GitHub via API |
+| `porra-match-live` | v17 | Live scores async + webhook |
+| `porra-apify-webhook` | v8 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
+| `porra-whatsapp-send` | v2 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
+| `porra-whatsapp-webhook` | v5 | Webhook entrada WhatsApp |
+| `create-league` | v3 | Crear liga (cualquier usuario, max 3 no-admin). verify_jwt=false |
+| `porra-ia-compute` | v14 | Motor IA Predictor (ELO+H2H+form+host). Genera ia_snapshots + ia_predictions |
+| `get-squad` | v8 | Sirve datos de `squads` (XI + roster + entrenador) a la Pizarra Táctica |
 
-Versiones canónicas en `docs/architecture.md` § Edge Functions.
+Tabla canónica completa (21 EFs ACTIVE + `verify_jwt`) en `docs/architecture.md` § Edge Functions.
 
 ---
 

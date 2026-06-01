@@ -2047,7 +2047,7 @@ Aplicado en: `public/js/auth.js` (iter 3+4 mergeados en `6e7c966`),
 es histórico — el bug crítico está resuelto en prod.
 
 
-## ERR-79 — Mapeo BD→motor: la EF montaba `scorer` raw y el motor leía `gol` (+2 goleador nunca sumaba)
+## ERR-79 — El motor (`_shared/scoring.mjs`) era correcto; el bug vivía 100% en el ENSAMBLADO de la EF
 
 > Nota: catalogado originalmente como ERR-77 en la rama PR-1 antes del
 > merge con main. Renumerado a ERR-79 al integrar (main ya había usado
@@ -2056,6 +2056,21 @@ es histórico — el bug crítico está resuelto en prod.
 > `tests/scoring.test.mjs` apuntan al número original; coherencia
 > textual a tratar en el sprint de reconciliación de motores (CLAUDE.md
 > Backlog #5).
+
+**Reformulación (01-jun, sprint B2 / PR#127):** el motor compartido
+`_shared/scoring.mjs` NUNCA estuvo mal — su paridad 1:1 con `public/js/scoring.js`
+está cubierta por `tests/scoring.test.mjs`. **Todos los fallos de puntuación de
+PR-1 fueron de ENSAMBLADO** en `get-league-standings/index.ts` (la capa que lee
+de BD y construye los objetos que entrega al motor). El arreglo correcto fue
+siempre en la EF, no en el motor. Dos olas:
+- **v1.0.1** — `scorer`→`gol` en los 2 mapeos (predsByUser + koByUser); el +2 de
+  goleador empieza a sumar.
+- **v1.1.0 (B2)** — cierra los huecos de ensamblado restantes **sin tocar el
+  motor**: (1) reader *type-tolerant* `asObj()` sustituye los 3 `JSON.parse` →
+  acepta TEXT u objeto ya parseado (sobrevive a la migración `results`→jsonb de
+  P1); (2) **boost ×2 grupos** desde `boost_picks` (`boostByUser[uid]` = Set de
+  `match_id`); (3) **merge de `results.overrides`** ENCIMA del canónico de grupos
+  por clave. KO queda sin boost (pendiente backend).
 
 **Síntoma:** PR-1 v1.0.0 — la EF `get-league-standings` devolvía los puntos
 de fase de grupos y KO SIN sumar el +2 del goleador acertado. Para un
@@ -2104,7 +2119,7 @@ entre `public/js/scoring.js` (browser) y `supabase/functions/_shared/scoring.mjs
 | Goleador            |  +2 | apila      | sí        | sí (v1.0.1) |
 | Bonus vs IA         |  +1 | apila (solo grupos) | sí | sí |
 | Cap por partido     |   7 | (pre-boost) | sí       | sí       |
-| Boost ×2            |  ×2 | solo si exacto + boost-day | sí | NO aplicado v1 |
+| Boost ×2            |  ×2 | solo si exacto + boost-day | sí | sí (v1.1.0, grupos; KO pdte) |
 | Avance r32          |  +5 | KO        | sí        | sí       |
 | Avance r16          | +10 | KO        | sí        | sí       |
 | Avance qf           | +15 | KO        | sí        | sí       |
@@ -2114,10 +2129,12 @@ entre `public/js/scoring.js` (browser) y `supabase/functions/_shared/scoring.mjs
 | Premios individuales| 15/15/15/20 | calcAwardPoints | sí | sí |
 | Clasificación final | 30/20/15/10 | calcClassificationPoints | sí | sí (no usado aún) |
 
-Acción pendiente: pasar la tabla a `docs/scoring-engine.md`, confirmar
-cada fila con `tests/scoring.test.mjs` añadiendo casos que cubran cada
-suceso individual + combinaciones realistas, y dejar los dos motores
-sincronizados al 100%.
+Acción pendiente (residual tras B2): el ensamblado y la paridad de motores
+quedan resueltos — `tests/scoring.test.mjs` extiende la paridad shared↔legacy a
+las 3 funciones (`calcMatchPoints`/`calcKOMatchPoints`/`calcAwardPoints`) + casos
+de boost exacto ×2, iaBonus y el wiring de ensamblado del boost. Quedan **2
+cosas**: (1) **boost ×2 en KO** (backend; hoy solo grupos); (2) trasladar esta
+tabla canónica a `docs/scoring-engine.md`. Backlog #5 (CLAUDE.md).
 
 
 ## ERR-80 — `window.currentUser` no expuesto: `let` top-level no crea propiedad en window (myId undefined)

@@ -159,21 +159,31 @@ Necesarias porque onclick HTML resuelve en parse-time, antes de que el DOM cargu
 
 ## Edge Functions Supabase
 
-| EF | Versión | Descripción |
-|---|---|---|
-| `admin-actions` | v7 | Gestión admin. Requiere JWT admin. |
-| `create-league` | v2 | Liga para cualquier user autenticado. Límite 3 si no-admin; ilimitadas si admin. `verify_jwt=false` (validación manual dentro de EF con service_role). Ver ERR-16. |
-| `update-results` | v4 | Sync football-data.org → results. Activar pg_cron el 11 jun. |
-| `porra-orchestrator` | v3 | N agentes Haiku en paralelo → orchestrator_jobs. |
-| `porra-patch-deploy` | v4 | Patches search/replace + commit GitHub. |
-| `porra-fix-encoding` | v5 | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main. |
-| `porra-match-live` | v16 | Async + webhook, live scores. Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback. |
-| `porra-apify-webhook` | v7 | Logging completo, detecta goles + status, Twilio directo. Bug pendiente v8: no persiste team names / competition / match_start_ts. |
-| `porra-whatsapp-send` | v1 | Envío WhatsApp via Twilio (form-urlencoded fetch). |
-| `porra-whatsapp-webhook` | v4 | Webhook entrada WhatsApp. |
-| `porra-ia-compute` | v10 | IA Predictor. 7 actions, motor log-odds + softmax. Ver `docs/ia-predictor.md`. |
-| `porra-sofascore-proxy` | v8 | OBSOLETA. |
-| `porra-github-pusher` | v6 | PLACEHOLDER. |
+Lista canónica EN VIVO a 01-jun-2026 (verificada vía Supabase MCP, proyecto `cmyfyswystjgzdwbqyyb`, 21 EFs ACTIVE). `verify_jwt=false` ⇒ la EF valida el JWT manualmente con service_role (ERR-16).
+
+| EF | Versión | `verify_jwt` | Descripción |
+|---|---|---|---|
+| `admin-actions` | v8 | false | Gestión admin. Valida JWT admin manualmente. |
+| `create-league` | v3 | false | Liga para cualquier user autenticado. Límite 3 si no-admin; ilimitadas si admin. Validación manual con service_role (ERR-16). |
+| `update-results` | v5 | true | Sync football-data.org → `results` (grupos, escribe objetos jsonb tras P1). **NO computa puntos**: los deriva `get-league-standings` on-read. Activar pg_cron el 11 jun. |
+| `get-league-standings` | v1.1.0 (deploy v3) | false | Leaderboard de liga server-side. Lee predictions/ko_predictions/award_picks/results/ia_predictions/boost_picks por liga con service_role y reutiliza `_shared/scoring.mjs`. Reader jsonb-tolerante (`asObj`), boost ×2 grupos, merge de `results.overrides`. Devuelve SOLO totales agregados (picks ajenos nunca viajan al cliente). Ver ERR-79. |
+| `porra-bridge-results` | v3 | false | **Puente P3**: `live_scores` (finished) + `wc_matches` → `results.match_results`. Normaliza goleador SofaScore→key corta vía `equipos_players`, aplica `teams_swapped`. Auth por secret==service_role. Detalle en `docs/live-scoring.md`. |
+| `porra-orchestrator` | v4 | false | N agentes Haiku en paralelo → `orchestrator_jobs`. |
+| `porra-patch-deploy` | v5 | false | Patches search/replace + commit GitHub. |
+| `porra-fix-encoding` | v7 | false | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main. |
+| `porra-github-pusher` | v7 | false | PLACEHOLDER. |
+| `gh-proxy` | v5 | true | Pendiente documentar (follow-up). |
+| `porra-match-live` | v17 | false | Async + webhook, live scores. Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback. |
+| `porra-apify-webhook` | v8 | false | Logging completo, detecta goles + status, Twilio directo. Aún no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (cosmético — **ya NO bloquea el puente P3**, que resuelve equipos vía `wc_matches` por `match_key`). |
+| `get-match-stats` | v1 | false | Pendiente documentar (follow-up). |
+| `porra-sofascore-proxy` | v9 | false | OBSOLETA. |
+| `porra-whatsapp-send` | v2 | false | Envío WhatsApp via Twilio (form-urlencoded fetch). |
+| `porra-whatsapp-webhook` | v5 | false | Webhook entrada WhatsApp. |
+| `porra-ia-compute` | v14 | false | IA Predictor. Motor log-odds + softmax. Ver `docs/ia-predictor.md`. |
+| `porra-upload-predictor` | v3 | false | Pendiente documentar (follow-up). |
+| `get-squad` | v8 | true | Sirve datos de `squads` (XI + roster + entrenador) a la Pizarra Táctica (`public/js/ui-pizarra-tactica.js`). |
+| `porra-tm-photos-sync` | v6 | true | Pendiente documentar (follow-up). |
+| `porra-flag-batch-upload` | v3 | true | Pendiente documentar (follow-up). |
 
 ## Stack infraestructura
 
