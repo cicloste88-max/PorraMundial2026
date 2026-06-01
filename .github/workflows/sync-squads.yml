@@ -68,7 +68,14 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 30 (era 15): el cron sin --iso3 baja las 48 FF en el prefetch (~8min,
+    # fetch_sources.py ProcessPool 3 workers) + install Scrapling/Playwright
+    # (~2-4min) + detect + enrich-tm-mw ≈ 18-20min. El cap de 15 cancelaba el
+    # job a mitad ("exceeded max execution time 15m0s") → runs fallidos en
+    # serie y nada persistido desde 31-may 13:38. Dispatches con iso3_filter
+    # son ligeros (FF acotado) y caben de sobra. Optimización pendiente
+    # (post-launch): acotar el prefetch FF a selecciones no-final.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
