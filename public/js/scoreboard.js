@@ -43,11 +43,13 @@ async function sbLoad(forceRefresh = false) {
   document.getElementById('sb-my-breakdown').style.display = 'none';
 
   try {
-    // 1. Todos los profiles
-    const { data: profiles, error: pe } = await db.from('profiles').select('id,nombre');
-    if (pe) throw pe;
-
-    // 2. Predictions filtradas por liga activa
+    // PR-1 Capa 2: el cómputo ahora vive en la Edge Function
+    // `get-league-standings`. Reemplaza las 4 lecturas de tablas + el cálculo
+    // cliente con 1 invocación. La EF aplica el motor _shared/scoring.mjs
+    // (parity 1:1 con public/js/scoring.js, validado por tests) y devuelve
+    // SOLO totales agregados — los picks ajenos NUNCA llegan al cliente,
+    // así que no necesitamos relajar las RLS de predictions/ko_predictions/
+    // award_picks. Ver supabase/functions/get-league-standings/index.ts.
     const _sbLeagueId = getActiveLeagueId();
     if (!_sbLeagueId) {
       document.getElementById('sb-loading').style.display = 'none';
@@ -57,120 +59,20 @@ async function sbLoad(forceRefresh = false) {
       if (refreshBtn) refreshBtn.classList.remove('spinning');
       return;
     }
-    const { data: preds, error: pre } = await db.from('predictions').select('*').eq('league_id', _sbLeagueId);
-    if (pre) throw pre;
 
-    // 3. Ko_predictions filtradas por liga activa
-    const { data: koPreds, error: koe } = await db.from('ko_predictions').select('*').eq('league_id', _sbLeagueId);
-    if (koe) throw koe;
-
-    // 4. Award_picks filtrados por liga activa
-    const { data: awards, error: ae } = await db.from('award_picks').select('*').eq('league_id', _sbLeagueId);
-    if (ae) throw ae;
-
-    // Guardia RLS: si profiles viene vacío, avisar con mensaje claro
-    if (!profiles || profiles.length === 0) {
-      document.getElementById('sb-loading').style.display = 'none';
-      const emptyEl = document.getElementById('sb-empty');
-      emptyEl.style.display = 'block';
-      emptyEl.querySelector('.sb-empty-text').innerHTML =
-        'Sin acceso a datos de participantes.<br>' +
-        '<span style="font-size:11px;color:#374151;margin-top:6px;display:block">' +
-        'Ejecuta las políticas RLS públicas en Supabase para el scoreboard.</span>';
-      if (refreshBtn) refreshBtn.classList.remove('spinning');
-      return;
+    const { data, error } = await db.functions.invoke('get-league-standings', {
+      body: { league_id: _sbLeagueId },
+    });
+    if (error) throw error;
+    if (!data || !Array.isArray(data.rows)) {
+      throw new Error('respuesta inválida (sin rows)');
     }
 
-    // 5. Resultados reales (si existe la tabla)
-    let realMatchResults   = null;
-    let realKoResults      = null;
-    let realAwardWinners   = null;
-    let realClassification = null;
-    try {
-      const { data: res } = await db.from('results').select('*').single();
-      if (res) {
-        realMatchResults   = res.match_results   ? JSON.parse(res.match_results)   : null;
-        realKoResults      = res.ko_results       ? JSON.parse(res.ko_results)       : null;
-        realAwardWinners   = res.award_winners    ? JSON.parse(res.award_winners)    : null;
-        realClassification = res.classification   ? JSON.parse(res.classification)   : null;
-      }
-    } catch(_) { /* tabla results aún no existe o vacía — modo simulación */ }
-
-    // 6. Agrupar datos por usuario
-    const predsByUser  = {};
-    const koPredsByUser = {};
-    const awardsByUser = {};
-
-    preds.forEach(p => {
-      if (!predsByUser[p.user_id]) predsByUser[p.user_id] = {};
-      // Reconstruir clave match_id → { l, v, gol, saved }
-      // La clave en memoria es "GROUP_home_away"; en DB está como match_id string
-      predsByUser[p.user_id][p.match_id] = { l: p.local, v: p.visitante, gol: p.scorer, saved: true };
-    });
-
-    koPreds.forEach(p => {
-      if (!koPredsByUser[p.user_id]) koPredsByUser[p.user_id] = {};
-      koPredsByUser[p.user_id][p.match_id] = { l: p.local, v: p.visitante, gol: p.scorer, classifier: p.classifier, saved: true };
-    });
-
-    awards.forEach(a => { awardsByUser[a.user_id] = a; });
-
-    // 7. Calcular puntos por usuario
-    const rows = profiles.map(profile => {
-      const uid        = profile.id;
-      const userPreds  = predsByUser[uid]  || {};
-      const userKoPreds= koPredsByUser[uid] || {};
-      const userAwards = awardsByUser[uid]  || null;
-
-      // --- Puntos grupos ---
-      let grpPts = 0;
-      PARTIDOS.forEach(m => {
-        const key  = getMatchKey(m);
-        const pred = userPreds[key];
-        const real = realMatchResults?.[key];
-        if (pred && real) grpPts += calcMatchPoints(pred, real.l, real.v, key);
-      });
-
-      // --- Puntos KO ---
-      let koPts = 0;
-      const KO_ROUNDS_SB = [
-        { matches: BRACKET.r32,   round: 'r32' },
-        { matches: BRACKET.r16,   round: 'r16' },
-        { matches: BRACKET.qf,    round: 'qf'  },
-        { matches: BRACKET.sf,    round: 'sf'  },
-        { matches: BRACKET.third, round: 'third'},
-        { matches: BRACKET.final, round: 'final'},
-      ];
-      KO_ROUNDS_SB.forEach(({ matches, round }) => {
-        matches.forEach(m => {
-          const pred = userKoPreds[m.id] || userKoPreds[String(m.id)];
-          const real = realKoResults?.[m.id];
-          if (pred && real) koPts += calcKOMatchPoints(pred, real.l, real.v, round);
-        });
-      });
-
-      // --- Premios awards ---
-      let awPts = 0;
-      if (userAwards && realAwardWinners) {
-        awPts = calcAwardPoints(
-          { golden_ball: userAwards.golden_ball, golden_boot: userAwards.golden_boot,
-            golden_glove: userAwards.golden_glove, young_player: userAwards.young_player },
-          realAwardWinners
-        );
-      }
-
-      const total = grpPts + koPts + awPts;
-      const hasPreds = Object.keys(userPreds).length > 0 || Object.keys(userKoPreds).length > 0;
-
-      return { uid, nombre: profile.nombre || '—', grpPts, koPts, awPts, total, hasPreds };
-    })
-    .filter(r => r.hasPreds)
-    .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
-
+    const rows = data.rows;
     _sbData = rows;
     window._sbData = rows; // exponer para vista jornada
     _sbLoaded = true;
-    sbRender(rows, realMatchResults);
+    sbRender(rows);
 
   } catch (err) {
     console.error('[scoreboard] Error:', err);
@@ -186,85 +88,212 @@ async function sbLoad(forceRefresh = false) {
   }
 }
 
-function sbRender(rows, realMatchResults) {
-  document.getElementById('sb-loading').style.display = 'none';
+// PR-1 Capa 3 — render "Trofeo".
+// Helpers locales: avatar color determinista, iniciales, esc HTML, trend.
+// (Fusión del cuerpo de scoreboard-v3.render.js entregado por San.)
+const _SB_AV = [
+  'linear-gradient(135deg,#2851E1,#1A3AAE)',
+  'linear-gradient(135deg,#C9A961,#9A7B3A)',
+  'linear-gradient(135deg,#3A6E5A,#1F4A3A)',
+  'linear-gradient(135deg,#7A4FA8,#4A2E78)',
+  'linear-gradient(135deg,#C26A4A,#8A3F28)',
+  'linear-gradient(135deg,#4A5163,#2A3142)',
+  'linear-gradient(135deg,#2E8AA8,#1A5A70)',
+  'linear-gradient(135deg,#A8546E,#702E48)',
+];
+function _sbAvColor(seed) {
+  seed = seed || '?';
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return _SB_AV[h % _SB_AV.length];
+}
+function _sbInitials(name) {
+  const p = (name || '?').trim().split(/\s+/);
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
+function _sbEsc(s) {
+  if (typeof escapeHtml === 'function') return escapeHtml(s);
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+function _sbTrendInfo(t) {
+  if (typeof t !== 'number') return null;
+  if (t > 0) return { cls: 'up', sym: '▲', n: t };
+  if (t < 0) return { cls: 'down', sym: '▼', n: Math.abs(t) };
+  return { cls: 'flat', sym: '—', n: '' };
+}
 
-  if (!rows.length) {
-    document.getElementById('sb-empty').style.display = 'block';
+function sbRender(rows) {
+  const loading = document.getElementById('sb-loading');
+  if (loading) loading.style.display = 'none';
+
+  if (!rows || !rows.length) {
+    const empty = document.getElementById('sb-empty');
+    if (empty) empty.style.display = 'block';
     return;
   }
 
-  const maxPts  = rows[0]?.total || 0;
-  const myId    = currentUser?.id;
+  // PR-1 fix lookup: el render Trofeo original leía `window.currentUser`,
+  // pero `currentUser` se declara como `let` top-level en auth.js — no se
+  // expone a window (ERR-02). Usamos el patrón ya presente en
+  // ui-groups-mobile.js:490 y data.js:256: variable global directa con
+  // fallback a window por si algún día sí se expone explícitamente.
+  const myId = (typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null)
+            || (window.currentUser && window.currentUser.id)
+            || null;
 
-  // ── Podio top 3 ──
+  // ── HERO PODIO (top-3 con orden visual 2 · 1 · 3) ────────
   const podiumEl = document.getElementById('sb-podium');
   const top3 = rows.slice(0, 3);
-  const medals = ['🥇','🥈','🥉'];
-  const rankCls = ['rank-1','rank-2','rank-3'];
-  const crowns  = ['👑','',''];
+  let order, meta, rowCls;
+  if (top3.length >= 3) {
+    order = [top3[1], top3[0], top3[2]];
+    meta = [{ cls: 'tf-pod--2', medal: '2' }, { cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--3', medal: '3' }];
+    rowCls = '';
+  } else if (top3.length === 2) {
+    order = [top3[0], top3[1]];
+    meta = [{ cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--2', medal: '2' }];
+    rowCls = ' duo';
+  } else {
+    order = [top3[0]];
+    meta = [{ cls: 'tf-pod--1', medal: '1' }];
+    rowCls = ' solo';
+  }
 
-  // Reordenar: 2º · 1º · 3º para el podio visual
-  const podiumOrder = top3.length >= 3
-    ? [top3[1], top3[0], top3[2]]
-    : top3.length === 2 ? [top3[1], top3[0]] : [top3[0]];
-  const podiumRanks = top3.length >= 3 ? [1, 0, 2] : top3.length === 2 ? [1, 0] : [0];
-
-  podiumEl.innerHTML = podiumOrder.map((u, i) => {
-    const realRank = podiumRanks[i];
-    const ini = (u.nombre || '?').charAt(0).toUpperCase();
-    return `<div class="sb-podium-card ${rankCls[realRank]}">
-      ${crowns[realRank] ? `<div class="sb-podium-crown">${crowns[realRank]}</div>` : ''}
-      <div class="sb-podium-rank">${medals[realRank]}</div>
-      <div class="sb-podium-avatar">${ini}</div>
-      <div class="sb-podium-name">${escapeHtml(u.nombre)}</div>
-      <div class="sb-podium-pts">${u.total}<span>pts</span></div>
-    </div>`;
+  const pods = order.map((u, i) => {
+    const m = meta[i];
+    const tr = _sbTrendInfo(u.trend);
+    const first = (u.nombre || '?').split(' ')[0];
+    return '' +
+      '<div class="tf-pod ' + m.cls + '">' +
+        '<div class="tf-pod__medal">' + m.medal + '</div>' +
+        '<div class="tf-pod__ring">' +
+          (m.cls === 'tf-pod--1' ? '<div class="tf-pod__crown">👑</div>' : '') +
+          '<div class="tf-pod__av" style="background:' + _sbAvColor(u.nombre) + '">' + _sbEsc(_sbInitials(u.nombre)) + '</div>' +
+        '</div>' +
+        '<div class="tf-pod__name">' + _sbEsc(first) + '</div>' +
+        '<div class="tf-pod__pts">' + u.total + '<span>pts</span></div>' +
+        (tr ? '<div class="tf-pod__trend ' + tr.cls + '">' + tr.sym + (tr.n !== '' ? ' ' + tr.n : ' =') + '</div>' : '') +
+      '</div>';
   }).join('');
-  podiumEl.style.display = 'grid';
 
-  // ── Tabla completa ──
+  podiumEl.innerHTML = '<div class="tf-hero"><div class="tf-hero__spark"></div><div class="tf-pod-row' + rowCls + '">' + pods + '</div></div>';
+  podiumEl.style.display = 'block';
+
+  // ── LISTA completa ────────────────────────────────────────
   const rowsEl = document.getElementById('sb-rows');
   rowsEl.innerHTML = rows.map((u, i) => {
-    const rank   = i + 1;
-    const isMe   = u.uid === myId;
-    const ini    = (u.nombre || '?').charAt(0).toUpperCase();
-    const rankCl = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
-    const ptsCl  = u.total === maxPts ? 'pts-total best' : 'pts-total';
-    return `<div class="sb-row${isMe ? ' is-me' : ''}">
-      <div class="sb-rank-badge ${rankCl}">${rank}</div>
-      <div class="sb-row-user">
-        <div class="sb-row-avatar">${ini}</div>
-        <div>
-          <div class="sb-row-name">${escapeHtml(u.nombre)}${isMe ? ' <span style="font-size:9px;color:#3b82f6;font-weight:700">TÚ</span>' : ''}</div>
-        </div>
-      </div>
-      <div class="sb-cell">${u.grpPts}</div>
-      <div class="sb-cell">${u.koPts}</div>
-      <div class="sb-cell">${u.awPts}</div>
-      <div class="sb-cell ${ptsCl}">${u.total}</div>
-    </div>`;
+    const rank = i + 1;
+    const isMe = u.uid === myId;
+    const topCls = rank === 1 ? ' top1' : rank === 2 ? ' top2' : rank === 3 ? ' top3' : '';
+    const tr = _sbTrendInfo(u.trend);
+    let badges = '';
+    if (typeof u.boosts === 'number') badges += '<span class="tf-badge">🔥 <b>' + u.boosts + '</b></span>';
+    if (typeof u.exa === 'number') badges += '<span class="tf-badge">🎯 <b>' + u.exa + '</b> exactos</span>';
+    return '' +
+      '<div class="tf-row' + topCls + (isMe ? ' is-me' : '') + '">' +
+        '<div class="tf-row__rank">' + rank + '</div>' +
+        '<div class="tf-row__l">' +
+          '<div class="tf-av" style="background:' + _sbAvColor(u.nombre) + '">' + _sbEsc(_sbInitials(u.nombre)) + '</div>' +
+          '<div class="tf-row__info">' +
+            '<div class="tf-row__name">' + _sbEsc(u.nombre) + (isMe ? '<span class="tf-tag-me">TÚ</span>' : '') + '</div>' +
+            '<div class="tf-row__badges">' + badges + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tf-row__r">' +
+          (tr ? '<div class="tf-row__trend ' + tr.cls + '">' + tr.sym + '<small>' + (tr.n !== '' ? tr.n : '') + '</small></div>' : '') +
+          '<div class="tf-row__total">' + u.total + '<span>pts</span></div>' +
+        '</div>' +
+      '</div>';
   }).join('');
   document.getElementById('sb-table-wrap').style.display = 'block';
 
-  // ── Mi desglose ──
-  if (myId) {
-    const me = rows.find(r => r.uid === myId);
-    if (me) {
-      const cards = [
-        { label: 'Grupos', val: me.grpPts, sub: 'pts de fase de grupos' },
-        { label: 'Eliminatorias', val: me.koPts, sub: 'pts KO + avance' },
-        { label: 'Premios', val: me.awPts, sub: 'awards individuales' },
-        { label: 'Total', val: me.total, sub: 'puntos acumulados' },
-      ];
-      document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c =>
-        `<div class="sb-breakdown-card">
-          <div class="sb-breakdown-label">${c.label}</div>
-          <div class="sb-breakdown-val">${c.val}</div>
-          <div class="sb-breakdown-sub">${c.sub}</div>
-        </div>`
-      ).join('');
-      document.getElementById('sb-my-breakdown').style.display = 'block';
-    }
+  // ── MI DESGLOSE (4 cards: Grupos · Elim. · Premios · Total) ──
+  // PR-1 Capa 3: la card "Premios" es TAPPABLE sólo con porra abierta —
+  // abre el picker via window.PorraPred._openTrophyModal (re-home del
+  // botón trofeo del Predictor). Post-cierre queda display only.
+  //
+  // Degradación elegante (San validó B): el desglose se pinta SIEMPRE
+  // para garantizar que el picker de premios tenga entrada visible
+  // aunque el usuario no esté en `rows` (el payload de la EF filtra por
+  // hasPreds; un usuario nuevo o sin pronósticos guardados todavía no
+  // viaja en filtered). Sin pronósticos los 4 valores se quedan en 0 —
+  // display puro, no engañoso.
+  const me = (myId && rows.find(r => r.uid === myId))
+          || { grpPts: 0, koPts: 0, awPts: 0, total: 0 };
+  const porraAbierta = !window._porraCerrada;
+  const cards = [
+    { lbl: 'Grupos',  val: me.grpPts },
+    { lbl: 'Elim.',   val: me.koPts },
+    { lbl: 'Premios', val: me.awPts, action: 'open-trophy' },
+    { lbl: 'Total',   val: me.total, total: true },
+  ];
+  document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c => {
+    const isClickable = c.action === 'open-trophy' && porraAbierta;
+    let cls = 'clz-bd-card';
+    if (c.total) cls += ' clz-bd-card--total';
+    if (isClickable) cls += ' clz-bd-card--clickable';
+    const attrs = isClickable
+      ? ` role="button" tabindex="0" data-sb-action="${c.action}" aria-label="Cambiar mis premios individuales"`
+      : '';
+    return '<div class="' + cls + '"' + attrs + '>' +
+             '<div class="clz-bd-card__lbl">' + c.lbl + '</div>' +
+             '<div class="clz-bd-card__val">' + c.val + '</div>' +
+           '</div>';
+  }).join('');
+  document.getElementById('sb-my-breakdown').style.display = 'block';
+
+  // Handler delegado idempotente: click / Enter / Space en la card
+  // Premios → _openTrophyModal.
+  const breakdownEl = document.getElementById('sb-breakdown-cards');
+  if (breakdownEl && !breakdownEl._sbBreakdownDelegated) {
+    breakdownEl.addEventListener('click', function (ev) {
+      const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+      if (!card) return;
+      _sbOpenTrophyFromBreakdown();
+    });
+    breakdownEl.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+      if (!card) return;
+      ev.preventDefault();
+      _sbOpenTrophyFromBreakdown();
+    });
+    breakdownEl._sbBreakdownDelegated = true;
   }
+}
+window.sbRender = sbRender;
+
+// Abre el picker de premios desde la card Premios del desglose. Reusa
+// _openTrophyModal expuesto por ui-pred-shell.js en window.PorraPred.
+// awPicks es const top-level de scoring.js — accesible en el global scope.
+function _sbOpenTrophyFromBreakdown() {
+  if (window._porraCerrada) return; // doble guard runtime
+  const open = window.PorraPred && window.PorraPred._openTrophyModal;
+  if (typeof open !== 'function') {
+    console.warn('[scoreboard] _openTrophyModal no disponible aún');
+    return;
+  }
+  // awPicks puede traer {key, name} o el key directo según el flujo previo;
+  // _openTrophyModal espera el formato flat con keys/strings.
+  const picks = (typeof awPicks === 'object' && awPicks) ? awPicks : {};
+  const flat = {
+    golden_ball:  (picks.golden_ball  && picks.golden_ball.key)  || picks.golden_ball  || null,
+    golden_boot:  (picks.golden_boot  && picks.golden_boot.key)  || picks.golden_boot  || null,
+    golden_glove: (picks.golden_glove && picks.golden_glove.key) || picks.golden_glove || null,
+    young_player: (picks.young_player && picks.young_player.key) || picks.young_player || null,
+  };
+  const leagueName = (window.currentLeague && window.currentLeague.nombre) || '';
+  open(flat, {
+    porraAbierta: !window._porraCerrada,
+    league: { name: leagueName },
+    onChangeAward: function (awardKey) {
+      const modalEl = document.getElementById('modal');
+      if (modalEl) modalEl.classList.remove('open');
+      if (typeof window.openPicker === 'function') window.openPicker(awardKey);
+    },
+    onClose: null,
+  });
 }

@@ -31,7 +31,8 @@ Main HEAD `6e7c966` (PR#125, 01-jun). **Sagas cerradas**: JO Jornada (31-may, PR
 1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
-4. **JO-1a — resolver KO por resultado real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` (`ui-groups.js`) devuelven `'Por definir'`. Inyectar lookup desde resultados oficiales (`PARTIDOS.realHome/realAway` + `ko_results`); **NUNCA** `resolvedSlots` (ERR-76: son predicciones). TODO en código.
+4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
+5. **Reconciliar scoring.js↔`_shared/scoring.mjs`** (ERR-79). Tabla 1:1 a `docs/scoring-engine.md` + tests por suceso. Pdte boost ×2 backend.
 
 ## Pendientes — Audit Postgres 28abr (backlog)
 
@@ -104,7 +105,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..76: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, Edge functions, UI mobile, KO/Globo, Overlay v3, simuladores, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real vs predicciones (76).
+ERR-01..79: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), mapeo BD→motor (79).
 
 ### Otros ficheros de contexto
 

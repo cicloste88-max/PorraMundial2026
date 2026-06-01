@@ -1,0 +1,231 @@
+/* ════════════════════════════════════════════════════════════
+   clasificacion-v3.css — Dirección "Trofeo" para #page-score
+   Porra Mundial 2026
+   ────────────────────────────────────────────────────────────
+   Cárgalo DESPUÉS de admin.css para que gane en cascada.
+   Consume tokens de elim-tokens.css (--ink-*, --lime, --fifa-*,
+   --font-*). Si esa hoja no estuviera cargada en la página,
+   el bloque :root de fallback de abajo cubre los valores.
+   Todo el scope vive bajo #page-score → cero colisión con el
+   resto del ecosistema.
+   ============================================================ */
+
+/* Fallback de tokens (no-op si elim-tokens.css ya está cargado) */
+:root {
+  --fifa-gold: #C9A961; --fifa-gold-deep: #9A7B3A; --fifa-blue: #0A4595;
+  --ink-900:#0A0E1A; --ink-800:#141826; --ink-700:#1F2433; --ink-600:#2A3142;
+  --ink-500:#4A5163; --ink-400:#7A8194; --ink-300:#B8BEC9; --ink-200:#E2E5EB; --ink-100:#F2F4F8;
+  --lime:#C4F046;
+  --font-display:"Saira","SF Pro Display",-apple-system,system-ui,sans-serif;
+  --font-text:"Inter",-apple-system,system-ui,sans-serif;
+  --font-numeric:"Saira","SF Mono",ui-monospace,monospace;
+}
+#page-score {
+  --clz-silver:#C7CDD6; --clz-bronze:#D08B5B;
+  --clz-up:#4ADE80; --clz-down:#F87171; --clz-flat:#7A8194;
+}
+
+/* ── Fondo + body de la página ───────────────────────────── */
+#page-score {
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 22%, rgba(201,169,97,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 70%, rgba(10,69,149,.16) 0%, transparent 65%),
+    var(--ink-900) !important;
+}
+#page-score .sb-body { max-width:440px; margin:0 auto; padding:14px 14px 90px; }
+
+/* ── Top title (reusa .sb-top existente, retematizado) ───── */
+#page-score .sb-top { text-align:center; margin-bottom:14px; }
+#page-score .sb-tournament-badge {
+  display:inline-block; font-family:var(--font-text);
+  font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--ink-400);
+}
+#page-score .sb-title {
+  font-family:var(--font-display); font-weight:900;
+  font-size:11px; letter-spacing:.16em; color:var(--ink-900);
+  background:var(--lime); display:inline-block;
+  padding:6px 18px; border-radius:999px; margin:8px 0 6px;
+  box-shadow:0 0 24px rgba(196,240,70,.35);
+}
+#page-score .sb-subtitle { font-family:var(--font-text); font-size:10px; color:var(--ink-500); }
+/* PR-1 pulido visual: refresh icónico en la appbar (32×32 sin texto).
+   El recalculo principal lo dispara el cron update-results al cierre de
+   cada partido; este botón sólo cubre el refresco manual secundario. */
+#page-score .sb-refresh-btn {
+  margin-left:auto;
+  flex-shrink:0;
+  width:32px; height:32px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--ink-300); background:rgba(0,0,0,.35);
+  border:1px solid var(--ink-700); border-radius:50%;
+  cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+#page-score .sb-refresh-btn:hover { color:var(--ink-100); background:rgba(0,0,0,.55); border-color:var(--ink-600); }
+#page-score .sb-refresh-btn:focus-visible { outline:2px solid var(--fifa-gold); outline-offset:2px; }
+#page-score .sb-refresh-btn.spinning svg { animation:clz-spin .8s linear infinite; }
+@keyframes clz-spin { to { transform:rotate(360deg); } }
+
+#page-score .sb-section-title {
+  font-family:var(--font-display); font-size:9px; font-weight:800;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-400);
+  margin:0 0 8px 2px;
+}
+/* PR-1 pulido visual (iter 2): aire entre "Mi desglose" y la
+   "Clasificación completa" — sin este margin-top la sección pegada al
+   bloque superior. Selector específico para no afectar al título de
+   "Mi desglose" (que ya tiene aire del podio). */
+#page-score #sb-table-wrap .sb-section-title { margin-top:18px; }
+/* Trofeo no usa cabecera de columnas — .sb-table-header eliminada del
+   markup en iter 3. La causa REAL del borde superior recortado en la
+   fila #1 (.tf-row.top1 / .is-me) era el contenedor .sb-table legacy
+   con overflow:hidden de admin.css clipando las esquinas redondeadas
+   y el box-shadow exterior del resaltado. Override a overflow:visible
+   + 4px de aire arriba en #sb-rows para que el contorno completo se
+   vea en las 4 esquinas (dorado y lime). */
+#page-score .sb-table { background:none; border:0; padding:0; overflow:visible; }
+#page-score #sb-rows { padding-top:4px; }
+
+/* ════════════ HERO PODIO (inyectado en #sb-podium) ════════ */
+/* El render controla la visibilidad con style.display inline
+   (block al mostrar · none en loading/empty). No forzamos display
+   aquí para no romper esos estados. Solo neutralizamos el grid
+   heredado de admin.css cuando el podio está visible. */
+#page-score #sb-podium.sb-podium[style*="block"] { grid-template-columns:none; }
+.tf-hero {
+  position:relative; border-radius:16px; padding:16px 12px 14px; margin-bottom:14px;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 70% 80% at 50% -10%, rgba(201,169,97,.28), transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 120%, rgba(10,69,149,.20), transparent 65%),
+    linear-gradient(180deg, rgba(28,22,8,.7) 0%, rgba(14,17,28,.85) 100%);
+  /* PR-1 pulido visual (iter 2): el inset shadow del intento anterior es
+     RECTANGULAR — no sigue el border-radius:16px, así que en las esquinas
+     redondeadas el radial-gradient dorado lavaba el contorno. Resolvemos
+     SOLO con el border (que sí respeta el radius), subiéndolo a dorado
+     plano #c9a961 para contraste uniforme en 4 lados Y 4 esquinas. */
+  border:1px solid #c9a961;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.tf-hero__spark {
+  position:absolute; inset:0; pointer-events:none;
+  background-image:
+    radial-gradient(circle, rgba(201,169,97,.9) 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(196,240,70,.8) 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(255,255,255,.7) 1px, transparent 1.4px);
+  background-size:90px 70px, 130px 100px, 70px 110px;
+  background-position:10px 8px, 60px 30px, 30px 50px;
+  opacity:.5;
+}
+.tf-pod-row { display:grid; grid-template-columns:1fr 1.25fr 1fr; align-items:end; gap:8px; position:relative; z-index:1; }
+.tf-pod-row.solo { grid-template-columns:1fr; }
+.tf-pod-row.duo  { grid-template-columns:1fr 1fr; }
+.tf-pod { display:flex; flex-direction:column; align-items:center; text-align:center; }
+.tf-pod__medal {
+  font-family:var(--font-display); font-size:9px; font-weight:900;
+  width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; margin-bottom:6px; color:var(--ink-900);
+}
+.tf-pod--1 .tf-pod__medal { background:var(--fifa-gold); box-shadow:0 0 12px rgba(201,169,97,.7); }
+.tf-pod--2 .tf-pod__medal { background:var(--clz-silver); }
+.tf-pod--3 .tf-pod__medal { background:var(--clz-bronze); }
+.tf-pod__ring { position:relative; border-radius:50%; padding:3px; margin-bottom:8px; }
+.tf-pod--1 .tf-pod__ring { background:conic-gradient(from 0deg,#C9A961,#FBE7A1,#9A7B3A,#C9A961); box-shadow:0 0 22px rgba(201,169,97,.55); }
+.tf-pod--2 .tf-pod__ring { background:linear-gradient(135deg,#E2E5EB,#8A909C); }
+.tf-pod--3 .tf-pod__ring { background:linear-gradient(135deg,#E6A876,#A8693C); }
+.tf-pod__av {
+  width:50px; height:50px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-display); font-weight:800; font-size:18px; color:#fff;
+  border:3px solid var(--ink-900);
+}
+.tf-pod--1 .tf-pod__av { width:62px; height:62px; font-size:22px; }
+.tf-pod__crown { position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:18px; filter:drop-shadow(0 2px 6px rgba(201,169,97,.7)); }
+.tf-pod__name {
+  font-family:var(--font-text); font-size:11px; font-weight:700; color:var(--ink-100);
+  line-height:1.1; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.tf-pod--1 .tf-pod__name { font-size:12px; font-weight:800; }
+.tf-pod__pts { font-family:var(--font-numeric); font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em; margin-top:2px; color:var(--ink-100); }
+.tf-pod--1 .tf-pod__pts { font-size:22px; color:var(--fifa-gold); text-shadow:0 0 14px rgba(201,169,97,.5); }
+.tf-pod--2 .tf-pod__pts { color:var(--clz-silver); }
+.tf-pod--3 .tf-pod__pts { color:var(--clz-bronze); }
+.tf-pod__pts span { font-size:9px; color:var(--ink-400); font-weight:600; margin-left:2px; }
+.tf-pod__trend {
+  display:inline-flex; align-items:center; gap:2px;
+  font-family:var(--font-display); font-size:8px; font-weight:800;
+  padding:2px 6px; border-radius:999px; margin-top:5px;
+}
+.tf-pod__trend.up { color:var(--clz-up); background:rgba(74,222,128,.12); }
+.tf-pod__trend.down { color:var(--clz-down); background:rgba(248,113,113,.12); }
+.tf-pod__trend.flat { color:var(--clz-flat); background:rgba(122,129,148,.12); }
+
+/* ════════════ LISTA (inyectada en #sb-rows) ═══════════════ */
+#page-score #sb-rows { display:flex; flex-direction:column; gap:6px; }
+.tf-row {
+  display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:10px;
+  padding:9px 11px; background:rgba(20,24,38,.55);
+  border:1px solid var(--ink-700); border-radius:11px; position:relative;
+}
+.tf-row__rank { font-family:var(--font-numeric); font-size:14px; font-weight:800; color:var(--ink-400); text-align:center; font-variant-numeric:tabular-nums; }
+.tf-row__l { display:flex; align-items:center; gap:9px; min-width:0; }
+.tf-av {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-display); font-weight:800; font-size:12px; color:#fff;
+  border:1.5px solid rgba(255,255,255,.12);
+}
+.tf-row__info { min-width:0; }
+.tf-row__name { font-family:var(--font-text); font-size:12px; font-weight:700; color:var(--ink-100); line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tf-row__badges { display:flex; gap:7px; margin-top:3px; }
+.tf-row__badges:empty { display:none; }
+.tf-badge { font-family:var(--font-text); font-size:9px; font-weight:600; color:var(--ink-400); display:inline-flex; align-items:center; gap:3px; font-variant-numeric:tabular-nums; }
+.tf-badge b { color:var(--ink-200); font-weight:700; }
+.tf-row__r { display:flex; align-items:center; gap:9px; }
+.tf-row__trend { font-family:var(--font-text); font-size:10px; font-weight:800; line-height:1; display:flex; flex-direction:column; align-items:center; width:18px; }
+.tf-row__trend.up { color:var(--clz-up); }
+.tf-row__trend.down { color:var(--clz-down); }
+.tf-row__trend.flat { color:var(--ink-600); }
+.tf-row__trend small { font-size:8px; font-weight:700; }
+.tf-row__total { font-family:var(--font-numeric); font-size:17px; font-weight:800; color:var(--ink-100); text-align:right; font-variant-numeric:tabular-nums; letter-spacing:-.02em; min-width:38px; }
+.tf-row__total span { font-size:8px; color:var(--ink-500); font-weight:600; display:block; margin-top:-2px; }
+.tf-row.top1 { border-color:rgba(201,169,97,.45); background:linear-gradient(90deg, rgba(201,169,97,.10), rgba(20,24,38,.55)); }
+.tf-row.top1 .tf-row__rank, .tf-row.top1 .tf-row__total { color:var(--fifa-gold); }
+.tf-row.top2 .tf-row__rank { color:var(--clz-silver); }
+.tf-row.top3 .tf-row__rank { color:var(--clz-bronze); }
+.tf-row.is-me {
+  border-color:rgba(196,240,70,.5);
+  background:linear-gradient(90deg, rgba(196,240,70,.12), rgba(20,24,38,.55));
+  box-shadow:0 0 0 1px rgba(196,240,70,.15), 0 4px 18px rgba(196,240,70,.1);
+}
+#page-score .tf-row.is-me .tf-row__total { color:var(--lime); }
+.tf-tag-me {
+  font-family:var(--font-display); font-size:8px; font-weight:800; letter-spacing:.08em;
+  color:var(--ink-900); background:var(--lime);
+  padding:1px 5px; border-radius:4px; margin-left:6px; vertical-align:middle;
+}
+
+/* ════════════ DESGLOSE (inyectado en #sb-breakdown-cards) ══ */
+#page-score #sb-breakdown-cards.sb-breakdown { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+.clz-bd-card { background:rgba(20,24,38,.55); border:1px solid var(--ink-700); border-radius:10px; padding:9px 6px 8px; text-align:center; }
+.clz-bd-card__lbl { font-family:var(--font-display); font-size:8px; font-weight:700; letter-spacing:.06em; color:var(--ink-400); text-transform:uppercase; }
+.clz-bd-card__val { font-family:var(--font-numeric); font-size:18px; font-weight:800; color:var(--ink-100); margin-top:3px; font-variant-numeric:tabular-nums; line-height:1; }
+.clz-bd-card--total { border-color:rgba(196,240,70,.4); background:rgba(196,240,70,.06); }
+#page-score .clz-bd-card--total .clz-bd-card__val { color:var(--lime); }
+
+/* ── PR-1 Capa 3: card Premios tappable (re-home picker) ─────
+   Modifier introducido por el wiring de scoreboard.js cuando
+   !window._porraCerrada. Hover/focus visibles para indicar
+   affordance sin romper la malla 4×1. */
+#page-score .clz-bd-card--clickable {
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color .15s ease, background .15s ease, transform .1s ease;
+}
+#page-score .clz-bd-card--clickable:hover { border-color:rgba(196,240,70,.4); background:rgba(196,240,70,.05); }
+#page-score .clz-bd-card--clickable:active { transform:scale(.98); }
+#page-score .clz-bd-card--clickable:focus-visible { outline:2px solid var(--lime); outline-offset:-2px; }
+
+/* ── Estados (reusa #sb-empty / #sb-loading) ─────────────── */
+#page-score .sb-empty { color:var(--ink-400); font-family:var(--font-text); }
+#page-score .sb-loading-text { color:var(--ink-400); font-family:var(--font-text); }

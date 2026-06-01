@@ -48,6 +48,7 @@ try {
 <link rel="stylesheet" href="/css/welcome.css">
 <link rel="stylesheet" href="/css/ko.css">
 <link rel="stylesheet" href="/css/admin.css">
+<link rel="stylesheet" href="/css/clasificacion-v3.css">
 <link rel="stylesheet" href="/css/bracket-results.css">
 <link rel="stylesheet" href="/css/boost.css">
 <link rel="stylesheet" href="/css/directo.css">
@@ -228,6 +229,14 @@ try {
   <header class="fc-appbar fc-appbar--page">
     <button class="fc-appbar__back" id="sb-back-btn" type="button" aria-label="Volver" onclick="showPage(window._sbPrevPage||'grupos')"></button>
     <span class="fc-appbar__title">Clasificación</span>
+    <!-- PR-1 pulido visual: botón refresh icónico compacto en la barra. El
+         recálculo principal será autónomo al cierre de cada partido (cron
+         update-results, fuera de este PR); este botón es refresco manual. -->
+    <button class="sb-refresh-btn" id="sb-refresh-btn" type="button" onclick="sbLoad()" aria-label="Actualizar clasificación">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+      </svg>
+    </button>
   </header>
 
   <!-- Body -->
@@ -240,12 +249,6 @@ try {
       </div>
       <div class="sb-title">CLASIFICACIÓN</div>
       <div class="sb-subtitle" id="sb-last-updated">Actualiza para ver los puntos</div>
-      <button class="sb-refresh-btn" id="sb-refresh-btn" onclick="sbLoad()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-        </svg>
-        Actualizar
-      </button>
     </div>
 
     <!-- Podio top 3 -->
@@ -263,26 +266,26 @@ try {
       <div class="sb-empty-text">Aún no hay participantes con pronósticos guardados.</div>
     </div>
 
-    <!-- Tabla completa -->
-    <div id="sb-table-wrap" style="display:none">
-      <div class="sb-section-title">Clasificación completa</div>
-      <div class="sb-table">
-        <div class="sb-table-header">
-          <div class="sb-th">#</div>
-          <div class="sb-th" style="text-align:left">Participante</div>
-          <div class="sb-th" title="Grupos">GRP</div>
-          <div class="sb-th" title="Eliminatorias">ELM</div>
-          <div class="sb-th" title="Premios">AWD</div>
-          <div class="sb-th" title="Total">TOTAL</div>
-        </div>
-        <div id="sb-rows"></div>
-      </div>
-    </div>
-
-    <!-- Mi desglose personal -->
+    <!-- PR-1 pulido visual: Mi desglose va ARRIBA, entre podio y tabla
+         (info valiosa del usuario en posición prominente). -->
     <div id="sb-my-breakdown" style="display:none">
       <div class="sb-section-title">Mi desglose de puntos</div>
       <div id="sb-breakdown-cards" class="sb-breakdown"></div>
+    </div>
+
+    <!-- Tabla completa -->
+    <!-- PR-1 pulido visual iter 3: .sb-table-header ELIMINADO. La cabecera
+         de columnas residual (de admin.css legacy) se montaba encima de
+         la fila #1 .tf-row.top1 y solapaba su borde superior; las esquinas
+         redondeadas (border-radius:11px) parecían cortadas en runtime. El
+         brief original ya marcaba esta eliminación como "opcional"; ahora
+         es la fix de raíz del solape. El render Trofeo NO usa cabecera
+         de columnas — la jerarquía se entiende por podio + ranking. -->
+    <div id="sb-table-wrap" style="display:none">
+      <div class="sb-section-title">Clasificación completa</div>
+      <div class="sb-table">
+        <div id="sb-rows"></div>
+      </div>
     </div>
 
   </div><!-- /sb-body -->

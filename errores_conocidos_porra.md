@@ -2045,3 +2045,76 @@ Aplicado en: `public/js/auth.js` (iter 3+4 mergeados en `6e7c966`),
 `js/main-entry.js` (iter 5 NO mergeado, descartado), rama
 `fix/auth-bootstrap-frozen-refresh` cerrada el 01-jun-2026. ERR-78
 es histórico — el bug crítico está resuelto en prod.
+
+
+## ERR-79 — Mapeo BD→motor: la EF montaba `scorer` raw y el motor leía `gol` (+2 goleador nunca sumaba)
+
+> Nota: catalogado originalmente como ERR-77 en la rama PR-1 antes del
+> merge con main. Renumerado a ERR-79 al integrar (main ya había usado
+> 77 para `renderPanelPais` y 78 para auth-bootstrap). Los comentarios
+> en `supabase/functions/get-league-standings/index.ts` y
+> `tests/scoring.test.mjs` apuntan al número original; coherencia
+> textual a tratar en el sprint de reconciliación de motores (CLAUDE.md
+> Backlog #5).
+
+**Síntoma:** PR-1 v1.0.0 — la EF `get-league-standings` devolvía los puntos
+de fase de grupos y KO SIN sumar el +2 del goleador acertado. Para un
+usuario con muchos goleadores correctos, la diferencia respecto al
+cliente legacy (que sí los sumaba) era importante. Detectado por San en
+QA del source desplegado.
+
+**Causa:** las tablas `predictions` y `ko_predictions` guardan el goleador
+en la columna `scorer`. El motor `_shared/scoring.mjs` lee `pred.gol`
+(espejo del browser `public/js/scoring.js`). En `get-league-standings`
+v1.0.0 los objetos pred del backend se montaban como
+`{ l, v, scorer: row.scorer, saved: true }`, así que el motor nunca
+encontraba `pred.gol` y el bloque `if (pred.gol) { ... pts += 2 }` no
+disparaba. El cliente original `scoreboard.js` SÍ hacía el mapeo
+`{ l, v, gol: p.scorer, saved: true }` (de ahí la divergencia).
+
+**Fix (v1.0.1):** en `index.ts` de la EF, cambiar `scorer:` por `gol:`
+en los 2 mapeos (predsByUser + koByUser) y actualizar las interfaces TS.
+Bump version 1.0.0 → 1.0.1 + redeploy.
+
+**Test de regresión:** los tests del motor puro (`tests/scoring.test.mjs`
+secciones 1-6) NO detectaron este bug porque pasaban `gol:` directamente
+al motor — no ejercían el ENSAMBLADO de la EF. Añadida sección 7
+"EF ASSEMBLY" con un guard que:
+  - Replica `mapPredFromDbRow({local, visitante, scorer}) → {l, v, gol, saved}`.
+  - Verifica que con scorer acertado el motor suma +2.
+  - **Asserts inverso**: si alguien revierte el mapeo y deja `scorer` raw,
+    el motor NO suma goleador → marca el caso explícitamente como
+    REGRESIÓN para que sea obvio en el output de fallo.
+
+**Patrón:** cuando un motor consume datos de BD (u otra capa), los tests
+del motor puro NO bastan. Necesitan tests de ENSAMBLADO que ejerzan el
+mapeo BD→motor (mock de la row + función mapeo + assert sobre el output).
+Aplica también a EFs que portan motores compartidos: cualquier mapping
+silencioso (rename de campo, tipo distinto, formato distinto) puede
+introducir un cero/null que el motor trata como "ausente" sin error.
+
+**Backlog asociado:** reconciliar la **tabla canónica de puntuación**
+entre `public/js/scoring.js` (browser) y `supabase/functions/_shared/scoring.mjs`
+(server). Repasar cada suceso acertado al 100%:
+
+| Suceso              | Pts | Apila/Solo | Browser ✓ | Shared ✓ |
+|---------------------|----:|------------|-----------|----------|
+| Signo (1·X·2)       |  +1 | base       | sí        | sí       |
+| Exacto              |  +3 | APILA sobre signo | sí | sí    |
+| Goleador            |  +2 | apila      | sí        | sí (v1.0.1) |
+| Bonus vs IA         |  +1 | apila (solo grupos) | sí | sí |
+| Cap por partido     |   7 | (pre-boost) | sí       | sí       |
+| Boost ×2            |  ×2 | solo si exacto + boost-day | sí | NO aplicado v1 |
+| Avance r32          |  +5 | KO        | sí        | sí       |
+| Avance r16          | +10 | KO        | sí        | sí       |
+| Avance qf           | +15 | KO        | sí        | sí       |
+| Avance sf           | +20 | KO        | sí        | sí       |
+| Final advance bonus | +25 | extra en sf si avanza | sí | sí |
+| Equipo pasa grupos  |  +5 | calcGroupsAdvancePoints | sí | (no usado aún) |
+| Premios individuales| 15/15/15/20 | calcAwardPoints | sí | sí |
+| Clasificación final | 30/20/15/10 | calcClassificationPoints | sí | sí (no usado aún) |
+
+Acción pendiente: pasar la tabla a `docs/scoring-engine.md`, confirmar
+cada fila con `tests/scoring.test.mjs` añadiendo casos que cubran cada
+suceso individual + combinaciones realistas, y dejar los dos motores
+sincronizados al 100%.
