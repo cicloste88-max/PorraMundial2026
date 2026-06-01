@@ -192,7 +192,11 @@
   flex-shrink: 0;
 }
 
-.phone .v3-column-right .v3-group.has-standings .v3-team-row__pos,
+/* FX-01: el realce verde de posición es SOLO para filas clasificadas
+   (.is-qualified). El selector anterior `.v3-column-right ... __pos` (al que le
+   faltaba .is-qualified) pintaba en verde TODAS las posiciones de la columna
+   derecha — verde indebido. El segundo selector ya cubre AMBAS columnas y solo
+   se aplica con resultados reales (gate .is-qualified en grupos-v3.js). */
 .phone .v3-group.has-standings .v3-team-row.is-qualified .v3-team-row__pos {
   color: var(--win);
 }
@@ -956,7 +960,15 @@
      capturara TODOS los clicks aunque opacity=0 → bloqueaba toda la página tras 1ª
      selección. Pattern idéntico al zoom-overlay del modal principal. */
   pointer-events: none;
-  overflow: hidden;
+  /* FX-13: el __inner es el SCROLLER. Es el elemento que recibe pointer-events
+     al abrir; el .v3-squad-picker-panel padre es pointer-events:none e iOS NO
+     scrollea un padre sin pointer-events (ERR-65). El overflow:hidden anterior
+     además cortaba la lista por abajo en Android (ERR-66). */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;   /* momentum iOS */
+  overscroll-behavior: contain;        /* no chained-scroll al body */
+  max-height: calc(100vh - 56px);      /* fallback */
+  max-height: calc(100dvh - 56px);     /* 32px padding panel + 24px margin inner */
 }
 
 .v3-squad-picker-overlay.is-open ~ .v3-squad-picker-panel .v3-squad-picker-panel__inner {
@@ -1001,7 +1013,9 @@
 }
 
 .v3-squad-picker-body {
-  padding: 14px 16px 18px;
+  /* FX-13: safe-area inset inferior para que el último jugador no quede bajo
+     el home indicator del iPhone al hacer scroll hasta el fondo. */
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
 }
 
 .v3-squad-picker-body__title {

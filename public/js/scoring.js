@@ -1544,7 +1544,13 @@ async function getScorerCandidates(iso3) {
     candidates = _fallbackScorerFromEquipos(iso3);
   } else {
     const resolved = resolveKeysForSquad(row.jugadores, iso3);
-    candidates = resolved.map(({ j, key }) => {
+    // FX-14: excluir porteros del picker de goleador (posicion === 'Portero').
+    // Solo si la posición es conocida; si falta (squad parcial) se conserva el
+    // jugador → degradación elegante para selecciones sin posicion enriquecida
+    // (el fallback _fallbackScorerFromEquipos trae bucket:null y no se filtra).
+    candidates = resolved
+      .filter(({ j }) => j.posicion !== 'Portero')
+      .map(({ j, key }) => {
       const dorsal = (typeof j.dorsal === 'number' && j.dorsal > 0) ? j.dorsal : 999;
       const nombre = j.nombre || '';
       // name preserva formato "dorsal · nombre" del legacy para consistencia
