@@ -76,8 +76,9 @@
    bloque superior. Selector específico para no afectar al título de
    "Mi desglose" (que ya tiene aire del podio). */
 #page-score #sb-table-wrap .sb-section-title { margin-top:18px; }
-/* Trofeo no usa cabecera de columnas */
-#page-score .sb-table-header { display:none !important; }
+/* Trofeo no usa cabecera de columnas — .sb-table-header eliminada del
+   markup en iter 3 (solapaba el borde superior de .tf-row.top1 a pesar
+   de su display:none, por el resto del flow del .sb-table legacy). */
 #page-score .sb-table { background:none; border:0; padding:0; }
 
 /* ════════════ HERO PODIO (inyectado en #sb-podium) ════════ */

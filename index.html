@@ -274,17 +274,16 @@ try {
     </div>
 
     <!-- Tabla completa -->
+    <!-- PR-1 pulido visual iter 3: .sb-table-header ELIMINADO. La cabecera
+         de columnas residual (de admin.css legacy) se montaba encima de
+         la fila #1 .tf-row.top1 y solapaba su borde superior; las esquinas
+         redondeadas (border-radius:11px) parecían cortadas en runtime. El
+         brief original ya marcaba esta eliminación como "opcional"; ahora
+         es la fix de raíz del solape. El render Trofeo NO usa cabecera
+         de columnas — la jerarquía se entiende por podio + ranking. -->
     <div id="sb-table-wrap" style="display:none">
       <div class="sb-section-title">Clasificación completa</div>
       <div class="sb-table">
-        <div class="sb-table-header">
-          <div class="sb-th">#</div>
-          <div class="sb-th" style="text-align:left">Participante</div>
-          <div class="sb-th" title="Grupos">GRP</div>
-          <div class="sb-th" title="Eliminatorias">ELM</div>
-          <div class="sb-th" title="Premios">AWD</div>
-          <div class="sb-th" title="Total">TOTAL</div>
-        </div>
         <div id="sb-rows"></div>
       </div>
     </div>
