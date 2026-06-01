@@ -5,23 +5,23 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `a1e3da9` (01-jun). **Sagas cerradas**: JO Jornada (#116-#121) + refresh F5 (#125 iter3+4; iter5 descartado, ERR-78) + **PR-1 leaderboard** (#123: EF v1.0.1 + render Trofeo + re-home picker; ERR-79/80/81). Pin XI tras #115. Detalle: `CHANGELOG.md`.
+Main HEAD `b89a5c9` (01-jun). **Hoy**: B2 scoring server-side (#127 `get-league-standings` v1.1.0; ERR-79 = ensamblado, motor OK), B1 entrada UI (#128 picker goleador + FX-01), P1 `results`→jsonb, P3 puente live→results (#129 + EF `porra-bridge-results` v3 + tablas `wc_matches`/`equipos_players`), CI sync (#126). EFs vivas: 21 → `docs/architecture.md`. Detalle: `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 
-1. **JO-6 ficha lenta** — debug rendimiento ficha jugador (perfil/predictor): identificar bottleneck (query Supabase / render / stats).
-2. **QA post-cierre PR-1 picker premios** — validar en simulacro 10-jun que la card "Premios" queda display-only tras `_porraCerrada=true`. NO verificable con porra abierta.
-3. **PR-3 ver pronósticos otros** — post-cierre 10-jun: consultar pronósticos resto liga (read-only).
+1. **P4 — activar pg_cron `update-results` (11-jun)** + verificar que el puente `porra-bridge-results` escribe `results.match_results` con goleador normalizado (simulacro).
+2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
+3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
 
 ## Pendientes — Bugs UI
 
-1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real (QA Playwright los renderizó). Causas a investigar en `CHANGELOG.md`.**
+1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real. Causas en `CHANGELOG.md`.**
 
 ## Pendientes — Antes del 11 junio 2026
 
 1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
 2. Activar pg_cron `update-results` el 11 jun.
-3. Convocatorias reales `EQUIPOS[].players` + action `update_ia_scorers` de `porra-ia-compute` para rellenar `predictions.scorer`/`ko_predictions.scorer` del bot IA Zayu (NULL en 3 ligas).
+3. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
 4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos.
 5. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
 6. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
@@ -32,11 +32,8 @@ Main HEAD `a1e3da9` (01-jun). **Sagas cerradas**: JO Jornada (#116-#121) + refre
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
-5. **Reconciliar scoring.js↔`_shared/scoring.mjs`** (ERR-79). Tabla 1:1 a `docs/scoring-engine.md` + tests por suceso. Pdte boost ×2 backend.
-
-## Pendientes — Audit Postgres 28abr (backlog)
-
-Items 1-5 cerrados (PR#37). Pendiente: leaked password protection (HaveIBeenPwned) en Supabase Auth → Policies. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
+5. **ERR-79 cerrado** (motor OK; v1.1.0 = boost grupos + overrides + reader jsonb; paridad tests 3 funcs). Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
+6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
 
 ## Auth & Secrets
 
@@ -105,7 +102,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..81: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), mapeo BD→motor (79), window scope (80), clip overflow (81).
+ERR-01..81: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81).
 
 ### Otros ficheros de contexto
 

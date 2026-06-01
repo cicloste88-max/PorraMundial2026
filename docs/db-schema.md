@@ -48,6 +48,64 @@ CREATE TABLE whatsapp_subscribers (
 );
 ```
 
+## Tablas de resultados (scoring) + puente live
+
+Las tres se aplicaron/migraron **vía MCP (lane Claude.ai, sin migration file)** el 01-jun-2026; los `CREATE TABLE` de abajo son ilustrativos del estado vivo.
+
+### `results`
+
+Fila única (singleton) con todos los resultados canónicos que consume el scoring. **P1 (01-jun-2026)**: las columnas de payload migraron de `text` (con `JSON.parse` en cliente) a **`jsonb`**; `ko_results` se normalizó de array a objeto en el proceso.
+
+```sql
+CREATE TABLE results (
+  id INT PRIMARY KEY,            -- singleton
+  match_results JSONB,           -- grupos: { "{grupo}_{home_es}_{away_es}": {l,v,scorers[],status} }
+  ko_results JSONB,              -- eliminatorias (normalizada array→objeto en P1)
+  award_winners JSONB,           -- premios individuales resueltos
+  classification JSONB,          -- clasificación final (1º/2º/3º/4º)
+  overrides JSONB,               -- correcciones manuales: merge ENCIMA de match_results por clave
+  log JSONB,                     -- traza de escrituras (puente / update-results)
+  updated_at TIMESTAMPTZ
+);
+```
+
+- **Clave de `match_results`** = `{grupo}_{home_es}_{away_es}` = `getMatchKey` (`data.js`) = `predictions.match_id` (`admin.js`).
+- **Consumidores**: `get-league-standings` lee con reader type-tolerant `asObj()` (funciona pre/post jsonb) y mergea `overrides` encima del canónico; `update-results` (v5) escribe `match_results` como objeto; `porra-bridge-results` escribe `match_results[...]` vía `jsonb_set`.
+
+### `wc_matches`
+
+Espejo DB de `public/data/worldcup-2026-matches.json` (72 partidos de grupos). Fuente de runtime del puente `porra-bridge-results`: resuelve equipos/orientación por `match_key`.
+
+```sql
+CREATE TABLE wc_matches (
+  match_key TEXT PRIMARY KEY,    -- wc2026_g{LETRA}_{sofascore_id}
+  sofascore_id BIGINT,
+  group_letter TEXT,             -- 'A'..'L'  (en el JSON el campo se llama "group")
+  home_es TEXT,                  -- nombre canónico del proyecto (= keyspace de predictions/results)
+  away_es TEXT,
+  home_iso3 TEXT,                -- iso3 de home_es (añadidos en P3c)
+  away_iso3 TEXT,                -- iso3 de away_es (añadidos en P3c)
+  teams_swapped BOOLEAN,         -- true si SofaScore invierte home/away vs proyecto
+  round INT,
+  date_utc TEXT,
+  updated_at TIMESTAMPTZ
+);
+```
+
+### `equipos_players`
+
+Espejo DB de `public/data/equipos-players.json` (48 selecciones). Fuente de la normalización de goleador del puente (`playerToShortKey`).
+
+```sql
+CREATE TABLE equipos_players (
+  iso3 TEXT PRIMARY KEY,
+  players JSONB,                 -- [{ key, name }] — key = goleador corto que usa el picker
+  updated_at TIMESTAMPTZ
+);
+```
+
+⚠️ **Dependencia de recarga (`wc_matches` + `equipos_players`)**: son espejos de JSON del repo. Si cambia el JSON fuente (p.ej. sync de squads enriquece `equipos-players.json`, o se añaden campos a `worldcup-2026-matches.json`), hay que **RECARGAR la tabla** (`UPDATE … FROM jsonb_each(...)`). Repo y tabla NO se sincronizan solos. Detalle del puente en `docs/live-scoring.md`.
+
 ## Tablas IA Predictor
 
 Cuatro tablas que sustentan el motor de predicción descrito en `docs/ia-predictor.md`. Migración canónica: `supabase/migrations/20260421_create_ia_predictor_tables.sql` (Fase A). Todas con RLS habilitado.
@@ -162,12 +220,14 @@ CREATE TABLE squads (
 
 **Estrategia de carga ratificada (13 may 2026)**: prioridad `FutbolFantasy` (primaria, info más fresca en castellano) → `AS` (backup) → `Transfermarkt` (enriquecimiento edad/valor) → `FIFA.com` snapshot final 2 jun (dorsales + fotos vía Chrome MCP).
 
-**Estado actual (20 may 2026)**: 10/48 selecciones operativas tras el sprint
-`feat/squads-sources-refactor` (PR#72 mergeada). Detect cross-validate 2-of-N
-sobre 5 fuentes primarias (AS + Sport.es + Olympics + Eurosport + Marca);
-FF queda como secundaria solo para XI titular sobre selecciones ya marcadas
-FINAL. Enriquecimiento TM en step 2 del cron. Detalle: `docs/sync-squads.md`
-+ `.claude/rules/sync-squads.md`.
+**Estado (01-jun-2026, verificado MCP)**: 48 filas; **46 FINAL**
+(`jugadores_is_final=true`, todas con ≥11 jugadores), **2 pendientes** de lista
+FIFA — **TUR y UZB**, ambas vacías — a la espera de la publicación oficial
+~2-jun. QAT cerró su lista FINAL (26, `as+espn+tm+tm-mw`) durante la sesión.
+Detect cross-validate 2-of-N sobre 5 fuentes primarias (AS + Sport.es +
+Olympics + Eurosport + Marca); FF queda como secundaria solo para XI titular
+sobre selecciones ya marcadas FINAL. Enriquecimiento TM en step 2 del cron.
+Detalle: `docs/sync-squads.md` + `.claude/rules/sync-squads.md`.
 
 ## Row-Level Security
 

@@ -1046,3 +1046,35 @@ Kanaanizadegan, GHA Kohn, JOR Layla portero.
 adaptativo), ERR-73 (anti-colisión), ERR-74 (pin estabilidad), ERR-75
 (FF dudosos + pos-1 fallback).
 
+<!-- Movido 2026-06-01 (cierre jornada B1+B2+P1+P3, rama feat/docs-sync-01jun): entrada 2026-05-31 (Saga JO Jornada #116-#121) — CHANGELOG.md superaba 30KB hook limite -->
+
+## [31-may-2026] Saga JO Jornada — 6 PRs #116→#121 (CERRADA)
+
+Sesión enfocada 100% en la pantalla Jornada y sus interacciones con login y
+con el bracket KO. 6 PRs squash a main, todos solo frontend (sin DDL).
+
+**PR#116 (`95f50a2`) — FG-1 (board stale post-login) + JO-4 (horarios CEST)**
+- FG-1: `auth.js` `loadUserData` emite `CustomEvent('mundial:predictions-changed',{detail:{source:'auth-load'}})` tras hidratar `predictions[]` desde Supabase. El listener en `grupos-v3.js:1248` ya existía; sin el dispatch, el board v3 quedaba en orden inicial si el usuario aterrizaba en Grupos antes de que loadUserData terminara.
+- JO-4: helper `_joParseMatchDate(s)` en `ui-groups.js` ancla fechas naive (`'2026-06-11T15:00:00'`) a `+02:00` (CEST, válido para todo el Mundial 11-jun→19-jul). `timeZone:'Europe/Madrid'` añadido a los 6 `toLocale{Time,Date}String` de la vista (incl. `_buildJCard`, `renderVistaJornada`, `_buildMatchButtons`, `renderBoostTicker`, modal `_showJcardModal`). En el modal `getHours()/getDate()` (siempre TZ del dispositivo) sustituidos por `Intl.toLocaleTimeString` con TZ Madrid.
+
+**PR#117 (`0f884ad`) — JO-2 nombres completos en cards y modal compact**
+- `_buildJCard` y `_showJcardModal`: ISO3 (`MEX`, `RSA`, `BIH`) sustituido por nombre completo (`hTeam.name`/`aTeam.name`) con fallback a `match.home/match.away`. Atributo `title` HTML duplicado para tooltip de nombres truncados en móvil.
+- CSS `.jv2-team-code` y `.jcard-compact-team-code`: tracking reducido `.08em→.02em`, `text-overflow:ellipsis` + `white-space:nowrap` + `max-width:100%` para que "Bosnia y Herzegovina" / "República de Corea" no rompan el grid `1fr auto 1fr`. `.jcard-compact-team` recibe `min-width:0` (grid item shrink, necesario para ellipsis).
+
+**PR#118 (`052109e`) + PR#119 hotfix (`972f3d6`) — JO-1a esqueleto KO**
+- PR#118 añade 6 secciones nuevas debajo de las jornadas de grupos en `renderVistaJornada`: 16avos · Octavos · Cuartos · Semifinales · 3er y 4º · Final. Reutiliza `ROUND_CONFIG` + `BRACKET[cfg.key]` + clases `.jv2-*`. Nuevas funciones en `ui-groups.js`: `_buildJKOCard`, `_buildJKOSection`, `_buildJKOSectionsHtml`, mapa `_JO_KO_SHORT`. Sin pronóstico, sin clicks. Etiquetas P3a ("16AVOS · KO", etc.).
+- **HOTFIX crítico PR#119**: la primera versión leía `resolvedSlots` (predicciones del usuario) y mostraba "INVALID DATE". Correcciones: `_joKOSlotLabel`→`'Por definir'` constante; `_joKOTeamFromSlot`→`null` constante; `resolveAllSlots()` removido de `_buildJKOSectionsHtml`. Fechas solo-día del BRACKET (`'2026-06-28'`) se anclan a `'T12:00:00'` antes de `_joParseMatchDate` + guard `isNaN(dt.getTime())`. **Principio (ERR-76)**: pantalla Jornada muestra calendario/competición REAL, NUNCA `resolvedSlots` (eso son predicciones). TODO documentado en código para conectar a resultados oficiales post-27jun.
+
+**PR#120 (`33f0328`) — JO-3 acordeón de secciones**
+- Cada `.jv2-section` (grupos + KO) pasa a colapsable. Estado en memoria `_joSectionCollapsed{}` keyed por `"date:YYYY-MM-DD"` (grupos) y `"ko:<cfg.key>"` (KO). Flag `_joCollapseInit` aplica defaults solo la primera vez; clicks posteriores del usuario se respetan en sesión.
+- "Jornada viva" = primer día (cronológico) con algún partido aún no finalizado. Pre-Mundial sin `live_scores` → `aliveDate = J1 11-jun`. Defensivo: si todos finalizados (fin torneo), aliveDate=null y todo arranca colapsado. KO siempre arranca colapsado.
+- Handler delegado en `jornada-container` idempotente con flag `_joCollapseDelegated`. Guards: `.jv2-nav-arrow` no dispara toggle (preserva navegación prev/next), `Enter`/`Space` sí (a11y). Patrón propio `.is-collapsed` + `display:none` (no `.collap` legacy con `max-height:1200px` — no escala a 16 cards de r32). Chev `▾` inline con rotación `-90deg`. `role="button"` + `tabindex="0"` + `aria-expanded` + `focus-visible` outline.
+
+**PR#121 (`3a03413`) — JO-7 fecha redundante en header de grupos**
+- Header mostraba `'11 JUN · Jueves, 11 De Junio'`. Sustitución de `dateShort` por contador de partidos (`matchesOfDay.length` ya en scope): `'Jueves, 11 De Junio · 2 partidos'`. Const `dateShort` eliminada (sin uso). Header KO intacto (usa `cfg.sub` de `ROUND_CONFIG`).
+
+**JO-5 confirmado NO-bug**: `_buildJCard` ya muestra score real si `live.status==='finished'`. La razón de que pre-Mundial se vea la predicción es que `live_scores` está vacía. Se resolverá al activar pipeline live (Apify webhook + `update-results`) el 11-jun. Sin cambios de código.
+
+**Bugs/errores nuevos**: ERR-76 — "Vistas de competición real NO leen `resolvedSlots`" (catalogado tras el hotfix #119).
+
+**Stats**: 6 PRs squash, 6 ficheros tocados (`auth.js`, `ui-groups.js`, `jornada-v3.css`). Sin migraciones SQL. Sin tocar `vercel.json`, Pizarra, Grupos v3, Fase Final, Predictor.
