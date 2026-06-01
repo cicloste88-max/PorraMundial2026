@@ -71,6 +71,11 @@
   letter-spacing:.14em; text-transform:uppercase; color:var(--ink-400);
   margin:0 0 8px 2px;
 }
+/* PR-1 pulido visual (iter 2): aire entre "Mi desglose" y la
+   "Clasificación completa" — sin este margin-top la sección pegada al
+   bloque superior. Selector específico para no afectar al título de
+   "Mi desglose" (que ya tiene aire del podio). */
+#page-score #sb-table-wrap .sb-section-title { margin-top:18px; }
 /* Trofeo no usa cabecera de columnas */
 #page-score .sb-table-header { display:none !important; }
 #page-score .sb-table { background:none; border:0; padding:0; }
@@ -88,14 +93,13 @@
     radial-gradient(ellipse 70% 80% at 50% -10%, rgba(201,169,97,.28), transparent 60%),
     radial-gradient(ellipse 90% 60% at 50% 120%, rgba(10,69,149,.20), transparent 65%),
     linear-gradient(180deg, rgba(28,22,8,.7) 0%, rgba(14,17,28,.85) 100%);
-  /* PR-1 pulido visual: el border dorado original (alpha .38) se fundía
-     con el radial-gradient top (mismo color, alpha .28) y desaparecía en
-     el borde superior. Subimos el border a .72 + reforzamos el contorno
-     completo con inset shadow de 1px que se superpone al gradiente
-     interior. Resultado: rectángulo perfectamente cerrado en los 4 lados
-     sin tocar overflow ni border-radius. */
-  border:1px solid rgba(201,169,97,.72);
-  box-shadow:0 8px 32px rgba(0,0,0,.4), inset 0 0 0 1px rgba(201,169,97,.45);
+  /* PR-1 pulido visual (iter 2): el inset shadow del intento anterior es
+     RECTANGULAR — no sigue el border-radius:16px, así que en las esquinas
+     redondeadas el radial-gradient dorado lavaba el contorno. Resolvemos
+     SOLO con el border (que sí respeta el radius), subiéndolo a dorado
+     plano #c9a961 para contraste uniforme en 4 lados Y 4 esquinas. */
+  border:1px solid #c9a961;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
 }
 .tf-hero__spark {
   position:absolute; inset:0; pointer-events:none;
