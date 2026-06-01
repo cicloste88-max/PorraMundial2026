@@ -1964,3 +1964,84 @@ directo es siempre preferible cuando ya tenemos el objeto league.
 Aplicado en: `public/js/auth.js` (listener no-session filter +
 `leagueSelect` directo en Path 1, rama `fix/auth-bootstrap-frozen-refresh`,
 31-may-2026, 4 iteraciones acumuladas).
+
+### Iteración 5 — DESCARTADA tras QA (commit `1da350a` NO mergeado a main)
+
+Tras iter 4, San reportó: "Sigue llevando al selector de ligas el
+refresco, independientemente de la pantalla en la que estes." La hipótesis
+de iter 5 fue que `js/main-entry.js:114-115` (safety-net welcome del chain
+final) **pisaba** el `showPage('grupos')` del bootstrap. Cambio
+propuesto: añadir un segundo gate por visibilidad de cualquier `#page-*`.
+
+**QA en preview Vercel demostró que la hipótesis era falsa.** San
+instrumentó un wrapper persistente sobre `window.showPage` para registrar
+TODAS las llamadas durante el F5. Resultado: **`showPage('grupos')` NI
+SIQUIERA SE LLAMA** en el escenario. Por tanto el safety-net de
+main-entry no estaba pisando nada. iter 5 atacaba un culprit falso para
+ese síntoma.
+
+Razón estructural por la que `showPage('grupos')` no se llama: el
+bootstrap (`_bootstrapSession` Path 1) no completa la cadena `getSession()
+→ retry leagueLoadMyLeagues → _foundLeague → leagueSelect → showPage('grupos')`
+en el orden+timing necesario. Sin escarbar más, queda fuera de la
+investigación porque la decisión de producto (abajo) cambió el alcance.
+
+**Lección iter 5: validar empíricamente que el código que asumes corre
+realmente corre, antes de teorizar overrides.** Wrapping persistente
+sobre funciones críticas (`showPage`, `leagueSelect`, etc.) durante QA
+permite descartar hipótesis sin escribir código de fix. Es lo que iter
+1-4 deberían haber hecho ANTES de cada commit en lugar de razonar sobre
+el flujo desde grep.
+
+### Cierre del saga — decisión de producto
+
+**Bug crítico (la pantalla en blanco tras F5) RESUELTO en producción
+vía PR#125 (squash `6e7c966`).** Esa parte es definitiva: iter 3
+identificó la causa raíz del BLANK (`#restore-lock-css` + `showPage`
+early-return) y aplicó el fix (`_navigateFallbackWelcome` + watchdog
+semántico). iter 4 cerró el flanco del listener `INITIAL_SESSION` con
+`session=null` prematuro.
+
+**Sub-síntoma "aterriza en selector de ligas tras F5":** persistió
+tras iter 4, pero **NO es bug crítico** — es UX accesoria. Decisión
+San (producto): el feature de persistir pantalla vía `porra_lastPage`/
+`_pendingPageRestore` (nacido `feat(nav)` 20-abr) es frágil. Aterrizar
+en el selector de ligas tras refresh es comportamiento ACEPTABLE.
+Cuando algún día se retome "restaurar pantalla", será como FEATURE
+nuevo con spec limpia, no parcheando el bootstrap.
+
+**Persistencia de DATOS intacta.** Las predicciones (216 grupos + 96
+KO verificadas en Supabase) nunca estuvieron en riesgo. Lo único que
+se reseteaba al aterrizar en welcome era la `_activeLeague` en memoria,
+que se restaura tras re-seleccionar la liga.
+
+**Rama `fix/auth-bootstrap-frozen-refresh` borrada** tras este commit
+solo-docs. Los 5 commits de iteración (incluido el iter 5 descartado)
+quedan visibles en el historial del PR#125 mergeado.
+
+### Recap completo de las 5 iteraciones (referencia futura)
+
+| Iter | Commit | Hipótesis | Resultado |
+|---|---|---|---|
+| 1 | `5405ebc` | Transient de `leagueLoadMyLeagues` + falta de timeouts en `await`s | INSUFICIENTE — el handler de `onAuthStateChange` nunca corría (race de registro tardío) |
+| 2 | `1b25ef1` | Race del listener: `INITIAL_SESSION` emitido antes del registro. Fix: `getSession()` explícito + bootstrap extraído | INSUFICIENTE — handler ya corría pero fallbacks `showPage('welcome')` bloqueados por lock CSS |
+| 3 | `27e732b` | `#restore-lock-css` bloquea `showPage('welcome')` en fallback + watchdog gateado por loader oculto | **CAUSA RAÍZ DEL BLANK — fix definitivo.** Mergeado en `6e7c966` |
+| 4 | `7156725` | INITIAL_SESSION con `session=null` prematuro nullifica `_pendingPageRestore` + `leagueSelectById` con leagueLoadMyLeagues redundante | Cierre del flanco listener prematuro. Mergeado en `6e7c966` |
+| 5 | `1da350a` | `main-entry.js:114-115` safety-net pisa `showPage('grupos')` del bootstrap | **DESCARTADA tras QA**: `showPage('grupos')` ni se llama. Culprit falso. NO mergeado |
+
+### Patrón general derivado de la saga
+
+**Cuando un bug se vuelve intermitente con `readyState` o timing
+async/sync, las hipótesis sobre "qué bloquea" / "qué pisa" / "qué se
+ejecuta antes" se confirman SOLO instrumentando el navegador en el
+estado del bug**, no leyendo código. Wrappers persistentes sobre
+funciones de control (`showPage`, `leagueSelect`, listeners, etc.) +
+DOM inspection durante el F5 son obligatorios antes de cada commit
+de fix. iter 1-4 razonaron sobre el flujo desde grep y acertaron solo
+una vez (iter 3) — el resto fueron correcciones de hipótesis
+incorrectas a las dos iteraciones de atrás.
+
+Aplicado en: `public/js/auth.js` (iter 3+4 mergeados en `6e7c966`),
+`js/main-entry.js` (iter 5 NO mergeado, descartado), rama
+`fix/auth-bootstrap-frozen-refresh` cerrada el 01-jun-2026. ERR-78
+es histórico — el bug crítico está resuelto en prod.

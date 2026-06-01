@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `3a03413` (PR#121). **Saga JO Jornada COMPLETA** (31-may, PRs #116→#121): FG-1 board stale + JO-4 CEST (`_joParseMatchDate` + `Europe/Madrid` en `ui-groups.js`) + JO-2 nombres completos + JO-1a esqueleto KO display-only (`'Por definir'` hasta resultados reales post-27jun) + JO-3 acordeón (viva expandida) + JO-7 header limpio. JO-5 no-bug. Squads pin XI estabilizado tras PR#115. Detalle: `CHANGELOG.md`.
+Main HEAD `6e7c966` (PR#125, 01-jun). **Sagas cerradas**: JO Jornada (31-may, PRs #116→#121) + refresh congelado / app blank tras F5 (PR#125, iter3+4 mergeados; iter5 descartado tras QA — culprit falso, `showPage('grupos')` ni se llamaba). Restaurar pantalla tras F5 = feature futuro NO bug (ERR-78). Squads pin XI tras PR#115. Detalle: `CHANGELOG.md`.
 
 ## Top-3 pendientes inmediatos
 

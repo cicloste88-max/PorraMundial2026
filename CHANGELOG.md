@@ -2,6 +2,75 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [01-jun-2026] Cierre saga refresh congelado — bug crítico resuelto, sub-síntoma de restauración deferred a feature futuro
+
+Cierre formal del saga "refresh congelado / blank tras F5" (ver entrada
+iter 1-4 más abajo + ERR-78 ampliado).
+
+**Estado final:**
+
+- **Bug crítico RESUELTO en producción** vía PR#125 (squash en main =
+  `6e7c966`), que recogió iter 3+4. La pantalla en blanco tras F5 no
+  vuelve a aparecer: `_navigateFallbackWelcome()` quita
+  `#restore-lock-css` antes de cada `showPage('welcome')`, el watchdog
+  redesignado con trigger semántico cubre todos los caminos de fallback,
+  y el filtro de eventos no-session evita el welcome prematuro por
+  INITIAL_SESSION con `session=null`. Confirmado en preview Vercel
+  (Chrome MCP) + producción.
+- **iter 5 NO mergeado.** El commit `1da350a` (rama
+  `fix/auth-bootstrap-frozen-refresh`) añadía un gate de visibilidad
+  al safety-net de `js/main-entry.js:114-115`. La hipótesis era que ese
+  safety-net pisaba el `showPage('grupos')` del bootstrap. QA en preview
+  con un wrapper persistente sobre `showPage` demostró que **`showPage('grupos')`
+  ni siquiera se llama** en el escenario F5: el bootstrap no llega a
+  invocar la restauración antes de que `main-entry.js` corra. Por tanto
+  el safety-net de main-entry NO estaba pisando nada — iter 5 atacaba
+  un culprit falso para ese síntoma. Rama y commit descartados.
+- **Decisión de producto (San):** "restaurar la última página tras F5"
+  NO es un bug crítico — es UX accesoria. El feature de persistir pantalla
+  vía `porra_lastPage` / `_pendingPageRestore` nació el 20-abr
+  (`feat(nav)`) y es frágil. Aterrizar en el selector de ligas tras
+  refresh es comportamiento ACEPTABLE de producto. Cuando algún día se
+  retome "restaurar pantalla", será como FEATURE nuevo con spec limpia,
+  no parcheando el bootstrap.
+- **Persistencia de DATOS intacta.** Las predicciones (216 + 96 KO
+  verificadas server-side en Supabase) nunca estuvieron en riesgo. Lo
+  único que se reseteaba al aterrizar en welcome era la `_activeLeague`
+  en memoria, que se restaura en cuanto el usuario re-selecciona su
+  liga.
+
+**Rama cerrada:** `fix/auth-bootstrap-frozen-refresh` borrada en remoto
+tras este commit. Los 5 commits de iteración quedan en el historial
+de PR#125 + en el detalle de ERR-78.
+
+**Lecciones acumuladas — saga 5 iters** (extendidas en ERR-78):
+
+1. Validar que el handler de un listener REALMENTE corre antes de poner
+   robustez dentro (iter 1→2: race de registro tardío de
+   `onAuthStateChange`).
+2. QA en browser real con DOM inspection es lo único definitivo —
+   hipótesis sobre "qué bloquea" se confirman SOLO leyendo el DOM en el
+   estado del bug, incluido CSS inyectado que no aparece en grep de
+   `showPage` (iter 2→3: el lock CSS era invisible al análisis estático).
+3. No todos los `null` significan "no hay sesión" — distinguir eventos
+   definitivos (SIGNED_OUT, USER_DELETED) de eventos prematuros
+   (INITIAL_SESSION pre-restauración). Eliminar awaits redundantes que
+   abren ventanas de timing (iter 3→4).
+4. **Verificar empíricamente que el código que asumes corre realmente
+   corre** antes de teorizar overrides (iter 4→5: iter 5 asumía que el
+   bootstrap llamaba `showPage('grupos')` y otro código lo pisaba, pero
+   `showPage('grupos')` ni se llamaba). Wrapping persistente sobre
+   funciones críticas (`showPage`) durante QA permite descartar
+   hipótesis sin escribir código.
+5. **Cuando un bug se vuelve intermitente con `readyState` o timing
+   async/sync**, auditar TODOS los sitios que ejecutan durante el
+   bootstrap, no solo el módulo bajo investigación (iter 4→5: 4 iters
+   en `auth.js`, el ruido venía del bootstrap chain en `main-entry.js`
+   — pero al final ni siquiera era el culprit).
+
+**Sin cambios de código en este commit** (solo docs). `public/js/auth.js`
+y `js/main-entry.js` quedan exactamente como están en `6e7c966`.
+
 ## [31-may-2026] Fix auth bootstrap: app congelada vacía tras refresh
 
 **Bug (prod, iPhone + Android):** tras F5 / recarga del navegador (o con
@@ -415,83 +484,3 @@ Kanaanizadegan, GHA Kohn, JOR Layla portero.
 adaptativo), ERR-73 (anti-colisión), ERR-74 (pin estabilidad), ERR-75
 (FF dudosos + pos-1 fallback).
 
-## [28-may-2026] feat/scale-ff-countries — FF_COUNTRIES 1→48 + ProcessPool paralelo
-
-**Sprint contexto**: tras hotfix PR #106 (parser FF cheerio + `img[alt]` non-empty filter), ESP valida 11/11 XI matched contra HTML real cacheado por Scrapling. Pero `FF_COUNTRIES` en `fetch_sources.py` aún tenía sólo `{"ESP": "espana"}` — los otros 47 países WC 2026 caen al fallback `fetch live` en `getFFLineupHtml`, sin estar pre-cacheados.
-
-**Cambio**:
-- `scripts/scraping/fetch_sources.py` carga `FF_COUNTRIES` desde `scripts/lib/iso3-slugs.json` (canonical, DRY con Node parsers) — pasa de 1 a 48 entradas.
-- `process_one()` extraído a top-level (no closure) para ser pickeable.
-- FF se procesa en paralelo con `ProcessPoolExecutor(max_workers=3, mp_context='spawn')`. Primarias siguen en serie (sólo 5, no vale la pena).
-
-**Por qué ProcessPool no ThreadPool**: Playwright sync_api usa greenlets que no son thread-safe. Cada worker necesita su event loop. `spawn` (vs fork) evita inheritance de estado de browsers embedded.
-
-**Wall time esperado**:
-- Serial 48 países × ~30s = ~24 min → excede timeout 15 min.
-- Paralelo 48 / 3 workers ≈ ~8 min + 80s primarias = ~10 min ✓
-
-**Países sin XI publicado**: FF sirve `/alineaciones/0.jpg` placeholder. `parseStartingXIFromHtml` lo detecta y retorna `[]`. Coste: ~30s wasted por país no-FINAL pero sin daño. A medida que países publiquen su lista oficial, el cron 6h poblará XI 11/11 automáticamente sin tocar código.
-
-## [25-may-2026] feat/mini-flags-rect (PR #93) — completa sprint banderas planas
-
-**Cierra el sprint banderas planas** iniciado con PR #91 (card expandida con `--flag-rect-url`) y continuado con PR #92 (reupload bucket `miniatures/flags-sm/` con WebPs croppeados al bbox no-blanco + remoción del border CSS sobre el rectángulo).
-
-Esta PR migra las **mini cards** del Directo (listado J1-J18 sin expandir) al mismo patrón de banderas rectangulares planas:
-
-- **JS** `ui-directo.js`: constante `ISO3_TO_ISO2` movida del scope cercano a `_buildDExpanded` al scope superior del IIFE (acceso compartido con `_buildDMini`). `_buildDMini` ahora inyecta `style="--flag-rect-url:url(.../miniatures/flags-sm/<ISO2>.webp)"` en cada `button.dv2-mini-flag-btn`.
-- **CSS** `directo-v3.css`: `.dv2-mini-flag` pasa de `<img>` con `object-fit:cover` a `background-image: var(--flag-rect-url)` sobre el button. Eliminado border dorado `rgba(201,169,97,.35)` y inset shadow blanco al 6% (ambos contornos visibles sobre `ink-900`). Reflejo banner `::after` atenuado 18%/25% → 8%/15% para no competir con la flag plana. `.dv2-mini.is-live` cambia `border-color` rojo por `outline` (mantiene glow EN VIVO sin reintroducir border base). `<img>` legacy con `display:none` como fallback semántico.
-
-**Estado del bucket** `miniatures/flags-sm/<ISO2>.webp` tras los 3 PRs: 48 banderas planas (flagcdn.com source) sin marco blanco, listas para uso inline rectangular. Pizarra Táctica ya las usaba con `mask-image` linear-gradient — sin regresión.
-
-**NO se tocan** en este PR: Grupos, KO, Globo equipos (siguen con flags circulares `flags/<ISO3>.png` — backlog post-launch para evaluar visualmente si conviene unificar).
-
-## [22-may-2026] feat/scrapling-integration-opt-a — Scrapling pre-fetch en sync-squads
-
-**Sprint contexto**: detect step en `sync-squads.yml` falla en 4/5 fuentes
-primarias por HTTP 403 Cloudflare/Akamai desde IPs USA de GH Actions (TLS
-fingerprint pobre de `node fetch()`). 6 runs cron consecutivos confirman el
-patrón. Eurosport además bloqueada por geoblock 307 server-side, irresoluble.
-
-**Solución**: Python/Scrapling como step previo. Métodos por fuente validados
-en 4 probes (`26279588881`, `26281337027`, `26293035353`, `26293757651`):
-
-| Fuente | Método Scrapling | Status | Latencia |
-|---|---|---|---|
-| Sport | `Fetcher.get(impersonate=chrome)` | 200 OK | 24-177ms |
-| Olympics | idem | 200 OK | 700-2000ms |
-| Marca | idem | 200 OK | 40-170ms |
-| AS | `StealthyFetcher.fetch(solve_cloudflare=False)` | 200 OK | 3.6s |
-| ESPN | idem | 200 OK | 6.8s |
-| ~~Eurosport~~ | descartada | 307 → /geoblocking.shtml | - |
-
-**Cambios**:
-- `scripts/scraping/fetch_sources.py` — pre-fetcha las 5 URLs, escribe
-  `cache/sources/<source>.html`. Sentinel empty file en fallo. exit 2 si
-  alguna falla (continue-on-error en YAML).
-- `scripts/lib/parsers/{as,sport,olympics,marca}.mjs` — refactor:
-  `fetchAndParse()` ahora llama `loadCachedHtml(SOURCE_NAME)` en vez de
-  `node fetch()`. Helper compartido en `_util.mjs`.
-- `scripts/lib/parsers/eurosport.mjs` — **eliminado**. Geoblock irresoluble.
-- `scripts/lib/parsers/espn.mjs` — **nuevo**. ESPN Deportes (Disney/Hearst)
-  como 5ª fuente. Reusa `parseHtmlAS({ requireBullet: false })` por
-  similitud asumida; primer run productivo confirmará.
-- `scripts/sync-squads.mjs` — `parserEurosport` → `parserESPN` en
-  `PRIMARY_PARSERS`.
-- `scripts/lib/cross-validate.mjs` — priority list eurosport → espn.
-- `.github/workflows/sync-squads.yml` — 3 nuevos steps (Setup Python 3.11,
-  Install Scrapling, Fetch source HTMLs) condicionados a `mode=detect`.
-  `continue-on-error: true` en el fetch para no bloquear el motor Node.
-- `.gitignore` — `cache/sources/.gitkeep` tracked, HTML regenerable
-  ignorado.
-- Tests: `sources.test.mjs` actualizado (eurosport test → espn fixture
-  AS-like). 77/77 pasan.
-- ERR-68 (HTTP 403 IPs GH Actions), ERR-69 (Eurosport geoblock), ERR-70
-  (setup-python cache:pip sin requirements.txt) registrados.
-
-**Pendiente post-merge** (San):
-- Cleanup branches probe pre-existentes (`probe/scrapling-viability`,
-  `fix/scrapling-probe-cache`, `probe/scrapling-v2`, `probe/scrapling-v3-mini`,
-  `probe/scrapling-v4-espn`).
-- Eliminar EF `gh-proxy` (creada por Claude.ai para descomprimir artifacts).
-- Eliminar `scripts/scraping/probe_scrapling.py` + `.github/workflows/scrapling-probe.yml`.
-- Validar parser ESPN con HTML real del 1er run y ajustar si difiere.
