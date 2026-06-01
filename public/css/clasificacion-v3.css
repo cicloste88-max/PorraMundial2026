@@ -48,13 +48,21 @@
   box-shadow:0 0 24px rgba(196,240,70,.35);
 }
 #page-score .sb-subtitle { font-family:var(--font-text); font-size:10px; color:var(--ink-500); }
+/* PR-1 pulido visual: refresh icónico en la appbar (32×32 sin texto).
+   El recalculo principal lo dispara el cron update-results al cierre de
+   cada partido; este botón sólo cubre el refresco manual secundario. */
 #page-score .sb-refresh-btn {
-  margin-top:10px; display:inline-flex; align-items:center; gap:6px;
-  font-family:var(--font-display); font-size:10px; font-weight:700; letter-spacing:.04em;
+  margin-left:auto;
+  flex-shrink:0;
+  width:32px; height:32px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
   color:var(--ink-300); background:rgba(0,0,0,.35);
-  border:1px solid var(--ink-700); border-radius:999px;
-  padding:6px 14px; cursor:pointer;
+  border:1px solid var(--ink-700); border-radius:50%;
+  cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease;
+  -webkit-tap-highlight-color:transparent;
 }
+#page-score .sb-refresh-btn:hover { color:var(--ink-100); background:rgba(0,0,0,.55); border-color:var(--ink-600); }
+#page-score .sb-refresh-btn:focus-visible { outline:2px solid var(--fifa-gold); outline-offset:2px; }
 #page-score .sb-refresh-btn.spinning svg { animation:clz-spin .8s linear infinite; }
 @keyframes clz-spin { to { transform:rotate(360deg); } }
 
@@ -80,8 +88,14 @@
     radial-gradient(ellipse 70% 80% at 50% -10%, rgba(201,169,97,.28), transparent 60%),
     radial-gradient(ellipse 90% 60% at 50% 120%, rgba(10,69,149,.20), transparent 65%),
     linear-gradient(180deg, rgba(28,22,8,.7) 0%, rgba(14,17,28,.85) 100%);
-  border:1px solid rgba(201,169,97,.38);
-  box-shadow:0 8px 32px rgba(0,0,0,.4);
+  /* PR-1 pulido visual: el border dorado original (alpha .38) se fundía
+     con el radial-gradient top (mismo color, alpha .28) y desaparecía en
+     el borde superior. Subimos el border a .72 + reforzamos el contorno
+     completo con inset shadow de 1px que se superpone al gradiente
+     interior. Resultado: rectángulo perfectamente cerrado en los 4 lados
+     sin tocar overflow ni border-radius. */
+  border:1px solid rgba(201,169,97,.72);
+  box-shadow:0 8px 32px rgba(0,0,0,.4), inset 0 0 0 1px rgba(201,169,97,.45);
 }
 .tf-hero__spark {
   position:absolute; inset:0; pointer-events:none;
