@@ -2,6 +2,353 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [01-jun-2026] Cierre saga refresh congelado — bug crítico resuelto, sub-síntoma de restauración deferred a feature futuro
+
+Cierre formal del saga "refresh congelado / blank tras F5" (ver entrada
+iter 1-4 más abajo + ERR-78 ampliado).
+
+**Estado final:**
+
+- **Bug crítico RESUELTO en producción** vía PR#125 (squash en main =
+  `6e7c966`), que recogió iter 3+4. La pantalla en blanco tras F5 no
+  vuelve a aparecer: `_navigateFallbackWelcome()` quita
+  `#restore-lock-css` antes de cada `showPage('welcome')`, el watchdog
+  redesignado con trigger semántico cubre todos los caminos de fallback,
+  y el filtro de eventos no-session evita el welcome prematuro por
+  INITIAL_SESSION con `session=null`. Confirmado en preview Vercel
+  (Chrome MCP) + producción.
+- **iter 5 NO mergeado.** El commit `1da350a` (rama
+  `fix/auth-bootstrap-frozen-refresh`) añadía un gate de visibilidad
+  al safety-net de `js/main-entry.js:114-115`. La hipótesis era que ese
+  safety-net pisaba el `showPage('grupos')` del bootstrap. QA en preview
+  con un wrapper persistente sobre `showPage` demostró que **`showPage('grupos')`
+  ni siquiera se llama** en el escenario F5: el bootstrap no llega a
+  invocar la restauración antes de que `main-entry.js` corra. Por tanto
+  el safety-net de main-entry NO estaba pisando nada — iter 5 atacaba
+  un culprit falso para ese síntoma. Rama y commit descartados.
+- **Decisión de producto (San):** "restaurar la última página tras F5"
+  NO es un bug crítico — es UX accesoria. El feature de persistir pantalla
+  vía `porra_lastPage` / `_pendingPageRestore` nació el 20-abr
+  (`feat(nav)`) y es frágil. Aterrizar en el selector de ligas tras
+  refresh es comportamiento ACEPTABLE de producto. Cuando algún día se
+  retome "restaurar pantalla", será como FEATURE nuevo con spec limpia,
+  no parcheando el bootstrap.
+- **Persistencia de DATOS intacta.** Las predicciones (216 + 96 KO
+  verificadas server-side en Supabase) nunca estuvieron en riesgo. Lo
+  único que se reseteaba al aterrizar en welcome era la `_activeLeague`
+  en memoria, que se restaura en cuanto el usuario re-selecciona su
+  liga.
+
+**Rama cerrada:** `fix/auth-bootstrap-frozen-refresh` borrada en remoto
+tras este commit. Los 5 commits de iteración quedan en el historial
+de PR#125 + en el detalle de ERR-78.
+
+**Lecciones acumuladas — saga 5 iters** (extendidas en ERR-78):
+
+1. Validar que el handler de un listener REALMENTE corre antes de poner
+   robustez dentro (iter 1→2: race de registro tardío de
+   `onAuthStateChange`).
+2. QA en browser real con DOM inspection es lo único definitivo —
+   hipótesis sobre "qué bloquea" se confirman SOLO leyendo el DOM en el
+   estado del bug, incluido CSS inyectado que no aparece en grep de
+   `showPage` (iter 2→3: el lock CSS era invisible al análisis estático).
+3. No todos los `null` significan "no hay sesión" — distinguir eventos
+   definitivos (SIGNED_OUT, USER_DELETED) de eventos prematuros
+   (INITIAL_SESSION pre-restauración). Eliminar awaits redundantes que
+   abren ventanas de timing (iter 3→4).
+4. **Verificar empíricamente que el código que asumes corre realmente
+   corre** antes de teorizar overrides (iter 4→5: iter 5 asumía que el
+   bootstrap llamaba `showPage('grupos')` y otro código lo pisaba, pero
+   `showPage('grupos')` ni se llamaba). Wrapping persistente sobre
+   funciones críticas (`showPage`) durante QA permite descartar
+   hipótesis sin escribir código.
+5. **Cuando un bug se vuelve intermitente con `readyState` o timing
+   async/sync**, auditar TODOS los sitios que ejecutan durante el
+   bootstrap, no solo el módulo bajo investigación (iter 4→5: 4 iters
+   en `auth.js`, el ruido venía del bootstrap chain en `main-entry.js`
+   — pero al final ni siquiera era el culprit).
+
+**Sin cambios de código en este commit** (solo docs). `public/js/auth.js`
+y `js/main-entry.js` quedan exactamente como están en `6e7c966`.
+
+## [31-may-2026] Fix auth bootstrap: app congelada vacía tras refresh
+
+**Bug (prod, iPhone + Android):** tras F5 / recarga del navegador (o con
+carga lenta), la app queda "congelada": header visible (ADMIN, usuario,
+"Cerrar sesión") pero el contenedor principal vacío (azul liso, sin grupos
+ni nav funcional). Workaround del usuario: logout + login. Reproducido por
+Claude.ai vía Chrome MCP en producción.
+
+**Causa:** en `runAuthInit > onAuthStateChange` (`public/js/auth.js`), branch
+`INITIAL_SESSION` (refresh con sesión persistida), el flujo encadena
+`leagueLoadMyLeagues() → _myLeagues.find(savedLeagueId) → leagueSelectById
+→ leagueSelect → showPage`. Tres fallos compuestos producían el shell mudo:
+
+1. **`leagueLoadMyLeagues()` sin retry** — la query Supabase con
+   `window._porraToken` fallaba o tardaba transitoriamente al arranque;
+   `_myLeagues` quedaba `[]`, `.find()` devolvía `undefined`, NO entraba en
+   `leagueSelectById`, `getActiveLeagueId()` quedaba null, y ninguna página
+   se activaba. El shell `.fc-pred-shell` montado pero TODOS los hijos a
+   `height:0` → pantalla vacía.
+2. **Sin timeout en los `await`s** — `db.from(...).select(...)` no expone
+   `signal` de cancelación nativo. Un fetch transitoriamente colgado dejaba
+   el handler en estado "pending" para siempre, sin llegar a `showPage`.
+   Re-ejecutar manualmente `window.leagueLoadMyLeagues()` en la consola
+   resolvía en 862ms y restauraba los 7 cards — prueba de que la red
+   funciona, solo el primer intento se ahogaba sin reintento.
+3. **`if (found) {...; return;}` early-return** — si `leagueSelectById`
+   throwba o se colgaba entre `find()` y `leagueSelect`, el handler salía
+   sin que NINGÚN `showPage` se hubiera llamado.
+
+**Fix (rama `fix/auth-bootstrap-frozen-refresh`, NO toca guards
+TOKEN_REFRESHED/USER_UPDATED ni `currentUser.id === session.user.id` —
+imprescindibles contra bucles al volver de segundo plano):**
+
+- **Retry con backoff** sobre `leagueLoadMyLeagues()` — 4 intentos (0, 400,
+  800, 1600ms entre fallos) hasta encontrar `savedLeagueId` en `_myLeagues`.
+- **`_withTimeout` helper** (Promise.race) envolviendo los 4 awaits del
+  bootstrap: `profile fetch` (8s), `leagueLoadMyLeagues` (8s), `leagueSelectById`
+  (8s), `loadUserData` (10s). Timeout → throw → `try/catch` registra warn
+  pero el flujo continúa hacia `showPage`.
+- **`_navigated` flag + try/finally**: garantiza que `showPage` se llame
+  en TODOS los caminos (liga restaurada, no encontrada, error, timeout,
+  excepción inesperada). Final `finally` fuerza `showPage('welcome')` como
+  red de seguridad.
+- **Preservar `savedLeagueId`** si tras 4 intentos `_myLeagues` sigue vacío
+  (posible transient; próximo refresh podría tener mejor suerte). Solo
+  limpia si `_myLeagues` tiene ligas pero la guardada no está (stale id
+  legítimo: usuario kickeado / liga borrada).
+- **Loader visible** (`#_auth-bootstrap-loader`, fixed center, inline CSS)
+  durante el bootstrap si hay token persistido o `_pendingPageRestore` —
+  "lento" no parece "roto". Removido tras la primera navegación.
+- **Watchdog 12s** que fuerza `showPage('welcome')` + oculta loader si nada
+  navega (red extrema para el caso donde TODOS los timeouts individuales
+  fallan).
+
+**Verificación pendiente:** QA en preview Vercel (San) reproduciendo el
+refresh múltiples veces. Lección PR#124: el test standalone no basta para
+validar timing real de fetch — el QA en browser es obligatorio.
+
+**Iteración 1 (commit `5405ebc`):** retry + timeout + `_navigated` flag +
+watchdog DENTRO del handler de `onAuthStateChange`. QA en preview Vercel
+reveló que el bug PERSISTE: el handler nunca se ejecuta porque
+supabase-js ya emitió `INITIAL_SESSION` durante `createClient` /
+restauración persistida ANTES de que `auth.js` cargue y registre su
+listener (auth.js está al final de la cadena `loadScript`). Toda la
+robustez añadida vive dentro de un handler huérfano.
+
+**Iteración 2 (este commit):** refactor estructural atacando la causa
+raíz — race de listener tardío.
+
+- **`_bootstrapSession(session, eventType)` extraído** a función
+  reutilizable con TODO el flujo (profile fetch, retry, loadUserData,
+  showPage). Invocada desde DOS puntos: el handler de `onAuthStateChange`
+  (cambios futuros) Y `db.auth.getSession()` explícito tras el registro
+  del listener (snapshot de sesión ya existente).
+- **Guard `window._bootstrapInFlight`** evita doble ejecución cuando
+  ambas vías compiten. Más el guard preservado de
+  `currentUser.id === session.user.id`.
+- **Loader + watchdog 12s armados INCONDICIONALMENTE** al inicio de
+  `runAuthInit`, fuera del handler. Antes el gating por
+  `sessionStorage.porra_token` era circular (token solo se escribía
+  desde el handler que no corría).
+- **`_withTimeout` aplicado también a `db.auth.getSession()`** (8s) —
+  protege contra hangs del cliente Supabase en la llamada explícita.
+- **Edge case**: si `getSession()` devuelve sin sesión pero
+  `_pendingPageRestore` estaba seteado (sesión expirada entre tab close
+  y reopen), limpiar pending y mostrar welcome.
+
+**Verificación pendiente (San en preview Vercel):** refresh con sesión
+persistida + `_pendingPageRestore='grupos'` debe acabar mostrando grupos.
+Refresh normal sin regresión. Refresh anónimo sin flash de loader
+persistente. Login fresco normal. Background return sin bucle de
+showPage. Lección reforzada de PR#124 y de iter 1 de este mismo ERR:
+nada de test standalone sustituye al QA en browser.
+
+**Stats iter 2:** 1 fichero tocado (`public/js/auth.js`, refactor
+cohesivo). ERR-78 reescrito con causa atribuida a race de listener
+tardío.
+
+**Iteración 3 (este commit):** causa raíz REAL identificada vía QA en
+preview Vercel con Chrome MCP + DOM inspection. Iter 2 NO resolvía
+el bug. Diagnóstico definitivo:
+
+`#restore-lock-css` (inyectado inline en `index.html` cuando hay
+`porra_lastPage`) bloquea TODOS los fallback `showPage('welcome')` del
+bootstrap. Y el watchdog estaba gateado por presencia del loader, que
+se oculta en TODOS los caminos de fallback antes del watchdog disparar
+→ watchdog nunca activaba.
+
+Cadena causal real: usuario tiene sesión + página guardada → lock se
+inyecta en parse time → bootstrap intenta restaurar; si CUALQUIER
+camino acaba en fallback welcome (getSession timeout, sesión nula,
+excepción inesperada, admin rejected, etc.), `showPage('welcome')`
+hace early-return por el lock → ninguna `#page-*` queda en
+`display:block` → blank permanente porque ningún `showPage(non-welcome)`
+ejecuta para quitar el lock.
+
+Iter 1 y 2 atacaban consecuencias correctas (listener tardío, fetch
+hangs, retry) pero NO la causa raíz. Verificado por San:
+`document.getElementById('restore-lock-css')` existe durante el blank;
+test causal `lock.remove(); showPage('grupos')` recupera la app.
+
+**Fix iter 3:**
+
+- **Helper `_navigateFallbackWelcome()`**: quita `#restore-lock-css`
+  ANTES de `showPage('welcome')` (evita el early-return). Sustituye
+  la combinación `_hideBootstrapLoader + showPage('welcome')` en los
+  4 sitios críticos: fall-through Path 2, red final del try/finally,
+  listener no-session branch, `_onNoSessionFromGetSession`.
+- **Watchdog redesignado** con trigger semántico ("¿hay alguna
+  `#page-*` con `style.display !== 'none'`?"). Sustituye el trigger
+  frágil (presencia del loader). Cubre TODOS los caminos de fallback
+  presentes y futuros sin enumerarlos. Acción:
+  `_navigateFallbackWelcome` (quita lock + welcome).
+- **(Opcional, secundario)** `loadIAPredictions` envuelto en
+  `Promise.race(..., setTimeout({}, 6000))` dentro de `loadUserData`'s
+  `Promise.all`. NO es el fix del blank (la IA NO bloqueaba showPage
+  en ningún camino verificable) — solo acorta la ventana de espera
+  cuando IA cuelga (red lenta).
+
+Descartado: B (auto-expire del lock en index.html inline). Discutido
+con San. Razón: quitar el lock sin re-renderizar no recupera la app
+(el `showPage('welcome')` que estaba bloqueado ya retornó early). El
+watchdog redesignado absorbe el rol de B con un trigger
+estructuralmente correcto.
+
+Preservado intacto de iter 2: helpers `_withTimeout`,
+`_bootstrapSession` extraído, `db.auth.getSession()` explícito,
+guards `TOKEN_REFRESHED/USER_UPDATED` y
+`currentUser.id===session.user.id`, retry+backoff sobre
+`leagueLoadMyLeagues`, flag `_navigated` + try/finally.
+
+**Verificación pendiente (San en preview Vercel):** refresh con
+sesión persistida + `porra_lastPage='grupos'` + IA lenta (simular
+6s+ timeout) → debe acabar mostrando grupos o welcome, NUNCA blank.
+`#restore-lock-css` debe quitarse y alguna `#page-*` debe quedar
+visible. Refresh happy path sin regresión. Refresh anónimo sin lock.
+
+**Stats iter 3:** 1 fichero (`public/js/auth.js`, +60/-15 sobre iter
+2). ERR-78 reescrito con causa raíz real (lock + watchdog gateado),
+incluye recap de las 3 iteraciones y lecciones acumuladas.
+
+**Iteración 4 (este commit):** fix regresión UX descubierta en QA de
+iter 3. El blank está resuelto, pero tras F5 con sesión + liga + 
+`porra_lastPage='grupos'`, la app aterrizaba en welcome en lugar de
+restaurar grupos. Medido (Chrome MCP): `visible_pages=['page-welcome']`,
+`getActiveLeagueId()=null`, `match_cards=0`, todas las queries
+Supabase 200 (las ligas SÍ cargan).
+
+**Causa raíz iter 4** (combinación de dos issues):
+
+1. **Listener fire premature INITIAL_SESSION sin sesión**: supabase-js
+   v2 a veces emite el evento ANTES de terminar de restaurar la sesión
+   persistida desde localStorage. El handler en iter 3 trataba todo
+   null como "no hay sesión" → nullificaba `_pendingPageRestore` y
+   mostraba welcome.
+
+2. **`leagueSelectById` redundante con timeout vulnerable**: cuando
+   `getSession()` explícito later resolvía con sesión válida y Path 1
+   se ejecutaba con `_foundLeague=true`, el `await
+   _withTimeout(leagueSelectById, 8000)` internamente hacía un
+   SEGUNDO `await leagueLoadMyLeagues()` redundante (la retry loop YA
+   había populado `_myLeagues`). Ese segundo fetch podía colgarse
+   (network jitter) → timeout 8s → catch → fall-through a Path 2.
+   Path 2 leía `target = _pendingPageRestore` que ya estaba null
+   (nullificado por issue 1) → `finalPage='welcome'` → showPage('welcome').
+   `_activeLeague=null` porque `leagueSelect` nunca corrió.
+
+**Fix iter 4:**
+
+- **A) Listener: distinguir eventos prematuros vs acción explícita.**
+  Solo `SIGNED_OUT` y `USER_DELETED` disparan clear+welcome. Otros
+  eventos sin sesión (INITIAL_SESSION sin sesión, USER_UPDATED con
+  null) se ignoran con `console.debug`. `getSession()` explícito
+  (que SÍ espera la restauración persistida) es la fuente
+  autoritativa.
+
+- **B) Path 1 llama `leagueSelect(_foundLeague)` directo**, eliminando
+  el `await leagueSelectById` y el segundo `leagueLoadMyLeagues`
+  redundante. `leagueSelect` es síncrono — sin timeout, sin riesgo
+  de hang. `_foundLeague` ya fue validado contra `_myLeagues`
+  populado por la retry loop arriba.
+
+Cualquiera de los dos por separado podría dejar el bug expuesto en
+ciertos timings. Juntos blindan la restauración desde dos ángulos.
+
+Preservado intacto de iter 3: `_navigateFallbackWelcome` con
+quita-lock, watchdog semántico, helpers `_withTimeout` /
+`_bootstrapSession` / `_onNoSessionFromGetSession`, retry+backoff,
+flag `_navigated` + try/finally, IA timeout 6s.
+
+**Verificación pendiente (San en preview Vercel):** F5 con sesión +
+liga + `porra_lastPage='grupos'` → restaura grupos (page-grupos
+visible, cards>0, `getActiveLeagueId` no null). NO welcome.
+Refresh anónimo / login fresco / logout real / background return →
+sin regresiones. Sin blank en ningún caso (iter 3 preservado).
+
+**Stats iter 4:** 1 fichero (`public/js/auth.js`, +35/-7 sobre iter
+3). Total acumulado en la rama: `public/js/auth.js` (~+365/-107
+sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`
+(PR #125). ERR-78 extendido con iter 4 + lecciones acumuladas
+(4 iteraciones).
+
+## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
+
+**Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
+Czech Republic, Ivory Coast, Korea o Turkey abría el modal con el mensaje
+"Datos de plantilla aún no disponibles para esta selección" pese a que la
+tabla `squads` tiene los jugadores (CPV 26 · CZE 30 · CIV 26 · KOR 26;
+TUR 0 — ver pendiente separado). Las otras 43 selecciones funcionaban.
+Detectado por Claude.ai vía MCP + Chrome en sesión paralela.
+
+**Causa:** `renderPanelPais` (`public/js/ui-globo-equipos.js:313`) derivaba
+`iso3` con match estricto `EQUIPOS.find(t => t.name_en === nameEn)`. El 3er
+argumento `nameEn` que llega al panel es la key WIKI canónica (resuelta por
+`getWikiKey()`), que para 5 selecciones diverge del `EQUIPOS.name_en`:
+Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic · Côte d'Ivoire ≠ Ivory
+Coast · South Korea ≠ Korea · Türkiye ≠ Turkey. Sin match → `iso3=''` → el
+botón `.fc-globo-detail__btn-roster` recibía `data-iso3=""` → `openRosterScreen`
+cortaba en `if (!iso3)` con `console.warn('[roster] iso3 vacío')` y nunca
+consultaba `squads`.
+
+**Fix (2 commits sobre la rama `fix/globo-roster-iso3-naming`):**
+
+- **Commit 1 (`f92c1af`)** — cascada NFD tolerante (`name_en`/`name`/`slug` ×
+  `nameEn`/`nombrePais`). QA en preview Vercel reveló que arreglaba solo 3/5:
+  con un GeoJSON donde `feat.properties.NAME` ya devuelve la WIKI key directa
+  (p.ej. `NAME="Czech Republic"`, `NAME="Ivory Coast"`), tanto `nameEn` como
+  `nombrePais` llegaban iguales y ningún campo de EQUIPOS contenía esas
+  cadenas (`name_en="Czechia"`/`slug="czech"`; `name_en="Côte d'Ivoire"`/`slug="ivory-coast"`).
+  Cape Verde / Korea / Turkey casaban porque EQUIPOS.name (es) o slug coincide
+  con la WIKI key; Czech Republic e Ivory Coast no.
+
+- **Commit 2 (este)** — diseño defensivo en 2 capas:
+  1. **Vía principal**: mapa explícito `WIKIKEY_TO_ISO3` con las 5 divergencias
+     conocidas (`Cape Verde`→`CPV`, `Czech Republic`→`CZE`, `Ivory Coast`→`CIV`,
+     `Korea`→`KOR`, `Turkey`→`TUR`). Conjunto cerrado y conocido — garantiza
+     5/5 independientemente de variaciones futuras en NE / `_norm`.
+  2. **Vía fallback**: cascada NFD con `_norm` mejorado que ahora también
+     colapsa separadores (`/[\s\-_'.]/g`). Step 0 preserva exact-match.
+     Blinda contra slugs con guiones (`ivory-coast` ↔ `ivorycoast`) y casos
+     similares futuros.
+
+**Verificación:** script standalone parseando EQUIPOS REAL de `data.js`
+(no datos asumidos) — 15/15 escenarios para las 5 divergentes (worst-case
+`nameEn === nombrePais` + polygon-path + flag-button-path) + round-trip
+48/48 con `EQUIPOS.name_en` raw + round-trip 48/48 simulando `getWikiKey()`.
+Cero regresiones. Cero cambios en BBDD, EF u otros ficheros.
+
+**Hallazgo independiente (no incluido en este PR):** `squads` para TUR
+(ISO3=TUR) tiene 0 jugadores; las otras 4 tienen pleno (CPV 26 · CZE 30 ·
+CIV 26 · KOR 26). Aunque el iso3 de Turquía ya quede bien resuelto, su
+modal saldrá vacío por falta de datos. Es problema del sync de plantillas
+(`scripts/sync-squads.mjs` + workflow), no del front. Anotado en
+`errores_conocidos_porra.md` ERR-77 como pendiente separado.
+
+**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`). Rama
+`fix/globo-roster-iso3-naming` (PR #124). Nuevo ERR-77 (revisado).
+
 ## [31-may-2026] Saga JO Jornada — 6 PRs #116→#121 (CERRADA)
 
 Sesión enfocada 100% en la pantalla Jornada y sus interacciones con login y
@@ -137,83 +484,3 @@ Kanaanizadegan, GHA Kohn, JOR Layla portero.
 adaptativo), ERR-73 (anti-colisión), ERR-74 (pin estabilidad), ERR-75
 (FF dudosos + pos-1 fallback).
 
-## [28-may-2026] feat/scale-ff-countries — FF_COUNTRIES 1→48 + ProcessPool paralelo
-
-**Sprint contexto**: tras hotfix PR #106 (parser FF cheerio + `img[alt]` non-empty filter), ESP valida 11/11 XI matched contra HTML real cacheado por Scrapling. Pero `FF_COUNTRIES` en `fetch_sources.py` aún tenía sólo `{"ESP": "espana"}` — los otros 47 países WC 2026 caen al fallback `fetch live` en `getFFLineupHtml`, sin estar pre-cacheados.
-
-**Cambio**:
-- `scripts/scraping/fetch_sources.py` carga `FF_COUNTRIES` desde `scripts/lib/iso3-slugs.json` (canonical, DRY con Node parsers) — pasa de 1 a 48 entradas.
-- `process_one()` extraído a top-level (no closure) para ser pickeable.
-- FF se procesa en paralelo con `ProcessPoolExecutor(max_workers=3, mp_context='spawn')`. Primarias siguen en serie (sólo 5, no vale la pena).
-
-**Por qué ProcessPool no ThreadPool**: Playwright sync_api usa greenlets que no son thread-safe. Cada worker necesita su event loop. `spawn` (vs fork) evita inheritance de estado de browsers embedded.
-
-**Wall time esperado**:
-- Serial 48 países × ~30s = ~24 min → excede timeout 15 min.
-- Paralelo 48 / 3 workers ≈ ~8 min + 80s primarias = ~10 min ✓
-
-**Países sin XI publicado**: FF sirve `/alineaciones/0.jpg` placeholder. `parseStartingXIFromHtml` lo detecta y retorna `[]`. Coste: ~30s wasted por país no-FINAL pero sin daño. A medida que países publiquen su lista oficial, el cron 6h poblará XI 11/11 automáticamente sin tocar código.
-
-## [25-may-2026] feat/mini-flags-rect (PR #93) — completa sprint banderas planas
-
-**Cierra el sprint banderas planas** iniciado con PR #91 (card expandida con `--flag-rect-url`) y continuado con PR #92 (reupload bucket `miniatures/flags-sm/` con WebPs croppeados al bbox no-blanco + remoción del border CSS sobre el rectángulo).
-
-Esta PR migra las **mini cards** del Directo (listado J1-J18 sin expandir) al mismo patrón de banderas rectangulares planas:
-
-- **JS** `ui-directo.js`: constante `ISO3_TO_ISO2` movida del scope cercano a `_buildDExpanded` al scope superior del IIFE (acceso compartido con `_buildDMini`). `_buildDMini` ahora inyecta `style="--flag-rect-url:url(.../miniatures/flags-sm/<ISO2>.webp)"` en cada `button.dv2-mini-flag-btn`.
-- **CSS** `directo-v3.css`: `.dv2-mini-flag` pasa de `<img>` con `object-fit:cover` a `background-image: var(--flag-rect-url)` sobre el button. Eliminado border dorado `rgba(201,169,97,.35)` y inset shadow blanco al 6% (ambos contornos visibles sobre `ink-900`). Reflejo banner `::after` atenuado 18%/25% → 8%/15% para no competir con la flag plana. `.dv2-mini.is-live` cambia `border-color` rojo por `outline` (mantiene glow EN VIVO sin reintroducir border base). `<img>` legacy con `display:none` como fallback semántico.
-
-**Estado del bucket** `miniatures/flags-sm/<ISO2>.webp` tras los 3 PRs: 48 banderas planas (flagcdn.com source) sin marco blanco, listas para uso inline rectangular. Pizarra Táctica ya las usaba con `mask-image` linear-gradient — sin regresión.
-
-**NO se tocan** en este PR: Grupos, KO, Globo equipos (siguen con flags circulares `flags/<ISO3>.png` — backlog post-launch para evaluar visualmente si conviene unificar).
-
-## [22-may-2026] feat/scrapling-integration-opt-a — Scrapling pre-fetch en sync-squads
-
-**Sprint contexto**: detect step en `sync-squads.yml` falla en 4/5 fuentes
-primarias por HTTP 403 Cloudflare/Akamai desde IPs USA de GH Actions (TLS
-fingerprint pobre de `node fetch()`). 6 runs cron consecutivos confirman el
-patrón. Eurosport además bloqueada por geoblock 307 server-side, irresoluble.
-
-**Solución**: Python/Scrapling como step previo. Métodos por fuente validados
-en 4 probes (`26279588881`, `26281337027`, `26293035353`, `26293757651`):
-
-| Fuente | Método Scrapling | Status | Latencia |
-|---|---|---|---|
-| Sport | `Fetcher.get(impersonate=chrome)` | 200 OK | 24-177ms |
-| Olympics | idem | 200 OK | 700-2000ms |
-| Marca | idem | 200 OK | 40-170ms |
-| AS | `StealthyFetcher.fetch(solve_cloudflare=False)` | 200 OK | 3.6s |
-| ESPN | idem | 200 OK | 6.8s |
-| ~~Eurosport~~ | descartada | 307 → /geoblocking.shtml | - |
-
-**Cambios**:
-- `scripts/scraping/fetch_sources.py` — pre-fetcha las 5 URLs, escribe
-  `cache/sources/<source>.html`. Sentinel empty file en fallo. exit 2 si
-  alguna falla (continue-on-error en YAML).
-- `scripts/lib/parsers/{as,sport,olympics,marca}.mjs` — refactor:
-  `fetchAndParse()` ahora llama `loadCachedHtml(SOURCE_NAME)` en vez de
-  `node fetch()`. Helper compartido en `_util.mjs`.
-- `scripts/lib/parsers/eurosport.mjs` — **eliminado**. Geoblock irresoluble.
-- `scripts/lib/parsers/espn.mjs` — **nuevo**. ESPN Deportes (Disney/Hearst)
-  como 5ª fuente. Reusa `parseHtmlAS({ requireBullet: false })` por
-  similitud asumida; primer run productivo confirmará.
-- `scripts/sync-squads.mjs` — `parserEurosport` → `parserESPN` en
-  `PRIMARY_PARSERS`.
-- `scripts/lib/cross-validate.mjs` — priority list eurosport → espn.
-- `.github/workflows/sync-squads.yml` — 3 nuevos steps (Setup Python 3.11,
-  Install Scrapling, Fetch source HTMLs) condicionados a `mode=detect`.
-  `continue-on-error: true` en el fetch para no bloquear el motor Node.
-- `.gitignore` — `cache/sources/.gitkeep` tracked, HTML regenerable
-  ignorado.
-- Tests: `sources.test.mjs` actualizado (eurosport test → espn fixture
-  AS-like). 77/77 pasan.
-- ERR-68 (HTTP 403 IPs GH Actions), ERR-69 (Eurosport geoblock), ERR-70
-  (setup-python cache:pip sin requirements.txt) registrados.
-
-**Pendiente post-merge** (San):
-- Cleanup branches probe pre-existentes (`probe/scrapling-viability`,
-  `fix/scrapling-probe-cache`, `probe/scrapling-v2`, `probe/scrapling-v3-mini`,
-  `probe/scrapling-v4-espn`).
-- Eliminar EF `gh-proxy` (creada por Claude.ai para descomprimir artifacts).
-- Eliminar `scripts/scraping/probe_scrapling.py` + `.github/workflows/scrapling-probe.yml`.
-- Validar parser ESPN con HTML real del 1er run y ajustar si difiere.
