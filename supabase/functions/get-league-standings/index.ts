@@ -1,6 +1,10 @@
 // supabase/functions/get-league-standings/index.ts
 // PR-1 · Pantalla Clasificación de liga (leaderboard multi-jugador)
-// Versión 1.0.1 — 31-may-2026
+// Versión 1.1.0 — 01-jun-2026
+//   v1.1.0: (B2/T1) reader jsonb type-tolerant (asObj) para soportar la
+//   migración results→jsonb sin acoplarse; boost ×2 en grupos vía boost_picks
+//   del PROPIO usuario; merge de results.overrides encima del canónico de
+//   grupos por clave.
 //   v1.0.1: BUG-fix mapeo scorer→gol en predsByUser/koByUser. La v1.0.0
 //   montaba `scorer: row.scorer` pero el motor _shared/scoring.mjs lee
 //   `pred.gol` — el +2 de goleador NUNCA sumaba. Test de ensamblado
@@ -12,14 +16,15 @@
 // agregados por usuario. Los picks ajenos NUNCA viajan en el payload.
 //
 // Reglas implementadas (espejo bit-a-bit del cliente actual scoreboard.js):
-//   - Grupos: calcMatchPoints con iaBonus aplicado vía ia_predictions[match_id].
-//   - KO: calcKOMatchPoints con avance de ronda. iaBonus NO se aplica
-//     (paridad con scoreboard.js que invoca con matchKey=null).
+//   - Grupos: calcMatchPoints con iaBonus aplicado vía ia_predictions[match_id]
+//     y boost ×2 vía boost_picks del PROPIO usuario (Set<match_id> por uid).
+//   - KO: calcKOMatchPoints con avance de ronda. iaBonus y boost NO se aplican
+//     (grupos-only; paridad con scoreboard.js que invoca con matchKey=null).
 //   - Awards: calcAwardPoints.
-//   - Boost x2: NO aplicado en esta v1 (paridad — el cliente actual usa
-//     boostPicks del usuario logueado para todos los rows, lo que es un
-//     bug latente; cuando se quiera arreglar, leer boost_picks por user_id
-//     y pasar { boost: true } a calcMatchPoints).
+//   - Overrides admin (results.overrides) mergeados encima del canónico de
+//     grupos por clave (mismo keyspace group_home_away que predictions.match_id).
+//   - Resultados leídos con asObj (type-tolerant): sirve para results.* en TEXT
+//     (hoy) y en jsonb (tras la migración P1) sin tocar esta EF.
 //
 // Sin gate temporal: solo se devuelven totales agregados (seguro pre y
 // post cierre de porra). El gate 10-jun (PR-3) afecta a una EF distinta
@@ -78,6 +83,18 @@ interface LeagueStandingsRow {
   awPts: number;
   total: number;
   hasPreds: boolean;
+}
+
+// ─── asObj — reader type-tolerant para columnas results.* ─────────────
+// Acepta string (JSON serializado; schema TEXT actual) u objeto ya parseado
+// (tras la migración results→jsonb, lane P1). null si vacío o JSON inválido.
+// deno-lint-ignore no-explicit-any
+function asObj(v: unknown): any {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    try { return JSON.parse(v); } catch { return null; }
+  }
+  return v;
 }
 
 serve(async (req: Request) => {
@@ -179,13 +196,15 @@ serve(async (req: Request) => {
     { data: awards,    error: aErr },
     { data: resultRow, error: rErr },
     { data: iaPreds,   error: iaErr },
+    { data: boosts,    error: bErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
     supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId),
     supa.from("ko_predictions").select("user_id, match_id, local, visitante, scorer, classifier").eq("league_id", leagueId),
     supa.from("award_picks").select("user_id, golden_ball, golden_boot, golden_glove, young_player").eq("league_id", leagueId),
-    supa.from("results").select("match_results, ko_results, award_winners").limit(1).maybeSingle(),
+    supa.from("results").select("match_results, ko_results, award_winners, overrides").limit(1).maybeSingle(),
     supa.from("ia_predictions").select("match_id, sign"),
+    supa.from("boost_picks").select("user_id, match_id").eq("league_id", leagueId),
   ]);
 
   for (const [err, label] of [
@@ -195,6 +214,7 @@ serve(async (req: Request) => {
     [aErr, "award_picks"],
     [rErr, "results"],
     [iaErr, "ia_predictions"],
+    [bErr, "boost_picks"],
   ] as const) {
     if (err) {
       return new Response(JSON.stringify({ error: "query_failed", table: label, detail: err.message }), {
@@ -217,20 +237,38 @@ serve(async (req: Request) => {
     });
   }
 
-  // ─── Parse results JSON (tabla guarda como TEXT) ──────────────────
+  // ─── Parse results (type-tolerant + overrides merge) ──────────────
+  // asObj soporta TEXT (hoy) y jsonb (post-migración P1). Los overrides admin
+  // (results.overrides) se mergean ENCIMA del canónico de grupos por clave —
+  // mismo keyspace group_home_away que predictions.match_id, así que el lookup
+  // realMatchResults[matchId] del loop de grupos recoge el override directo.
   let realMatchResults: Record<string, { l: number; v: number; scorers?: string[] }> | null = null;
   let realKoResults: Record<string, { l: number; v: number; scorers?: string[] }> | null = null;
   let realAwardWinners: Record<string, string> | null = null;
   if (resultRow) {
-    try { if (resultRow.match_results) realMatchResults = JSON.parse(resultRow.match_results); } catch { /* malformed, treat as null */ }
-    try { if (resultRow.ko_results)    realKoResults    = JSON.parse(resultRow.ko_results); }    catch { /* idem */ }
-    try { if (resultRow.award_winners) realAwardWinners = JSON.parse(resultRow.award_winners); } catch { /* idem */ }
+    realMatchResults = asObj(resultRow.match_results);
+    realKoResults    = asObj(resultRow.ko_results);
+    realAwardWinners = asObj(resultRow.award_winners);
+    const overrides  = asObj(resultRow.overrides);
+    if (overrides && typeof overrides === "object") {
+      realMatchResults = { ...(realMatchResults ?? {}), ...overrides };
+    }
   }
 
   // ─── Index ia_predictions por match_id (string) → {sign} ──────────
   const iaByMatchId: Record<string, { sign: string }> = {};
   for (const ia of iaPreds ?? []) {
     if (ia.match_id && ia.sign) iaByMatchId[ia.match_id] = { sign: ia.sign };
+  }
+
+  // ─── Index boost_picks por user_id → Set<match_id> ────────────────
+  // Boost ×2 SOLO en grupos. boost_picks.match_id comparte keyspace
+  // (group_home_away) con predictions.match_id (data.js:264 + data.js:310),
+  // por lo que el .has(matchId) del loop de grupos casa directo.
+  const boostByUser: Record<string, Set<string>> = {};
+  for (const b of boosts ?? []) {
+    if (!b.user_id || !b.match_id) continue;
+    (boostByUser[b.user_id] ??= new Set<string>()).add(b.match_id);
   }
 
   // ─── Index predictions / ko / awards por user_id ──────────────────
@@ -292,7 +330,7 @@ serve(async (req: Request) => {
       grpPts += calcMatchPoints(pred2, real.l, real.v, {
         scorers: real.scorers ?? null,
         iaBonus: ia,
-        boost: false, // v1 — parity con scoreboard.js cliente actual.
+        boost: boostByUser[uid]?.has(matchId) ?? false, // boost ×2 grupos-only.
       });
     }
 
@@ -307,8 +345,8 @@ serve(async (req: Request) => {
       if (!real) continue;
       koPts += calcKOMatchPoints({ ...pred, saved: true as const }, real.l, real.v, round, {
         scorers: real.scorers ?? null,
-        iaBonus: false,
-        boost: false,
+        iaBonus: false, // grupos-only (paridad scoreboard.js: matchKey=null en KO).
+        boost: false,   // grupos-only.
       });
     }
 
@@ -338,7 +376,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.0.1" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.1.0" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
