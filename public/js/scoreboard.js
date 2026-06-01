@@ -135,7 +135,14 @@ function sbRender(rows) {
     return;
   }
 
-  const myId = (window.currentUser || {}).id;
+  // PR-1 fix lookup: el render Trofeo original leía `window.currentUser`,
+  // pero `currentUser` se declara como `let` top-level en auth.js — no se
+  // expone a window (ERR-02). Usamos el patrón ya presente en
+  // ui-groups-mobile.js:490 y data.js:256: variable global directa con
+  // fallback a window por si algún día sí se expone explícitamente.
+  const myId = (typeof currentUser !== 'undefined' && currentUser ? currentUser.id : null)
+            || (window.currentUser && window.currentUser.id)
+            || null;
 
   // ── HERO PODIO (top-3 con orden visual 2 · 1 · 3) ────────
   const podiumEl = document.getElementById('sb-podium');
@@ -207,50 +214,54 @@ function sbRender(rows) {
   // PR-1 Capa 3: la card "Premios" es TAPPABLE sólo con porra abierta —
   // abre el picker via window.PorraPred._openTrophyModal (re-home del
   // botón trofeo del Predictor). Post-cierre queda display only.
-  if (myId) {
-    const me = rows.find(r => r.uid === myId);
-    if (me) {
-      const porraAbierta = !window._porraCerrada;
-      const cards = [
-        { lbl: 'Grupos',  val: me.grpPts },
-        { lbl: 'Elim.',   val: me.koPts },
-        { lbl: 'Premios', val: me.awPts, action: 'open-trophy' },
-        { lbl: 'Total',   val: me.total, total: true },
-      ];
-      document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c => {
-        const isClickable = c.action === 'open-trophy' && porraAbierta;
-        let cls = 'clz-bd-card';
-        if (c.total) cls += ' clz-bd-card--total';
-        if (isClickable) cls += ' clz-bd-card--clickable';
-        const attrs = isClickable
-          ? ` role="button" tabindex="0" data-sb-action="${c.action}" aria-label="Cambiar mis premios individuales"`
-          : '';
-        return '<div class="' + cls + '"' + attrs + '>' +
-                 '<div class="clz-bd-card__lbl">' + c.lbl + '</div>' +
-                 '<div class="clz-bd-card__val">' + c.val + '</div>' +
-               '</div>';
-      }).join('');
-      document.getElementById('sb-my-breakdown').style.display = 'block';
+  //
+  // Degradación elegante (San validó B): el desglose se pinta SIEMPRE
+  // para garantizar que el picker de premios tenga entrada visible
+  // aunque el usuario no esté en `rows` (el payload de la EF filtra por
+  // hasPreds; un usuario nuevo o sin pronósticos guardados todavía no
+  // viaja en filtered). Sin pronósticos los 4 valores se quedan en 0 —
+  // display puro, no engañoso.
+  const me = (myId && rows.find(r => r.uid === myId))
+          || { grpPts: 0, koPts: 0, awPts: 0, total: 0 };
+  const porraAbierta = !window._porraCerrada;
+  const cards = [
+    { lbl: 'Grupos',  val: me.grpPts },
+    { lbl: 'Elim.',   val: me.koPts },
+    { lbl: 'Premios', val: me.awPts, action: 'open-trophy' },
+    { lbl: 'Total',   val: me.total, total: true },
+  ];
+  document.getElementById('sb-breakdown-cards').innerHTML = cards.map(c => {
+    const isClickable = c.action === 'open-trophy' && porraAbierta;
+    let cls = 'clz-bd-card';
+    if (c.total) cls += ' clz-bd-card--total';
+    if (isClickable) cls += ' clz-bd-card--clickable';
+    const attrs = isClickable
+      ? ` role="button" tabindex="0" data-sb-action="${c.action}" aria-label="Cambiar mis premios individuales"`
+      : '';
+    return '<div class="' + cls + '"' + attrs + '>' +
+             '<div class="clz-bd-card__lbl">' + c.lbl + '</div>' +
+             '<div class="clz-bd-card__val">' + c.val + '</div>' +
+           '</div>';
+  }).join('');
+  document.getElementById('sb-my-breakdown').style.display = 'block';
 
-      // Handler delegado idempotente: click / Enter / Space en la card
-      // Premios → _openTrophyModal.
-      const breakdownEl = document.getElementById('sb-breakdown-cards');
-      if (breakdownEl && !breakdownEl._sbBreakdownDelegated) {
-        breakdownEl.addEventListener('click', function (ev) {
-          const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
-          if (!card) return;
-          _sbOpenTrophyFromBreakdown();
-        });
-        breakdownEl.addEventListener('keydown', function (ev) {
-          if (ev.key !== 'Enter' && ev.key !== ' ') return;
-          const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
-          if (!card) return;
-          ev.preventDefault();
-          _sbOpenTrophyFromBreakdown();
-        });
-        breakdownEl._sbBreakdownDelegated = true;
-      }
-    }
+  // Handler delegado idempotente: click / Enter / Space en la card
+  // Premios → _openTrophyModal.
+  const breakdownEl = document.getElementById('sb-breakdown-cards');
+  if (breakdownEl && !breakdownEl._sbBreakdownDelegated) {
+    breakdownEl.addEventListener('click', function (ev) {
+      const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+      if (!card) return;
+      _sbOpenTrophyFromBreakdown();
+    });
+    breakdownEl.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      const card = ev.target.closest && ev.target.closest('[data-sb-action="open-trophy"]');
+      if (!card) return;
+      ev.preventDefault();
+      _sbOpenTrophyFromBreakdown();
+    });
+    breakdownEl._sbBreakdownDelegated = true;
   }
 }
 window.sbRender = sbRender;
