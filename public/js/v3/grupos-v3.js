@@ -984,17 +984,43 @@ function v3RenderSquadPickerTeamSection(equipo, candidates, currentPickKey, side
       + '</div>';
   }
   var sideAttr = side ? ' data-v3-side="' + side + '"' : '';
-  var html = '<div class="v3-squad-picker-team-section">'
-    + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>'
-    + '<div class="v3-squad-picker-list">';
+
+  // Sprint Pickers (02-jun): combo agrupado por bucket (Defensas/Centrocampistas/
+  // Delanteros). Porteros ya excluidos por getScorerCandidates. Jugadores sin
+  // bucket conocido (fallback EQUIPOS legacy, bucket:null) caen a un grupo final
+  // SIN sub-cabecera → la ruta degradada se ve como lista plana de siempre.
+  var BUCKET_ORDER = [
+    { bucket: 'Defensa',        label: 'Defensas' },
+    { bucket: 'Centrocampista', label: 'Centrocampistas' },
+    { bucket: 'Delantero',      label: 'Delanteros' }
+  ];
+  var grouped = {};
   candidates.forEach(function(pl) {
+    var b = pl.bucket || '_otros';
+    (grouped[b] = grouped[b] || []).push(pl);
+  });
+
+  function renderPlayerBtn(pl) {
     var isPicked = currentPickKey === pl.key;
-    html += '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '"' + sideAttr + '>'
+    return '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '"' + sideAttr + '>'
       + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
       + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
       + '</button>';
-  });
-  html += '</div></div>';
+  }
+  function renderBucket(label, list) {
+    if (!list || !list.length) return '';
+    var h = '<div class="v3-squad-picker-bucket">';
+    if (label) h += '<div class="v3-squad-picker-bucket__label">' + label + '</div>';
+    h += '<div class="v3-squad-picker-list">';
+    list.forEach(function(pl) { h += renderPlayerBtn(pl); });
+    return h + '</div></div>';
+  }
+
+  var html = '<div class="v3-squad-picker-team-section">'
+    + '<div class="v3-squad-picker-team-section__title">' + equipo.name + '</div>';
+  BUCKET_ORDER.forEach(function(g) { html += renderBucket(g.label, grouped[g.bucket]); });
+  if (grouped['_otros']) html += renderBucket(null, grouped['_otros']); // sin cabecera
+  html += '</div>';
   return html;
 }
 

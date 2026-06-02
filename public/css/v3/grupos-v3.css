@@ -901,6 +901,23 @@
   margin-bottom: 8px;
 }
 
+/* Sprint Pickers (02-jun): sub-grupos por bucket dentro de cada selección. */
+.v3-squad-picker-bucket {
+  margin-bottom: 10px;
+}
+.v3-squad-picker-bucket:last-child {
+  margin-bottom: 0;
+}
+.v3-squad-picker-bucket__label {
+  font-family: var(--font-text);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-400, var(--ink-500));
+  padding: 2px 4px 6px;
+}
+
 .v3-squad-picker-team-section--empty {
   opacity: .55;
 }
