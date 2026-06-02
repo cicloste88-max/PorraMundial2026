@@ -6,9 +6,9 @@
 |---|---|---|
 | Actor `sofascore-webshare-proxy` `N8vUChlhok5JU3cnL` | build 1.0.7 | PRODUCCIÓN — proxy Webshare residencial (~$0.001/run) |
 | Actor `sofascore-live-proxy` `BYLtYcOxYkruVipwr` | build 1.0.19 | FALLBACK — proxies Apify residenciales (~$0.03/run) |
-| `porra-match-live` EF | v17 | async + webhook (Webshare principal + fallback automático) |
-| `porra-apify-webhook` EF | v8 | logging completo, detecta goles + status, llama Twilio directo. Aún no persiste `home_team_name` / `away_team_name` / `competition` / `match_start_ts` (cosmético — **ya NO bloquea el puente P3**, que resuelve equipos vía `wc_matches` por `match_key`) |
-| `porra-bridge-results` EF | v3 | puente `live_scores`→`results` (goleador normalizado + `teams_swapped`) — ver §Puente `live_scores → results` |
+| `porra-match-live` EF | v18 | async + webhook (Webshare principal + fallback automático). Disparada batched por `dispatch-live-slots` (ver §Bloque crítico) |
+| `porra-apify-webhook` EF | v9 | logging completo, detecta goles + status, llama Twilio directo. Aún no persiste `home_team_name` / `away_team_name` / `competition` / `match_start_ts` (cosmético — **ya NO bloquea el puente**, que resuelve equipos vía `wc_matches` por `match_key`) |
+| `porra-bridge-results` EF | v4 | puente `live_scores`→`results` (grupos + **rama KO**, goleador normalizado, `teams_swapped`, **guardas anti-dato-incompleto**). Disparo automático vía **trigger + barrido** — ver §Bloque crítico + §Puente |
 | `porra-whatsapp-send` EF | v2 | form-urlencoded via fetch |
 | `porra-whatsapp-webhook` EF | v5 | OK |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | NO usar — caché CDN ~15min |
@@ -55,15 +55,15 @@ Webshare reduce coste ~96% respecto al proxy datacenter porque las IPs residenci
 ## Flujo async + webhook
 
 ```
-pg_cron (cada 3 min durante partido)
+dispatch-live-slots (cron */3min) → dispatch_live_slots() agrupa partidos por slot
   ↓
-porra-match-live EF (v17)
+porra-match-live EF (v18)  — lanzada batched por slot de match_start_ts
   ↓
-Apify API: lanzar actor N8vUChlhow5JU3cnL async (no espera)
+Apify API: lanzar actor N8vUChlhok5JU3cnL async (no espera)
   ↓
 (Actor completa ~5-10s con Webshare)
   ↓
-Apify webhook → porra-apify-webhook EF (v8)
+Apify webhook → porra-apify-webhook EF (v9)
   ↓
 ├─ leer dataset: { event, incidents }
 ├─ detectar cambios vs DB (goles + cambios status)
@@ -71,15 +71,132 @@ Apify webhook → porra-apify-webhook EF (v8)
 └─ upsert live_scores
 ```
 
-El webhook elimina polling síncrono y permite a la EF cron retornar inmediatamente. Si el actor falla o devuelve 5xx, el siguiente cron lo reintenta; el fallback `sofascore-live-proxy` se invoca manualmente si Webshare cae sostenido.
+El webhook elimina polling síncrono y permite a la EF cron retornar inmediatamente. Si el actor falla o devuelve 5xx, el siguiente slot lo reintenta; el fallback `sofascore-live-proxy` se invoca manualmente si Webshare cae sostenido. La continuación del flujo (`live_scores` → `results` → puntuación) está en §Bloque crítico.
+
+## Bloque crítico: pipeline live→puntuación
+
+Es el **núcleo del torneo**: convierte el estado live crudo de SofaScore en los
+resultados canónicos (`results`) que consume el motor de puntuación. Cerrado
+end-to-end el **02-jun-2026 (P4)** — el volcado a `results` ya es **automático**
+(trigger + barrido); antes el puente se disparaba a mano.
+
+> **Alcance de P4**: cierra SOLO la vía del **puente** (SofaScore → `live_scores`
+> → `results`). La vía `update-results` (football-data.org → `results`) es
+> **independiente** y sigue pendiente de activar su pg_cron el 11-jun — el puente
+> NO la sustituye.
+
+### Diagrama
+
+```
+dispatch-live-slots (cron */3min)
+  └─ dispatch_live_slots(): agrupa partidos por match_start_ts en slots
+     └─ porra-match-live v18 (batched)
+        └─ Apify (actor Webshare N8vUChlhok5JU3cnL)
+           └─ porra-apify-webhook v9 ──────────────────────────────→ live_scores
+
+live_scores (status→'finished' Y score no-null)
+  ├─[TRIGGER bridge_on_finished]─────────→ porra-bridge-results v4 ──→ results
+  └─[red de seguridad: cron sweep-unbridged-finished */5min]────────────┘
+
+results ──[on-read]──→ get-league-standings v1.2.0 (motor _shared/scoring.mjs) → puntuación
+```
+
+> ⚠️ **Drift runtime↔repo**: el cron `dispatch-live-slots` (`cron.job` jobid 24,
+> `*/3min`) y las funciones `dispatch_live_slots()`, `sweep_unbridged_finished()`
+> y `trg_bridge_on_finished()` **existen solo en runtime** (creadas vía Supabase
+> MCP, sin fichero en `supabase/migrations/`) y **NO están versionadas en el
+> repo**. Pendiente backfill a `supabase/migrations/` o docs. Mismo lane que las
+> EFs del puente (Claude.ai/MCP).
+
+### Pieza A — Trigger `bridge_on_finished`
+
+Migración `p4_trigger_bridge_on_finished` (vía MCP, 02-jun): función
+`trg_bridge_on_finished()` `SECURITY DEFINER` + trigger `bridge_on_finished`
+`AFTER UPDATE OF status ON live_scores`. Dispara `porra-bridge-results` vía
+`net.http_post` **solo en la transición real** a finished:
+
+```
+OLD.status <> 'finished' AND NEW.status = 'finished'
+  AND NEW.score_home IS NOT NULL AND NEW.score_away IS NOT NULL
+```
+
+Idempotente (la guarda de transición evita re-disparos en updates posteriores
+del mismo partido ya finished). **Validado en vivo**: un `UPDATE` de MEX-RSA a
+`finished` disparó el puente solo y el resultado apareció en `results` con 3
+goleadores normalizados, sin intervención manual.
+
+### Pieza B — Barrido `sweep-unbridged-finished`
+
+Migración `p4_sweep_unbridged_finished` (vía MCP, 02-jun): función
+`sweep_unbridged_finished()` `SECURITY DEFINER` + cron `sweep-unbridged-finished`
+(`*/5min`). Red de seguridad: detecta partidos `finished` con dato completo cuya
+clave **no** está aún en `results` (huérfanos: el trigger falló, o el partido
+llegó a finished sin disparar) y **reinvoca el puente sin `match_key`** (procesa
+todos, idempotente). Noop barato cuando no hay huérfanos.
+
+> El trigger es el camino feliz (instantáneo); el barrido es la red cada 5 min.
+> Juntos garantizan que ningún partido finished se quede sin volcar a `results`.
+
+### Guardas anti-dato-incompleto (premisa "no rectificar después")
+
+El puente v4 **no escribe** si el dato no es fiable, y loguea el motivo en
+`results.log` — en vez de escribir un resultado provisional que habría que
+corregir luego (rompe la premisa de que un resultado escrito es definitivo):
+
+| Condición | Acción | `results.log` |
+|---|---|---|
+| `score_home`/`score_away` NULL | skip | `{event:bridge_skip, reason:score_null}` |
+| clave no resuelve en ningún diccionario | skip | `{event:bridge_skip, reason:no_dict_entry}` |
+| KO empate sin ganador determinable | skip | `{event:bridge_skip, reason:ko_winner_undetermined}` |
+
+**Validado**: la guarda `score_null` no escribió con marcador incompleto.
+
+### Rama KO — `wc_matches_ko` + determinación del winner (penaltis)
+
+- **Resolución de clave**: el puente resuelve el `match_key` de KO contra la tabla
+  `wc_matches_ko` (PK `match_key`; esquema en `docs/db-schema.md`). Escribe en
+  `results.ko_results["{ko_match_id}"] = {l, v, scorers, winner, round, status}`
+  (`ko_match_id` int 73-104, casa `ko_predictions.match_id` y `KO_ROUND_BY_ID`
+  del motor). Tabla **vacía** hasta publicarse los IDs SofaScore de KO (~28-jun);
+  el código del puente + motor ya la soportan.
+- **`koWinner()`** (orden de resolución):
+  1. Marcador no-empate → ganador directo.
+  2. Empate → `score_agg` (agregado, orientado al proyecto por `teams_swapped`).
+  3. Sigue empate → conteo de `penaltyShootout` con `incidentClass='scored'` en
+     `events` (tanda de penaltis).
+- **`penaltyShootout` EXCLUIDO de `scorers`**: los penaltis de la tanda **no** son
+  goleador de la porra (decisión de diseño, no bug — ver ERR-82).
+- **Motor `calcKOMatchPoints` (v1.2.0)**: determina el ganador KO por
+  `opts.winner` (`'home'|'away'`) si viene, con **fallback** a la derivación
+  `l`/`v`. Motivo: un KO que acaba en empate y se decide por penaltis tenía
+  `realWinner=null` con el motor viejo → el avance de ronda **no puntuaba** aunque
+  el usuario acertara el clasificador (la card KO obliga a indicar quién pasa).
+  Con `winner` explícito, quien predice empate + classifier correcto SÍ se lleva
+  el `+5/+10/…`. Retrocompatible: grupos no usan `winner`; KO sin penaltis cae al
+  fallback. `index.ts` pasa `winner: real.winner` a `calcKOMatchPoints`.
+
+### Validaciones (evidencia 02-jun, runtime)
+
+- **Trigger en vivo**: `UPDATE` MEX-RSA→finished disparó el puente solo →
+  `results` con 3 goleadores normalizados.
+- **Simulacro KO penaltis**: empate 1-1, ganador por tanda 6-2 → `winner:home`; el
+  motor da `+5` (avance) a quien predijo `classifier=home` y `0` a
+  `classifier=away`.
+- **Guarda score-null**: no escribió con marcador incompleto.
+- **Goleadores normalizados** vía `playerToShortKey`: Pedri, Mbappe, Jimenez,
+  Lozano, Percy.
+- Todos los seeds de simulacro **limpiados** tras validar.
 
 ## Puente `live_scores → results` (porra-bridge-results)
 
-EF **`porra-bridge-results` v3** (`verify_jwt=false`, auth por secret igual a
+EF **`porra-bridge-results` v4** (`verify_jwt=false`, auth por secret igual a
 `service_role`). Es el eslabón que convierte el estado live crudo en los
 resultados canónicos que consume el scoring: `live_scores` (SofaScore) →
-`results.match_results` (keyspace del proyecto). Lane Claude.ai/MCP — **no vive
-en el repo** (desplegada vía MCP, 01-jun-2026).
+`results` (keyspace del proyecto). Lane Claude.ai/MCP — **no vive en el repo**
+(desplegada vía MCP; v3 01-jun, **v4 02-jun**). Su **invocación es automática**
+(trigger `bridge_on_finished` + cron `sweep-unbridged-finished`, ver §Bloque
+crítico); **no invocar a mano salvo debug**. Esta sección detalla la rama de
+**grupos**; la rama **KO** y las **guardas** están en §Bloque crítico.
 
 ### Flujo
 
@@ -145,6 +262,16 @@ viejos.
 - **Estados de SofaScore** que el cron sigue: `notstarted` / `inprogress` / `halftime` / `overtime` / `penalties` / `finished`. Al detectar `finished`, parar.
 
 Ambos crons se programan vía `schedule_match_crons(match_key, start_ts)` (helper documentado en `docs/db-schema.md`). Nunca duplicar manualmente.
+
+> ⚠️ **Reconciliación pendiente (drift)**: en runtime el disparo live lo hace
+> hoy el cron **`dispatch-live-slots`** (`cron.job` jobid 24, `*/3min`) vía
+> `dispatch_live_slots()`, que agrupa partidos por `match_start_ts` en slots y
+> lanza `porra-match-live` **batched** (ver §Bloque crítico). Entre los 6 crons
+> activos NO hay `poll_<key>`/`prematch_<key>` per-match a 02-jun (pre-Mundial,
+> sin partidos programados aún). La relación exacta `dispatch-live-slots` ↔
+> `schedule_match_crons` (¿el slot batched sustituye al per-match, o conviven?)
+> queda **pendiente de reconciliar + backfill al repo** — `dispatch_live_slots()`
+> tampoco está versionada en `supabase/migrations/`.
 
 ## SofaScore IDs
 

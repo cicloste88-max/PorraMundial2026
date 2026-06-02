@@ -5,11 +5,11 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `b89a5c9` (01-jun). **Hoy**: B2 scoring server-side (#127 `get-league-standings` v1.1.0; ERR-79 = ensamblado, motor OK), B1 entrada UI (#128 picker goleador + FX-01), P1 `results`→jsonb, P3 puente live→results (#129 + EF `porra-bridge-results` v3 + tablas `wc_matches`/`equipos_players`), CI sync (#126). EFs vivas: 21 → `docs/architecture.md`. Detalle: `CHANGELOG.md`.
+Main HEAD `5dfd7ba` (01-jun). **02-jun — P4 puente live→puntuación CERRADO**: `porra-bridge-results` **v4** (KO + guardas) auto (trigger `bridge_on_finished` + barrido); `get-league-standings` **v1.2.0** (winner KO penaltis, ERR-82); `wc_matches_ko`. `update-results` (football-data.org) indep., 11-jun. EFs: 21 → `docs/architecture.md`. Ver `docs/live-scoring.md` §Bloque crítico.
 
 ## Top-3 pendientes inmediatos
 
-1. **P4 — activar pg_cron `update-results` (11-jun)** + verificar que el puente `porra-bridge-results` escribe `results.match_results` con goleador normalizado (simulacro).
+1. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, vía INDEPENDIENTE (P4 puente ya cerrado; simulacro puente OK).
 2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
 3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
 
@@ -102,7 +102,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..81: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81).
+ERR-01..82: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82).
 
 ### Otros ficheros de contexto
 

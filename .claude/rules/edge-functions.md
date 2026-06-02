@@ -67,6 +67,19 @@ Algunas EFs leen tablas que son **espejo 1:1 de ficheros JSON versionados en el 
 
 **Regla**: editar el JSON en el repo **NO** actualiza la tabla. Tras cualquier cambio en el JSON fuente (p.ej. el sync de squads enriquece `equipos-players.json`, o se añaden campos a `worldcup-2026-matches.json` como en P3c), hay que **RECARGAR la tabla** vía MCP (`UPDATE … FROM jsonb_each(...)`). Si no, la EF queda leyendo datos viejos silenciosamente. Esquema en `docs/db-schema.md`; flujo del puente en `docs/live-scoring.md` §Puente.
 
+## Puente `porra-bridge-results` — invocación canónica (trigger + barrido)
+
+El volcado `live_scores` → `results` es **automático** (P4, 02-jun-2026). **NO invocar el puente a mano** salvo debug puntual:
+
+- **Camino feliz**: trigger `bridge_on_finished` (`AFTER UPDATE OF status ON live_scores`) dispara el puente vía `net.http_post` en la transición real a `finished` con marcador no-null.
+- **Red de seguridad**: cron `sweep-unbridged-finished` (`*/5min`) reprocesa partidos finished huérfanos (finished con dato completo pero sin entrada en `results`).
+
+El puente trae **guardas anti-dato-incompleto**: si el marcador es NULL, la clave no resuelve, o un KO empatado no tiene ganador determinable, **NO escribe** y loguea `{event:'bridge_skip', reason}` en `results.log` (premisa "no rectificar después"). Ante un partido finished ausente de `results`, **mirar `results.log` antes de re-disparar a mano** — probablemente fue un skip deliberado y el barrido lo reintentará al completarse el dato.
+
+**Rama KO**: resuelve el `match_key` de KO contra `wc_matches_ko` (tabla diccionario, runtime-only, vacía hasta ~28-jun) y escribe `ko_results` con `winner` (incluye desempate por penaltis; `penaltyShootout` NO cuenta como goleador). Detalle: `docs/live-scoring.md` §Bloque crítico + ERR-82.
+
+> ⚠️ **Drift**: el trigger `trg_bridge_on_finished()`, las funciones `sweep_unbridged_finished()` / `dispatch_live_slots()` (cron `dispatch-live-slots`, `*/3min`) y la tabla `wc_matches_ko` viven **solo en runtime** (creados vía MCP, sin migration file). Pendiente backfill a `supabase/migrations/`.
+
 ## Migration log obligatorio
 
 Toda EF nueva o cambio de versión requiere entrada en `migration-log.md` con:
