@@ -34,8 +34,9 @@ Webshare reduce coste ~96% respecto al proxy datacenter porque las IPs residenci
 
 **Contrato I/O**:
 
-- Input: `{ "eventId": "15832749" }`
-- Output JSON: `item.event = {status, ok, data: {event: {...}}}` + `item.incidents = {status, ok, data: {incidents: [...]}}`
+- Input: `{ "eventId": "15832749" }` (single, retrocompat) **o** `{ "eventIds": ["15832749","…"] }` (batch por slot). `matchUrl` con `#id:` sigue aceptándose.
+- Output JSON: **un item por eventId** en el dataset — cada uno `{ eventId, event: {status, ok, data:{event}}, incidents: {status, ok, data:{incidents:[…]}} }`.
+- Un único `context`+cookies por run; `try/catch` por id (un partido que falle no tumba el resto del batch — empuja un item `ok:false` que el webhook ignora).
 - Latencia: ~5-10 segundos por run
 
 ## Actor fallback — sofascore-live-proxy
@@ -73,6 +74,11 @@ Apify webhook → porra-apify-webhook EF (v8)
 
 El webhook elimina polling síncrono y permite a la EF cron retornar inmediatamente. Si el actor falla o devuelve 5xx, el siguiente cron lo reintenta; el fallback `sofascore-live-proxy` se invoca manualmente si Webshare cae sostenido.
 
+> **Batching por slot (en preparación, lane MCP)**: el actor ya acepta `eventIds[]`
+> (ver Contrato I/O) para leer varios partidos de un slot en un único run. El lanzador,
+> el webhook multi-item y el dispatcher que lo orquestan son Edge Functions / cron
+> (no viven en el repo) y se documentarán al desplegarse.
+
 ## Puente `live_scores → results` (porra-bridge-results)
 
 EF **`porra-bridge-results` v3** (`verify_jwt=false`, auth por secret igual a
@@ -106,8 +112,13 @@ results.match_results["{group_letter}_{home_es}_{away_es}"]
 ### Normalización del goleador
 
 1. **`extractScorers(events)`**: recorre los incidents de SofaScore quedándose
-   con los tipos de gol válidos (`goal`, `inGamePenalty`, `penaltyShootout`) e
-   **ignora `ownGoal`** (gol en propia puerta no cuenta para el +2 de goleador).
+   con los goles válidos e **ignora `ownGoal`** (gol en propia puerta no cuenta
+   para el +2 de goleador). **Modelo de incidencias SofaScore**: el gol de
+   penalti en juego es `incidentType='goal'` con **`incidentClass='penalty'`**
+   (NO un tipo `inGamePenalty`); el gol normal es `incidentClass='regular'`; la
+   tanda de penaltis KO es `penaltyShootout`. Se ignora todo lo demás
+   (`card`/`substitution`/`period`/`injuryTime`/`varDecision`). El marcador se
+   toma de `event.homeScore/awayScore.current`, nunca contando incidents.
 2. **iso3 del autor**: derivado de `isHome` del incident combinado con
    `teams_swapped` → resuelve a `home_iso3` / `away_iso3` de `wc_matches`.
 3. **`playerToShortKey(name, iso3)`** (port de `scorer-keys.ts`): busca al
@@ -163,7 +174,7 @@ Ambos crons se programan vía `schedule_match_crons(match_key, start_ts)` (helpe
 
 SofaScore no expone API pública para obtener el ID por equipos + fecha. Workflow manual probado para KO + simulacros:
 
-1. **Búsqueda web**: `web_search` Google con `site:sofascore.com <home> <away> <fecha>`. En el snippet aparece el hash `#id:XXXXXXX` de la URL pública — copiar el número.
+1. **Búsqueda web**: `web_search` Google con `site:sofascore.com <home> <away> <fecha>`. **El `#id:` ya NO aparece en el snippet** (SofaScore migró a URLs `/match/{slug}/{customId}` sin el hash). Método actual: `web_fetch` de la página del partido y extraer el ID del `<meta og:image>`, que apunta a `…/event/{ID}/share-image`. Copiar ese `{ID}`.
 2. **Validación**: ejecutar el actor Webshare con ese ID:
    ```
    apify call N8vUChlhok5JU3cnL -i '{"eventId":"XXXXXXX"}' -t 30
@@ -171,6 +182,8 @@ SofaScore no expone API pública para obtener el ID por equipos + fecha. Workflo
    Si `event.homeTeam.name` y `event.awayTeam.name` cuadran con los equipos esperados, confirmado. Si Cloudflare devuelve 403 (ver ERR-05), reintentar con el fallback `sofascore-live-proxy`.
 3. **Registro**: añadir el ID al JSON `worldcup-2026-sofascore-ids.json` + crear fila en `live_scores` con `match_key=wc2026_g{LETRA}_{sofascore_id}` + programar crons con `SELECT schedule_match_crons(match_key, start_ts)`.
 
-URL pública SofaScore (input del workflow, nunca la construimos internamente): `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`. Solo importa el número tras `#id:`.
+URL pública SofaScore (input del workflow, nunca la construimos internamente): `https://www.sofascore.com/match/{slug}/{customId}` (SofaScore retiró el viejo `…#id:{sofascore_id}`). El `sofascore_id` numérico que necesita el actor **no** es el `{customId}` de la URL: se extrae del `<meta property="og:image">` de la página, que apunta a `…/api/v1/event/{sofascore_id}/share-image`.
+
+> **EF `porra-sofascore-proxy` (v9) — MUERTA**: el fetch directo a `api.sofascore.com` desde Supabase devuelve un challenge 403 de Cloudflare (ERR-05). El **actor Apify es el único camino** para datos SofaScore; no reintroducir un proxy server-side. Marcada OBSOLETA en `docs/architecture.md`.
 
 **Nota**: los simulacros (`is_historic=true` en `live_scores`) usan exactamente este mismo workflow. La única diferencia es el flag `is_historic` que filtra de la UI live del Mundial. Detalle de simulacros en `docs/simulacros.md`.

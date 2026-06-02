@@ -2348,3 +2348,11 @@ Sesión enfocada 100% en la pantalla Jornada. **Sin migraciones SQL** — solo f
 [21:55] **Squads (verificado MCP)**: 48 filas, 46 FINAL (≥11 jug.), 2 vacías pendientes ~2-jun (**TUR, UZB**). QAT cerró lista FINAL (26, `as+espn+tm+tm-mw`) durante la sesión — corrige la nota "QAT 33 provisional" del brief. Actualizado `docs/db-schema.md`.
 
 [21:55] **Docs tocadas por Code** (rama `feat/docs-sync-01jun`, solo documentación, cero runtime): `CLAUDE.md`, `migration-log.md` (este), `errores_conocidos_porra.md` (ERR-79), `CHANGELOG.md` + `CHANGELOG-archive-202605.md`, `docs/live-scoring.md`, `docs/architecture.md`, `README.md`, `docs/db-schema.md`, `docs/whatsapp.md`, `.claude/rules/edge-functions.md`. Verificado el pre-commit hook (tamaños). Sin DDL, sin deploy, sin tocar EFs.
+
+## 2026-06-02 — Batching live-scoring por slot · LANE CODE (rama `claude/zen-franklin-jBVs8`)
+
+[14:08 UTC] **Actor `sofascore-webshare-proxy/main.js` → input `eventIds[]`** (batch por slot): retrocompat `eventId`/`matchUrl`→`[id]`, un único `context`+cookies por run, `Promise.all(/event+/incidents)` por id, `pushData` 1 item/eventId (eventId normalizado a string), `try/catch` por id (un partido que falle no tumba el slot). Modos capture/reuse/normal preservados. `node --check` OK. Sin `apify push` (lo hace San en local; el container no tiene CLI ni `APIFY_TOKEN`).
+
+[14:08 UTC] **`docs/live-scoring.md`** — 3 correcciones: descubrimiento eventId vía `og:image`/`share-image` (el `#id:` ya no aparece en el snippet), gol de penalti = `incidentClass='penalty'` de `incidentType='goal'` (no `inGamePenalty`), `porra-sofascore-proxy` marcada MUERTA (403 Cloudflare); + contrato I/O del actor con `eventIds[]`.
+
+[14:08 UTC] **Reparto de lanes** (confirmado con San): webhook **v9** + dispatcher cron `*/3` + seed `live_scores` (72, `match_start_ts` epoch) + lanzador batched (`porra-match-live` es **EF Supabase**, no repo) = **lane MCP de Claude.ai/San**, NO en este PR. Code entrega solo actor + doc en rama feature + PR para gate de merge de San. Sin push a main, sin prod.
