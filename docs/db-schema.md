@@ -60,17 +60,19 @@ Fila única (singleton) con todos los resultados canónicos que consume el scori
 CREATE TABLE results (
   id INT PRIMARY KEY,            -- singleton
   match_results JSONB,           -- grupos: { "{grupo}_{home_es}_{away_es}": {l,v,scorers[],status} }
-  ko_results JSONB,              -- eliminatorias (normalizada array→objeto en P1)
+  ko_results JSONB,              -- KO: { "{ko_match_id}": {l,v,scorers[],winner,round,status} } (normalizada array→objeto en P1; winner+round ampliados en P4)
   award_winners JSONB,           -- premios individuales resueltos
   classification JSONB,          -- clasificación final (1º/2º/3º/4º)
   overrides JSONB,               -- correcciones manuales: merge ENCIMA de match_results por clave
-  log JSONB,                     -- traza de escrituras (puente / update-results)
+  log JSONB,                     -- traza de escrituras + skips del puente (ver nota abajo)
   updated_at TIMESTAMPTZ
 );
 ```
 
 - **Clave de `match_results`** = `{grupo}_{home_es}_{away_es}` = `getMatchKey` (`data.js`) = `predictions.match_id` (`admin.js`).
-- **Consumidores**: `get-league-standings` lee con reader type-tolerant `asObj()` (funciona pre/post jsonb) y mergea `overrides` encima del canónico; `update-results` (v5) escribe `match_results` como objeto; `porra-bridge-results` escribe `match_results[...]` vía `jsonb_set`.
+- **Consumidores**: `get-league-standings` (v1.2.0) lee con reader type-tolerant `asObj()` (funciona pre/post jsonb) y mergea `overrides` encima del canónico; `update-results` (v5) escribe `match_results` como objeto; `porra-bridge-results` (v4) escribe `match_results[...]` (grupos) y `ko_results[...]` (KO) vía `jsonb_set`, con **guardas anti-dato-incompleto** (no escribe + loguea en `log` si el dato es incompleto).
+- **Contrato `ko_results`** (ampliado P4): clave = `ko_match_id` (int 73-104, string en el objeto JSON); valor `{ l, v, scorers[], winner, round, status }`. `winner` (`'home'|'away'`) lo determina el puente (`koWinner()`, con desempate por tanda de penaltis) y lo consume `calcKOMatchPoints` para puntuar el avance de ronda **aun en KO resueltos por penaltis** (antes `realWinner=null` → no puntuaba). `round` ∈ `r32|r16|qf|sf|third|final`. Detalle en `docs/live-scoring.md` §Bloque crítico.
+- **`results.log`**: traza de eventos. El puente añade `{event:'bridge_skip', reason}` con `reason` ∈ `score_null` | `no_dict_entry` | `ko_winner_undetermined` cuando **no** escribe (premisa "no rectificar después"). Permite auditar partidos finished ausentes de `match_results`/`ko_results`.
 
 ### `wc_matches`
 
@@ -105,6 +107,32 @@ CREATE TABLE equipos_players (
 ```
 
 ⚠️ **Dependencia de recarga (`wc_matches` + `equipos_players`)**: son espejos de JSON del repo. Si cambia el JSON fuente (p.ej. sync de squads enriquece `equipos-players.json`, o se añaden campos a `worldcup-2026-matches.json`), hay que **RECARGAR la tabla** (`UPDATE … FROM jsonb_each(...)`). Repo y tabla NO se sincronizan solos. Detalle del puente en `docs/live-scoring.md`.
+
+### `wc_matches_ko`
+
+Diccionario de eliminatorias para la **rama KO** del puente. Migración
+`wc_matches_ko_dictionary_p4` (vía MCP, 02-jun; **sin migration file** en el repo
+— drift registrado, ver `docs/live-scoring.md` §Bloque crítico). A diferencia de
+`wc_matches`, **NO** es espejo de un JSON del repo: está **vacía** hasta que se
+publiquen los IDs SofaScore de KO (~28-jun, tras la fase de grupos). El código del
+puente (`koWinner()` + escritura `ko_results`) y el motor (`calcKOMatchPoints`) ya
+la soportan.
+
+```sql
+CREATE TABLE wc_matches_ko (
+  match_key TEXT PRIMARY KEY,    -- clave KO que resuelve el puente
+  sofascore_id BIGINT,
+  ko_match_id INT,               -- 73-104; casa ko_predictions.match_id + KO_ROUND_BY_ID del motor
+  round TEXT,                    -- 'r32' | 'r16' | 'qf' | 'sf' | 'third' | 'final'
+  home_iso3 TEXT,                -- iso3 canónico del proyecto (= home del ko_match_id)
+  away_iso3 TEXT,
+  teams_swapped BOOLEAN          -- true si SofaScore invierte home/away vs proyecto
+);
+-- RLS habilitado, policy SELECT abierta (lectura pública).
+```
+
+El puente resuelve el `match_key` de KO contra esta tabla y escribe
+`results.ko_results["{ko_match_id}"]` (contrato ampliado arriba en `results`).
 
 ## Tablas IA Predictor
 

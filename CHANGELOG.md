@@ -2,6 +2,35 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [02-jun-2026] Bloque crítico P4 — pipeline live→puntuación automático
+
+Multi-lane (runtime Claude.ai/MCP + docs Code, rama `feat/docs-p4-bloque-critico`).
+El volcado `live_scores` → `results` pasa a **automático**; cierra la vía del
+**puente** (SofaScore). `update-results` (football-data.org) sigue pendiente e
+independiente (pg_cron 11-jun) — el puente NO la sustituye.
+
+### Runtime (lane Claude.ai/MCP — no vive en git)
+
+- **Motor `get-league-standings` v1.1.0→v1.2.0**: `calcKOMatchPoints` acepta
+  `opts.winner` con fallback `l`/`v` → arregla el avance de ronda en **KO por
+  penaltis** (antes `realWinner=null` no puntuaba el classifier acertado, ERR-82).
+- **Puente `porra-bridge-results` v3→v4**: rama **KO** (`wc_matches_ko` →
+  `ko_results` con `winner` vía `koWinner()`/desempate por tanda; `penaltyShootout`
+  fuera de `scorers`) + **guardas anti-dato-incompleto** (skip + `results.log`).
+- **Trigger `bridge_on_finished`** + **cron `sweep-unbridged-finished` (`*/5min`)**
+  = disparo automático del puente (antes manual). Validado en vivo (MEX-RSA) +
+  simulacro KO penaltis.
+- **Drift**: trigger/funciones/`dispatch-live-slots`/`wc_matches_ko` solo en
+  runtime (sin migration file). Upstream verificado: match-live **v18**,
+  apify-webhook **v9**.
+
+### Docs (lane Code)
+
+§Bloque crítico en `docs/live-scoring.md`; `wc_matches_ko` + contrato `ko_results`
++ `results.log` en `docs/db-schema.md`; **ERR-82**; tabla EF canónica
+(`architecture.md` + `README.md`: standings v1.2.0, bridge v4, match-live v18,
+apify-webhook v9); `CLAUDE.md`; `.claude/rules/edge-functions.md`.
+
 ## [01-jun-2026] Jornada motor + entrada + puente live (B1 #128 · B2 #127 · P1 · P3 · #126)
 
 Sesión multi-lane (Code + Claude.ai). Code commitea docs/datos/tests; Claude.ai

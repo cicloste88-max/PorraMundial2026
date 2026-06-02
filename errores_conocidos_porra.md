@@ -2263,3 +2263,61 @@ Aplicado en `public/css/clasificacion-v3.css` (PR-1 iter 4, commit
 markup, pista parcial), `cf7567c` (border `.tf-hero` + inset shadow
 rectangular, incompatible con radius). Sólo el QA caliente en preview
 reveló el clipper real.
+
+
+## ERR-82 — Puente P4: winner KO explícito (KO por penaltis no puntuaba el avance) + guardas anti-dato-incompleto
+
+Tres decisiones de diseño del **bloque crítico P4** (pipeline `live_scores` →
+`results`, 02-jun-2026). Documentadas como patrón, no como bug en producción
+(se cazaron en simulacro antes del Mundial). Pipeline completo en
+`docs/live-scoring.md` §Bloque crítico.
+
+### A · Winner KO explícito — el motor viejo no puntuaba KO por penaltis
+
+**Síntoma (latente):** un partido de eliminatoria que termina **en empate y se
+decide por la tanda de penaltis** no puntuaba el avance de ronda, aunque el
+usuario hubiera acertado el clasificador. La card KO **obliga** a indicar quién
+pasa, así que ese acierto debería valer `+5/+10/…`.
+
+**Causa:** `calcKOMatchPoints` (`_shared/scoring.mjs` + `public/js/scoring.js`)
+derivaba el ganador solo del marcador `l`/`v`. En empate `realWinner=null` → la
+comparación contra el classifier del usuario nunca casaba → 0 puntos de avance
+para TODOS, incluso quien acertó el clasificador.
+
+**Fix (motor v1.2.0):** `calcKOMatchPoints` acepta `opts.winner`
+(`'home'|'away'`) y lo usa si viene, con **fallback** a la derivación `l`/`v`
+(retrocompatible). El puente calcula `winner` con `koWinner()` (marcador
+no-empate → directo; empate → `score_agg` orientado por `teams_swapped`; sigue
+empate → conteo de `penaltyShootout` `incidentClass='scored'` en `events`) y lo
+persiste en `results.ko_results["{ko_match_id}"].winner`. `index.ts` pasa
+`winner: real.winner`. Grupos no usan `winner` → sin efecto colateral.
+
+**Validado:** simulacro empate 1-1 + tanda 6-2 → `winner:home`; el motor da `+5`
+a quien predijo `classifier=home` y `0` a `classifier=away`.
+
+### B · `penaltyShootout` EXCLUIDO de `scorers`
+
+**Decisión de diseño (no bug):** los goles de la **tanda de penaltis** llegan en
+`events` de SofaScore como `penaltyShootout`. El puente los usa para determinar
+el `winner` (apartado A) pero **NO** los cuenta como goleador de la porra: un gol
+en la tanda no es un gol del partido a efectos del `+2` de goleador.
+`extractScorers` por tanto **excluye** `penaltyShootout` del array `scorers` (sí
+cuenta `goal` + `inGamePenalty` —penalti en juego—; también ignora `ownGoal`).
+
+### C · Guardas anti-dato-incompleto (premisa "no rectificar después")
+
+**Decisión de diseño:** un resultado escrito en `results` es **definitivo** (no
+se rectifica luego). Para no escribir resultados provisionales que habría que
+corregir, el puente v4 **no escribe** y loguea el motivo en `results.log` cuando
+el dato no es fiable:
+
+| Condición | `results.log` |
+|---|---|
+| `score_home`/`score_away` NULL | `{event:bridge_skip, reason:score_null}` |
+| clave sin entrada en ningún diccionario | `{event:bridge_skip, reason:no_dict_entry}` |
+| KO empate sin ganador determinable | `{event:bridge_skip, reason:ko_winner_undetermined}` |
+
+**Patrón:** ante un partido `finished` ausente de `match_results`/`ko_results`,
+**revisar `results.log`** antes de sospechar del motor — probablemente el puente
+lo saltó a propósito por dato incompleto. El barrido `sweep-unbridged-finished`
+(`*/5min`) lo reintenta en cuanto el dato se complete (ver §Bloque crítico).

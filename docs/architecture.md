@@ -166,15 +166,15 @@ Lista canónica EN VIVO a 01-jun-2026 (verificada vía Supabase MCP, proyecto `c
 | `admin-actions` | v8 | false | Gestión admin. Valida JWT admin manualmente. |
 | `create-league` | v3 | false | Liga para cualquier user autenticado. Límite 3 si no-admin; ilimitadas si admin. Validación manual con service_role (ERR-16). |
 | `update-results` | v5 | true | Sync football-data.org → `results` (grupos, escribe objetos jsonb tras P1). **NO computa puntos**: los deriva `get-league-standings` on-read. Activar pg_cron el 11 jun. |
-| `get-league-standings` | v1.1.0 (deploy v3) | false | Leaderboard de liga server-side. Lee predictions/ko_predictions/award_picks/results/ia_predictions/boost_picks por liga con service_role y reutiliza `_shared/scoring.mjs`. Reader jsonb-tolerante (`asObj`), boost ×2 grupos, merge de `results.overrides`. Devuelve SOLO totales agregados (picks ajenos nunca viajan al cliente). Ver ERR-79. |
-| `porra-bridge-results` | v3 | false | **Puente P3**: `live_scores` (finished) + `wc_matches` → `results.match_results`. Normaliza goleador SofaScore→key corta vía `equipos_players`, aplica `teams_swapped`. Auth por secret==service_role. Detalle en `docs/live-scoring.md`. |
+| `get-league-standings` | v1.2.0 (deploy v4) | false | Leaderboard de liga server-side. Lee predictions/ko_predictions/award_picks/results/ia_predictions/boost_picks por liga con service_role y reutiliza `_shared/scoring.mjs`. Reader jsonb-tolerante (`asObj`), boost ×2 grupos, merge de `results.overrides`, **winner KO explícito** (`opts.winner` → puntúa el avance en KO por penaltis, ERR-82). Devuelve SOLO totales agregados (picks ajenos nunca viajan al cliente). Ver ERR-79. |
+| `porra-bridge-results` | v4 | false | **Puente live→`results`** (P3+P4): `live_scores` (finished) + `wc_matches`/`wc_matches_ko` → `results.match_results` (grupos) + `ko_results` (KO, con `winner` vía `koWinner()`). Normaliza goleador vía `equipos_players` (`penaltyShootout` excluido), aplica `teams_swapped`. **Guardas anti-dato-incompleto** (skip + `results.log`). Disparo **automático** (trigger `bridge_on_finished` + cron `sweep-unbridged-finished`). Auth secret==service_role. Detalle: `docs/live-scoring.md` §Bloque crítico. |
 | `porra-orchestrator` | v4 | false | N agentes Haiku en paralelo → `orchestrator_jobs`. |
 | `porra-patch-deploy` | v5 | false | Patches search/replace + commit GitHub. |
 | `porra-fix-encoding` | v7 | false | Inspect/write ficheros GitHub via API. Defaults: CLAUDE.md / main. |
 | `porra-github-pusher` | v7 | false | PLACEHOLDER. |
 | `gh-proxy` | v5 | true | Pendiente documentar (follow-up). |
-| `porra-match-live` | v17 | false | Async + webhook, live scores. Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback. |
-| `porra-apify-webhook` | v8 | false | Logging completo, detecta goles + status, Twilio directo. Aún no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (cosmético — **ya NO bloquea el puente P3**, que resuelve equipos vía `wc_matches` por `match_key`). |
+| `porra-match-live` | v18 | false | Async + webhook, live scores. Lanzada batched por el cron `dispatch-live-slots` (`*/3min`, runtime-only — drift, ver `docs/live-scoring.md`). Webshare `N8vUChlhok5JU3cnL` build 1.0.7 principal + `BYLtYcOxYkruVipwr` build 1.0.19 fallback. |
+| `porra-apify-webhook` | v9 | false | Logging completo, detecta goles + status, Twilio directo. Aún no persiste `home_team_name`/`away_team_name`/`competition`/`match_start_ts` (cosmético — **ya NO bloquea el puente**, que resuelve equipos vía `wc_matches` por `match_key`). |
 | `get-match-stats` | v1 | false | Pendiente documentar (follow-up). |
 | `porra-sofascore-proxy` | v9 | false | OBSOLETA. |
 | `porra-whatsapp-send` | v2 | false | Envío WhatsApp via Twilio (form-urlencoded fetch). |

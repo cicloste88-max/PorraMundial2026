@@ -111,13 +111,13 @@ RLS habilitado en todas las tablas. Audit de seguridad completo aplicado 28-29ab
 |---------|---------|-------------|
 | `admin-actions` | v8 | Gestión admin. Requiere JWT admin |
 | `update-results` | v5 | Sync football-data.org → `results`. NO computa puntos (los deriva `get-league-standings` on-read). Activar pg_cron el 11 jun |
-| `get-league-standings` | v1.1.0 | Leaderboard liga server-side (motor `_shared/scoring.mjs`). Ver ERR-79 |
-| `porra-bridge-results` | v3 | Puente `live_scores`→`results` (goleador + `teams_swapped`). Ver `docs/live-scoring.md` |
+| `get-league-standings` | v1.2.0 | Leaderboard liga server-side (motor `_shared/scoring.mjs`). Winner KO explícito (ERR-82). Ver ERR-79 |
+| `porra-bridge-results` | v4 | Puente `live_scores`→`results` (grupos + KO, goleador + `teams_swapped`, guardas). Disparo auto (trigger + barrido). Ver `docs/live-scoring.md` §Bloque crítico |
 | `porra-orchestrator` | v4 | N agentes Haiku en paralelo → `orchestrator_jobs` |
 | `porra-patch-deploy` | v5 | Patches search/replace + commit GitHub |
 | `porra-fix-encoding` | v7 | Inspect/write ficheros GitHub via API |
-| `porra-match-live` | v17 | Live scores async + webhook |
-| `porra-apify-webhook` | v8 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
+| `porra-match-live` | v18 | Live scores async + webhook (batched por cron `dispatch-live-slots`) |
+| `porra-apify-webhook` | v9 | Recibe webhooks Apify, detecta goles + status, llama Twilio |
 | `porra-whatsapp-send` | v2 | Envía WhatsApp via Twilio (form-urlencoded fetch) |
 | `porra-whatsapp-webhook` | v5 | Webhook entrada WhatsApp |
 | `create-league` | v3 | Crear liga (cualquier usuario, max 3 no-admin). verify_jwt=false |
@@ -202,15 +202,19 @@ Balón de Oro, Bota de Oro, Guante de Oro (+15 pts), Mejor Joven ≤21 (+20 pts)
 Flujo asíncrono con webhook:
 
 ```
-pg_cron (durante partido)
-  → net.http_post → porra-match-live EF
+dispatch-live-slots (cron */3min, batched por slot de match_start_ts)
+  → net.http_post → porra-match-live EF (v18)
       → Apify API: lanzar actor N8vUChlhok5JU3cnL async
-  → Apify webhook → porra-apify-webhook EF
+  → Apify webhook → porra-apify-webhook EF (v9)
       → leer dataset: { event, incidents }
       → detectar goles + cambios status
       → Twilio directo (form-urlencoded fetch) → WhatsApp
       → upsert live_scores
+  → [live_scores finished] trigger bridge_on_finished + cron sweep-unbridged-finished
+      → porra-bridge-results v4 → results → get-league-standings (puntuación)
 ```
+
+Pipeline completo `live_scores → results → puntuación` (trigger + barrido + rama KO + guardas): `docs/live-scoring.md` §Bloque crítico.
 
 **Actor principal (producción):** `sofascore-webshare-proxy` (~$0.001/run)
 **Coste estimado torneo completo:** ~$13
