@@ -1,4 +1,19 @@
-// supabase/functions/get-squad/index.ts — v7.2
+// supabase/functions/get-squad/index.ts — v7.3
+// Cambios v7.2 → v7.3 (Sprint Pickers — fuente única squads.jugadores, 02-jun):
+//   1. Nueva ruta GET get-squad?mode=awards (torneo entero). Lee las 48 squads
+//      y devuelve 3 listas YA segmentadas desde squads.jugadores (fuente única
+//      de todos los pickers): porteros (bucket Portero → Guante de Oro),
+//      todos (1272 → Balón + Bota), sub21 (~67 → Mejor Joven). Cada jugador
+//      SIN dorsal: { iso3, pais, nombre, club, foto_url, posicion }. Agrupable
+//      por selección (iso3+pais) para combos optgroup como el picker MVP.
+//      SUB21 = regla FIFA: nacidos el 1-ene-2005 O DESPUÉS. dob viene como
+//      string DD/MM/YYYY (NO ISO). Fallback: edad <= 21 si dob falta/no parsea.
+//      Cache-Control generoso (cambia poco hasta el cierre de la porra).
+//      NOTA: la `key` corta de scoring NO se deriva aquí — squads.jugadores no
+//      la trae; el front la resuelve client-side (resolveKeysForSquad), única
+//      forma de derivación, para que case con la del puente porra-bridge-results.
+//
+// --- v7.2 (anterior) ---
 // Cambios v7.1 → v7.2 (Sprint A2 FIX C, Pizarra XI real, 29-may):
 //   1. XIPlayer += foto_url + tm_player_id (el front Pizarra ya puede pintar
 //      la foto circular del jugador; antes nunca llegaba foto al XI).
@@ -218,13 +233,112 @@ function buildPlantilla(jugadores: unknown): PlantillaPlayer[] {
   })
 }
 
+// ── Modo awards (v7.3) ────────────────────────────────────────────────────
+type AwardPlayer = {
+  iso3: string
+  pais: string
+  nombre: string
+  club: string | null
+  foto_url: string | null
+  posicion: string
+}
+
+// SUB21 = nacidos el 1-ene-2005 O DESPUÉS (regla FIFA). dob en squads.jugadores
+// es string DD/MM/YYYY → se parsea como tal, NUNCA como ISO (Date(str) lo leería
+// como MM/DD o fallaría). Devuelve epoch ms o null si formato inválido.
+const SUB21_CUTOFF_MS = Date.UTC(2005, 0, 1)
+
+function parseDobDDMMYYYY(dob: unknown): number | null {
+  if (typeof dob !== 'string') return null
+  const m = dob.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return null
+  const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3])
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  return Date.UTC(y, mo - 1, d)
+}
+
+function isSub21(j: Record<string, unknown>): boolean {
+  const t = parseDobDDMMYYYY(j.dob)
+  if (t !== null) return t >= SUB21_CUTOFF_MS
+  // Fallback (~3% sin dob parseable): no excluir a un joven por dato ausente.
+  const edad = typeof j.edad === 'number' ? j.edad : (j.edad != null ? Number(j.edad) : NaN)
+  return Number.isFinite(edad) && edad <= 21
+}
+
+// Lee las 48 squads y segmenta squads.jugadores en porteros / todos / sub21.
+// Ordenado por pais (equipo) para que el front pinte secciones por selección
+// en orden alfabético (renderPickerList agrupa por teamName preservando orden).
+async function handleAwards(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Response> {
+  const { data: rows, error } = await supabase
+    .from('squads')
+    .select('iso3, equipo, jugadores')
+    .order('equipo', { ascending: true })
+
+  if (error || !rows) {
+    return new Response(JSON.stringify({ error: 'No se pudieron leer las squads', detail: String(error?.message ?? error) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const porteros: AwardPlayer[] = []
+  const todos: AwardPlayer[] = []
+  const sub21: AwardPlayer[] = []
+
+  for (const row of rows as Record<string, unknown>[]) {
+    const iso3 = String(row.iso3 ?? '')
+    const pais = (typeof row.equipo === 'string' && row.equipo) ? row.equipo : iso3
+    const jugadores = Array.isArray(row.jugadores) ? row.jugadores : []
+    for (const raw of jugadores) {
+      const j = (raw ?? {}) as Record<string, unknown>
+      const nombre = typeof j.nombre === 'string' ? j.nombre : ''
+      if (!nombre) continue
+      const posicion = typeof j.posicion === 'string' ? j.posicion : ''
+      const player: AwardPlayer = {
+        iso3,
+        pais,
+        nombre,
+        club: typeof j.club === 'string' ? j.club : null,
+        // mismo fallback foto que getScorerCandidates (foto_url | foto_url_tm)
+        foto_url: typeof j.foto_url === 'string' ? j.foto_url
+          : (typeof j.foto_url_tm === 'string' ? j.foto_url_tm : null),
+        posicion,
+      }
+      todos.push(player)
+      if (posicion === 'Portero') porteros.push(player)
+      if (isSub21(j)) sub21.push(player)
+    }
+  }
+
+  return new Response(JSON.stringify({ mode: 'awards', porteros, todos, sub21 }), {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      // Cambia poco hasta el cierre → cache agresiva (1h cliente / 24h CDN).
+      'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+    },
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const url = new URL(req.url)
+    const mode = url.searchParams.get('mode')
     const iso3 = url.searchParams.get('iso3')?.toUpperCase()
     const iso2 = url.searchParams.get('iso2')?.toUpperCase()
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false }
+    })
+
+    // v7.3 — modo awards (torneo entero): listas segmentadas para los 4 premios.
+    if (mode === 'awards') {
+      return await handleAwards(supabase)
+    }
 
     if (!iso3 && !iso2) {
       return new Response(JSON.stringify({ error: 'iso3 o iso2 requerido' }), {
@@ -232,10 +346,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false }
-    })
 
     const filter = iso3 ? { col: 'iso3', val: iso3 } : { col: 'iso2', val: iso2! }
     const { data, error } = await supabase

@@ -652,8 +652,11 @@ function createMatchCard(match, idx) {
   const hStickerEl = '';
   const aStickerEl = '';
 
-  const hOpts = homeTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+p.name+'</option>').join('');
-  const aOpts = awayTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+p.name+'</option>').join('');
+  // Sprint Pickers (02-jun): sin dorsal en la etiqueta (path legacy, superseded
+  // por v3). EQUIPOS[].players.name trae "N · Nombre" → se quita el prefijo.
+  const _stripDorsal = (n) => (n || '').replace(/^\d+\s*·\s*/, '');
+  const hOpts = homeTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+_stripDorsal(p.name)+'</option>').join('');
+  const aOpts = awayTeam.players.map(p=>'<option value="'+p.key+'"'+(pred.gol===p.key?' selected':'')+'>'+_stripDorsal(p.name)+'</option>').join('');
 
   const lVal = pred.l!==null ? pred.l : '—';
   const vVal = pred.v!==null ? pred.v : '—';
@@ -1499,8 +1502,13 @@ function resolveKeysForSquad(jugadores, iso3) {
 window.resolveKeysForSquad = resolveKeysForSquad;
 
 // Sprint Combos & Awards (F1) — candidates dinámicos por iso3 para el picker
-// de goleador en grupos+KO. Lee squads.jugadores con xi_pinned=true; fallback
-// a EQUIPOS[].players legacy si BD no disponible o squad sin pin.
+// de goleador en grupos+KO. Fuente ÚNICA: squads.jugadores (plantilla completa,
+// porteros excluidos). El fallback a EQUIPOS[].players legacy SOLO entra si la BD
+// no está disponible o el squad llega vacío (degradación), NUNCA como fuente
+// primaria — antes el gate xi_pinned dejaba 15 selecciones con roster completo
+// cayendo al curado de 4 jugadores (Sprint Pickers 02-jun). La `key` se deriva
+// con resolveKeysForSquad (única forma; DEBE casar con la del puente
+// porra-bridge-results, que compara pred.gol vs scorers[] con includes()).
 let _scorerCandidatesCache = {};
 window._scorerCandidatesCache = _scorerCandidatesCache;
 
@@ -1529,7 +1537,7 @@ async function getScorerCandidates(iso3) {
   try {
     const { data, error } = await db
       .from('squads')
-      .select('iso3, jugadores, xi_pinned')
+      .select('iso3, jugadores')
       .eq('iso3', iso3)
       .limit(1)
       .maybeSingle();
@@ -1540,7 +1548,10 @@ async function getScorerCandidates(iso3) {
   }
 
   let candidates;
-  if (!row || !row.xi_pinned || !Array.isArray(row.jugadores) || !row.jugadores.length) {
+  // Sprint Pickers (02-jun): SIN gate xi_pinned. Mientras el squad tenga roster
+  // se usa squads.jugadores (plantilla completa); el curado EQUIPOS solo entra si
+  // la fila falta o el roster está vacío (degradación), no como fuente primaria.
+  if (!row || !Array.isArray(row.jugadores) || !row.jugadores.length) {
     candidates = _fallbackScorerFromEquipos(iso3);
   } else {
     const resolved = resolveKeysForSquad(row.jugadores, iso3);
@@ -1553,15 +1564,13 @@ async function getScorerCandidates(iso3) {
       .map(({ j, key }) => {
       const dorsal = (typeof j.dorsal === 'number' && j.dorsal > 0) ? j.dorsal : 999;
       const nombre = j.nombre || '';
-      // name preserva formato "dorsal · nombre" del legacy para consistencia
-      // visual con EQUIPOS[].players.name. Si no hay dorsal real, omitimos.
-      const display = (dorsal !== 999) ? (dorsal + ' · ' + nombre) : nombre;
-      // foto_url + posicion_tm se incluyen pero NO se renderizan en el picker
-      // scorer (decisión San 28-may). Reservados para sprints futuros:
-      // Pizarra Táctica sobre el campo + vista Plantilla estilo Transfermarkt.
+      // Sprint Pickers (02-jun): SIN dorsal en la etiqueta (807/1272 lo traen →
+      // queda a medias). Solo el nombre. `key` (resolveKeysForSquad) y `dorsal`
+      // (orden interno) intactos. foto_url + posicion_tm disponibles pero no se
+      // pintan aquí (reservados Pizarra Táctica / vista Plantilla).
       return {
         key,
-        name: display,
+        name: nombre,
         bucket: j.posicion || null,
         posicion_tm: j.posicion_tm || null,
         foto_url: j.foto_url || j.foto_url_tm || null,
@@ -1592,77 +1601,123 @@ function _bucketToRole(bucket) {
   }
 }
 
-// Criterios por award (matriz acordada con San):
-// - golden_ball:  top 20 selecciones Elo, cualquier rol.
-// - golden_boot:  top 30 Elo, bucket IN (Centrocampista, Delantero).
-// - golden_glove: top 30 Elo, bucket = Portero.
-// - young_player: top 30 Elo, edad ≤ 21 (Transfermarkt enrich-tm).
-// Ordenado por (rank Elo asc, name asc). Cacheado por award.
+// Sprint Pickers (02-jun) — candidatos de awards desde get-squad?mode=awards
+// (fuente ÚNICA squads.jugadores, las 48 selecciones, NO solo top-Elo como antes).
+// Un solo fetch compartido entre las 4 categorías; la EF segmenta en
+// porteros/todos/sub21. El mapa de keys se deriva del squad COMPLETO por iso3 con
+// resolveKeysForSquad → MISMAS keys que el picker de scorer y el puente (no se
+// introduce una 2ª forma de derivar keys).
+//   - golden_ball  (MVP):    todos
+//   - golden_boot  (Bota):   todos   (decisión brief 02-jun: cualquier jugador)
+//   - golden_glove (Guante): porteros
+//   - young_player (Joven):  sub21   (nacidos ≥ 1-ene-2005; fallback edad ≤ 21)
+// Ordenado por (selección, nombre) → renderPickerList agrupa por teamName.
+const _FN_GET_SQUAD = 'https://cmyfyswystjgzdwbqyyb.supabase.co/functions/v1/get-squad';
+
+async function _awardsJWT() {
+  // mismo patrón que ui-pizarra-tactica.js getJWT (auth.js publica _porraToken).
+  if (typeof window !== 'undefined' && window._porraToken) return window._porraToken;
+  try { const t = sessionStorage.getItem('porra_token'); if (t) return t; } catch (_) {}
+  // Fallback: sesión viva del cliente supabase. Cubre el bootstrap (loadUserData
+  // resuelve los award_picks guardados) antes de que auth.js publique _porraToken
+  // — equivalente a lo que hacía el lector db anterior, que usaba esta sesión.
+  try {
+    if (typeof db !== 'undefined' && db && db.auth && db.auth.getSession) {
+      const { data } = await db.auth.getSession();
+      return (data && data.session && data.session.access_token) || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+let _awardsEFData = null;      // { porteros, todos, sub21 } cacheado tras 1er fetch
+let _awardsEFPromise = null;   // in-flight compartido entre las 4 categorías
+let _awardsKeyByIso3 = null;   // { iso3: { nombre: key } } desde `todos` (squad completo)
+
+async function _fetchAwardsEF() {
+  if (_awardsEFData) return _awardsEFData;
+  if (_awardsEFPromise) return _awardsEFPromise;
+  _awardsEFPromise = (async () => {
+    const jwt = await _awardsJWT();
+    if (!jwt) { console.warn('[awards] sin JWT — no se cargan candidatos'); return null; }
+    try {
+      const r = await fetch(_FN_GET_SQUAD + '?mode=awards', {
+        headers: { 'Authorization': 'Bearer ' + jwt },
+      });
+      if (!r.ok) { console.warn('[awards] get-squad?mode=awards HTTP ' + r.status); return null; }
+      const data = await r.json();
+      if (!data || !Array.isArray(data.todos)) { console.warn('[awards] respuesta awards inválida'); return null; }
+      _awardsEFData = data;
+      return data;
+    } catch (e) {
+      console.warn('[awards] excepción fetch awards', e);
+      return null;
+    }
+  })();
+  try { return await _awardsEFPromise; }
+  finally { _awardsEFPromise = null; }
+}
+
+// Agrupa `todos` por iso3 (squad COMPLETO, porteros incluidos) y corre
+// resolveKeysForSquad sobre cada squad → mismo contexto de anti-colisión que el
+// picker de scorer (que también resuelve sobre el squad completo antes de filtrar
+// porteros). Devuelve { iso3: { nombre: key } } para que porteros/sub21
+// (subconjuntos de todos) reusen la MISMA key.
+function _buildAwardsKeyMap(todos) {
+  const byIso3 = {};
+  (todos || []).forEach(p => { (byIso3[p.iso3] = byIso3[p.iso3] || []).push(p); });
+  const keyMap = {};
+  Object.keys(byIso3).forEach(iso3 => {
+    const resolved = resolveKeysForSquad(byIso3[iso3], iso3);
+    const m = {};
+    resolved.forEach(({ j, key }) => { m[j.nombre] = key; });
+    keyMap[iso3] = m;
+  });
+  return keyMap;
+}
+
+function _awardPlayerRow(p, keyMap) {
+  const iso3 = p.iso3;
+  // key del mapa del squad completo; fallback a la MISMA derivación (no 2ª forma).
+  const key = (keyMap[iso3] && keyMap[iso3][p.nombre]) || playerToShortKey(p.nombre, iso3);
+  let teamName = p.pais;
+  if (!teamName && typeof EQUIPOS !== 'undefined') {
+    const eq = EQUIPOS.find(e => e.flag === iso3);
+    if (eq) teamName = eq.name;
+  }
+  return {
+    key,
+    name: p.nombre,
+    teamName: teamName || iso3,
+    flag: iso3,
+    role: _bucketToRole(p.posicion),
+    bucket: p.posicion,
+    club: p.club || null,
+    foto_url: p.foto_url || null,
+  };
+}
+
 async function getAwardCandidates(award) {
   if (_awardCandidatesCache[award]) return _awardCandidatesCache[award];
-  if (typeof db === 'undefined' || !db) {
-    console.warn('[awards] BD no disponible');
-    return [];
-  }
-  const topN = (award === 'golden_ball') ? 20 : 30;
-  const { data: topTeams, error: eloErr } = await db
-    .from('ia_elo_fifa')
-    .select('team_code, team_name, rank_position')
-    .order('rank_position', { ascending: true })
-    .limit(topN);
-  if (eloErr || !topTeams) { console.warn('[awards] error Elo:', eloErr); return []; }
-  const topCodes = topTeams.map(t => t.team_code);
-  const teamNameByCode = {};
-  const rankByCode = {};
-  topTeams.forEach(t => {
-    teamNameByCode[t.team_code] = t.team_name;
-    rankByCode[t.team_code] = t.rank_position;
-  });
-  const { data: squadsData, error: sqErr } = await db
-    .from('squads')
-    .select('iso3, jugadores')
-    .in('iso3', topCodes);
-  if (sqErr || !squadsData) { console.warn('[awards] error squads:', sqErr); return []; }
-
-  // Sprint Combos & Awards (F2) — unificar keys con el picker de scorer.
-  // resolveKeysForSquad aplica anti-colisión por iso3 (I. + apellido) y
-  // playerToShortKey resuelve a la key corta (Mbappe, Kane, Yamal...). Si
-  // el jugador ya está en EQUIPOS[].players, devuelve su .key histórica
-  // para preservar award_picks guardados antes del refactor.
-  const players = [];
-  squadsData.forEach(squad => {
-    const arr = Array.isArray(squad.jugadores) ? squad.jugadores : [];
-    const resolved = resolveKeysForSquad(arr, squad.iso3);
-    resolved.forEach(({ j, key }) => {
-      players.push({
-        key,
-        name: j.nombre,
-        teamName: teamNameByCode[squad.iso3] || squad.iso3,
-        flag: squad.iso3,
-        role: _bucketToRole(j.posicion),
-        bucket: j.posicion,
-        edad: (typeof j.edad === 'number') ? j.edad : (j.edad ? Number(j.edad) : null),
-        club: j.club,
-        foto_url: j.foto_url || null,
-        rank: rankByCode[squad.iso3] || 999,
-      });
-    });
-  });
-
-  let filtered;
+  const data = await _fetchAwardsEF();
+  if (!data) return [];
+  if (!_awardsKeyByIso3) _awardsKeyByIso3 = _buildAwardsKeyMap(data.todos);
+  const keyMap = _awardsKeyByIso3;
+  let src;
   switch (award) {
-    case 'golden_ball':  filtered = players; break;
-    case 'golden_boot':  filtered = players.filter(p => p.bucket === 'Centrocampista' || p.bucket === 'Delantero'); break;
-    case 'golden_glove': filtered = players.filter(p => p.bucket === 'Portero'); break;
-    case 'young_player': filtered = players.filter(p => typeof p.edad === 'number' && p.edad <= 21); break;
-    default: filtered = [];
+    case 'golden_ball':  src = data.todos;    break;
+    case 'golden_boot':  src = data.todos;    break;
+    case 'golden_glove': src = data.porteros; break;
+    case 'young_player': src = data.sub21;    break;
+    default: src = [];
   }
-  filtered.sort((a, b) => {
-    if (a.rank !== b.rank) return a.rank - b.rank;
-    return (a.name || '').localeCompare(b.name || '');
+  const list = (src || []).map(p => _awardPlayerRow(p, keyMap));
+  list.sort((a, b) => {
+    const t = (a.teamName || '').localeCompare(b.teamName || '');
+    return t !== 0 ? t : (a.name || '').localeCompare(b.name || '');
   });
-  _awardCandidatesCache[award] = filtered;
-  return filtered;
+  _awardCandidatesCache[award] = list;
+  return list;
 }
 window.getAwardCandidates = getAwardCandidates;
 const awPicks={golden_ball:null,golden_boot:null,golden_glove:null,young_player:null};

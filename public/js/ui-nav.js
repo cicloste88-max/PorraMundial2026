@@ -84,9 +84,11 @@ function openModal(match) {
   const lVal = pred.l !== null ? pred.l : '—';
   const vVal = pred.v !== null ? pred.v : '—';
 
-  // Jugadores para el goleador
-  const hOpts = (hTeam.players||[]).map(p=>`<option value="${p.key}"${pred.gol===p.key?' selected':''}>${p.name}</option>`).join('');
-  const aOpts = (aTeam.players||[]).map(p=>`<option value="${p.key}"${pred.gol===p.key?' selected':''}>${p.name}</option>`).join('');
+  // Jugadores para el goleador. Sprint Pickers (02-jun): sin dorsal en la etiqueta
+  // (path legacy, superseded por v3). EQUIPOS[].players.name trae "N · Nombre".
+  const _stripDorsal = (n) => (n || '').replace(/^\d+\s*·\s*/, '');
+  const hOpts = (hTeam.players||[]).map(p=>`<option value="${p.key}"${pred.gol===p.key?' selected':''}>${_stripDorsal(p.name)}</option>`).join('');
+  const aOpts = (aTeam.players||[]).map(p=>`<option value="${p.key}"${pred.gol===p.key?' selected':''}>${_stripDorsal(p.name)}</option>`).join('');
 
   const content = document.getElementById('modal-content');
   content.innerHTML = `
