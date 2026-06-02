@@ -2356,3 +2356,17 @@ Sesión enfocada 100% en la pantalla Jornada. **Sin migraciones SQL** — solo f
 [14:08 UTC] **`docs/live-scoring.md`** — 3 correcciones: descubrimiento eventId vía `og:image`/`share-image` (el `#id:` ya no aparece en el snippet), gol de penalti = `incidentClass='penalty'` de `incidentType='goal'` (no `inGamePenalty`), `porra-sofascore-proxy` marcada MUERTA (403 Cloudflare); + contrato I/O del actor con `eventIds[]`.
 
 [14:08 UTC] **Reparto de lanes** (confirmado con San): webhook **v9** + dispatcher cron `*/3` + seed `live_scores` (72, `match_start_ts` epoch) + lanzador batched (`porra-match-live` es **EF Supabase**, no repo) = **lane MCP de Claude.ai/San**, NO en este PR. Code entrega solo actor + doc en rama feature + PR para gate de merge de San. Sin push a main, sin prod.
+
+[14:08 UTC] **PR #131 abierto** (`claude/zen-franklin-jBVs8` → `main`): lane Code (actor `eventIds[]` + `docs/live-scoring.md`). Commit `6271a77`.
+
+### Deploys lane MCP (Claude.ai/San, documentados por Code — verificados EN VIVO vía MCP)
+
+[~16:00] **EFs ACTIVE**: `porra-apify-webhook` **v9** (`verify_jwt=false`) itera dataset multi-item, resuelve `match_key` por `sofascore_event_id` (fallback `?match_key=`), bucle independiente por item (status+goles+Twilio+upsert, try/catch); goleadores `incidentType='goal'` + `incidentClass IN ('regular','penalty')` + `penaltyShootout/scored`, excluye `ownGoal` del aviso. `porra-match-live` **v18** (`verify_jwt=false`) lanzador BATCHED: `{match_keys[]}`/`{match_key}`, filtra finished, auto-activa `poll_active`, 1 run `{eventIds[]}`, webhook sin `?match_key=`.
+
+[~16:00] **DB**: índice único **`live_scores_match_key_uidx`** sobre `match_key` (la tabla no tenía UNIQUE → sin él fallan los upserts). **Seed 72 filas** desde `wc_matches` (`match_start_ts` epoch UTC, `sofascore_url` placeholder, `status='notstarted'`, `poll_active=false`, `is_historic=false`, `competition='FIFA World Cup 2026'`). Función **`dispatch_live_slots()`** (SECURITY DEFINER): agrupa por `match_start_ts`, ventana `[start-45min, start+window]` (grupos 150min/KO 210min), early-exit. Cron **`dispatch-live-slots` jobid 24** `*/3 * * * *`. Auto-gating: nada hasta 11-jun T-45 del inaugural.
+
+[~16:00] **Actor** `sofascore-webshare-proxy` **build 1.0.10 SUCCEEDED** (vía API Apify, `SOURCE_FILES`; main.js vivo == PR #131). NO conectado a Git → el merge del PR no reconstruye el actor. Build falló 2× por reenviar `package-lock.json` → **ERR-82** (omitirlo; npm lo regenera).
+
+[~16:00] **Validación E2E real**: (a) webhook v9 con 1 item real BRA-PAN `#15926535` → 6-2 finished, 8 goles, autogol excluido del aviso. (b) cadena batched grupo C (2 partidos) → match-live v18 (1 run, 2 eventIds) → actor 1.0.10 (dataset 2 items) → webhook v9 (2 upserts independientes). Reseteado tras la prueba. `date_utc` de `wc_matches` confirmado UTC real (diff 0s vs `startTimestamp` SofaScore del inaugural).
+
+[16:30 UTC] **Docs (lane Code, este commit)**: `docs/live-scoring.md` (tabla EF v9/v18 + actor 1.0.10 + §Batching por slot desplegada), `errores_conocidos_porra.md` (ERR-82), `CHANGELOG.md`, `CLAUDE.md` (estado + Top-3), este log. Sin tocar EFs/cron/actor/seed (lane MCP). Pendiente San: merge PR #131, rotar `APIFY_TOKEN` (quedó en chat MCP), KO ~28-jun (32 filas + marcador prórroga/penaltis).

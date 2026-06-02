@@ -4,10 +4,10 @@
 
 | Componente | Versión | Estado |
 |---|---|---|
-| Actor `sofascore-webshare-proxy` `N8vUChlhok5JU3cnL` | build 1.0.7 | PRODUCCIÓN — proxy Webshare residencial (~$0.001/run) |
+| Actor `sofascore-webshare-proxy` `N8vUChlhok5JU3cnL` | build 1.0.10 | PRODUCCIÓN — proxy Webshare residencial (~$0.001/run). Soporta `eventIds[]` (batch por slot) |
 | Actor `sofascore-live-proxy` `BYLtYcOxYkruVipwr` | build 1.0.19 | FALLBACK — proxies Apify residenciales (~$0.03/run) |
-| `porra-match-live` EF | v17 | async + webhook (Webshare principal + fallback automático) |
-| `porra-apify-webhook` EF | v8 | logging completo, detecta goles + status, llama Twilio directo. Aún no persiste `home_team_name` / `away_team_name` / `competition` / `match_start_ts` (cosmético — **ya NO bloquea el puente P3**, que resuelve equipos vía `wc_matches` por `match_key`) |
+| `porra-match-live` EF | v18 | lanzador BATCHED: `{match_keys[]}` o `{match_key}` (retrocompat) → filtra finished, auto-activa `poll_active`, 1 run `{eventIds[]}` por slot. Webhook sin `?match_key=` |
+| `porra-apify-webhook` EF | v9 | itera dataset multi-item; resuelve `match_key` por `sofascore_event_id` (fallback `?match_key=`); cada partido independiente (status+goles+Twilio+upsert) con try/catch por item |
 | `porra-bridge-results` EF | v3 | puente `live_scores`→`results` (goleador normalizado + `teams_swapped`) — ver §Puente `live_scores → results` |
 | `porra-whatsapp-send` EF | v2 | form-urlencoded via fetch |
 | `porra-whatsapp-webhook` EF | v5 | OK |
@@ -58,13 +58,13 @@ Webshare reduce coste ~96% respecto al proxy datacenter porque las IPs residenci
 ```
 pg_cron (cada 3 min durante partido)
   ↓
-porra-match-live EF (v17)
+porra-match-live EF (v18)
   ↓
 Apify API: lanzar actor N8vUChlhow5JU3cnL async (no espera)
   ↓
 (Actor completa ~5-10s con Webshare)
   ↓
-Apify webhook → porra-apify-webhook EF (v8)
+Apify webhook → porra-apify-webhook EF (v9)
   ↓
 ├─ leer dataset: { event, incidents }
 ├─ detectar cambios vs DB (goles + cambios status)
@@ -74,10 +74,38 @@ Apify webhook → porra-apify-webhook EF (v8)
 
 El webhook elimina polling síncrono y permite a la EF cron retornar inmediatamente. Si el actor falla o devuelve 5xx, el siguiente cron lo reintenta; el fallback `sofascore-live-proxy` se invoca manualmente si Webshare cae sostenido.
 
-> **Batching por slot (en preparación, lane MCP)**: el actor ya acepta `eventIds[]`
-> (ver Contrato I/O) para leer varios partidos de un slot en un único run. El lanzador,
-> el webhook multi-item y el dispatcher que lo orquestan son Edge Functions / cron
-> (no viven en el repo) y se documentarán al desplegarse.
+## Batching por slot (grupos) — DESPLEGADO 02-jun-2026
+
+Para no saturar el límite de Apify (**2 runs en paralelo**) y pre-provisionar el polling
+de los 72 partidos de grupos, los partidos de un mismo **slot** se leen en **un único run**
+y se procesan de forma independiente. Cadena (toda lane MCP/Supabase, no vive en el repo):
+
+```
+cron dispatch-live-slots (jobid 24, */3 * * * *)
+  ↓  dispatch_live_slots() SECURITY DEFINER: agrupa live_scores por match_start_ts (slot),
+  ↓  filtra vivos por ventana [start-45min, start+window] · grupos 150min / KO 210min
+  ↓  early-exit barato si 0 vivos (auto-gating: nada hasta 11-jun T-45 del inaugural)
+porra-match-live v18  ← { match_keys:[…] }   filtra finished, auto-activa poll_active
+  ↓  lanza 1 run { eventIds:[…] } + 1 webhook (SIN ?match_key=)
+actor sofascore-webshare-proxy 1.0.10  → dataset de N items (1 por eventId)
+  ↓
+porra-apify-webhook v9  → itera TODOS los items; resuelve match_key por sofascore_event_id
+                          (fallback ?match_key=); por item: status+goles+Twilio+upsert (try/catch)
+```
+
+- **Seed**: `live_scores` sembrada con los 72 partidos de grupos desde `wc_matches`
+  (`match_start_ts` epoch UTC, `poll_active=false`, `is_historic=false`, `sofascore_url`
+  placeholder, `competition='FIFA World Cup 2026'`). Índice único `live_scores_match_key_uidx`
+  sobre `match_key` — imprescindible para los upserts del webhook.
+- **Clustering**: 72 partidos → **60 slots** = 48 de 1 partido + **12 de 2** (jornada 3,
+  simultáneos). Las franjas de grupos están escalonadas → concurrencia Apify ≤ 2 runs.
+- **Goleadores (webhook v9)**: `incidentType='goal'` con `incidentClass IN ('regular','penalty')`
+  + `penaltyShootout/scored`; **excluye `ownGoal` del aviso** (sí cuenta en el marcador, que se
+  toma de `event.homeScore/awayScore.current`).
+- **Supersede `schedule_match_crons`** para el flujo live de grupos (evita doble polling); el
+  helper se conserva para simulacros/ad-hoc (ver `docs/db-schema.md`).
+- **KO (~28-jun)**: pendiente sembrar 32 filas `live_scores` con sus eventId + resolución de
+  marcador prórroga/penaltis (pendiente conocido del webhook).
 
 ## Puente `live_scores → results` (porra-bridge-results)
 

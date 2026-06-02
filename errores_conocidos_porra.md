@@ -2263,3 +2263,23 @@ Aplicado en `public/css/clasificacion-v3.css` (PR-1 iter 4, commit
 markup, pista parcial), `cf7567c` (border `.tf-hero` + inset shadow
 rectangular, incompatible con radius). Sólo el QA caliente en preview
 reveló el clipper real.
+
+## ERR-82 — Build de actor Apify por API falla en `npm install` si se reenvía `package-lock.json`
+
+**Síntoma:** al redesplegar el actor `sofascore-webshare-proxy` vía API Apify
+(`sourceType=SOURCE_FILES`, build del batching `eventIds[]` → build 1.0.10), el build
+falló **2 veces** con `exit code 243 / operation rejected by OS` durante `npm install`.
+
+**Causa:** el `package-lock.json` reenviado dentro de los sourceFiles entra en conflicto
+con la resolución de dependencias del builder remoto de Apify (el lock fija un árbol
+incompatible con el entorno de build → `npm install` abortado por el OS).
+
+**Fix:** **omitir `package-lock.json` de los sourceFiles** al desplegar por API —
+`npm install` lo regenera limpio en el build. Build SUCCEEDED a la primera tras quitarlo.
+
+**Patrón / lección:** si en el futuro se re-despliega un actor Apify **por API** (no por
+`apify push` ni Git-connected), NO incluir `package-lock.json` en el payload de
+sourceFiles; enviar solo `main.js` + `package.json` + `.actor/` + `Dockerfile`. El lock
+versionado en el repo sigue siendo válido para `apify push` / CI local. Contexto: el
+actor NO está conectado a Git → el merge del PR del repo no reconstruye el actor (el
+build se hace manualmente por `apify push` o API).

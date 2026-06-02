@@ -2,6 +2,30 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [02-jun-2026] Batching live-scoring por slot (deploy + E2E · PR #131)
+
+Sprint multi-lane. Lee los partidos simultáneos de un slot en **1 run** del actor
+(límite Apify = 2 runs) y pre-provisiona el polling de los 72 de grupos.
+
+**Desplegado (lane MCP)**: `porra-apify-webhook` **v9** (dataset multi-item; `match_key` por
+`sofascore_event_id`; bucle independiente por item; goleadores `goal`+`incidentClass IN
+(regular,penalty)`+`penaltyShootout/scored`, excluye `ownGoal` del aviso) · `porra-match-live`
+**v18** (lanzador batched `{match_keys[]}` → 1 run `{eventIds[]}`) · cron `dispatch-live-slots`
+jobid 24 `*/3` (`dispatch_live_slots()` agrupa por `match_start_ts`, ventana 150/210min,
+auto-gating 11-jun) · índice `live_scores_match_key_uidx` + **seed 72 filas** · actor **build 1.0.10**.
+
+**Lane Code (PR #131 `6271a77`)**: actor `main.js` `eventIds[]` (1 context+cookies, try/catch
+por id) + `docs/live-scoring.md` (eventId vía `og:image`; penalti `incidentClass='penalty'`;
+`porra-sofascore-proxy` muerto 403).
+
+**E2E real**: webhook v9 BRA-PAN `#15926535` (6-2, 8 goles, autogol excluido); cadena batched
+grupo C (2 partidos) → 1 run → 2 items → 2 upserts. `date_utc`=UTC real (diff 0s).
+
+**ERR-82**: build de actor por API falla si se reenvía `package-lock.json` (`exit 243`);
+omitirlo. Actor no Git-connected → merge del PR no lo reconstruye.
+
+**Pendiente San**: merge PR #131 · rotar `APIFY_TOKEN` · KO ~28-jun (32 filas + prórroga/penaltis).
+
 ## [01-jun-2026] Jornada motor + entrada + puente live (B1 #128 · B2 #127 · P1 · P3 · #126)
 
 Sesión multi-lane (Code + Claude.ai). Code commitea docs/datos/tests; Claude.ai
