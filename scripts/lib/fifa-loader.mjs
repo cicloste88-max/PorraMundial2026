@@ -44,7 +44,18 @@
 //   Asignación: greedy GLOBAL por score descendente (cada FIFA y cada BD a lo
 //   sumo una vez) → sin cross-wires por orden.
 
-import { tokens as nmTokens, levenshtein, resolveAlias, NON_LATIN_ISO3 } from './name-matcher.mjs';
+import { tokens as nmTokens, levenshtein, resolveAlias, NON_LATIN_ISO3, normalize } from './name-matcher.mjs';
+
+// dob de BD CORRUPTO (gap ~10 años en un match de nombre exacto) → pisar con el
+// de FIFA SOLO en estos casos puntuales (decisión de San 03-jun). En el resto se
+// mantiene el dob de BD + log (premisa "no rectificar"). Clave: normalize() del
+// nombre BD por iso3. Solo aplica si HAY conflicto real (los matches sin gap son
+// no-op). MEX Raúl Jiménez (BD 2001→FIFA 1991), BRA Danilo (BD 2001→FIFA 1991,
+// el match contra Danilo Luiz da Silva; el otro Danilo no tiene gap → intacto).
+const DOB_OVERRIDE = {
+  MEX: new Set(['jimenez raul']),
+  BRA: new Set(['danilo']),
+};
 
 // FIFA pos (PO/DF/MC/DC) → posicion canónica en español usada por squads.jugadores.
 // Verificado contra el vocabulario real de la BD (146 Portero / 425 Defensa /
@@ -340,18 +351,29 @@ export function buildFifaRoster({ fifaRows, bdRoster, iso3, aliases = null }) {
       if (bdPlayer.club && f.club_fifa && !clubsRoughlyEqual(bdPlayer.club, f.club_fifa)) {
         report.clubDiffs.push({ nombre: bdPlayer.nombre, bd: bdPlayer.club, fifa: f.club_fifa });
       }
-      if (dobConflict(bdPlayer.dob, f.dob)) {
-        report.dobDiffs.push({ nombre: bdPlayer.nombre, bd: bdPlayer.dob, fifa: convertFifaDob(f.dob) });
+      const ovSet = DOB_OVERRIDE[iso3];
+      const dobDiffers = dobConflict(bdPlayer.dob, f.dob);
+      const overrideDob = dobDiffers && !!ovSet && ovSet.has(normalize(bdPlayer.nombre || ''));
+      if (dobDiffers) {
+        report.dobDiffs.push({
+          nombre: bdPlayer.nombre,
+          bd: bdPlayer.dob,
+          fifa: convertFifaDob(f.dob),
+          overridden: overrideDob,
+        });
       }
       // Hereda TODO de BD; aplica de FIFA dorsal + campos nuevos. nombre y club
-      // se conservan (el spread de bdPlayer ya los trae; no los pisamos).
-      roster.push({
+      // se conservan (el spread de bdPlayer ya los trae; no los pisamos). dob solo
+      // se pisa con FIFA en los casos corruptos del allowlist (DOB_OVERRIDE).
+      const merged = {
         ...bdPlayer,
         dorsal: f.dorsal,
         nombre_camiseta: f.camiseta,
         estatura_cm: f.estatura_cm,
         posicion_fifa: f.pos,
-      });
+      };
+      if (overrideDob) merged.dob = convertFifaDob(f.dob);
+      roster.push(merged);
     } else {
       report.inserted.push(f.nombre_oficial);
       roster.push({
@@ -410,7 +432,9 @@ export function formatFifaReport(r) {
   }
   if (r.dobDiffs.length) {
     lines.push(`   dob≠ (${r.dobDiffs.length}):`);
-    for (const d of r.dobDiffs) lines.push(`       ${d.nombre}: BD ${d.bd}  vs FIFA ${d.fifa}`);
+    for (const d of r.dobDiffs) {
+      lines.push(`       ${d.nombre}: BD ${d.bd}  vs FIFA ${d.fifa}${d.overridden ? '  → PISADO con FIFA (dob BD corrupto)' : ''}`);
+    }
   }
   return lines.join('\n');
 }
