@@ -192,3 +192,41 @@ export async function upsertSquad(iso3, players, { isFinal, fuente, dryRun = fal
   if (error) throw error;
   return { changed: true, before, after: data, dryRun: false };
 }
+
+// ─── load-fifa (carga one-time lista oficial FIFA) ─────────────────────────
+// Lee la tabla espejo public.staging_fifa_players (RLS on sin policies →
+// service_role la lee, anon no). Devuelve filas crudas; el agrupado por iso3 y
+// la transformación viven en fifa-loader.mjs + sync-squads.mjs (runLoadFifa).
+export async function listStagingFifa() {
+  const supa = getClient();
+  const { data, error } = await supa
+    .from('staging_fifa_players')
+    .select('iso3, dorsal, pos, camiseta, nombre_oficial, nombre_lista, dob, club_fifa, estatura_cm')
+    .order('iso3')
+    .order('dorsal');
+  if (error) throw error;
+  return data || [];
+}
+
+// Reemplazo DIRECTO del roster (sin mergeJugadores): en load-fifa el roster FIFA
+// es autoritativo y la herencia ya se resolvió explícitamente en buildFifaRoster
+// (no queremos que el merge fill-if-null reintroduzca datos de un jugador
+// eliminado por colisión de nombre). NO toca xi / xi_pinned / xi_pinned_at /
+// formacion (el re-pineo del XI es un paso aparte).
+export async function replaceSquadRoster(iso3, players, { fuente, isFinal, dryRun = false }) {
+  if (dryRun) return { dryRun: true, n: players.length };
+  const supa = getClient();
+  const nowIso = new Date().toISOString();
+  const { error } = await supa
+    .from('squads')
+    .update({
+      jugadores: players,
+      jugadores_is_final: isFinal,
+      jugadores_fuente: fuente,
+      jugadores_synced_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('iso3', iso3);
+  if (error) throw error;
+  return { dryRun: false, n: players.length };
+}
