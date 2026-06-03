@@ -13,6 +13,11 @@
 //     Selección: --iso3=FRA | --all-missing | --refresh-final | --all
 //   --mode=enrich-tm Enriquece roster ya existente con Transfermarkt
 //     Selección: --iso3=FRA | --all
+//   --mode=load-fifa Carga ONE-TIME la lista oficial FIFA (tabla espejo
+//                    staging_fifa_players) sobre squads.jugadores: roster = 26
+//                    FIFA/nación, match por nombre (fifa-loader.mjs), herencia
+//                    de enrichment desde BD, dorsal autoritativo FIFA. NO toca
+//                    el cron. Selección opcional --iso3=JOR,KSA. Usa --dry-run.
 //
 // Flags:
 //   --dry-run        No aplica UPDATE, solo loguea el diff propuesto
@@ -33,7 +38,15 @@ import { fetchTmKader, enrichRosterWithTm } from './lib/tm-scraper.mjs';
 import { fetchAllPages } from './lib/tm-worldcup-market-values.mjs';
 import { applyEnrich } from './lib/enrich-merge.mjs';
 import { uploadPlayerPhoto } from './lib/storage-upload.mjs';
-import { getSquadRow, listAllSquads, upsertSquad, updateSquadXi } from './lib/squads-db.mjs';
+import {
+  getSquadRow,
+  listAllSquads,
+  upsertSquad,
+  updateSquadXi,
+  listStagingFifa,
+  replaceSquadRoster,
+} from './lib/squads-db.mjs';
+import { buildFifaRoster, formatFifaReport } from './lib/fifa-loader.mjs';
 import { buildXi } from './lib/xi-slot-map.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
@@ -102,7 +115,7 @@ const SKIP = new Set(
 );
 
 if (!MODE) {
-  console.error('Error: falta --mode=detect | --mode=scrape | --mode=enrich-tm | --mode=enrich-tm-mw');
+  console.error('Error: falta --mode=detect | --mode=scrape | --mode=enrich-tm | --mode=enrich-tm-mw | --mode=load-fifa');
   printUsage();
   process.exit(1);
 }
@@ -122,6 +135,9 @@ Uso:
   node scripts/sync-squads.mjs --mode=enrich-tm-mw                   (recomendado)
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --iso3=FRA,QAT
   node scripts/sync-squads.mjs --mode=enrich-tm-mw --full           (forzar fase B siempre)
+  node scripts/sync-squads.mjs --mode=load-fifa --dry-run           (carga ONE-TIME lista FIFA, reporte)
+  node scripts/sync-squads.mjs --mode=load-fifa --iso3=JOR --dry-run
+  node scripts/sync-squads.mjs --mode=load-fifa                     (APLICA: staging_fifa_players → squads.jugadores)
 
 Flags: --dry-run --force --verbose --skip=A,B --delay=2000 --no-enrich-xi --full --reseed-xi --build-xi --kader-stragglers
 `);
@@ -861,6 +877,91 @@ async function runEnrichTmMw({ iso3Filter, full }) {
   return results;
 }
 
+// ─── modo load-fifa ─────────────────────────────────────────────────────────
+// Carga ONE-TIME de la lista oficial FIFA (tabla espejo staging_fifa_players)
+// sobre squads.jugadores (jsonb), que SIGUE siendo la fuente de verdad. Roster
+// final = 26 FIFA/nación con herencia por NOMBRE desde BD (dorsal autoritativo
+// de FIFA). Lógica pura en scripts/lib/fifa-loader.mjs. NO toca el cron detect
+// (workflow disabled permanente). --dry-run reporta sin escribir.
+async function runLoadFifa(targets) {
+  // alias dict (mismo patrón lazy que detect). Inofensivo si falta el fichero.
+  let aliases = null;
+  try {
+    aliases = JSON.parse(await fs.readFile(path.join(__dirname, 'lib', 'name-aliases.json'), 'utf8'));
+  } catch (e) {
+    if (VERBOSE) console.log(`  ! name-aliases.json no cargado: ${e.message.slice(0, 60)}`);
+  }
+
+  const staging = await listStagingFifa();
+  const byIso = new Map();
+  for (const r of staging) {
+    if (!byIso.has(r.iso3)) byIso.set(r.iso3, []);
+    byIso.get(r.iso3).push(r);
+  }
+  const allSquads = await listAllSquads();
+  const squadByIso = new Map(allSquads.map((s) => [s.iso3, s]));
+
+  const isoList = targets && targets.length > 0 ? targets : [...byIso.keys()].sort();
+  console.log(`\nload-fifa: ${isoList.length} naciones  dry=${DRY_RUN}\n`);
+
+  const results = [];
+  let totalRoster = 0;
+  for (const iso3 of isoList) {
+    if (SKIP.has(iso3)) {
+      results.push({ iso3, status: 'skipped' });
+      continue;
+    }
+    const fifaRows = byIso.get(iso3);
+    if (!fifaRows || fifaRows.length === 0) {
+      console.log(`${iso3}: sin filas en staging_fifa_players — skip`);
+      results.push({ iso3, status: 'no-staging' });
+      continue;
+    }
+    const sq = squadByIso.get(iso3);
+    const bdRoster = Array.isArray(sq?.jugadores) ? sq.jugadores : [];
+    const { roster, report } = buildFifaRoster({ fifaRows, bdRoster, iso3, aliases });
+
+    console.log(formatFifaReport(report));
+
+    // fuente += "+fifa" (idempotente).
+    const prevFuente = sq?.jugadores_fuente || '';
+    const fuente = prevFuente.split('+').includes('fifa')
+      ? prevFuente
+      : `${prevFuente}+fifa`.replace(/^\+/, '');
+
+    if (!DRY_RUN) {
+      await replaceSquadRoster(iso3, roster, { fuente, isFinal: sq?.jugadores_is_final ?? true });
+    }
+
+    totalRoster += roster.length;
+    results.push({
+      iso3,
+      status: DRY_RUN ? 'dry-run' : 'updated',
+      n: roster.length,
+      matched: report.matched,
+      inserted: report.inserted.length,
+      eliminated: report.eliminated.length,
+      possible: report.possibleMatches.length,
+    });
+  }
+
+  const nIns = results.filter((r) => r.inserted > 0).length;
+  const nElim = results.filter((r) => r.eliminated > 0).length;
+  const totIns = results.reduce((a, r) => a + (r.inserted || 0), 0);
+  const totElim = results.reduce((a, r) => a + (r.eliminated || 0), 0);
+  const totPoss = results.reduce((a, r) => a + (r.possible || 0), 0);
+  const bad = results.filter((r) => r.n != null && r.n !== 26);
+  console.log('\n=== LOAD-FIFA GLOBAL ===');
+  console.log(
+    `naciones=${isoList.length}  roster total=${totalRoster} (objetivo ${isoList.length * 26})  roster≠26: ${bad.length}`,
+  );
+  console.log(
+    `inserted: ${totIns} (en ${nIns} nac) | eliminated: ${totElim} (en ${nElim} nac) | possible same-person: ${totPoss}`,
+  );
+  if (bad.length) console.log('  ⚠ naciones roster≠26:', bad.map((b) => `${b.iso3}:${b.n}`).join(', '));
+  return results;
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────
 async function main() {
   let results;
@@ -892,6 +993,11 @@ async function main() {
           .filter(Boolean)
       : null;
     results = await runEnrichTmMw({ iso3Filter, full: !!argv.full });
+  } else if (MODE === 'load-fifa') {
+    const targets = argv.iso3
+      ? String(argv.iso3).split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    results = await runLoadFifa(targets);
   } else {
     console.error(`Modo desconocido: ${MODE}`);
     printUsage();
