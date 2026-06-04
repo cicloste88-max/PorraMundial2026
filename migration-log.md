@@ -2415,3 +2415,9 @@ Sesión enfocada 100% en la pantalla Jornada. **Sin migraciones SQL** — solo f
   - `SCO 4-3-2-1`: 1:PO:#1 2:LD:#2 3:DFC:#13 4:DFC:#6 5:LI:#3 6:MCD:#4 7:MC:#7 8:MC:#19 9:MCO:#11 10:MCO:#17 11:DC:#10
   - `SWE 3-5-2`: 1:PO:#12 2:DFC:#4 3:DFC:#3 4:DFC:#2 5:CAD:#5 6:MC:#18 7:MCD:#7 8:MC:#16 9:CAI:#8 10:DC:#9 11:SD:#17
   - Nota fidelidad: la disposición de San es 1-indexada (slot 1..11) y en los 3-5-2 usa CAD/CAI para los carrileros (vs LD/LI en `POS_BY_FORMATION['3-5-2']` de `xi-slot-map.mjs`); renderiza OK en prod. Doc-only (San no pidió ejecutar nada).
+
+## 2026-06-04 — awards: dorsal en picker de premios (rama `awards-dorsal`)
+
+[23:52] **get-squad v7.3 → v7.4 (DEPLOYED prod, version 10, verify_jwt=true sin tocar auth).** `AwardPlayer` += `dorsal: number | null`; `handleAwards` lo emite por jugador desde `squads.jugadores` (`dorsal: typeof j.dorsal === 'number' ? j.dorsal : null`). El payload de `mode=awards` ahora trae dorsal en porteros/todos/sub21. Deploy vía Supabase MCP (payload <70KB, sin drift: prod v7.3 == repo HEAD pre-edit, byte-equivalente). Verificado post-deploy: header v7.4 + dorsal en type y objeto + verify_jwt=true. — `supabase/functions/get-squad/index.ts`
+[23:52] **Frontend picker de premios: antepone dorsal "N · Nombre".** `_awardPlayerRow` (scoring.js) carga `dorsal` en cada item del picker (preserva el sort alfabético por nombre de `getAwardCandidates`); `renderPickerList` (ui-nav.js:691) antepone `p.dorsal + ' · '` cuando existe (null → solo nombre); `_buildTopScorersHtml` (sección "Tus goleadores" de golden_boot) hace lo mismo por consistencia. `node --check` OK los 2 ficheros + `npm run build` OK (dorsal verificado en dist/js/). — `public/js/scoring.js`, `public/js/ui-nav.js`
+[23:52] COMMIT: awards: exponer dorsal en picker de premios (get-squad v7.4) (003bd6d) + PUSH rama `awards-dorsal` → origin. Pendiente QA en preview (la EF ya está en prod). NO PR.
