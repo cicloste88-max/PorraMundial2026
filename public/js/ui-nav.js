@@ -688,7 +688,7 @@ function renderPickerList(list, selected) {
       const isActive = selected && selected.key === p.key ? 'active' : '';
       return `<div class="aw-player-row ${isActive}" onclick="selectAward('${p.key}')">
         <div class="aw-player-info">
-          <div class="aw-player-pname">${p.name}</div>
+          <div class="aw-player-pname">${p.dorsal != null ? p.dorsal + ' · ' : ''}${p.name}</div>
           <div class="aw-player-team">
             <div class="aw-player-tf"><img src="${SB}/flags/${flag}.png" alt=""/></div>
             ${teamName}
