@@ -1688,6 +1688,7 @@ function _awardPlayerRow(p, keyMap) {
   return {
     key,
     name: p.nombre,
+    dorsal: typeof p.dorsal === 'number' ? p.dorsal : null,
     teamName: teamName || iso3,
     flag: iso3,
     role: _bucketToRole(p.posicion),
@@ -1787,7 +1788,11 @@ async function openPicker(award) {
 function _buildTopScorersHtml(topScorers, candidates) {
   const nameByKey = {};
   const candidateKeys = new Set();
-  (candidates || []).forEach(c => { nameByKey[c.key] = c.name; candidateKeys.add(c.key); });
+  (candidates || []).forEach(c => {
+    // Dorsal antepuesto ("N · Nombre") por consistencia con la lista principal.
+    nameByKey[c.key] = (c.dorsal != null ? c.dorsal + ' · ' : '') + c.name;
+    candidateKeys.add(c.key);
+  });
   const filteredTop = (topScorers || [])
     .filter(t => candidateKeys.has(t.scorer_key))
     .slice(0, 3);

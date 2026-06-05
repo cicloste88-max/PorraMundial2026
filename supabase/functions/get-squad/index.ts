@@ -1,4 +1,10 @@
-// supabase/functions/get-squad/index.ts — v7.3
+// supabase/functions/get-squad/index.ts — v7.4
+// Cambios v7.3 → v7.4 (awards expone dorsal por jugador (combos+awards con números, 05-jun)):
+//   1. AwardPlayer += dorsal (number | null). handleAwards lo emite por jugador
+//      desde squads.jugadores → los pickers de premios (Balón/Bota/Guante/Joven)
+//      anteponen el dorsal al nombre ("N · Nombre"), igual que los combos de
+//      goleador. Si dorsal es null el front muestra solo el nombre.
+//
 // Cambios v7.2 → v7.3 (Sprint Pickers — fuente única squads.jugadores, 02-jun):
 //   1. Nueva ruta GET get-squad?mode=awards (torneo entero). Lee las 48 squads
 //      y devuelve 3 listas YA segmentadas desde squads.jugadores (fuente única
@@ -238,6 +244,7 @@ type AwardPlayer = {
   iso3: string
   pais: string
   nombre: string
+  dorsal: number | null
   club: string | null
   foto_url: string | null
   posicion: string
@@ -300,6 +307,7 @@ async function handleAwards(
         iso3,
         pais,
         nombre,
+        dorsal: typeof j.dorsal === 'number' ? j.dorsal : null,
         club: typeof j.club === 'string' ? j.club : null,
         // mismo fallback foto que getScorerCandidates (foto_url | foto_url_tm)
         foto_url: typeof j.foto_url === 'string' ? j.foto_url
