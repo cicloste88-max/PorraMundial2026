@@ -220,7 +220,7 @@
       { key:'goalsFor',  label:'Goles / partido',  suffix:null, higherWins:true },
       { key:'goalsAg',   label:'Goles encajados',  suffix:null, higherWins:false },
       { key:'possession',label:'Posesión media',   suffix:'%',  higherWins:true },
-      { key:'winRate',   label:'% Victorias · 12m',suffix:'%',  higherWins:true },
+      { key:'winRate',   label:'% Victorias · forma',suffix:'%',  higherWins:true },
       { key:'avgAge',    label:'Edad media',       suffix:null, higherWins:null },
       { key:'value',     label:'Valor plantilla',  suffix:'M €',higherWins:true },
     ];
