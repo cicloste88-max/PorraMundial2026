@@ -100,8 +100,12 @@ export interface ReceiptData {
   awards: AwardPick[];
   champion: string | null;
   championIso3: string | null;
+  runnerUp: string | null;
+  runnerUpIso3: string | null;
   thirdPlace: string | null;
   thirdPlaceIso3: string | null;
+  fourth: string | null;
+  fourthIso3: string | null;
   counts: { groups: number; ko: number; awards: number };
   verificationCode: string;
   flagsBase: string;
@@ -357,12 +361,35 @@ export async function buildReceiptData(
   );
 
   // Podio: campeón = classifier slot 104 ; ganador 3.er puesto = classifier 103.
-  const slot104 = ko.find((x) => x.slot === 104);
-  const slot103 = ko.find((x) => x.slot === 103);
-  const champion = slot104?.classifierName ?? null;
-  const championIso3 = slot104?.classifierIso3 ?? null;
-  const thirdPlace = slot103?.classifierName ?? null;
-  const thirdPlaceIso3 = slot103?.classifierIso3 ?? null;
+  // Podio completo derivado SOLO de classifiers + mapa fijo del cuadro (ko.js
+  // BRACKET; NO standings, NO Annex C). Cruces confirmados:
+  //   SF 101 = W97 vs W98 · SF 102 = W99 vs W100
+  //   third 103 = L101 vs L102 · final 104 = W101 vs W102
+  const clsBySlot = new Map<number, string | null>();
+  for (const k of ko) clsBySlot.set(k.slot, k.classifierName);
+  const cls = (s: number): string | null => clsBySlot.get(s) ?? null;
+  // El de [a,b] que NO es `winner` — solo si winner es uno de los dos (si no,
+  // dato incompleto/inconsistente -> null). Espejo de "el que NO es classifier".
+  const other = (a: string | null, b: string | null, winner: string | null): string | null => {
+    if (!winner) return null;
+    if (a && winner === a) return b ?? null;
+    if (b && winner === b) return a ?? null;
+    return null;
+  };
+
+  const champion = cls(104);                          // ganador de la final (W101 vs W102)
+  const runnerUp = other(cls(101), cls(102), champion); // finalista que no es campeón
+  const thirdPlace = cls(103);                        // ganador del 3.er puesto
+  // 4.º = perdedor del 103 que no es el classifier(103). Los dos del 103 son
+  // los perdedores de semis: perdedor de cada SF = QF que la alimentan - winner SF.
+  const loserSF1 = other(cls(97), cls(98), cls(101));
+  const loserSF2 = other(cls(99), cls(100), cls(102));
+  const fourth = other(loserSF1, loserSF2, thirdPlace);
+
+  const championIso3 = champion ? (esNameToIso3.get(champion) ?? null) : null;
+  const runnerUpIso3 = runnerUp ? (esNameToIso3.get(runnerUp) ?? null) : null;
+  const thirdPlaceIso3 = thirdPlace ? (esNameToIso3.get(thirdPlace) ?? null) : null;
+  const fourthIso3 = fourth ? (esNameToIso3.get(fourth) ?? null) : null;
 
   // ── PREMIOS ─────────────────────────────────────────────────────────────────
   const awards: AwardPick[] = AWARDS.map((cfg) => ({
@@ -396,8 +423,12 @@ export async function buildReceiptData(
     awards,
     champion,
     championIso3,
+    runnerUp,
+    runnerUpIso3,
     thirdPlace,
     thirdPlaceIso3,
+    fourth,
+    fourthIso3,
     counts: { groups: groups.length, ko: ko.length, awards: awards.filter((a) => a.player).length },
     verificationCode,
     flagsBase: SB_BASE,

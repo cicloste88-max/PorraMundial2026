@@ -26,7 +26,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { readVaultSecret, requireAdminOrCron } from "./auth.ts";
 import { buildReceiptData } from "./build-data.ts";
-import { renderReceiptHtml } from "./render.ts";
+import { renderReceiptBody, renderReceiptHtml } from "./render.ts";
 
 // ─── CORS ──────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set([
@@ -65,7 +65,8 @@ async function sendEmail(
   from: string,
   to: string,
   subject: string,
-  html: string,
+  bodyHtml: string,
+  attachmentHtml: string,
   attachmentName: string,
 ): Promise<string> {
   const res = await fetch("https://api.resend.com/emails", {
@@ -78,10 +79,10 @@ async function sendEmail(
       from,
       to: [to],
       subject,
-      html,
+      html: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
       attachments: [{
         filename: attachmentName,
-        content: base64Encode(new TextEncoder().encode(html)),
+        content: base64Encode(new TextEncoder().encode(attachmentHtml)), // comprobante completo
       }],
     }),
   });
@@ -144,12 +145,13 @@ async function processReceipt(
   if (!cfg.resendKey) {
     return { user_id: userId, status: "failed", error: "resend_key_missing" };
   }
-  const html = renderReceiptHtml(data);
+  const bodyHtml = renderReceiptBody(data);   // cuerpo ejecutivo ligero
+  const fullHtml = renderReceiptHtml(data);   // comprobante completo (adjunto)
   const filename = `comprobante-${slugify(data.leagueName)}-${data.verificationCode}.html`;
   const subject = `Comprobante de tu porra · ${data.leagueName}`;
   let resendId = "";
   try {
-    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, html, filename);
+    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml, fullHtml, filename);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }

@@ -1,9 +1,17 @@
 // render.ts — send-porra-receipt
 //
-// Renderiza el COMPROBANTE (acuse de recibo) a HTML email-safe (estilos inline).
-// El mismo HTML sirve como cuerpo del email y como adjunto .html. NO incluye
-// puntuación (al cierre no se ha jugado nada) ni badge de Boost ×2 (el ×2 es
-// exclusivo de grupos y, además, los boosts quedan fuera de este comprobante).
+// Dos salidas:
+//   renderReceiptBody(d)  → CUERPO ejecutivo ligero del email (~6-8 KB). Entra
+//                           entero en Gmail sin recorte (Gmail corta a ~102 KB).
+//                           Cabecera + nota + resumen de conteos + PODIO (4) +
+//                           PREMIOS (4) + código de verificación + aviso de que
+//                           el detalle va en el adjunto. SIN tablas 72/32.
+//   renderReceiptHtml(d)  → COMPROBANTE completo (chuleta): + 72 grupos + 32 KO.
+//                           Se manda como ADJUNTO .html (abre con el diseño;
+//                           Imprimir → Guardar como PDF en el navegador).
+//
+// NO incluye puntuación (al cierre no se ha jugado nada) ni badge de Boost ×2
+// (boosts fuera de este comprobante).
 
 import type { KoPred, ReceiptData } from "./build-data.ts";
 
@@ -66,6 +74,104 @@ function sectionTitle(emoji: string, text: string): string {
   );
 }
 
+// ─── Bloques compartidos cuerpo/adjunto ────────────────────────────────────
+function headerBlock(d: ReceiptData): string {
+  return (
+    `<div style="background:linear-gradient(135deg,#0a3d62 0%,#c1121f 100%);border-radius:14px 14px 0 0;padding:24px 22px;color:#fff">` +
+    `<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85">Porra Mundial 2026 · Comprobante</div>` +
+    `<div style="font-size:24px;font-weight:800;margin-top:6px">Tus pronósticos quedan registrados</div>` +
+    `<div style="font-size:14px;margin-top:8px;opacity:.95">Liga <b>${esc(d.leagueName)}</b> · ${esc(d.userName)}</div>` +
+    `</div>`
+  );
+}
+
+function disclaimerBlock(): string {
+  return (
+    `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:11px 13px;font-size:13px;color:#9a3412">` +
+    `📋 Esto es un <b>acuse de recibo</b>, no la puntuación. Al cierre todavía no se ha jugado nada: ` +
+    `es la copia íntegra de lo que has pronosticado, para tu tranquilidad y como copia de auditoría.` +
+    `</div>`
+  );
+}
+
+function summaryBlock(d: ReceiptData): string {
+  const generated = fmtMadrid(d.generatedAt);
+  const summary =
+    `${d.groups.length}/72 grupos · ${d.ko.length}/32 fase final · ${d.counts.awards}/4 premios`;
+  return (
+    `<p style="font-size:14px;color:#374151;margin:16px 0 0">` +
+    `Generado el <b>${esc(generated)}</b>. Resumen: <b>${esc(summary)}</b>.` +
+    `</p>`
+  );
+}
+
+function attachmentNotice(d: ReceiptData): string {
+  return (
+    `<div style="margin-top:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:11px 13px;font-size:13px;color:#1e3a8a">` +
+    `📎 El <b>detalle completo</b> (${d.groups.length} partidos de grupos + ${d.ko.length} cruces de fase final, con marcadores y goleadores) ` +
+    `va en el <b>archivo adjunto</b> <code>.html</code>. Ábrelo en el navegador para verlo con el diseño ` +
+    `(Imprimir → Guardar como PDF si quieres un PDF).` +
+    `</div>`
+  );
+}
+
+function auditBlock(d: ReceiptData): string {
+  const generated = fmtMadrid(d.generatedAt);
+  return (
+    `<div style="margin-top:26px;border-top:1px dashed #d1d5db;padding-top:14px">` +
+    `<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Copia de auditoría</div>` +
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;font-size:13px;color:#374151">` +
+    `<tr><td style="padding:3px 0;width:170px;color:#6b7280">Código de verificación</td>` +
+    `<td style="padding:3px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;letter-spacing:.05em">${esc(d.verificationCode)}</td></tr>` +
+    `<tr><td style="padding:3px 0;color:#6b7280">Pronósticos grupos</td><td style="padding:3px 0">${d.groups.length} / 72</td></tr>` +
+    `<tr><td style="padding:3px 0;color:#6b7280">Pronósticos fase final</td><td style="padding:3px 0">${d.ko.length} / 32</td></tr>` +
+    `<tr><td style="padding:3px 0;color:#6b7280">Premios elegidos</td><td style="padding:3px 0">${d.counts.awards} / 4</td></tr>` +
+    `<tr><td style="padding:3px 0;color:#6b7280">Generado</td><td style="padding:3px 0">${esc(generated)}</td></tr>` +
+    `</table>` +
+    `<p style="font-size:12px;color:#9ca3af;margin:10px 0 0">` +
+    `El código de verificación es un hash de tus pronósticos guardados: si no cambian, el código no cambia. ` +
+    `Conserva este correo (y el adjunto) como comprobante.</p>` +
+    `</div>`
+  );
+}
+
+function footerBlock(): string {
+  return (
+    `<div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px">` +
+    `Porra Mundial 2026 · porramundial2026-seven.vercel.app</div>`
+  );
+}
+
+function renderPodium(d: ReceiptData): string {
+  const cell = (emoji: string, label: string, name: string | null, iso3: string | null) =>
+    `<td width="50%" style="padding:14px;text-align:center;vertical-align:top;border:1px solid #f1e9cf">` +
+    `<div style="font-size:24px;line-height:1">${emoji}</div>` +
+    `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:6px 0 4px">${esc(label)}</div>` +
+    `<div style="font-size:15px;font-weight:700">${name ? flagName(d.flagsBase, iso3, name, { bold: true }) : "—"}</div>` +
+    `</td>`;
+  return (
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ` +
+    `style="border-collapse:collapse;border-radius:8px;overflow:hidden;background:#fffdf5">` +
+    `<tr>${cell("🏆", "Campeón", d.champion, d.championIso3)}` +
+    `${cell("🥈", "Subcampeón", d.runnerUp, d.runnerUpIso3)}</tr>` +
+    `<tr>${cell("🥉", "Tercer puesto", d.thirdPlace, d.thirdPlaceIso3)}` +
+    `${cell("4️⃣", "Cuarto puesto", d.fourth, d.fourthIso3)}</tr></table>`
+  );
+}
+
+function renderAwards(d: ReceiptData): string {
+  const rows = d.awards.map((a) =>
+    `<tr><td style="${CELL}"><b>${esc(a.label)}</b> ` +
+    `<span style="color:#9ca3af;font-size:12px">(+${a.pts})</span></td>` +
+    `<td style="${CELL}">${a.player ? esc(a.player) : '<span style="color:#cbd5e1">—</span>'}</td></tr>`
+  ).join("");
+  return (
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ` +
+    `style="border-collapse:collapse;border:1px solid #eef0f3;border-radius:8px;overflow:hidden">` +
+    `<tbody>${rows}</tbody></table>`
+  );
+}
+
 function renderGroups(d: ReceiptData): string {
   if (d.groups.length === 0) {
     return `<p style="color:#6b7280;font-size:14px">Sin pronósticos de grupos.</p>`;
@@ -75,8 +181,7 @@ function renderGroups(d: ReceiptData): string {
   for (const g of d.groups) {
     if (g.group !== currentGroup) {
       currentGroup = g.group;
-      rows +=
-        `<tr><td colspan="3" style="${SUBHEAD}">Grupo ${esc(g.group)}</td></tr>`;
+      rows += `<tr><td colspan="3" style="${SUBHEAD}">Grupo ${esc(g.group)}</td></tr>`;
     }
     const match =
       `${flagName(d.flagsBase, g.homeIso3, g.homeName)} ` +
@@ -110,8 +215,7 @@ function renderKo(d: ReceiptData): string {
   for (const k of d.ko as KoPred[]) {
     if (k.roundLabel !== currentRound) {
       currentRound = k.roundLabel;
-      rows +=
-        `<tr><td colspan="3" style="${SUBHEAD}">${esc(k.roundLabel)}</td></tr>`;
+      rows += `<tr><td colspan="3" style="${SUBHEAD}">${esc(k.roundLabel)}</td></tr>`;
     }
     const advances = k.classifierName
       ? flagName(d.flagsBase, k.classifierIso3, k.classifierName, { bold: true })
@@ -135,39 +239,8 @@ function renderKo(d: ReceiptData): string {
   );
 }
 
-function renderPodium(d: ReceiptData): string {
-  const cell = (emoji: string, label: string, name: string | null, iso3: string | null) =>
-    `<td width="50%" style="padding:14px;text-align:center;vertical-align:top">` +
-    `<div style="font-size:26px;line-height:1">${emoji}</div>` +
-    `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:6px 0 4px">${esc(label)}</div>` +
-    `<div style="font-size:15px;font-weight:700">${name ? flagName(d.flagsBase, iso3, name, { bold: true }) : "—"}</div>` +
-    `</td>`;
-  return (
-    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ` +
-    `style="border-collapse:separate;border:1px solid #eef0f3;border-radius:8px;background:#fffdf5">` +
-    `<tr>${cell("🏆", "Campeón", d.champion, d.championIso3)}` +
-    `${cell("🥉", "Ganador 3.er puesto", d.thirdPlace, d.thirdPlaceIso3)}</tr></table>`
-  );
-}
-
-function renderAwards(d: ReceiptData): string {
-  const rows = d.awards.map((a) =>
-    `<tr><td style="${CELL}"><b>${esc(a.label)}</b> ` +
-    `<span style="color:#9ca3af;font-size:12px">(+${a.pts})</span></td>` +
-    `<td style="${CELL}">${a.player ? esc(a.player) : '<span style="color:#cbd5e1">—</span>'}</td></tr>`
-  ).join("");
-  return (
-    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ` +
-    `style="border-collapse:collapse;border:1px solid #eef0f3;border-radius:8px;overflow:hidden">` +
-    `<tbody>${rows}</tbody></table>`
-  );
-}
-
-export function renderReceiptHtml(d: ReceiptData): string {
-  const generated = fmtMadrid(d.generatedAt);
-  const summary =
-    `${d.groups.length} de 72 grupos · ${d.ko.length} de 32 fase final · ${d.counts.awards} de 4 premios`;
-
+// ─── Documento (shell común) ────────────────────────────────────────────────
+function wrapDoc(d: ReceiptData, inner: string): string {
   return `<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="utf-8">
@@ -176,63 +249,44 @@ export function renderReceiptHtml(d: ReceiptData): string {
 </head>
 <body style="margin:0;padding:0;background:#eef1f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
 <div style="max-width:680px;margin:0 auto;padding:18px 12px">
-
-  <div style="background:linear-gradient(135deg,#0a3d62 0%,#c1121f 100%);border-radius:14px 14px 0 0;padding:24px 22px;color:#fff">
-    <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85">Porra Mundial 2026 · Comprobante</div>
-    <div style="font-size:24px;font-weight:800;margin-top:6px">Tus pronósticos quedan registrados</div>
-    <div style="font-size:14px;margin-top:8px;opacity:.95">
-      Liga <b>${esc(d.leagueName)}</b> · ${esc(d.userName)}
-    </div>
-  </div>
-
+  ${headerBlock(d)}
   <div style="background:#fff;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 14px 14px;padding:20px 22px 26px">
-
-    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:11px 13px;font-size:13px;color:#9a3412">
-      📋 Esto es un <b>acuse de recibo</b>, no la puntuación. Al cierre todavía no se ha jugado nada:
-      es la copia íntegra de lo que has pronosticado, para tu tranquilidad y como copia de auditoría.
-    </div>
-
-    <p style="font-size:14px;color:#374151;margin:16px 0 0">
-      Generado el <b>${esc(generated)}</b>. Resumen: <b>${esc(summary)}</b>.
-    </p>
-
-    ${sectionTitle("⚽", "Fase de grupos")}
-    ${renderGroups(d)}
-
-    ${sectionTitle("🏟️", "Fase final")}
-    ${renderKo(d)}
-
-    ${sectionTitle("🥇", "Podio pronosticado")}
-    ${renderPodium(d)}
-    <p style="font-size:12px;color:#9ca3af;margin:6px 2px 0">
-      Solo se muestran campeón y ganador del 3.<sup>er</sup> puesto: el subcampeón y el 4.º dependen del cruce y no se almacenan.
-    </p>
-
-    ${sectionTitle("🏆", "Premios individuales")}
-    ${renderAwards(d)}
-
-    <div style="margin-top:26px;border-top:1px dashed #d1d5db;padding-top:14px">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Copia de auditoría</div>
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;font-size:13px;color:#374151">
-        <tr><td style="padding:3px 0;width:170px;color:#6b7280">Código de verificación</td>
-            <td style="padding:3px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;letter-spacing:.05em">${esc(d.verificationCode)}</td></tr>
-        <tr><td style="padding:3px 0;color:#6b7280">Pronósticos grupos</td><td style="padding:3px 0">${d.groups.length} / 72</td></tr>
-        <tr><td style="padding:3px 0;color:#6b7280">Pronósticos fase final</td><td style="padding:3px 0">${d.ko.length} / 32</td></tr>
-        <tr><td style="padding:3px 0;color:#6b7280">Premios elegidos</td><td style="padding:3px 0">${d.counts.awards} / 4</td></tr>
-        <tr><td style="padding:3px 0;color:#6b7280">Generado</td><td style="padding:3px 0">${esc(generated)}</td></tr>
-      </table>
-      <p style="font-size:12px;color:#9ca3af;margin:10px 0 0">
-        El código de verificación es un hash de tus pronósticos guardados: si no cambian, el código no cambia.
-        Conserva este correo (y el adjunto) como comprobante.
-      </p>
-    </div>
-
+    ${inner}
   </div>
-
-  <div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px">
-    Porra Mundial 2026 · porramundial2026-seven.vercel.app
-  </div>
-
+  ${footerBlock()}
 </div>
 </body></html>`;
+}
+
+// ─── CUERPO ejecutivo ligero (email body) ──────────────────────────────────
+export function renderReceiptBody(d: ReceiptData): string {
+  const inner = [
+    disclaimerBlock(),
+    summaryBlock(d),
+    attachmentNotice(d),
+    sectionTitle("🥇", "Podio pronosticado"),
+    renderPodium(d),
+    sectionTitle("🏆", "Premios individuales"),
+    renderAwards(d),
+    auditBlock(d),
+  ].join("\n    ");
+  return wrapDoc(d, inner);
+}
+
+// ─── COMPROBANTE completo (adjunto .html) ──────────────────────────────────
+export function renderReceiptHtml(d: ReceiptData): string {
+  const inner = [
+    disclaimerBlock(),
+    summaryBlock(d),
+    sectionTitle("⚽", "Fase de grupos"),
+    renderGroups(d),
+    sectionTitle("🏟️", "Fase final"),
+    renderKo(d),
+    sectionTitle("🥇", "Podio pronosticado"),
+    renderPodium(d),
+    sectionTitle("🏆", "Premios individuales"),
+    renderAwards(d),
+    auditBlock(d),
+  ].join("\n    ");
+  return wrapDoc(d, inner);
 }
