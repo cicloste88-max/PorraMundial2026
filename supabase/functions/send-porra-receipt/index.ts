@@ -1,9 +1,11 @@
 // send-porra-receipt — Acuse de recibo (comprobante) de la porra.
 //
-// Cuando se cierra la porra, envía a cada usuario un email con la copia íntegra
-// de sus pronósticos (chuleta + copia de auditoría). NO es puntuación: al cierre
-// aún no se ha jugado nada. Feature ADITIVA (función + tabla sent_receipts +
-// 1 paso de cron). No toca el motor de puntuación ni el flujo de cierre.
+// Cuando se cierra la porra, envía a cada usuario un email ligero (resumen +
+// podio + premios + código) con un BOTÓN al comprobante completo, que se ALOJA
+// en Supabase Storage (bucket público `receipts`): la chuleta íntegra de sus
+// pronósticos (72 grupos + 32 KO + premios + boosts). NO es puntuación: al
+// cierre aún no se ha jugado nada. Feature ADITIVA (función + tabla
+// sent_receipts + 1 paso de cron). No toca el motor de puntuación ni el cierre.
 //
 // Auth: requireAdminOrCron (./auth.ts) — header X-Cron-Key == Vault IA_CRON_KEY,
 //       o service_role, o JWT admin. verify_jwt=false en deploy (ERR-16).
@@ -21,7 +23,6 @@
 // Idempotencia: UNIQUE(user_id, league_id) en sent_receipts. 2ª llamada → skipped.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { readVaultSecret, requireAdminOrCron } from "./auth.ts";
@@ -45,12 +46,6 @@ function cors(origin: string | null): Record<string, string> {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_FROM = "Porra Mundial 2026 <onboarding@resend.dev>";
 
-function slugify(s: string): string {
-  return String(s || "porra")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "porra";
-}
-
 // deno-lint-ignore no-explicit-any
 function jsonResponse(body: any, status: number, origin: string | null): Response {
   return new Response(JSON.stringify(body), {
@@ -66,8 +61,6 @@ async function sendEmail(
   to: string,
   subject: string,
   bodyHtml: string,
-  attachmentHtml: string,
-  attachmentName: string,
 ): Promise<string> {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -79,11 +72,7 @@ async function sendEmail(
       from,
       to: [to],
       subject,
-      html: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
-      attachments: [{
-        filename: attachmentName,
-        content: base64Encode(new TextEncoder().encode(attachmentHtml)), // comprobante completo
-      }],
+      html: bodyHtml, // cuerpo ligero con botón al comprobante alojado (sin adjunto)
     }),
   });
   if (!res.ok) {
@@ -94,9 +83,45 @@ async function sendEmail(
   return j?.id ?? "";
 }
 
+// ─── Supabase Storage: comprobante alojado ──────────────────────────────────
+// Sube el HTML completo al bucket público `receipts` (PUT REST) y devuelve la
+// URL pública. Las keys sb_secret_ exigen AMBAS cabeceras apikey + Authorization
+// (gotcha conocido). Fail-loud: lanza si la respuesta no es 2xx — el caller NO
+// registra sent_receipts y la EF retorna failed (sin fallback a adjunto).
+//
+// Content-Type = "text/html" SIN "; charset=utf-8": el bucket tiene
+// allowed_mime_types=["text/html"] y storage-api (validateMimeType) compara el
+// subtipo EXACTO contra la cabecera cruda — "html; charset=utf-8" !== "html"
+// daría InvalidMimeType (422) y, fail-loud, abortaría todos los envíos. El
+// charset es irrelevante para el render: el documento ya lleva <meta charset>.
+async function uploadReceipt(
+  supabaseUrl: string,
+  serviceKey: string,
+  filename: string,
+  html: string,
+): Promise<string> {
+  const res = await fetch(`${supabaseUrl}/storage/v1/object/receipts/${filename}`, {
+    method: "PUT",
+    headers: {
+      "apikey": serviceKey,
+      "Authorization": `Bearer ${serviceKey}`,
+      "Content-Type": "text/html",
+      "x-upsert": "true",
+    },
+    body: html,
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`storage_http_${res.status}:${t.slice(0, 240)}`);
+  }
+  return `${supabaseUrl}/storage/v1/object/public/receipts/${filename}`;
+}
+
 interface SendConfig {
   resendKey: string;
   from: string;
+  supabaseUrl: string;
+  serviceKey: string;
 }
 
 interface ProcessResult {
@@ -106,6 +131,7 @@ interface ProcessResult {
   resend_id?: string;
   code?: string;
   error?: string;
+  receipt_url?: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -141,22 +167,34 @@ async function processReceipt(
     return { user_id: userId, status: "failed", error: "no_recipient_email" };
   }
 
-  // 4. Render + envío.
+  // 4. Render del comprobante completo + alojamiento en Storage + envío.
   if (!cfg.resendKey) {
     return { user_id: userId, status: "failed", error: "resend_key_missing" };
   }
-  const bodyHtml = renderReceiptBody(data);   // cuerpo ejecutivo ligero
-  const fullHtml = renderReceiptHtml(data);   // comprobante completo (adjunto)
-  const filename = `comprobante-${slugify(data.leagueName)}-${data.verificationCode}.html`;
+  const fullHtml = renderReceiptHtml(data); // comprobante completo (se aloja)
+
+  // 4a. Subir a Storage. Nombre NO adivinable: code + slice de UUID. Fail-loud:
+  //     si la subida falla NO se envía ni se registra (sin fallback a adjunto).
+  const filename = `${data.verificationCode}-${crypto.randomUUID().slice(0, 8)}.html`;
+  let receiptUrl: string;
+  try {
+    receiptUrl = await uploadReceipt(cfg.supabaseUrl, cfg.serviceKey, filename, fullHtml);
+  } catch (e) {
+    return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
+  }
+  data.receiptUrl = receiptUrl; // el cuerpo lleva el botón → esta URL
+
+  // 4b. Cuerpo ejecutivo ligero (con botón al comprobante) + envío SIN adjunto.
+  const bodyHtml = renderReceiptBody(data);
   const subject = `Comprobante de tu porra · ${data.leagueName}`;
   let resendId = "";
   try {
-    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml, fullHtml, filename);
+    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
 
-  // 5. Registrar el envío (idempotencia + auditoría).
+  // 5. Registrar el envío (idempotencia + auditoría). Guarda receipt_url.
   const { error: insErr } = await supa.from("sent_receipts").insert({
     user_id: userId,
     league_id: leagueId,
@@ -166,6 +204,7 @@ async function processReceipt(
       code: data.verificationCode,
       counts: data.counts,
       override: !!toOverride,
+      receipt_url: receiptUrl,
     },
   });
   if (insErr) {
@@ -179,6 +218,7 @@ async function processReceipt(
     email: recipient,
     resend_id: resendId,
     code: data.verificationCode,
+    receipt_url: receiptUrl,
   };
 }
 
@@ -237,7 +277,7 @@ serve(async (req: Request) => {
     (Deno.env.get("PORRA_FROM_EMAIL") || "").trim() ||
     (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "PORRA_FROM_EMAIL")) ||
     DEFAULT_FROM;
-  const cfg: SendConfig = { resendKey, from };
+  const cfg: SendConfig = { resendKey, from, supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY };
 
   // ── BULK ────────────────────────────────────────────────────────────────
   if (bulk) {

@@ -30,6 +30,12 @@ type SupabaseClient = any;
 export const SB_BASE =
   "https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public";
 
+// Total de JORNADAS del calendario de PARTIDOS del frontend. NO recomputar
+// desde wc_matches.date_utc: daría 18 por la madrugada del 28-jun en Madrid,
+// que en hora de la sede (USA) cae el 27-jun. Si algún día se centraliza, mejor
+// que el front exponga el dato.
+const TOTAL_JORNADAS = 17;
+
 // ─── Slot KO -> ronda ──────────────────────────────────────────────────────
 // Fuente de verdad confirmada contra get-league-standings KO_ROUND_BY_ID y
 // porra-ia-compute BRACKET_KO_ROUNDS (ambos coinciden, espejo de ko.js BRACKET):
@@ -68,6 +74,7 @@ export interface GroupPred {
   v: number | null;
   scorer: string | null; // nombre legible resuelto (o la clave cruda)
   dateUtc: string | null;
+  boosted: boolean; // ⚡ Boost ×2 elegido para este partido (boost_picks)
 }
 
 export interface KoPred {
@@ -106,9 +113,10 @@ export interface ReceiptData {
   thirdPlaceIso3: string | null;
   fourth: string | null;
   fourthIso3: string | null;
-  counts: { groups: number; ko: number; awards: number };
+  counts: { groups: number; ko: number; awards: number; boosts: number; boostsTotal: number };
   verificationCode: string;
   flagsBase: string;
+  receiptUrl?: string; // URL pública del comprobante alojado (lo fija index.ts)
 }
 
 // Catálogo de premios (espejo de AWARDS_CFG en public/js/scoring.js).
@@ -184,6 +192,7 @@ export async function buildReceiptData(
     { data: league, error: lErr },
     { data: wcRows, error: wErr },
     { data: rosterRows, error: rErr },
+    { data: boostRows, error: bErr },
   ] = await Promise.all([
     supa.from("predictions").select("match_id, local, visitante, scorer")
       .eq("user_id", userId).eq("league_id", leagueId),
@@ -195,6 +204,8 @@ export async function buildReceiptData(
     supa.from("leagues").select("nombre").eq("id", leagueId).maybeSingle(),
     supa.from("wc_matches").select("group_letter, home_es, away_es, home_iso3, away_iso3, date_utc"),
     supa.from("equipos_players").select("iso3, players"),
+    supa.from("boost_picks").select("match_id, match_date")
+      .eq("user_id", userId).eq("league_id", leagueId),
   ]);
 
   for (const [err, label] of [
@@ -205,6 +216,7 @@ export async function buildReceiptData(
     [lErr, "leagues"],
     [wErr, "wc_matches"],
     [rErr, "equipos_players"],
+    [bErr, "boost_picks"],
   ] as const) {
     if (err) throw new Error(`query_failed:${label}:${err.message}`);
   }
@@ -227,6 +239,13 @@ export async function buildReceiptData(
   if (rawPreds.length === 0 && rawKo.length === 0 && !hasAwards) {
     return null; // sin nada que reflejar
   }
+
+  // ── Boosts (⚡ ×2) del usuario en esta liga ─────────────────────────────────
+  // boost_picks.match_id comparte keyspace con predictions.match_id
+  // ({grupo}_{home_es}_{away_es}). Cruce directo, sin normalizar.
+  const boostedSet = new Set<string>(
+    (boostRows ?? []).map((b: { match_id: string }) => b.match_id),
+  );
 
   // ── Maps derivados de wc_matches ──────────────────────────────────────────
   // groupFixtures: clave "{grupo}_{nameHome}_{nameAway}" -> {iso3 + names + date}
@@ -329,6 +348,7 @@ export async function buildReceiptData(
       v: p.visitante ?? null,
       scorer: resolveGroupScorer(p.scorer ?? null, homeIso3, awayIso3),
       dateUtc,
+      boosted: boostedSet.has(p.match_id),
     });
   }
   groups.sort((a, b) =>
@@ -429,7 +449,13 @@ export async function buildReceiptData(
     thirdPlaceIso3,
     fourth,
     fourthIso3,
-    counts: { groups: groups.length, ko: ko.length, awards: awards.filter((a) => a.player).length },
+    counts: {
+      groups: groups.length,
+      ko: ko.length,
+      awards: awards.filter((a) => a.player).length,
+      boosts: boostedSet.size,
+      boostsTotal: TOTAL_JORNADAS,
+    },
     verificationCode,
     flagsBase: SB_BASE,
   };
