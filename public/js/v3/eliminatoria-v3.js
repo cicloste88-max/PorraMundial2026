@@ -756,17 +756,78 @@ function v3GetMatchTeamIso3(match, side) {
 }
 window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
 
+// Bloque A.1 — IA Predice on-demand para tarjetas KO.
+// Llama a la EF porra-ia-compute action compute_match (misma que usa ko.js
+// loadKOIAHint) y cachea el resultado en iaPredictions con la clave canónica
+// ondemand_<HOME>_<AWAY>_<snapshot_id>. Devuelve SIEMPRE una promesa que
+// resuelve a la entrada de cache (o null si faltan equipos/sesión o falla la
+// EF: 429, sin red, etc.). Dedup in-flight por par de equipos.
+function v3FetchIAOnDemand(match) {
+  var homeIso3 = v3GetMatchTeamIso3(match, 'home');
+  var awayIso3 = v3GetMatchTeamIso3(match, 'away');
+  if (!homeIso3 || !awayIso3 || homeIso3 === awayIso3) return Promise.resolve(null);
+  // Misma guarda que ko.js loadKOIAHint: sin cliente/sesión la EF rechaza.
+  if (!window._porraDb || !window._porraToken) return Promise.resolve(null);
+  window._iaOndemandInflight = window._iaOndemandInflight || {};
+  var inflightKey = homeIso3 + '_' + awayIso3;
+  if (window._iaOndemandInflight[inflightKey]) return window._iaOndemandInflight[inflightKey];
+  var promise = window._porraDb.functions.invoke('porra-ia-compute', {
+    body: { action: 'compute_match', home: homeIso3, away: awayIso3 },
+  }).then(function (res) {
+    if (!res || res.error) return null;
+    var data = res.data;
+    if (!data || !data.ok || !data.prediction) return null;
+    // A.2 — snapshot_id viene en la respuesta; lo memorizamos para que las
+    // lecturas de cache usen el snapshot activo (no el hardcoded _2).
+    var snapId = data.snapshot_id || window._iaActiveSnapshotId || 2;
+    window._iaActiveSnapshotId = snapId;
+    var entry = {
+      p_home: data.prediction.p_home,
+      p_draw: data.prediction.p_draw,
+      p_away: data.prediction.p_away,
+      sign: data.prediction.sign,
+      quip: data.quip || '',
+    };
+    if (typeof iaPredictions === 'object' && iaPredictions) {
+      iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId] = entry;
+      window.iaPredictions = iaPredictions;
+    }
+    return entry;
+  }).catch(function (e) {
+    console.warn('[IA on-demand] fetch error:', e && e.message ? e.message : e);
+    return null;
+  }).finally(function () {
+    delete window._iaOndemandInflight[inflightKey];
+  });
+  window._iaOndemandInflight[inflightKey] = promise;
+  return promise;
+}
+window.v3FetchIAOnDemand = v3FetchIAOnDemand;
+
+// Inner HTML del estado "vacío" del bloque IA (cabecera label + cuerpo).
+// loading=true → spinner "Calculando predicción IA…"; false → placeholder
+// "— Datos IA pendientes —". Reutilizado por el render inicial y por el
+// reemplazo post-fetch on-demand (A.1).
+function _v3IAEmptyInner(loading) {
+  var body = loading
+    ? '<div class="v3-zoom-ia__empty v3-zoom-ia__empty--loading"><span class="v3-zoom-ia__spinner" aria-hidden="true"></span>Calculando predicción IA…</div>'
+    : '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>';
+  return '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+    + '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+    + '</div>' + body;
+}
+
 // Polish v1 Fix-3: acepta string key (grupos: "A_México_Sudáfrica") o
-// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_2" desde
-// slots resueltos). BD ia_predictions.match_id formato confirmado:
-// 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
-// probamos ambos órdenes.
+// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_<snap>" desde
+// slots resueltos). Para KO sin entrada cacheada dispara compute_match
+// on-demand (A.1). No hay simetría garantizada, probamos ambos órdenes.
 function v3RenderIABlock(matchKeyOrMatch) {
   // F-05 (round 3): NO devolver '' aunque iaPredictions no esté disponible.
   // Renderizar siempre al menos la cabecera label + '?' para que el tooltip
   // explicativo esté accesible en TODAS las cards (grupos + KO QF/SF/F).
   var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
   var pred = null;
+  var koFetchMatch = null; // A.1: match KO elegible para compute_match on-demand
 
   if (typeof matchKeyOrMatch === 'string') {
     pred = iaMap[matchKeyOrMatch];
@@ -778,8 +839,15 @@ function v3RenderIABlock(matchKeyOrMatch) {
       var homeIso3 = v3GetMatchTeamIso3(match, 'home');
       var awayIso3 = v3GetMatchTeamIso3(match, 'away');
       if (homeIso3 && awayIso3) {
-        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+        // A.2 — sufijo snapshot_id dinámico (antes hardcoded _2). Se prueba el
+        // snapshot activo memorizado y se mantiene _2 como fallback de compat
+        // con el cache ya poblado en BD (snapshot id=2).
+        var snapId = window._iaActiveSnapshotId || 2;
+        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId]
+            || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_' + snapId]
+            || iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
             || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+        koFetchMatch = match; // ambos equipos resueltos → elegible on-demand
       }
     }
   }
@@ -788,11 +856,27 @@ function v3RenderIABlock(matchKeyOrMatch) {
   // label + botón "?" (tooltip generico de cómo funciona la IA). El bloque
   // de probabilidades queda oculto hasta que llegue la data.
   if (!pred || pred.p_home == null || pred.p_away == null) {
+    // A.1 — KO con ambos equipos resueltos: dispara compute_match on-demand
+    // (fire-and-forget) y muestra spinner. Al resolver, reemplaza el nodo
+    // [data-v3-ia-block] del DOM con las barras de probabilidad (re-render) o,
+    // si falla (429/sin sesión), con el placeholder "Datos IA pendientes".
+    if (koFetchMatch) {
+      var mid = koFetchMatch.id;
+      v3FetchIAOnDemand(koFetchMatch).then(function (result) {
+        var node = document.querySelector('[data-v3-ia-block][data-match-id="' + mid + '"]');
+        if (!node) return;
+        if (result && result.p_home != null && result.p_away != null) {
+          node.outerHTML = v3RenderIABlock(koFetchMatch);
+        } else {
+          node.innerHTML = _v3IAEmptyInner(false);
+        }
+      });
+      return '<div data-v3-ia-block data-match-id="' + mid + '" class="v3-zoom-ia v3-zoom-ia--empty">'
+        + _v3IAEmptyInner(true)
+        + '</div>';
+    }
     return '<div class="v3-zoom-ia v3-zoom-ia--empty">'
-      + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
-      +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
-      + '</div>'
-      + '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>'
+      + _v3IAEmptyInner(false)
       + '</div>';
   }
 

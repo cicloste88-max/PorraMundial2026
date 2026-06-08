@@ -60,6 +60,10 @@ async function loadIAPredictions() {
     const { data: snap } = await db.from('ia_snapshots')
       .select('id').eq('is_active', true).maybeSingle();
     if (!snap?.id) return {};
+    // A.2 — exponer el snapshot activo para que los lookups KO on-demand
+    // (v3RenderIABlock / v3FetchIAOnDemand) usen el sufijo correcto y no el
+    // hardcoded _2. Mata la bomba de tiempo cuando se cree un snapshot nuevo.
+    try { window._iaActiveSnapshotId = snap.id; } catch (_) {}
     const [{ data: preds }, matchesJson] = await Promise.all([
       db.from('ia_predictions')
         .select('match_id, sign, confidence, breakdown, used_fallback')
