@@ -206,6 +206,10 @@ function v3RenderBoard() {
   if (typeof resolveAllSlots === 'function') {
     try { resolveAllSlots(); } catch (e) { console.warn('HF-08 resolveAllSlots:', e); }
   }
+  // A.3 — slots ya propagados: calienta la IA de los cruces KO recién resueltos
+  // (background, throttled). saveKO() solo persiste; la propagación W/L ocurre
+  // aquí en resolveAllSlots, por eso el hook va en el render del board.
+  if (typeof v3PrecomputeResolvedKO === 'function') v3PrecomputeResolvedKO();
   var board = document.getElementById('v3-bracket-board');
   if (!board) return;
   board.innerHTML = '';
@@ -803,6 +807,53 @@ function v3FetchIAOnDemand(match) {
   return promise;
 }
 window.v3FetchIAOnDemand = v3FetchIAOnDemand;
+
+// A.3 — precompute proactivo. Tras recalcular el bracket (resolveAllSlots en
+// v3RenderBoard) calienta la IA de los cruces KO ya resueltos que aún no están
+// en cache cliente. Throttle a 3 fetches simultáneos (rate-limit 30/min/user).
+// dedup in-flight + cache hacen que las re-ejecuciones sean baratas (no
+// re-disparan lo ya hecho). Pre-auth es no-op.
+function v3PrecomputeResolvedKO() {
+  if (typeof BRACKET === 'undefined' || !BRACKET) return;
+  if (!window._porraDb || !window._porraToken) return;
+  var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
+  var snapId = window._iaActiveSnapshotId || 2;
+  var inflight = window._iaOndemandInflight || {};
+  var allKO = [].concat(
+    BRACKET.r32 || [], BRACKET.r16 || [], BRACKET.qf || [],
+    BRACKET.sf || [], BRACKET.third || [], BRACKET.final || []
+  );
+  var queue = [];
+  allKO.forEach(function (match) {
+    var h = v3GetMatchTeamIso3(match, 'home');
+    var a = v3GetMatchTeamIso3(match, 'away');
+    if (!h || !a || h === a) return; // slot aún sin resolver
+    // ¿ya cacheado? (mismo lookup que v3RenderIABlock: ambos órdenes + _2)
+    var cached = iaMap['ondemand_' + h + '_' + a + '_' + snapId]
+              || iaMap['ondemand_' + a + '_' + h + '_' + snapId]
+              || iaMap['ondemand_' + h + '_' + a + '_2']
+              || iaMap['ondemand_' + a + '_' + h + '_2'];
+    if (cached && cached.p_home != null && cached.p_away != null) return;
+    if (inflight[h + '_' + a] || inflight[a + '_' + h]) return; // ya en vuelo
+    queue.push(match);
+  });
+  if (!queue.length) return;
+  // Cola con concurrencia máx 3 (ventana deslizante).
+  var MAX = 3, idx = 0;
+  function pump() {
+    if (idx >= queue.length) return;
+    var match = queue[idx++];
+    v3FetchIAOnDemand(match).then(function (result) {
+      // Si la tarjeta de ese match quedó abierta, refrescar su bloque IA.
+      if (result && result.p_home != null && result.p_away != null) {
+        var node = document.querySelector('[data-v3-ia-block][data-match-id="' + match.id + '"]');
+        if (node) node.outerHTML = v3RenderIABlock(match);
+      }
+    }).finally(function () { pump(); });
+  }
+  for (var k = 0; k < Math.min(MAX, queue.length); k++) pump();
+}
+window.v3PrecomputeResolvedKO = v3PrecomputeResolvedKO;
 
 // Inner HTML del estado "vacío" del bloque IA (cabecera label + cuerpo).
 // loading=true → spinner "Calculando predicción IA…"; false → placeholder
