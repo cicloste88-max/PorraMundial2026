@@ -43,7 +43,7 @@ function cors(origin: string | null): Record<string, string> {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_FROM = "Porra Mundial 2026 <onboarding@resend.dev>";
+const DEFAULT_FROM = "Porra Mundial 2026 <adminmundialapp@gmail.com>";
 
 function slugify(s: string): string {
   return String(s || "porra")
@@ -59,9 +59,21 @@ function jsonResponse(body: any, status: number, origin: string | null): Respons
   });
 }
 
-// ─── Resend ──────────────────────────────────────────────────────────────────
+// ─── Brevo ───────────────────────────────────────────────────────────────────
+// Parsea "Nombre <email>" → { name, email }. El email DEBE ser un remitente
+// verificado en Brevo (adminmundialapp@gmail.com). Fallback si no hay <…>.
+function parseSender(from: string): { name: string; email: string } {
+  const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m && m[2]) {
+    return { name: (m[1] || "").trim() || "Porra Mundial 2026", email: m[2].trim() };
+  }
+  const bare = from.trim();
+  if (bare.includes("@")) return { name: "Porra Mundial 2026", email: bare };
+  return { name: "Porra Mundial 2026", email: "adminmundialapp@gmail.com" };
+}
+
 async function sendEmail(
-  resendKey: string,
+  apiKey: string,
   from: string,
   to: string,
   subject: string,
@@ -69,29 +81,31 @@ async function sendEmail(
   attachmentHtml: string,
   attachmentName: string,
 ): Promise<string> {
-  const res = await fetch("https://api.resend.com/emails", {
+  const sender = parseSender(from);
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
+      "api-key": apiKey,
+      "accept": "application/json",
+      "content-type": "application/json",
     },
     body: JSON.stringify({
-      from,
-      to: [to],
+      sender,
+      to: [{ email: to }],
       subject,
-      html: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
-      attachments: [{
-        filename: attachmentName,
-        content: base64Encode(new TextEncoder().encode(attachmentHtml)), // comprobante completo
+      htmlContent: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
+      attachment: [{
+        name: attachmentName,
+        content: base64Encode(new TextEncoder().encode(attachmentHtml)), // comprobante completo (base64 puro)
       }],
     }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`resend_http_${res.status}:${t.slice(0, 240)}`);
+    throw new Error(`brevo_http_${res.status}:${t.slice(0, 240)}`);
   }
   const j = await res.json().catch(() => ({}));
-  return j?.id ?? "";
+  return j?.messageId ?? "";
 }
 
 interface SendConfig {
@@ -228,10 +242,12 @@ serve(async (req: Request) => {
     toOverride = candidate; // honrado: la request ya pasó requireAdminOrCron
   }
 
-  // ── Config Resend (env → Vault → fallback from) ──────────────────────────
+  // ── Config Brevo (env → Vault → fallback from) ───────────────────────────
+  // (la variable conserva el nombre resendKey: solo es la api-key del proveedor;
+  //  se mantiene el contrato de SendConfig/processReceipt sin tocarlos.)
   const resendKey =
-    (Deno.env.get("RESEND_API_KEY") || "").trim() ||
-    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "RESEND_API_KEY")) ||
+    (Deno.env.get("BREVO_API_KEY") || "").trim() ||
+    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "BREVO_API_KEY")) ||
     "";
   const from =
     (Deno.env.get("PORRA_FROM_EMAIL") || "").trim() ||
