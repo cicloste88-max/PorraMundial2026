@@ -109,7 +109,7 @@ ERR-01..82: detalle completo en `errores_conocidos_porra.md`. **Consultar antes 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
 - `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..50 (síntoma/causa/fix/patrón).
-- `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs redesign v3: 15 match-card features (IA tooltip, CEST, Pizarra long-press, EN VIVO, stadium, boost, awards, etc.) + **9 puntos integración v3↔legacy I1-I9** (routing, scope shell, state global, cierre porra, EN VIVO, IA wiring, Boost UX, Pizarra entry, CSS cascada) + **Backlog F3** con HF-08 detallado 5 bloques A-E. Generado F2.8.2, ampliado F2.9 HF-cierre (15 may). NO implementado — referencia para F3 wiring.
+- `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — referencia para F3 wiring.
 
 ## End-of-session protocol
 

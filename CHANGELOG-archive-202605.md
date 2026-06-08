@@ -1078,3 +1078,61 @@ con el bracket KO. 6 PRs squash a main, todos solo frontend (sin DDL).
 **Bugs/errores nuevos**: ERR-76 — "Vistas de competición real NO leen `resolvedSlots`" (catalogado tras el hotfix #119).
 
 **Stats**: 6 PRs squash, 6 ficheros tocados (`auth.js`, `ui-groups.js`, `jornada-v3.css`). Sin migraciones SQL. Sin tocar `vercel.json`, Pizarra, Grupos v3, Fase Final, Predictor.
+
+<!-- Movido 2026-06-08: entrada 31-may globo roster name_en, desde CHANGELOG.md para mantener <30KB -->
+
+## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
+
+**Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
+Czech Republic, Ivory Coast, Korea o Turkey abría el modal con el mensaje
+"Datos de plantilla aún no disponibles para esta selección" pese a que la
+tabla `squads` tiene los jugadores (CPV 26 · CZE 30 · CIV 26 · KOR 26;
+TUR 0 — ver pendiente separado). Las otras 43 selecciones funcionaban.
+Detectado por Claude.ai vía MCP + Chrome en sesión paralela.
+
+**Causa:** `renderPanelPais` (`public/js/ui-globo-equipos.js:313`) derivaba
+`iso3` con match estricto `EQUIPOS.find(t => t.name_en === nameEn)`. El 3er
+argumento `nameEn` que llega al panel es la key WIKI canónica (resuelta por
+`getWikiKey()`), que para 5 selecciones diverge del `EQUIPOS.name_en`:
+Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic · Côte d'Ivoire ≠ Ivory
+Coast · South Korea ≠ Korea · Türkiye ≠ Turkey. Sin match → `iso3=''` → el
+botón `.fc-globo-detail__btn-roster` recibía `data-iso3=""` → `openRosterScreen`
+cortaba en `if (!iso3)` con `console.warn('[roster] iso3 vacío')` y nunca
+consultaba `squads`.
+
+**Fix (2 commits sobre la rama `fix/globo-roster-iso3-naming`):**
+
+- **Commit 1 (`f92c1af`)** — cascada NFD tolerante (`name_en`/`name`/`slug` ×
+  `nameEn`/`nombrePais`). QA en preview Vercel reveló que arreglaba solo 3/5:
+  con un GeoJSON donde `feat.properties.NAME` ya devuelve la WIKI key directa
+  (p.ej. `NAME="Czech Republic"`, `NAME="Ivory Coast"`), tanto `nameEn` como
+  `nombrePais` llegaban iguales y ningún campo de EQUIPOS contenía esas
+  cadenas (`name_en="Czechia"`/`slug="czech"`; `name_en="Côte d'Ivoire"`/`slug="ivory-coast"`).
+  Cape Verde / Korea / Turkey casaban porque EQUIPOS.name (es) o slug coincide
+  con la WIKI key; Czech Republic e Ivory Coast no.
+
+- **Commit 2 (este)** — diseño defensivo en 2 capas:
+  1. **Vía principal**: mapa explícito `WIKIKEY_TO_ISO3` con las 5 divergencias
+     conocidas (`Cape Verde`→`CPV`, `Czech Republic`→`CZE`, `Ivory Coast`→`CIV`,
+     `Korea`→`KOR`, `Turkey`→`TUR`). Conjunto cerrado y conocido — garantiza
+     5/5 independientemente de variaciones futuras en NE / `_norm`.
+  2. **Vía fallback**: cascada NFD con `_norm` mejorado que ahora también
+     colapsa separadores (`/[\s\-_'.]/g`). Step 0 preserva exact-match.
+     Blinda contra slugs con guiones (`ivory-coast` ↔ `ivorycoast`) y casos
+     similares futuros.
+
+**Verificación:** script standalone parseando EQUIPOS REAL de `data.js`
+(no datos asumidos) — 15/15 escenarios para las 5 divergentes (worst-case
+`nameEn === nombrePais` + polygon-path + flag-button-path) + round-trip
+48/48 con `EQUIPOS.name_en` raw + round-trip 48/48 simulando `getWikiKey()`.
+Cero regresiones. Cero cambios en BBDD, EF u otros ficheros.
+
+**Hallazgo independiente (no incluido en este PR):** `squads` para TUR
+(ISO3=TUR) tiene 0 jugadores; las otras 4 tienen pleno (CPV 26 · CZE 30 ·
+CIV 26 · KOR 26). Aunque el iso3 de Turquía ya quede bien resuelto, su
+modal saldrá vacío por falta de datos. Es problema del sync de plantillas
+(`scripts/sync-squads.mjs` + workflow), no del front. Anotado en
+`errores_conocidos_porra.md` ERR-77 como pendiente separado.
+
+**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`). Rama
+`fix/globo-roster-iso3-naming` (PR #124). Nuevo ERR-77 (revisado).
