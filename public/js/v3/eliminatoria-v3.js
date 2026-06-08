@@ -893,11 +893,27 @@ function v3RenderIABlock(matchKeyOrMatch) {
         // A.2 — sufijo snapshot_id dinámico (antes hardcoded _2). Se prueba el
         // snapshot activo memorizado y se mantiene _2 como fallback de compat
         // con el cache ya poblado en BD (snapshot id=2).
+        // A.1-bis — separar orden directo (HOME_AWAY del bracket) del inverso
+        // (AWAY_HOME). ko.js loadKOIAHint puede poblar el cache con orden
+        // distinto al del partido (p.ej. ondemand_HAI_GER para GER vs HAI).
+        // Si solo existe el inverso, swappear p_home↔p_away y sign 1↔2 para
+        // alinearlo con el orden de la card (draw=X y quip se preservan).
         var snapId = window._iaActiveSnapshotId || 2;
-        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId]
-            || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_' + snapId]
-            || iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+        var predDirect = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId]
+            || iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2'];
+        var predInverse = iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_' + snapId]
             || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+        if (predDirect) {
+          pred = predDirect;
+        } else if (predInverse) {
+          pred = Object.assign({}, predInverse, {
+            p_home: predInverse.p_away,
+            p_away: predInverse.p_home,
+            sign: predInverse.sign === '1' ? '2'
+                : predInverse.sign === '2' ? '1'
+                : predInverse.sign
+          });
+        }
         koFetchMatch = match; // ambos equipos resueltos → elegible on-demand
       }
     }
