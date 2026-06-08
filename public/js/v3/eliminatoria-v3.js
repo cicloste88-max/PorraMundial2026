@@ -1253,6 +1253,19 @@ async function v3FinalizarPorra() {
   // jornada de grupos con el MISMO calendario que usa el front (PARTIDOS),
   // igual que el cierre legacy en close-porra.js. No basta count>=N: exige 1
   // boost por jornada (evita 2 en un día y 0 en otro).
+
+  // Pre-flight de sincronización: garantiza que boost_picks esté al día
+  // antes de validar. loadBoostPicks() ya incorpora la auto-migración
+  // one-shot localStorage→DB del PR #139 (commit 4700d2e), así que esto
+  // cubre el escenario "usuario que no había recargado la app tras el
+  // fix y tiene boosts atrapados en localStorage". Idempotente y silencioso
+  // si ya está sincronizado. Si falla, el gate sigue y lo detecta abajo.
+  try {
+    if (typeof loadBoostPicks === 'function') await loadBoostPicks();
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] pre-flight loadBoostPicks fallo (sigue):', e && e.message);
+  }
+
   try {
     var responses = await Promise.all([
       db.from('predictions').select('*', { count: 'exact', head: true })
