@@ -252,7 +252,7 @@ async function saveBoostPicks() {
 
   // 2. Sincronizar con Supabase (upsert por usuario/liga/día)
   try {
-    const db = window._porraDb;
+    const db = (typeof getQueryDb === 'function') ? getQueryDb() : window._porraDb;
     const uid = window.currentUser?.id;
     const leagueId = window.getActiveLeagueId?.();
     if (!db || !uid || !leagueId) return;
@@ -279,27 +279,38 @@ async function loadBoostPicks() {
     boostPicks = raw ? JSON.parse(raw) : {};
   } catch(e) { boostPicks = {}; }
 
-  // 2. Sobreescribir con datos de Supabase (fuente de verdad)
+  // 2. Sobreescribir/migrar contra Supabase (fuente de verdad)
   try {
-    const db = window._porraDb;
+    const db = (typeof getQueryDb === 'function') ? getQueryDb() : window._porraDb;
     const uid = window.currentUser?.id;
     const leagueId = window.getActiveLeagueId?.();
     if (!db || !uid || !leagueId) return;
 
-    const { data } = await db
+    const { data, error } = await db
       .from('boost_picks')
       .select('match_date, match_id')
       .eq('user_id', uid)
       .eq('league_id', leagueId);
 
+    if (error) {
+      console.warn('[loadBoostPicks] Supabase error:', error.message);
+      return;
+    }
+
     if (data && data.length > 0) {
+      // Camino normal: DB es la fuente de verdad
       boostPicks = {};
       data.forEach(row => { boostPicks[row.match_date] = row.match_id; });
-      // Actualizar caché local
       try {
         const key = 'boostPicks_' + (window._currentLeagueId || 'default');
         localStorage.setItem(key, JSON.stringify(boostPicks));
       } catch(e) {}
+    } else if (Object.keys(boostPicks).length > 0) {
+      // Recuperación one-shot: DB vacía + localStorage con boosts
+      // (resaca del bug del cliente AUTH). Subir y dejar que el próximo
+      // load entre por la rama normal. Idempotente.
+      console.log('[loadBoostPicks] DB vacía + local con', Object.keys(boostPicks).length, 'boosts → migrando');
+      await saveBoostPicks();
     }
   } catch(e) {
     console.warn('[loadBoostPicks] Supabase error:', e.message);
