@@ -821,6 +821,16 @@
   color: var(--fifa-gold);
 }
 
+/* Bloque D — variantes final (104) y 3er puesto (103). No avanzan a ronda. */
+.v3-zoom-ko-summary--final {
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, .12), transparent);
+  color: var(--fifa-gold, gold);
+}
+.v3-zoom-ko-summary--third {
+  background: linear-gradient(90deg, transparent, rgba(205, 127, 50, .12), transparent);
+  color: #cd7f32;
+}
+
 /* Pizarra button */
 .v3-pizarra-btn {
   background: transparent;

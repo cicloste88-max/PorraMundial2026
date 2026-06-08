@@ -1033,9 +1033,29 @@ function v3RenderZoomKO() {
     </div>
   ` : '';
 
-  var summaryHtml = decided
-    ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong></div>`
-    : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
+  // Bloque D — match 103 (3er/4º puesto) y 104 (final) NO avanzan a ninguna
+  // ronda: no aplica "Pasa:". Resolvemos ganador/perdedor y etiquetamos según
+  // el match. El resto (73-102) mantiene "Pasa: <ganador>".
+  var winnerLabel, loserLabel;
+  if (decided) {
+    var winnerSide = v3ResolveWinner(pred, match.home, match.away);
+    winnerLabel = winnerSide === 'home' ? homeLabel : awayLabel;
+    loserLabel  = winnerSide === 'home' ? awayLabel : homeLabel;
+  }
+  var summaryHtml;
+  if (match.id === 104) {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary v3-zoom-ko-summary--final">🏆 Campeón: <strong>${winnerLabel}</strong> · Subcampeón: ${loserLabel}</div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica el campeón' : 'Introduce el marcador final'}</div>`;
+  } else if (match.id === 103) {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary v3-zoom-ko-summary--third">🥉 3er puesto: <strong>${winnerLabel}</strong> · 4º puesto: ${loserLabel}</div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica quién gana el 3er puesto' : 'Introduce el marcador final'}</div>`;
+  } else {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${winnerLabel}</strong></div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
+  }
 
   // F1 — picker goleador KO. Lookup nombre del jugador desde EQUIPOS resueltos
   // + fallback en window._scorerCandidatesCache (poblado al abrir el picker
