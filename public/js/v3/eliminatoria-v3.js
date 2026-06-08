@@ -968,6 +968,28 @@ function v3RenderIABlock(matchKeyOrMatch) {
 }
 window.v3RenderIABlock = v3RenderIABlock;
 
+// Bloque B — etiqueta de goleador normalizada a "<dorsal> · <Nombre>".
+// Robusta a las dos fuentes de datos del repo:
+//  - EQUIPOS[].players (data.js): dorsal EMBEBIDO en name ("9 · Raúl Jiménez"),
+//    sin campo dorsal.
+//  - getScorerCandidates / get-squad (BD): name limpio + campo dorsal numérico,
+//    con 999 como CENTINELA de "sin dorsal" (scoring.js).
+// Sin dorsal resoluble → solo nombre (nunca "null · X" ni "999 · X").
+function v3FormatGoleadorLabel(found, fallbackKey) {
+  if (!found) return fallbackKey != null ? String(fallbackKey) : '';
+  var rawName = String(found.name || found.nombre || fallbackKey || '');
+  var embedded = rawName.match(/^(\d{1,2})\s*[·.]\s*/);
+  var cleanName = rawName.replace(/^\d{1,2}\s*[·.]\s*/, '').trim();
+  var dorsal = found.dorsal;
+  // Centinela 999 o ausente → intenta recuperar el dorsal embebido en el nombre.
+  if ((dorsal == null || +dorsal === 999) && embedded) dorsal = embedded[1];
+  if (dorsal != null && Number.isFinite(+dorsal) && +dorsal > 0 && +dorsal !== 999) {
+    return dorsal + ' · ' + cleanName;
+  }
+  return cleanName || (fallbackKey != null ? String(fallbackKey) : '');
+}
+window.v3FormatGoleadorLabel = v3FormatGoleadorLabel;
+
 function v3RenderZoomKO() {
   var match = v3CurrentMatch;
   var meta = v3CurrentRoundObj;
@@ -1036,7 +1058,7 @@ function v3RenderZoomKO() {
            || (Array.isArray(cacheA) && cacheA.find(function (p) { return p.key === scorerKey; }))
            || null;
     }
-    scorerName = found ? found.name : scorerKey;
+    scorerName = v3FormatGoleadorLabel(found, scorerKey);
   }
   var goleadorHtml = `
     <div class="v3-zoom-ko-goleador">
