@@ -1461,9 +1461,9 @@ async function v3FinalizarPorra() {
 
   try {
     var responses = await Promise.all([
-      db.from('predictions').select('*', { count: 'exact', head: true })
+      db.from('predictions').select('match_id, local, visitante, scorer', { count: 'exact' })
         .eq('user_id', currentUser.id).eq('league_id', leagueId),
-      db.from('ko_predictions').select('*', { count: 'exact', head: true })
+      db.from('ko_predictions').select('match_id, local, visitante, classifier, scorer', { count: 'exact' })
         .eq('user_id', currentUser.id).eq('league_id', leagueId),
       db.from('award_picks').select('golden_ball,golden_boot,golden_glove,young_player')
         .eq('user_id', currentUser.id).eq('league_id', leagueId).maybeSingle(),
@@ -1472,6 +1472,8 @@ async function v3FinalizarPorra() {
     ]);
     var gF = responses[0].count || 0;
     var kF = responses[1].count || 0;
+    var gRows = responses[0].data || [];   // grupos: { match_id, local, visitante, scorer }
+    var kRows = responses[1].data || [];   // KO: { match_id, local, visitante, classifier, scorer }
     var aD = responses[2].data;
     var aF = (aD && aD.golden_ball && aD.golden_boot && aD.golden_glove && aD.young_player) ? 4 : 0;
 
@@ -1535,6 +1537,68 @@ async function v3FinalizarPorra() {
       alert('Aún no puedes cerrar la porra.\n\nFalta:\n• ' + missing.join('\n• '));
       return;
     }
+
+    // ── Gate de goleadores + ganador KO (ampliación cierre) ──
+    // Reglas (acordadas con San):
+    //  · predictions (grupos): si (local>0 || visitante>0) exige scorer.
+    //    Empate 0-0 NO exige goleador.
+    //  · ko_predictions: marcador relleno SIEMPRE (defensivo); si es empate
+    //    (local==visitante) exige classifier (ganador por penaltis); si el
+    //    marcador es decisivo el ganador se DEDUCE del marcador y classifier
+    //    puede ser null (un 2-1 guarda classifier=null — ver saveKO/ERR).
+    //    Si (local>0 || visitante>0) exige scorer (0-0 a penaltis no).
+    // Validado contra datos reales (cicloste88/Biwenger): 1 empate-sin-
+    // classifier + 26 KO-con-goles-sin-goleador.
+    var _ne = function (s) { return s !== null && s !== undefined && String(s).trim() !== ''; };
+
+    var gruposScorerGaps = [];   // claves match_id de grupos con goles sin goleador
+    gRows.forEach(function (r) {
+      var l = Number(r.local), v = Number(r.visitante);
+      if (((l > 0) || (v > 0)) && !_ne(r.scorer)) gruposScorerGaps.push(r.match_id);
+    });
+
+    var koNoScore = [];          // KO sin marcador (defensivo; saveKO no debería dejarlos)
+    var koNoClassifier = [];     // KO empatado sin ganador por penaltis
+    var koScorerGaps = [];       // KO con goles sin goleador
+    kRows.forEach(function (r) {
+      if (r.local === null || r.local === undefined ||
+          r.visitante === null || r.visitante === undefined) {
+        koNoScore.push(r.match_id);
+        return;
+      }
+      var l = Number(r.local), v = Number(r.visitante);
+      if (l === v && !_ne(r.classifier)) koNoClassifier.push(r.match_id);
+      if (((l > 0) || (v > 0)) && !_ne(r.scorer)) koScorerGaps.push(r.match_id);
+    });
+
+    var totalGaps = gruposScorerGaps.length + koNoScore.length +
+                    koNoClassifier.length + koScorerGaps.length;
+    if (totalGaps > 0) {
+      var gapLines = [];
+      if (gruposScorerGaps.length) {
+        gapLines.push('• Te falta' + (gruposScorerGaps.length === 1 ? '' : 'n') + ' ' +
+          gruposScorerGaps.length + ' goleador' + (gruposScorerGaps.length === 1 ? '' : 'es') +
+          ' en partidos de grupos.');
+      }
+      if (koScorerGaps.length) {
+        gapLines.push('• Te falta' + (koScorerGaps.length === 1 ? '' : 'n') + ' ' +
+          koScorerGaps.length + ' goleador' + (koScorerGaps.length === 1 ? '' : 'es') +
+          ' en eliminatorias.');
+      }
+      if (koNoClassifier.length) {
+        gapLines.push('• Tienes ' + koNoClassifier.length + ' empate' +
+          (koNoClassifier.length === 1 ? '' : 's') +
+          ' en eliminatorias sin elegir ganador por penaltis.');
+      }
+      if (koNoScore.length) {
+        gapLines.push('• Tienes ' + koNoScore.length + ' eliminatoria' +
+          (koNoScore.length === 1 ? '' : 's') + ' sin marcador.');
+      }
+      alert('Aún no puedes cerrar la porra.\n\n' + gapLines.join('\n') +
+            '\n\nTe llevo al primero que falta.');
+      _v3CerrarScrollToFirstGap(gruposScorerGaps, koNoScore, koNoClassifier, koScorerGaps);
+      return;
+    }
   } catch (e) {
     console.error('[v3FinalizarPorra] check error:', e);
     alert('Error verificando pronósticos. Reintenta.');
@@ -1547,21 +1611,152 @@ async function v3FinalizarPorra() {
     'Pulsa Aceptar para confirmar.'
   )) return;
 
+  // ── Cierre verificado (parte B) ──
+  // El UPDATE debe CONFIRMAR 1 fila actualizada antes de declarar "cerrado".
+  // `db.from(...)` enruta por getQueryDb() (cliente JWT authenticated), así que
+  // un 0-filas aquí suele ser RLS silencioso o token caducado (la policy
+  // lm_update exige `porra_cerrada=false` en USING + ownership). `.select()`
+  // fuerza a PostgREST a devolver las filas afectadas para poder contarlas.
+  var updRes;
   try {
-    var result = await db.from('league_members')
+    updRes = await db.from('league_members')
       .update({ porra_cerrada: true, cerrada_at: new Date().toISOString() })
-      .eq('user_id', currentUser.id).eq('league_id', leagueId);
-    if (result.error) console.warn('[v3FinalizarPorra] update warning:', result.error);
+      .eq('user_id', currentUser.id).eq('league_id', leagueId)
+      .select('user_id, porra_cerrada');
   } catch (e) {
-    console.warn('[v3FinalizarPorra] update exception:', e);
+    console.error('[v3FinalizarPorra] update exception:', e);
+    alert('No se ha podido cerrar: ' + ((e && e.message) || 'error de red') +
+          '. Inténtalo otra vez o avisa al admin.');
+    return;
   }
 
-  // Marcar cerrada y refrescar UI independiente del resultado del UPDATE.
+  if (updRes.error) {
+    console.error('[v3FinalizarPorra] update error:', updRes.error);
+    alert('No se ha podido cerrar: ' + (updRes.error.message || 'error desconocido') +
+          '. Inténtalo otra vez o avisa al admin.');
+    return;
+  }
+
+  var updatedRows = updRes.data || [];
+  if (updatedRows.length !== 1) {
+    // 0 filas (o >1) = la BD no confirmó el cierre. Fallo silencioso típico de
+    // RLS: tratar como error, NO mostrar OK, NO setear flag local.
+    console.error('[v3FinalizarPorra] update afectó', updatedRows.length,
+      'fila(s), esperaba 1 — posible RLS silencioso o token caducado');
+    alert('No se ha podido cerrar: la base de datos no confirmó el cierre (' +
+          updatedRows.length + ' filas actualizadas, esperaba 1). ' +
+          'Inténtalo otra vez o avisa al admin.');
+    return;
+  }
+
+  // Confirmado 1 fila → marcar cerrada localmente.
   window._porraCerrada = true;
+
+  // Red de seguridad: releer porra_cerrada. Si la BD la devuelve en false,
+  // deshacer la flag local y NO declarar cerrado (premisa "no rectificar
+  // después"). Un error de red en esta relectura NO deshace (el UPDATE ya
+  // confirmó 1 fila); solo un `false` explícito revierte.
+  try {
+    var verify = await db.from('league_members')
+      .select('porra_cerrada')
+      .eq('user_id', currentUser.id).eq('league_id', leagueId)
+      .maybeSingle();
+    if (!verify.error && verify.data && verify.data.porra_cerrada === false) {
+      console.error('[v3FinalizarPorra] red de seguridad: porra_cerrada volvió false — revierto flag');
+      window._porraCerrada = false;
+      alert('No se ha podido confirmar el cierre: la base de datos sigue ' +
+            'marcando tu porra como abierta. Inténtalo otra vez o avisa al admin.');
+      return;
+    }
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] red de seguridad re-read excepción ' +
+      '(no revierte; el UPDATE ya confirmó 1 fila):', e && e.message);
+  }
+
+  // Solo aquí: OK + re-render. El comprobante lo envía el cron bulk server-side
+  // al leer porra_cerrada=true (dedupe vía sent_receipts) — sin trigger cliente.
   alert('¡Pronósticos cerrados! Mucha suerte 🍀');
   if (typeof v3RenderAll === 'function') v3RenderAll();
 }
 window.v3FinalizarPorra = v3FinalizarPorra;
+
+// ─── Ampliación cierre: scroll al primer hueco (orden grupos → KO) ───
+// Best-effort: navega a la page y hace scrollIntoView. Si algo falla, NO
+// bloquea (el alert ya informó al usuario qué falta y dónde).
+function _v3CerrarScrollToFirstGap(gruposGapKeys, koNoScore, koNoClassifier, koScorerGaps) {
+  try {
+    if (gruposGapKeys && gruposGapKeys.length) {
+      _v3CerrarScrollToGrupoGap(gruposGapKeys[0]);
+      return;
+    }
+    var koIds = [].concat(koNoScore || [], koNoClassifier || [], koScorerGaps || [])
+      .map(Number).filter(function (n) { return !isNaN(n); });
+    if (koIds.length) {
+      koIds.sort(function (a, b) { return a - b; });
+      _v3CerrarScrollToKoGap(koIds[0]);
+    }
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] scroll-al-hueco falló (no bloquea):', e && e.message);
+  }
+}
+
+function _v3CerrarScrollToGrupoGap(matchKey) {
+  if (typeof PARTIDOS === 'undefined' || !Array.isArray(PARTIDOS) ||
+      typeof getMatchKey !== 'function') return;
+  var match = PARTIDOS.find(function (m) { return getMatchKey(m) === matchKey; });
+  if (!match) return;
+  var letter = match.group;
+  var groupMatches = PARTIDOS.filter(function (m) { return m.group === letter; });
+  var idx = groupMatches.findIndex(function (m) { return getMatchKey(m) === matchKey; });
+  if (typeof showPage === 'function') showPage('grupos');
+  // Abrir el zoom del grupo, ir a la tab Goleadores y centrar el pick que falta.
+  setTimeout(function () {
+    try {
+      if (typeof v3OpenZoomGrupos === 'function') v3OpenZoomGrupos(letter);
+      setTimeout(function () {
+        var golTab = document.querySelector('.v3-zoom-overlay [data-v3-tab="goleadores"]')
+                  || document.querySelector('[data-v3-tab="goleadores"]');
+        if (golTab && !golTab.disabled) golTab.click();
+        setTimeout(function () {
+          var sel = '[data-v3-goleador-pick][data-v3-match="' + idx + '"]';
+          var pick = document.querySelector('.v3-zoom-overlay ' + sel)
+                  || document.querySelector(sel);
+          if (pick && pick.scrollIntoView) {
+            pick.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 140);
+      }, 140);
+    } catch (_e) { /* best-effort */ }
+  }, 160);
+}
+
+function _v3CerrarKoRoundKey(id) {
+  id = Number(id);
+  if (id >= 73 && id <= 88) return 'r32';
+  if (id >= 89 && id <= 96) return 'r16';
+  if (id >= 97 && id <= 100) return 'qf';
+  if (id >= 101 && id <= 102) return 'sf';
+  if (id === 103 || id === 104) return 'f';
+  return 'r32';
+}
+
+function _v3CerrarScrollToKoGap(matchId) {
+  if (typeof showPage === 'function') showPage('elim');
+  v3CurrentRound = _v3CerrarKoRoundKey(matchId);
+  setTimeout(function () {
+    try {
+      if (typeof v3RenderAll === 'function') v3RenderAll();
+      setTimeout(function () {
+        var card = document.querySelector('#v3-bracket-board [data-match="' + matchId + '"]')
+                || document.querySelector('[data-match="' + matchId + '"]');
+        var target = card || document.getElementById('v3-bracket-board');
+        if (target && target.scrollIntoView) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 160);
+    } catch (_e) { /* best-effort */ }
+  }, 120);
+}
 
 // Polish v1 B4: helper de lock state.
 // Llamado al inicio de las mutaciones v3 (adjustScore, save goleador, etc.)
