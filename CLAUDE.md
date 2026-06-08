@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `5dfd7ba` (01-jun). **02-jun — P4 puente live→puntuación CERRADO**: `porra-bridge-results` **v4** (KO + guardas) auto (trigger `bridge_on_finished` + barrido); `get-league-standings` **v1.2.0** (winner KO penaltis, ERR-82); `wc_matches_ko`. `update-results` (football-data.org) indep., 11-jun. EFs: 21 → `docs/architecture.md`. Ver `docs/live-scoring.md` §Bloque crítico.
+Main HEAD `6f04b85` (08-jun). **08-jun — sprint ko-card-polish mergeado (#140)**: IA on-demand KO + `snapshot_id` dinámico + A.1-bis (swap cache `ondemand` inverso, fix GER/HAI), goleador dorsal, Pizarra limpia, tarjeta 103/104. + #138 gate boosts cierre v3, #139 boost JWT. CORS `porra-ia-compute` regex (previews) deployado runtime, sin commit. **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 auto; `get-league-standings` v1.2.0 (ERR-82); `wc_matches_ko`. `update-results` indep. 11-jun. EFs 21. Ver `docs/live-scoring.md` §Bloque crítico.
 
 ## Top-3 pendientes inmediatos
 
