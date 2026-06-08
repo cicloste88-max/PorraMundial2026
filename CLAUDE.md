@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `6f04b85` (08-jun). **08-jun — sprint ko-card-polish mergeado (#140)**: IA on-demand KO + `snapshot_id` dinámico + A.1-bis (swap cache `ondemand` inverso, fix GER/HAI), goleador dorsal, Pizarra limpia, tarjeta 103/104. + #138 gate boosts cierre v3, #139 boost JWT. CORS `porra-ia-compute` regex (previews) deployado runtime, sin commit. **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 auto; `get-league-standings` v1.2.0 (ERR-82); `wc_matches_ko`. `update-results` indep. 11-jun. EFs 21. Ver `docs/live-scoring.md` §Bloque crítico.
+Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = IA on-demand KO + A.1-bis (fix cache inverso GER/HAI), goleador dorsal, Pizarra, tarjeta 103/104; boost = #137 receipt + #138 gate boosts cierre v3 + #139 cliente JWT `getQueryDb` + espejo `window.currentUser` (ERR-83/84). CORS `porra-ia-compute` regex previews (runtime, sin commit). **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
 
 ## Top-3 pendientes inmediatos
 
@@ -20,11 +20,9 @@ Main HEAD `6f04b85` (08-jun). **08-jun — sprint ko-card-polish mergeado (#140)
 ## Pendientes — Antes del 11 junio 2026
 
 1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
-2. Activar pg_cron `update-results` el 11 jun.
-3. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
-4. Email confirmación cierre porra (Resend + EF) con copia de pronósticos.
-5. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
-6. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
+2. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
+3. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
+4. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
 
 ## Backlog post-launch / Deuda técnica
 
@@ -34,6 +32,7 @@ Main HEAD `6f04b85` (08-jun). **08-jun — sprint ko-card-polish mergeado (#140)
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
 5. **ERR-79 cerrado** (motor OK; v1.1.0 = boost grupos + overrides + reader jsonb; paridad tests 3 funcs). Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
 6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
+7. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
 
 ## Auth & Secrets
 
@@ -102,14 +101,14 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..82: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82).
+ERR-01..84: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..50 (síntoma/causa/fix/patrón).
-- `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — referencia para F3 wiring.
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..84 (síntoma/causa/fix/patrón).
+- `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol
 
