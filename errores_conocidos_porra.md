@@ -2321,3 +2321,37 @@ el dato no es fiable:
 **revisar `results.log`** antes de sospechar del motor — probablemente el puente
 lo saltó a propósito por dato incompleto. El barrido `sweep-unbridged-finished`
 (`*/5min`) lo reintenta en cuanto el dato se complete (ver §Bloque crítico).
+
+## ERR-83 — Cliente Supabase incorrecto rompe RLS silenciosamente
+
+**Síntoma**: tabla con RLS basada en `auth.uid()` devuelve `[]` en SELECT y falla silenciosamente en INSERT pese a sesión activa. El `catch` solo hace `console.warn`, no propaga.
+
+**Causa**: el proyecto tiene DOS clientes Supabase en `auth.js`:
+- `getDb()` / `window._porraDb`: cliente AUTH para login/sesión (NO lleva `accessToken`).
+- `getQueryDb()` / `window._porraQueryDb`: cliente QUERY con `accessToken: async () => window._porraToken`.
+
+Si por error se usa el cliente AUTH para `.from(...).select()` o `.upsert()`, `auth.uid()` resuelve a NULL → RLS rechaza pero el error es silencioso en SELECT (devuelve `[]`) e indistinguible de "0 filas legítimas" en INSERT con `onConflict`.
+
+**Fix**: usar siempre `getQueryDb()` para queries de datos (`savePredictions`, `saveKOPredictions`, `saveAwPicks` ya lo hacen). Alternativa robusta: `const db = (typeof getQueryDb === 'function') ? getQueryDb() : window._porraDb;`.
+
+**Patrón detectable**: `const db = window._porraDb;` seguido de `.from(<tabla con RLS>)`. Auditar con grep.
+
+**Caso real**: PR #139 (08-jun), `data.js` L256/L285 (`saveBoostPicks`/`loadBoostPicks`). Bug latente desde lanzamiento; impacto: `boost_picks` vacía para todos los usuarios.
+
+## ERR-84 — `window.currentUser` nunca asignado por declaración `let` en script clásico
+
+**Síntoma**: código que lee `window.currentUser?.id` siempre obtiene `undefined`, aunque la sesión esté activa y `currentUser` (sin `window.`) tenga valor correcto en consola.
+
+**Causa**: `auth.js` declara `let currentUser = null` a nivel top-level. En scripts clásicos (no módulos ES), las declaraciones `let`/`const` van al "script global record" pero NO al objeto `window`. Por tanto:
+- `currentUser` directo: accesible cross-script gracias al scope global de script clásico ✓
+- `window.currentUser`: siempre `undefined` ✗
+
+Las funciones que asumen lo segundo (`if (!uid) return;` con `uid = window.currentUser?.id`) salen silenciosamente.
+
+**Fix preferido**: asignar `window.currentUser = currentUser` en `auth.js` tras cada mutación de `currentUser`. Un cambio en una función repara todos los call sites afectados.
+
+**Fix alternativo (por call site)**: cambiar `window.currentUser?.id` por `currentUser?.id` (o defensivo: `(typeof currentUser !== 'undefined' && currentUser?.id) || window.currentUser?.id`).
+
+**Patrón detectable**: grep `window.currentUser?.id` y `window.currentUser && window.currentUser.id`. En el repo (post-#139): 3 sitios restantes en `data.js` L435 y `ui-groups.js` L807/L830 — ahora funcionan gracias al espejo pero conviene normalizar.
+
+**Caso real**: PR #139 commit `606ea7f` (08-jun). Bug latente desde el inicio; descubierto al investigar por qué `boost_picks` seguía vacía incluso tras arreglar ERR-83.

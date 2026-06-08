@@ -2455,3 +2455,15 @@ Sprint pre-launch (Claude.ai supervisa, Code edita). Base main `2da570e`. 5 comm
 [16:20] PUSH rama `feature/ko-card-polish` (5 commits, HEAD `f512b09`). NO PR creado (pendiente confirmación San). QA preview Vercel pendiente; fail-fast en A si no funciona.
 
 [20:12] **PR #140 ko-card-polish MERGEADO a main** (squash `6f04b85`). Sprint A/B/C.1/D + A.1-bis. Merge previo de `origin/main` (#138 gate boosts cierre v3 + #139 boost JWT) resuelto en rama: auto-merge limpio en auth.js/eliminatoria-v3.js/data.js/grupos-v3.js (ortogonales); conflictos manuales solo en append-only (CHANGELOG-archive: misma entrada 31-may unificada; migration-log: ambas entradas conservadas). `node --check` + `npm run build` OK. Post-merge: main sync `6f04b85`, rama local+remote borradas. CORS `porra-ia-compute` regex previews deployado runtime (sin commit). CLAUDE.md Estado actual actualizado.
+
+## 2026-06-08 — Sprint boost cerrado (PRs #137 + #139 + #138, docs rama `docs/sprint-boost-8jun`)
+
+[18:00] **Síntesis del sprint boost — 3 PRs mergeados, `boost_picks` operativo a 3 días del launch.**
+- `2da570e` (#137) — `send-porra-receipt` EF v3 + tabla `sent_receipts`: comprobante de porra por email (cuerpo ligero + adjunto HTML, Resend).
+- `617577e` (#139) — `saveBoostPicks`/`loadBoostPicks` usan `getQueryDb()` (cliente JWT) en vez de `window._porraDb` (AUTH sin token), que rompía la RLS de `boost_picks` silenciosamente (**ERR-83**) + auto-migración one-shot localStorage→DB + espejo `window.currentUser = currentUser` en `auth.js` (L586 post-restore, L740 post-logout) porque `let currentUser` no va a `window` en script clásico (**ERR-84**).
+- `154840b` (#138) — gate de boosts obligatorios en `v3FinalizarPorra` (lee `boost_picks`; `boostedDates` vs `jornadasGrupos`=17; bloquea cierre incompleto) + pre-flight `loadBoostPicks()` antes del `Promise.all` (auto-curativo: migra boosts atrapados en localStorage pre-#139). Rebase sobre main post-#139 sin conflictos.
+- **Sin migraciones SQL**: el schema `boost_picks` (RLS `auth.uid()=user_id` en SELECT/INSERT/UPDATE/DELETE) no cambia — el bug era 100% client-side.
+- Validación E2E (Claude.ai vía Chrome MCP + Supabase MCP sobre el preview de #138 rebaseado): 3 escenarios OK (DB vacía+local vacío → bloquea "faltan 17"; DB vacía+local 17 → pre-flight migra y pasa; DB 17 → pasa).
+- main: `2da570e` → `617577e` → `154840b`.
+
+[20:30] **Rebase `docs/sprint-boost-8jun` sobre `origin/main` (`5cbdac7`).** Conflictos solo en docs append-only: CLAUDE.md (Estado actual fusionado: HEAD `6f04b85` ko-card-polish + boost #137/#138/#139 ERR-83/84; índice ERR-01..84; trims para ≤10240 B hook), migration-log (3 entradas conservadas). CHANGELOG.md auto-merge → 31150 B >30KB → archivada entrada 31-may auth bootstrap a `CHANGELOG-archive-202605.md` (ahora 18606 B). `errores_conocidos_porra.md` ERR-83/84 íntegros. Hook OK. Pendiente reconfirmación mergeable por San.
