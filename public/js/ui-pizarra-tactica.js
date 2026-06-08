@@ -174,6 +174,7 @@
     });
     if (!r.ok) throw new Error('get-squad ' + r.status);
     const data = await r.json();
+    try { warnSquadDesync(iso3 || iso2, data); } catch (_) {}
     _cache.set(cacheKey, data);
     return data;
   }
@@ -181,6 +182,45 @@
   // ── RENDER ───────────────────────────────────────────────────────────
   function getCoords(formacion) {
     return FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
+  }
+
+  // ── Bloque C.1 — defense in depth ────────────────────────────────────
+  // Limpia sufijos/prefijos basura (em-dash, en-dash, guiones colgados) de un
+  // nombre antes de pintarlo. Si queda vacío, el caller lo trata como
+  // placeholder "—" (no pastilla en blanco).
+  function v3CleanPlayerName(name) {
+    if (!name) return '';
+    return String(name)
+      .replace(/\s*[—–\-]+\s*$/, '')
+      .replace(/^\s*[—–\-]+\s*/, '')
+      .trim();
+  }
+
+  // Warnings diagnósticos al recibir un squad de get-squad. No alteran el
+  // render; solo avisan en consola de inconsistencias (QA defense in depth).
+  // get-squad NO expone xi_pinned: el XI es `jugadores` (siempre 11, con
+  // placeholders "—") y la señal de "lista cerrada" es plantilla_meta.is_final.
+  function warnSquadDesync(iso3, data) {
+    if (!data || !Array.isArray(data.jugadores)) return;
+    var xi = data.jugadores;
+    var realCount = xi.filter(function (j) {
+      return !!v3CleanPlayerName(j && j.nombre);
+    }).length;
+    var isFinal = !!(data.plantilla_meta && data.plantilla_meta.is_final);
+    if (isFinal && realCount !== 11) {
+      console.warn('[pizarra] squad', iso3, 'xi inconsistent: final but real XI len', realCount, '/ 11');
+    }
+    // Formación declarada vs jugadores de campo del XI (suma dígitos = outfield).
+    var digits = String(data.formacion || '').match(/\d/g) || [];
+    var declaredOutfield = digits.reduce(function (s, d) { return s + (+d); }, 0);
+    var gk = xi.filter(function (j) { return j && j.posicion === 'PO'; }).length;
+    var outfield = xi.length - gk;
+    if (declaredOutfield && declaredOutfield !== outfield) {
+      console.warn('[pizarra] formacion mismatch', iso3, data.formacion, 'declara', declaredOutfield, 'de campo vs XI', outfield);
+    }
+    if (data.formacion && !FORMATION_COORDS[data.formacion]) {
+      console.warn('[pizarra] formacion', iso3, 'desconocida', JSON.stringify(data.formacion), '— fallback 4-3-3');
+    }
   }
 
   function buildOverlay() {
@@ -259,14 +299,19 @@
       const isGK = j.posicion === 'PO';
       const bg = isGK ? fichaPo : ficha;
       const textColor = (isLight && !isGK) ? '#111827' : '#ffffff';
+      // C.1: limpia sufijos basura (em-dash colgado, etc.) antes de pintar.
+      const nombre = v3CleanPlayerName(j.nombre);
       const isPlaceholder = !j.nombre || j.nombre === '—' || j.nombre === '\u2014';
       // F-08: pastilla = dorsal + posicion + apellido (3a linea solo cuando
       // hay nombre). Apellido = ultimo token, truncado a 10 chars con ellipsis.
       let apellidoHtml = '';
-      if (!isPlaceholder) {
-        let surname = j.nombre.split(' ').slice(-1)[0];
+      if (nombre) {
+        let surname = nombre.split(' ').slice(-1)[0];
         if (surname.length > 10) surname = surname.slice(0, 10) + '…';
         apellidoHtml = '<span class="fc-pizarra-token-surname">' + surname + '</span>';
+      } else {
+        // C.1: placeholder explícito "—" en vez de pastilla en blanco.
+        apellidoHtml = '<span class="fc-pizarra-token-surname">—</span>';
       }
 
       // A2 FIX C: foto circular si get-squad v7.2 la entrega (squads.xi / roster).

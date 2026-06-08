@@ -1002,8 +1002,14 @@ function v3RenderSquadPickerTeamSection(equipo, candidates, currentPickKey, side
 
   function renderPlayerBtn(pl) {
     var isPicked = currentPickKey === pl.key;
+    // Bloque B — etiqueta normalizada "<dorsal> · <Nombre>" (centinela 999 y
+    // dorsal embebido tratados en v3FormatGoleadorLabel). Fallback al name crudo
+    // si la función aún no está disponible (orden de carga).
+    var label = (typeof v3FormatGoleadorLabel === 'function')
+      ? v3FormatGoleadorLabel(pl, pl.key)
+      : pl.name;
     return '<button class="v3-squad-picker-player ' + (isPicked?'is-picked':'') + '" data-v3-squad-player="' + pl.key + '"' + sideAttr + '>'
-      + '<span class="v3-squad-picker-player__name">' + pl.name + '</span>'
+      + '<span class="v3-squad-picker-player__name">' + label + '</span>'
       + (isPicked ? '<span class="v3-squad-picker-player__check">✓</span>' : '')
       + '</button>';
   }

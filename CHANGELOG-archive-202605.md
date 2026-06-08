@@ -1079,7 +1079,7 @@ con el bracket KO. 6 PRs squash a main, todos solo frontend (sin DDL).
 
 **Stats**: 6 PRs squash, 6 ficheros tocados (`auth.js`, `ui-groups.js`, `jornada-v3.css`). Sin migraciones SQL. Sin tocar `vercel.json`, Pizarra, Grupos v3, Fase Final, Predictor.
 
-<!-- Movido 2026-06-08 (gate boosts cierre v3): entrada [31-may] Fix globo roster iso3 — CHANGELOG.md superaba 30KB hook limite -->
+<!-- Movido 2026-06-08: entrada 31-may globo roster name_en, desde CHANGELOG.md para mantener <30KB (sprint ko-card-polish + gate boosts cierre v3) -->
 
 ## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
 

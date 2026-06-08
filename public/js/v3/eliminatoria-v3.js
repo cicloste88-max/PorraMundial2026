@@ -206,6 +206,10 @@ function v3RenderBoard() {
   if (typeof resolveAllSlots === 'function') {
     try { resolveAllSlots(); } catch (e) { console.warn('HF-08 resolveAllSlots:', e); }
   }
+  // A.3 — slots ya propagados: calienta la IA de los cruces KO recién resueltos
+  // (background, throttled). saveKO() solo persiste; la propagación W/L ocurre
+  // aquí en resolveAllSlots, por eso el hook va en el render del board.
+  if (typeof v3PrecomputeResolvedKO === 'function') v3PrecomputeResolvedKO();
   var board = document.getElementById('v3-bracket-board');
   if (!board) return;
   board.innerHTML = '';
@@ -756,17 +760,125 @@ function v3GetMatchTeamIso3(match, side) {
 }
 window.v3GetMatchTeamIso3 = v3GetMatchTeamIso3;
 
+// Bloque A.1 — IA Predice on-demand para tarjetas KO.
+// Llama a la EF porra-ia-compute action compute_match (misma que usa ko.js
+// loadKOIAHint) y cachea el resultado en iaPredictions con la clave canónica
+// ondemand_<HOME>_<AWAY>_<snapshot_id>. Devuelve SIEMPRE una promesa que
+// resuelve a la entrada de cache (o null si faltan equipos/sesión o falla la
+// EF: 429, sin red, etc.). Dedup in-flight por par de equipos.
+function v3FetchIAOnDemand(match) {
+  var homeIso3 = v3GetMatchTeamIso3(match, 'home');
+  var awayIso3 = v3GetMatchTeamIso3(match, 'away');
+  if (!homeIso3 || !awayIso3 || homeIso3 === awayIso3) return Promise.resolve(null);
+  // Misma guarda que ko.js loadKOIAHint: sin cliente/sesión la EF rechaza.
+  if (!window._porraDb || !window._porraToken) return Promise.resolve(null);
+  window._iaOndemandInflight = window._iaOndemandInflight || {};
+  var inflightKey = homeIso3 + '_' + awayIso3;
+  if (window._iaOndemandInflight[inflightKey]) return window._iaOndemandInflight[inflightKey];
+  var promise = window._porraDb.functions.invoke('porra-ia-compute', {
+    body: { action: 'compute_match', home: homeIso3, away: awayIso3 },
+  }).then(function (res) {
+    if (!res || res.error) return null;
+    var data = res.data;
+    if (!data || !data.ok || !data.prediction) return null;
+    // A.2 — snapshot_id viene en la respuesta; lo memorizamos para que las
+    // lecturas de cache usen el snapshot activo (no el hardcoded _2).
+    var snapId = data.snapshot_id || window._iaActiveSnapshotId || 2;
+    window._iaActiveSnapshotId = snapId;
+    var entry = {
+      p_home: data.prediction.p_home,
+      p_draw: data.prediction.p_draw,
+      p_away: data.prediction.p_away,
+      sign: data.prediction.sign,
+      quip: data.quip || '',
+    };
+    if (typeof iaPredictions === 'object' && iaPredictions) {
+      iaPredictions['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId] = entry;
+      window.iaPredictions = iaPredictions;
+    }
+    return entry;
+  }).catch(function (e) {
+    console.warn('[IA on-demand] fetch error:', e && e.message ? e.message : e);
+    return null;
+  }).finally(function () {
+    delete window._iaOndemandInflight[inflightKey];
+  });
+  window._iaOndemandInflight[inflightKey] = promise;
+  return promise;
+}
+window.v3FetchIAOnDemand = v3FetchIAOnDemand;
+
+// A.3 — precompute proactivo. Tras recalcular el bracket (resolveAllSlots en
+// v3RenderBoard) calienta la IA de los cruces KO ya resueltos que aún no están
+// en cache cliente. Throttle a 3 fetches simultáneos (rate-limit 30/min/user).
+// dedup in-flight + cache hacen que las re-ejecuciones sean baratas (no
+// re-disparan lo ya hecho). Pre-auth es no-op.
+function v3PrecomputeResolvedKO() {
+  if (typeof BRACKET === 'undefined' || !BRACKET) return;
+  if (!window._porraDb || !window._porraToken) return;
+  var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
+  var snapId = window._iaActiveSnapshotId || 2;
+  var inflight = window._iaOndemandInflight || {};
+  var allKO = [].concat(
+    BRACKET.r32 || [], BRACKET.r16 || [], BRACKET.qf || [],
+    BRACKET.sf || [], BRACKET.third || [], BRACKET.final || []
+  );
+  var queue = [];
+  allKO.forEach(function (match) {
+    var h = v3GetMatchTeamIso3(match, 'home');
+    var a = v3GetMatchTeamIso3(match, 'away');
+    if (!h || !a || h === a) return; // slot aún sin resolver
+    // ¿ya cacheado? (mismo lookup que v3RenderIABlock: ambos órdenes + _2)
+    var cached = iaMap['ondemand_' + h + '_' + a + '_' + snapId]
+              || iaMap['ondemand_' + a + '_' + h + '_' + snapId]
+              || iaMap['ondemand_' + h + '_' + a + '_2']
+              || iaMap['ondemand_' + a + '_' + h + '_2'];
+    if (cached && cached.p_home != null && cached.p_away != null) return;
+    if (inflight[h + '_' + a] || inflight[a + '_' + h]) return; // ya en vuelo
+    queue.push(match);
+  });
+  if (!queue.length) return;
+  // Cola con concurrencia máx 3 (ventana deslizante).
+  var MAX = 3, idx = 0;
+  function pump() {
+    if (idx >= queue.length) return;
+    var match = queue[idx++];
+    v3FetchIAOnDemand(match).then(function (result) {
+      // Si la tarjeta de ese match quedó abierta, refrescar su bloque IA.
+      if (result && result.p_home != null && result.p_away != null) {
+        var node = document.querySelector('[data-v3-ia-block][data-match-id="' + match.id + '"]');
+        if (node) node.outerHTML = v3RenderIABlock(match);
+      }
+    }).finally(function () { pump(); });
+  }
+  for (var k = 0; k < Math.min(MAX, queue.length); k++) pump();
+}
+window.v3PrecomputeResolvedKO = v3PrecomputeResolvedKO;
+
+// Inner HTML del estado "vacío" del bloque IA (cabecera label + cuerpo).
+// loading=true → spinner "Calculando predicción IA…"; false → placeholder
+// "— Datos IA pendientes —". Reutilizado por el render inicial y por el
+// reemplazo post-fetch on-demand (A.1).
+function _v3IAEmptyInner(loading) {
+  var body = loading
+    ? '<div class="v3-zoom-ia__empty v3-zoom-ia__empty--loading"><span class="v3-zoom-ia__spinner" aria-hidden="true"></span>Calculando predicción IA…</div>'
+    : '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>';
+  return '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
+    + '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
+    + '</div>' + body;
+}
+
 // Polish v1 Fix-3: acepta string key (grupos: "A_México_Sudáfrica") o
-// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_2" desde
-// slots resueltos). BD ia_predictions.match_id formato confirmado:
-// 218 filas KO con prefijo "ondemand_". No hay simetría garantizada,
-// probamos ambos órdenes.
+// objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_<snap>" desde
+// slots resueltos). Para KO sin entrada cacheada dispara compute_match
+// on-demand (A.1). No hay simetría garantizada, probamos ambos órdenes.
 function v3RenderIABlock(matchKeyOrMatch) {
   // F-05 (round 3): NO devolver '' aunque iaPredictions no esté disponible.
   // Renderizar siempre al menos la cabecera label + '?' para que el tooltip
   // explicativo esté accesible en TODAS las cards (grupos + KO QF/SF/F).
   var iaMap = (typeof iaPredictions === 'object' && iaPredictions) ? iaPredictions : {};
   var pred = null;
+  var koFetchMatch = null; // A.1: match KO elegible para compute_match on-demand
 
   if (typeof matchKeyOrMatch === 'string') {
     pred = iaMap[matchKeyOrMatch];
@@ -778,8 +890,31 @@ function v3RenderIABlock(matchKeyOrMatch) {
       var homeIso3 = v3GetMatchTeamIso3(match, 'home');
       var awayIso3 = v3GetMatchTeamIso3(match, 'away');
       if (homeIso3 && awayIso3) {
-        pred = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2']
+        // A.2 — sufijo snapshot_id dinámico (antes hardcoded _2). Se prueba el
+        // snapshot activo memorizado y se mantiene _2 como fallback de compat
+        // con el cache ya poblado en BD (snapshot id=2).
+        // A.1-bis — separar orden directo (HOME_AWAY del bracket) del inverso
+        // (AWAY_HOME). ko.js loadKOIAHint puede poblar el cache con orden
+        // distinto al del partido (p.ej. ondemand_HAI_GER para GER vs HAI).
+        // Si solo existe el inverso, swappear p_home↔p_away y sign 1↔2 para
+        // alinearlo con el orden de la card (draw=X y quip se preservan).
+        var snapId = window._iaActiveSnapshotId || 2;
+        var predDirect = iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_' + snapId]
+            || iaMap['ondemand_' + homeIso3 + '_' + awayIso3 + '_2'];
+        var predInverse = iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_' + snapId]
             || iaMap['ondemand_' + awayIso3 + '_' + homeIso3 + '_2'];
+        if (predDirect) {
+          pred = predDirect;
+        } else if (predInverse) {
+          pred = Object.assign({}, predInverse, {
+            p_home: predInverse.p_away,
+            p_away: predInverse.p_home,
+            sign: predInverse.sign === '1' ? '2'
+                : predInverse.sign === '2' ? '1'
+                : predInverse.sign
+          });
+        }
+        koFetchMatch = match; // ambos equipos resueltos → elegible on-demand
       }
     }
   }
@@ -788,11 +923,27 @@ function v3RenderIABlock(matchKeyOrMatch) {
   // label + botón "?" (tooltip generico de cómo funciona la IA). El bloque
   // de probabilidades queda oculto hasta que llegue la data.
   if (!pred || pred.p_home == null || pred.p_away == null) {
+    // A.1 — KO con ambos equipos resueltos: dispara compute_match on-demand
+    // (fire-and-forget) y muestra spinner. Al resolver, reemplaza el nodo
+    // [data-v3-ia-block] del DOM con las barras de probabilidad (re-render) o,
+    // si falla (429/sin sesión), con el placeholder "Datos IA pendientes".
+    if (koFetchMatch) {
+      var mid = koFetchMatch.id;
+      v3FetchIAOnDemand(koFetchMatch).then(function (result) {
+        var node = document.querySelector('[data-v3-ia-block][data-match-id="' + mid + '"]');
+        if (!node) return;
+        if (result && result.p_home != null && result.p_away != null) {
+          node.outerHTML = v3RenderIABlock(koFetchMatch);
+        } else {
+          node.innerHTML = _v3IAEmptyInner(false);
+        }
+      });
+      return '<div data-v3-ia-block data-match-id="' + mid + '" class="v3-zoom-ia v3-zoom-ia--empty">'
+        + _v3IAEmptyInner(true)
+        + '</div>';
+    }
     return '<div class="v3-zoom-ia v3-zoom-ia--empty">'
-      + '<div class="v3-zoom-ia__label">🤖 IA PREDICE'
-      +   '<button type="button" class="ia-info-btn" aria-label="Cómo funciona IA Predice" onclick="event.stopPropagation();window.showIAInfoTooltip&&window.showIAInfoTooltip(this)">?</button>'
-      + '</div>'
-      + '<div class="v3-zoom-ia__empty">— Datos IA pendientes —</div>'
+      + _v3IAEmptyInner(false)
       + '</div>';
   }
 
@@ -832,6 +983,28 @@ function v3RenderIABlock(matchKeyOrMatch) {
     + '</div>';
 }
 window.v3RenderIABlock = v3RenderIABlock;
+
+// Bloque B — etiqueta de goleador normalizada a "<dorsal> · <Nombre>".
+// Robusta a las dos fuentes de datos del repo:
+//  - EQUIPOS[].players (data.js): dorsal EMBEBIDO en name ("9 · Raúl Jiménez"),
+//    sin campo dorsal.
+//  - getScorerCandidates / get-squad (BD): name limpio + campo dorsal numérico,
+//    con 999 como CENTINELA de "sin dorsal" (scoring.js).
+// Sin dorsal resoluble → solo nombre (nunca "null · X" ni "999 · X").
+function v3FormatGoleadorLabel(found, fallbackKey) {
+  if (!found) return fallbackKey != null ? String(fallbackKey) : '';
+  var rawName = String(found.name || found.nombre || fallbackKey || '');
+  var embedded = rawName.match(/^(\d{1,2})\s*[·.]\s*/);
+  var cleanName = rawName.replace(/^\d{1,2}\s*[·.]\s*/, '').trim();
+  var dorsal = found.dorsal;
+  // Centinela 999 o ausente → intenta recuperar el dorsal embebido en el nombre.
+  if ((dorsal == null || +dorsal === 999) && embedded) dorsal = embedded[1];
+  if (dorsal != null && Number.isFinite(+dorsal) && +dorsal > 0 && +dorsal !== 999) {
+    return dorsal + ' · ' + cleanName;
+  }
+  return cleanName || (fallbackKey != null ? String(fallbackKey) : '');
+}
+window.v3FormatGoleadorLabel = v3FormatGoleadorLabel;
 
 function v3RenderZoomKO() {
   var match = v3CurrentMatch;
@@ -876,9 +1049,29 @@ function v3RenderZoomKO() {
     </div>
   ` : '';
 
-  var summaryHtml = decided
-    ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${v3ResolveWinner(pred, match.home, match.away) === 'home' ? homeLabel : awayLabel}</strong></div>`
-    : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
+  // Bloque D — match 103 (3er/4º puesto) y 104 (final) NO avanzan a ninguna
+  // ronda: no aplica "Pasa:". Resolvemos ganador/perdedor y etiquetamos según
+  // el match. El resto (73-102) mantiene "Pasa: <ganador>".
+  var winnerLabel, loserLabel;
+  if (decided) {
+    var winnerSide = v3ResolveWinner(pred, match.home, match.away);
+    winnerLabel = winnerSide === 'home' ? homeLabel : awayLabel;
+    loserLabel  = winnerSide === 'home' ? awayLabel : homeLabel;
+  }
+  var summaryHtml;
+  if (match.id === 104) {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary v3-zoom-ko-summary--final">🏆 Campeón: <strong>${winnerLabel}</strong> · Subcampeón: ${loserLabel}</div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica el campeón' : 'Introduce el marcador final'}</div>`;
+  } else if (match.id === 103) {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary v3-zoom-ko-summary--third">🥉 3er puesto: <strong>${winnerLabel}</strong> · 4º puesto: ${loserLabel}</div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica quién gana el 3er puesto' : 'Introduce el marcador final'}</div>`;
+  } else {
+    summaryHtml = decided
+      ? `<div class="v3-zoom-ko-summary">Pasa: <strong>${winnerLabel}</strong></div>`
+      : `<div class="v3-zoom-ko-summary">${hasHome && hasAway ? '⚠️ Indica equipo que clasifica' : 'Introduce el marcador final'}</div>`;
+  }
 
   // F1 — picker goleador KO. Lookup nombre del jugador desde EQUIPOS resueltos
   // + fallback en window._scorerCandidatesCache (poblado al abrir el picker
@@ -901,7 +1094,7 @@ function v3RenderZoomKO() {
            || (Array.isArray(cacheA) && cacheA.find(function (p) { return p.key === scorerKey; }))
            || null;
     }
-    scorerName = found ? found.name : scorerKey;
+    scorerName = v3FormatGoleadorLabel(found, scorerKey);
   }
   var goleadorHtml = `
     <div class="v3-zoom-ko-goleador">
