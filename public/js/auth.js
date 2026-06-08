@@ -584,6 +584,7 @@ const runAuthInit = async () => {
         nombre: _profile?.nombre || session.user.email.split('@')[0],
         is_admin: _profile?.is_admin || false
       };
+      window.currentUser = currentUser;
 
       // Flag _navigated + try/finally garantiza showPage en TODOS los caminos.
       let _navigated = false;
@@ -738,6 +739,7 @@ const runAuthInit = async () => {
       // restauración tardía, SIGNED_OUT real, etc.) sí actúan normal.
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         currentUser = null;
+        window.currentUser = null;
         window._porraToken = null;
         try { sessionStorage.removeItem('porra_token'); } catch (e) {}
         _hideBootstrapLoader();
