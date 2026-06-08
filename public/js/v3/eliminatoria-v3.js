@@ -1228,7 +1228,7 @@ window._v3SuggestGoldenBoot = _v3SuggestGoldenBoot;
 // ─── Polish v1 B4 Items 12+13 — Cerrar porra v3 (sin email) ──
 // Equivalente self-contained a finalizarPorra legacy (close-porra.js)
 // pero sin dependencias DOM (`finalizar-btn`, etc.). Comprueba grupos+KO+
-// awards en BD, confirma, UPDATE league_members.porra_cerrada, set
+// awards+boosts en BD, confirma, UPDATE league_members.porra_cerrada, set
 // window._porraCerrada, re-render. Email queda fuera (Resend pendiente).
 async function v3FinalizarPorra() {
   if (typeof db === 'undefined' || typeof currentUser === 'undefined' || !currentUser) {
@@ -1246,7 +1246,26 @@ async function v3FinalizarPorra() {
   }
 
   // Chequeo BD (en paralelo) — mismo criterio que checkFinalizarReady legacy:
-  // 72 grupos + 32 KO + 4 awards. (Boost queda fuera en v3 — no expuesto aún).
+  // 72 grupos + 32 KO + 4 awards + boosts de jornada (1 por día de grupos).
+  // El gate de boosts (antes ausente en v3 — los cierres saltaban la regla
+  // publicada en index.html: "Sin todos los boosts asignados no se puede
+  // cerrar la porra") se valida aquí leyendo boost_picks y mapeando cada
+  // jornada de grupos con el MISMO calendario que usa el front (PARTIDOS),
+  // igual que el cierre legacy en close-porra.js. No basta count>=N: exige 1
+  // boost por jornada (evita 2 en un día y 0 en otro).
+
+  // Pre-flight de sincronización: garantiza que boost_picks esté al día
+  // antes de validar. loadBoostPicks() ya incorpora la auto-migración
+  // one-shot localStorage→DB del PR #139 (commit 4700d2e), así que esto
+  // cubre el escenario "usuario que no había recargado la app tras el
+  // fix y tiene boosts atrapados en localStorage". Idempotente y silencioso
+  // si ya está sincronizado. Si falla, el gate sigue y lo detecta abajo.
+  try {
+    if (typeof loadBoostPicks === 'function') await loadBoostPicks();
+  } catch (e) {
+    console.warn('[v3FinalizarPorra] pre-flight loadBoostPicks fallo (sigue):', e && e.message);
+  }
+
   try {
     var responses = await Promise.all([
       db.from('predictions').select('*', { count: 'exact', head: true })
@@ -1254,17 +1273,70 @@ async function v3FinalizarPorra() {
       db.from('ko_predictions').select('*', { count: 'exact', head: true })
         .eq('user_id', currentUser.id).eq('league_id', leagueId),
       db.from('award_picks').select('golden_ball,golden_boot,golden_glove,young_player')
-        .eq('user_id', currentUser.id).eq('league_id', leagueId).maybeSingle()
+        .eq('user_id', currentUser.id).eq('league_id', leagueId).maybeSingle(),
+      db.from('boost_picks').select('match_date, match_id')
+        .eq('user_id', currentUser.id).eq('league_id', leagueId)
     ]);
     var gF = responses[0].count || 0;
     var kF = responses[1].count || 0;
     var aD = responses[2].data;
     var aF = (aD && aD.golden_ball && aD.golden_boot && aD.golden_glove && aD.young_player) ? 4 : 0;
 
+    // ── Gate de boosts obligatorios ──
+    // Fail-closed si la lectura de boost_picks falla: no cerrar con datos
+    // parciales (la premisa "no rectificar después" aplica también aquí).
+    if (responses[3].error) {
+      console.error('[v3FinalizarPorra] boost_picks read error:', responses[3].error);
+      alert('No se pudieron verificar tus boosts. Reintenta en unos segundos.');
+      return;
+    }
+    // Días de grupos que el usuario YA tiene cubiertos con un boost (DB =
+    // fuente de verdad). Normalizamos match_date a YYYY-MM-DD por si la
+    // columna llega como timestamp.
+    var boostedDates = new Set(
+      (responses[3].data || [])
+        .filter(function (r) { return r && r.match_id; })
+        .map(function (r) { return String(r.match_date).substring(0, 10); })
+    );
+    // Jornadas de grupos = días distintos con partido en PARTIDOS (calendario
+    // del front). Solo grupos: PARTIDOS no contiene KO.
+    var jornadasGrupos = (typeof PARTIDOS !== 'undefined' && Array.isArray(PARTIDOS))
+      ? Array.from(new Set(
+          PARTIDOS
+            .map(function (m) { return (m && m.date) ? m.date.substring(0, 10) : null; })
+            .filter(Boolean)
+        ))
+      : [];
+    var missingBoosts = jornadasGrupos.filter(function (d) { return !boostedDates.has(d); });
+
     var missing = [];
     if (gF < 72) missing.push((72 - gF) + ' partidos de grupos');
     if (kF < 32) missing.push((32 - kF) + ' partidos de eliminatorias');
     if (aF < 4)  missing.push('premios individuales');
+
+    // Boost gate: bloquea el cierre y lleva al selector si falta algún boost.
+    if (missingBoosts.length > 0) {
+      var extra = missing.length
+        ? '\n\nAdemás falta:\n• ' + missing.join('\n• ')
+        : '';
+      alert(
+        'Debes elegir tus ' + jornadasGrupos.length + ' boosts, 1 por jornada, ' +
+        'antes de cerrar tus pronósticos.\n\n' +
+        'Te faltan ' + missingBoosts.length + ' boost(s) de jornada por asignar.' + extra
+      );
+      // Llevar/scroll al selector de boosts (#boost-ticker en #page-jornada).
+      try {
+        if (typeof showPage === 'function') showPage('jornada');
+        setTimeout(function () {
+          if (typeof renderBoostTicker === 'function') renderBoostTicker();
+          var ticker = document.getElementById('boost-ticker');
+          if (ticker && ticker.scrollIntoView) {
+            ticker.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+      } catch (_navErr) { /* navegación best-effort */ }
+      return;
+    }
 
     if (missing.length > 0) {
       alert('Aún no puedes cerrar la porra.\n\nFalta:\n• ' + missing.join('\n• '));

@@ -2,6 +2,28 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [08-jun-2026] Gate de boosts obligatorios antes de cerrar la porra (v3)
+
+Rama `claude/wonderful-thompson-K5LK5`. El cierre v3 (`v3FinalizarPorra` en
+`public/js/v3/eliminatoria-v3.js`) **no validaba los boosts** de jornada
+(obligatorios: 1 por día de grupos). El botón "Cerrar y enviar mi porra" saltaba
+la regla publicada ("Sin todos los boosts asignados no se puede cerrar la
+porra") — **7 usuarios cerraron con 0 boosts**. El cierre legacy
+`close-porra.js` sí los gateaba; el path v3 no.
+
+- **Fix**: el chequeo BD del cierre suma una 4.ª query (`boost_picks`) y exige
+  **1 boost por jornada de grupos**, mapeando los días con el mismo calendario
+  que usa el front (`PARTIDOS`). Validación por pertenencia de día (no `count≥N`):
+  "2 boosts en un día y 0 en otro" bloquea igual.
+- **UX**: si falta algún boost → mensaje claro + navegación al selector
+  (`showPage('jornada')` + scroll a `#boost-ticker`), **sin** ejecutar el UPDATE
+  de `league_members.porra_cerrada`. Fail-closed ante error de lectura.
+- **Nota**: la regla son **17** jornadas (jun 11–27), no 12 — confirmado por
+  `PARTIDOS`, `close-porra.js:150`, checklist `index.html` ("0/17") y la regla en
+  `index.html`; el gate lo deriva dinámicamente. No se toca el selector de boosts
+  (verificado operativo: escribe en `boost_picks`, `match_id` = clave de
+  `predictions.match_id`). Pendiente: backfill de los 7 cierres previos.
+
 ## [02-jun-2026] Bloque crítico P4 — pipeline live→puntuación automático
 
 Multi-lane (runtime Claude.ai/MCP + docs Code, rama `feat/docs-p4-bloque-critico`).
@@ -501,59 +523,3 @@ sin regresiones. Sin blank en ningún caso (iter 3 preservado).
 sobre main `f626714`). Rama `fix/auth-bootstrap-frozen-refresh`
 (PR #125). ERR-78 extendido con iter 4 + lecciones acumuladas
 (4 iteraciones).
-
-## [31-may-2026] Fix globo: roster vacío en 5 selecciones por divergencia name_en
-
-**Bug (prod):** en el overlay del globo 3D, pulsar "Plantilla" en Cape Verde,
-Czech Republic, Ivory Coast, Korea o Turkey abría el modal con el mensaje
-"Datos de plantilla aún no disponibles para esta selección" pese a que la
-tabla `squads` tiene los jugadores (CPV 26 · CZE 30 · CIV 26 · KOR 26;
-TUR 0 — ver pendiente separado). Las otras 43 selecciones funcionaban.
-Detectado por Claude.ai vía MCP + Chrome en sesión paralela.
-
-**Causa:** `renderPanelPais` (`public/js/ui-globo-equipos.js:313`) derivaba
-`iso3` con match estricto `EQUIPOS.find(t => t.name_en === nameEn)`. El 3er
-argumento `nameEn` que llega al panel es la key WIKI canónica (resuelta por
-`getWikiKey()`), que para 5 selecciones diverge del `EQUIPOS.name_en`:
-Cabo Verde ≠ Cape Verde · Czechia ≠ Czech Republic · Côte d'Ivoire ≠ Ivory
-Coast · South Korea ≠ Korea · Türkiye ≠ Turkey. Sin match → `iso3=''` → el
-botón `.fc-globo-detail__btn-roster` recibía `data-iso3=""` → `openRosterScreen`
-cortaba en `if (!iso3)` con `console.warn('[roster] iso3 vacío')` y nunca
-consultaba `squads`.
-
-**Fix (2 commits sobre la rama `fix/globo-roster-iso3-naming`):**
-
-- **Commit 1 (`f92c1af`)** — cascada NFD tolerante (`name_en`/`name`/`slug` ×
-  `nameEn`/`nombrePais`). QA en preview Vercel reveló que arreglaba solo 3/5:
-  con un GeoJSON donde `feat.properties.NAME` ya devuelve la WIKI key directa
-  (p.ej. `NAME="Czech Republic"`, `NAME="Ivory Coast"`), tanto `nameEn` como
-  `nombrePais` llegaban iguales y ningún campo de EQUIPOS contenía esas
-  cadenas (`name_en="Czechia"`/`slug="czech"`; `name_en="Côte d'Ivoire"`/`slug="ivory-coast"`).
-  Cape Verde / Korea / Turkey casaban porque EQUIPOS.name (es) o slug coincide
-  con la WIKI key; Czech Republic e Ivory Coast no.
-
-- **Commit 2 (este)** — diseño defensivo en 2 capas:
-  1. **Vía principal**: mapa explícito `WIKIKEY_TO_ISO3` con las 5 divergencias
-     conocidas (`Cape Verde`→`CPV`, `Czech Republic`→`CZE`, `Ivory Coast`→`CIV`,
-     `Korea`→`KOR`, `Turkey`→`TUR`). Conjunto cerrado y conocido — garantiza
-     5/5 independientemente de variaciones futuras en NE / `_norm`.
-  2. **Vía fallback**: cascada NFD con `_norm` mejorado que ahora también
-     colapsa separadores (`/[\s\-_'.]/g`). Step 0 preserva exact-match.
-     Blinda contra slugs con guiones (`ivory-coast` ↔ `ivorycoast`) y casos
-     similares futuros.
-
-**Verificación:** script standalone parseando EQUIPOS REAL de `data.js`
-(no datos asumidos) — 15/15 escenarios para las 5 divergentes (worst-case
-`nameEn === nombrePais` + polygon-path + flag-button-path) + round-trip
-48/48 con `EQUIPOS.name_en` raw + round-trip 48/48 simulando `getWikiKey()`.
-Cero regresiones. Cero cambios en BBDD, EF u otros ficheros.
-
-**Hallazgo independiente (no incluido en este PR):** `squads` para TUR
-(ISO3=TUR) tiene 0 jugadores; las otras 4 tienen pleno (CPV 26 · CZE 30 ·
-CIV 26 · KOR 26). Aunque el iso3 de Turquía ya quede bien resuelto, su
-modal saldrá vacío por falta de datos. Es problema del sync de plantillas
-(`scripts/sync-squads.mjs` + workflow), no del front. Anotado en
-`errores_conocidos_porra.md` ERR-77 como pendiente separado.
-
-**Stats:** 1 fichero tocado (`public/js/ui-globo-equipos.js`). Rama
-`fix/globo-roster-iso3-naming` (PR #124). Nuevo ERR-77 (revisado).
