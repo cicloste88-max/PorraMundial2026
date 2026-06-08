@@ -2,6 +2,28 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [08-jun-2026] Gate de boosts obligatorios antes de cerrar la porra (v3)
+
+Rama `claude/wonderful-thompson-K5LK5`. El cierre v3 (`v3FinalizarPorra` en
+`public/js/v3/eliminatoria-v3.js`) **no validaba los boosts** de jornada
+(obligatorios: 1 por día de grupos). El botón "Cerrar y enviar mi porra" saltaba
+la regla publicada ("Sin todos los boosts asignados no se puede cerrar la
+porra") — **7 usuarios cerraron con 0 boosts**. El cierre legacy
+`close-porra.js` sí los gateaba; el path v3 no.
+
+- **Fix**: el chequeo BD del cierre suma una 4.ª query (`boost_picks`) y exige
+  **1 boost por jornada de grupos**, mapeando los días con el mismo calendario
+  que usa el front (`PARTIDOS`). Validación por pertenencia de día (no `count≥N`):
+  "2 boosts en un día y 0 en otro" bloquea igual.
+- **UX**: si falta algún boost → mensaje claro + navegación al selector
+  (`showPage('jornada')` + scroll a `#boost-ticker`), **sin** ejecutar el UPDATE
+  de `league_members.porra_cerrada`. Fail-closed ante error de lectura.
+- **Nota**: la regla son **17** jornadas (jun 11–27), no 12 — confirmado por
+  `PARTIDOS`, `close-porra.js:150`, checklist `index.html` ("0/17") y la regla en
+  `index.html`; el gate lo deriva dinámicamente. No se toca el selector de boosts
+  (verificado operativo: escribe en `boost_picks`, `match_id` = clave de
+  `predictions.match_id`). Pendiente: backfill de los 7 cierres previos.
+
 ## [02-jun-2026] Bloque crítico P4 — pipeline live→puntuación automático
 
 Multi-lane (runtime Claude.ai/MCP + docs Code, rama `feat/docs-p4-bloque-critico`).
