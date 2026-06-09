@@ -284,7 +284,7 @@ export function renderReceiptBody(d: ReceiptData): string {
   return wrapDoc(d, inner);
 }
 
-// ─── COMPROBANTE completo (adjunto .html) ──────────────────────────────────
+// ─── COMPROBANTE completo (chuleta → PDF) ─────────────────────────────────
 export function renderReceiptHtml(d: ReceiptData): string {
   const inner = [
     disclaimerBlock(),
