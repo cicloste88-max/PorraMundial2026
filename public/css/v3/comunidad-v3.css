@@ -59,7 +59,7 @@
 /* meta */
 .pc-meta { text-align: center; padding: 10px 16px 0; }
 .pc-meta__eyebrow { font-family: var(--font-display); font-size: 9px; font-weight: 800; letter-spacing: .24em; color: var(--fifa-gold); text-transform: uppercase; }
-.pc-meta__time { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--ink-300); text-transform: uppercase; margin-top: 4px; }
+.pc-meta__time { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--ink-300); text-transform: uppercase; margin-top: 4px; }
 .pc-meta__stadium { font-size: 10px; font-weight: 500; color: var(--ink-400); margin-top: 3px; }
 
 /* hero */
@@ -75,7 +75,7 @@
 .pc-team__flag.is-broken { background: var(--ink-600); }
 .pc-team--a .pc-team__flag { border-color: var(--team-a); --team-glow: rgba(40,81,225,.45); }
 .pc-team--b .pc-team__flag { border-color: var(--team-b); --team-glow: rgba(227,6,19,.45); }
-.pc-team__name { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--ink-100); text-transform: uppercase; text-align: center; }
+.pc-team__name { font-family: var(--font-display); font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--ink-100); text-transform: uppercase; text-align: center; }
 .pc-team__sub { font-size: 9px; font-weight: 500; color: var(--ink-400); letter-spacing: .04em; }
 
 .pc-score { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 4px; }
@@ -83,11 +83,11 @@
 .pc-score--final .pc-score__label { color: var(--win); }
 .pc-score__nums {
   display: flex; align-items: baseline; gap: 8px; font-family: var(--font-display);
-  font-size: 34px; font-weight: 900; line-height: 1; letter-spacing: -.04em; color: var(--ink-100);
+  font-size: 33px; font-weight: 900; line-height: 1; letter-spacing: -.04em; color: var(--ink-100);
   font-variant-numeric: tabular-nums; text-shadow: 0 2px 12px rgba(201,169,97,.25);
 }
 .pc-score__nums.is-empty { color: var(--ink-500); }
-.pc-score__sep { font-size: 20px; color: var(--ink-500); font-weight: 700; }
+.pc-score__sep { font-size: 19px; color: var(--ink-500); font-weight: 700; }
 
 /* body + sections */
 .pc-body { padding: 4px 16px 24px; }
@@ -100,13 +100,13 @@
 .pc-section__title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--ink-700), transparent); }
 .pc-section__count { font-family: var(--font-display); font-size: 9px; font-weight: 700; color: var(--ink-500); letter-spacing: .1em; margin-left: auto; white-space: nowrap; }
 .pc-section__title:has(.pc-section__count)::after { display: none; }
-.pc-section__empty { font-family: var(--font-text); font-size: 11px; color: var(--ink-500); text-align: center; padding: 8px 0; }
+.pc-section__empty { font-family: var(--font-text); font-size: 10px; color: var(--ink-500); text-align: center; padding: 8px 0; }
 
 /* footer · pronóstico propio */
 .pc-footer { padding: 13px 16px 16px; background: rgba(0,0,0,.35); border-top: 1px solid var(--ink-700); display: flex; gap: 8px; align-items: center; }
 .pc-footer__l { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pc-footer__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .2em; color: var(--ink-400); text-transform: uppercase; }
-.pc-footer__val { font-family: var(--font-display); font-size: 14px; font-weight: 800; color: var(--ink-100); letter-spacing: -.01em; }
+.pc-footer__val { font-family: var(--font-display); font-size: 13px; font-weight: 800; color: var(--ink-100); letter-spacing: -.01em; }
 .pc-footer__val b { color: var(--fifa-gold); font-weight: 900; }
 .pc-chip-ok { color: var(--win) !important; }
 
@@ -123,7 +123,7 @@
 .pcb-donut { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; }
 .pcb-donut::after { content: ''; position: absolute; inset: 19px; border-radius: 50%; background: var(--ink-900); box-shadow: inset 0 0 0 1px var(--ink-700); }
 .pcb-donut__center { position: relative; z-index: 1; text-align: center; }
-.pcb-donut__pct { font-family: var(--font-display); font-size: 23px; font-weight: 900; color: var(--ink-100); line-height: 1; letter-spacing: -.03em; }
+.pcb-donut__pct { font-family: var(--font-display); font-size: 22px; font-weight: 900; color: var(--ink-100); line-height: 1; letter-spacing: -.03em; }
 .pcb-donut__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-300); margin-top: 3px; }
 .pcb-signleg { display: flex; flex-direction: column; gap: 9px; }
 .pcb-signleg__row { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px; }
@@ -131,8 +131,8 @@
 .pcb-signleg__dot--1 { background: var(--team-a); }
 .pcb-signleg__dot--x { background: var(--ink-400); }
 .pcb-signleg__dot--2 { background: var(--team-b); }
-.pcb-signleg__name { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--ink-200); }
-.pcb-signleg__pct { font-family: var(--font-display); font-size: 16px; font-weight: 900; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.pcb-signleg__name { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--ink-200); }
+.pcb-signleg__pct { font-family: var(--font-display); font-size: 15px; font-weight: 900; color: var(--ink-100); font-variant-numeric: tabular-nums; }
 .pcb-signleg__row.mine .pcb-signleg__name, .pcb-signleg__row.mine .pcb-signleg__pct { color: var(--fifa-gold); }
 .pcb-signleg__row.mine::after { content: 'TU PICK'; font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .1em; color: var(--fifa-gold); }
 
@@ -143,72 +143,72 @@
 .pcb-top__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .pcb-top__rank { font-family: var(--font-display); font-size: 9px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: var(--fifa-gold); }
 .pcb-top__main { display: flex; align-items: baseline; gap: 14px; }
-.pcb-top__score { font-family: var(--font-display); font-size: 46px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.pcb-top__score { font-family: var(--font-display); font-size: 32px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
 .pcb-top.is-exact .pcb-top__score { color: var(--fifa-gold); }
 .pcb-top__count { display: flex; flex-direction: column; }
-.pcb-top__countnum { font-family: var(--font-display); font-size: 22px; font-weight: 900; color: var(--ink-200); line-height: 1; }
+.pcb-top__countnum { font-family: var(--font-display); font-size: 21px; font-weight: 900; color: var(--ink-200); line-height: 1; }
 .pcb-top__countlbl { font-family: var(--font-display); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-400); }
 .pcb-names { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
 .pcb-name { font-family: var(--font-text); font-size: 10px; font-weight: 600; color: var(--ink-300); background: rgba(255,255,255,.05); border: 1px solid var(--ink-700); border-radius: 999px; padding: 3px 9px; }
 .pcb-rest { display: flex; flex-direction: column; gap: 8px; }
 .pcb-restrow { display: grid; grid-template-columns: 22px 54px 1fr auto; align-items: center; gap: 10px; }
-.pcb-restrow__rank { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--ink-500); text-align: center; }
-.pcb-restrow__score { font-family: var(--font-display); font-size: 15px; font-weight: 900; color: var(--ink-200); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 4px; }
+.pcb-restrow__rank { font-family: var(--font-display); font-size: 10px; font-weight: 800; color: var(--ink-500); text-align: center; }
+.pcb-restrow__score { font-family: var(--font-display); font-size: 14px; font-weight: 900; color: var(--ink-200); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 4px; }
 .pcb-restrow__track { height: 6px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; }
 .pcb-restrow__fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--ink-500), var(--ink-400)); }
 .pcb-restrow.sign1 .pcb-restrow__fill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-a) 55%, var(--ink-600)), var(--team-a)); }
 .pcb-restrow.sign2 .pcb-restrow__fill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-b) 55%, var(--ink-600)), var(--team-b)); }
 .pcb-restrow.is-exact .pcb-restrow__score { color: var(--fifa-gold); }
 .pcb-restrow.is-exact .pcb-restrow__fill { background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); }
-.pcb-restrow__cnt { font-family: var(--font-display); font-size: 13px; font-weight: 800; color: var(--ink-300); }
+.pcb-restrow__cnt { font-family: var(--font-display); font-size: 12px; font-weight: 800; color: var(--ink-300); }
 
 /* goleadores más elegidos · SECCIÓN NUEVA (no estaba en el mock; brief §3.2-6) */
 .pcb-golers { display: flex; flex-direction: column; gap: 8px; }
 .pcb-goler { display: grid; grid-template-columns: 22px minmax(0, 1fr) 72px auto; align-items: center; gap: 10px; }
-.pcb-goler__rank { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--ink-500); text-align: center; }
-.pcb-goler__name { font-family: var(--font-display); font-size: 13px; font-weight: 800; letter-spacing: .02em; color: var(--ink-200); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcb-goler__rank { font-family: var(--font-display); font-size: 10px; font-weight: 800; color: var(--ink-500); text-align: center; }
+.pcb-goler__name { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--ink-200); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcb-goler__track { height: 6px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; }
 .pcb-goler__fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--ink-500), var(--ink-400)); }
-.pcb-goler__cnt { font-family: var(--font-display); font-size: 13px; font-weight: 800; color: var(--ink-300); font-variant-numeric: tabular-nums; }
+.pcb-goler__cnt { font-family: var(--font-display); font-size: 12px; font-weight: 800; color: var(--ink-300); font-variant-numeric: tabular-nums; }
 .pcb-goler.is-exact .pcb-goler__name, .pcb-goler.is-exact .pcb-goler__cnt { color: var(--fifa-gold); }
 .pcb-goler.is-exact .pcb-goler__fill { background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); }
 
 /* global hero */
 .pcb-global { text-align: center; }
-.pcb-global__num { font-family: var(--font-display); font-size: 44px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.pcb-global__num { font-family: var(--font-display); font-size: 43px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
 .pcb-global__sub { font-family: var(--font-display); font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-400); margin-top: 6px; }
 .pcb-global__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .pcb-gcard { background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .pcb-gcard__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400); }
-.pcb-gcard__v { font-family: var(--font-display); font-size: 20px; font-weight: 900; color: var(--ink-100); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-.pcb-gcard__pct { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--fifa-gold); }
+.pcb-gcard__v { font-family: var(--font-display); font-size: 19px; font-weight: 900; color: var(--ink-100); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.pcb-gcard__pct { font-family: var(--font-display); font-size: 10px; font-weight: 800; color: var(--fifa-gold); }
 
 /* IA card prominente */
 .pcb-ia { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 16px; border-radius: 18px; background: radial-gradient(120% 120% at 50% 0%, rgba(201,169,97,.16), rgba(0,0,0,.25)); border: 1px solid rgba(201,169,97,.35); text-align: center; }
-.pcb-ia__badge { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(201,169,97,.16); border: 1px solid rgba(201,169,97,.45); font-size: 22px; }
+.pcb-ia__badge { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(201,169,97,.16); border: 1px solid rgba(201,169,97,.45); font-size: 21px; }
 .pcb-ia__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--fifa-gold); }
-.pcb-ia__score { font-family: var(--font-display); font-size: 40px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.pcb-ia__score { font-family: var(--font-display); font-size: 39px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
 .pcb-ia__ring { display: flex; align-items: center; gap: 8px; }
 .pcb-ia__bartrack { width: 120px; height: 7px; background: rgba(0,0,0,.4); border: 1px solid var(--ink-700); border-radius: 4px; overflow: hidden; }
 .pcb-ia__barfill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); box-shadow: 0 0 10px rgba(201,169,97,.4); }
-.pcb-ia__conf { font-family: var(--font-display); font-size: 14px; font-weight: 900; color: var(--fifa-gold); font-variant-numeric: tabular-nums; }
+.pcb-ia__conf { font-family: var(--font-display); font-size: 13px; font-weight: 900; color: var(--fifa-gold); font-variant-numeric: tabular-nums; }
 .pcb-ia__hit { font-family: var(--font-display); font-size: 9px; font-weight: 900; letter-spacing: .08em; color: var(--win); text-transform: uppercase; }
 
 /* ============================================================
    SCREEN 2 — Porra de un jugador (.up-*)
    ============================================================ */
 .up-profile { display: flex; align-items: center; gap: 14px; padding: 14px 16px 6px; }
-.up-avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink-900); background: linear-gradient(150deg, var(--fifa-gold), var(--fifa-gold-deep)); box-shadow: 0 6px 16px rgba(201,169,97,.35); }
+.up-avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 21px; color: var(--ink-900); background: linear-gradient(150deg, var(--fifa-gold), var(--fifa-gold-deep)); box-shadow: 0 6px 16px rgba(201,169,97,.35); }
 .up-id { min-width: 0; }
-.up-id__name { font-family: var(--font-display); font-size: 21px; font-weight: 900; letter-spacing: -.01em; color: var(--ink-100); line-height: 1.05; }
+.up-id__name { font-family: var(--font-display); font-size: 20px; font-weight: 900; letter-spacing: -.01em; color: var(--ink-100); line-height: 1.05; }
 .up-id__meta { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); margin-top: 4px; }
 .up-id__meta b { color: var(--fifa-gold); }
 
 .up-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 16px 4px; }
 .up-stat { background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.up-stat__num { font-family: var(--font-display); font-size: 22px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink-100); }
+.up-stat__num { font-family: var(--font-display); font-size: 21px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink-100); }
 .up-stat__num b { color: var(--fifa-gold); }
-.up-stat__num small { font-size: 12px; color: var(--ink-500); }
+.up-stat__num small { font-size: 11px; color: var(--ink-500); }
 .up-stat__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); text-align: center; }
 
 .up-jornada { font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-300); padding: 0 0 12px; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
@@ -231,16 +231,16 @@
 .up-team__flag { display: block; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--ink-700); border: 1.5px solid var(--ink-600); }
 .up-team__flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .up-team__flag.is-broken { background: var(--ink-600); }
-.up-team__code { font-family: var(--font-display); font-size: 13px; font-weight: 800; letter-spacing: .04em; color: var(--ink-100); }
+.up-team__code { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--ink-100); }
 .up-pred { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 4px; }
 .up-pred__lbl { font-family: var(--font-display); font-size: 7px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-500); }
-.up-pred__score { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 24px; font-weight: 900; line-height: 1; letter-spacing: -.03em; color: var(--ink-100); font-variant-numeric: tabular-nums; }
-.up-pred__sep { color: var(--ink-500); font-size: 16px; }
+.up-pred__score { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 23px; font-weight: 900; line-height: 1; letter-spacing: -.03em; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.up-pred__sep { color: var(--ink-500); font-size: 15px; }
 
 .up-match__foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--ink-700); background: rgba(0,0,0,.25); }
 .up-foot__real { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--ink-400); text-transform: uppercase; }
-.up-foot__real b { color: var(--ink-100); font-weight: 900; font-size: 12px; margin-left: 4px; font-variant-numeric: tabular-nums; }
-.up-foot__pts { font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.up-foot__real b { color: var(--ink-100); font-weight: 900; font-size: 11px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.up-foot__pts { font-family: var(--font-display); font-size: 10px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
 .up-match.k-exact { box-shadow: inset 3px 0 0 var(--fifa-gold); }
 .up-match.k-exact .up-pred__score, .up-match.k-exact .up-foot__pts { color: var(--fifa-gold); }
 .up-match.k-sign { box-shadow: inset 3px 0 0 var(--win); }
@@ -271,7 +271,7 @@
 .up-tabs { display: flex; gap: 7px; padding: 4px 16px 14px; overflow-x: auto; scrollbar-width: none; }
 .up-tabs::-webkit-scrollbar { display: none; }
 .up-tab { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 13px; border-radius: 10px; border: 1px solid var(--ink-700); background: rgba(0,0,0,.25); cursor: pointer; transition: border-color .15s, background .15s; }
-.up-tab__t { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--ink-200); }
+.up-tab__t { font-family: var(--font-display); font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--ink-200); }
 .up-tab__s { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-500); white-space: nowrap; }
 .up-tab.done .up-tab__s { color: var(--win); }
 .up-tab.live .up-tab__s { color: var(--fifa-red); }

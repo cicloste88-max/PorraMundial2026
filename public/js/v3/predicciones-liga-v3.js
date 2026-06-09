@@ -108,7 +108,11 @@
     const eyebrow = [jornada ? 'Jornada ' + jornada : null, match.group ? 'Grupo ' + match.group : null, indexInJornada ? 'Partido ' + indexInJornada : null].filter(Boolean).join(' · ');
     const real = _realResult(match, matchKey);
     const final = !!real;
-    const stadium = (typeof window.stadiumForMatch === 'function') ? (window.stadiumForMatch(match) || '') : (match.stadium || '');
+    // stadiumForMatch devuelve OBJETO {name, city, capacity} (no string) → componer.
+    const _stRaw = (typeof window.stadiumForMatch === 'function') ? window.stadiumForMatch(match) : (match.stadium || '');
+    const stadium = !_stRaw ? ''
+      : (typeof _stRaw === 'string' ? _stRaw
+      : (_stRaw.name ? _stRaw.name + (_stRaw.city ? ' · ' + _stRaw.city : '') : ''));
 
     const pred = _predictions()[matchKey] || {};
     const hasPred = pred.l != null && pred.v != null;
@@ -144,7 +148,9 @@
     scorers.sort((a, b) => b.count - a.count);
     if (final && scorers.length) scorers[0].hit = true; // demo estado oro
 
-    const gTotal = 70000 + Math.floor(rnd() * 90000);
+    // Total global cross-liga (demo): ~2-3× el total de la liga (decenas).
+    // En F5 lo da el endpoint cross-liga real (puede ser mucho mayor).
+    const gTotal = Math.round(total * (2 + rnd()));
     const gWinner = p1 >= pX && p1 >= p2 ? '1' : p2 >= pX ? '2' : 'X';
     const gPct = Math.max(p1, pX, p2);
     const topScore = { home: scores[0].home, away: scores[0].away, pct: 10 + Math.floor(rnd() * 9) };
