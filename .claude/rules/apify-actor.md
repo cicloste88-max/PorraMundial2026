@@ -12,21 +12,23 @@ Al modificar cualquier fichero bajo `apify-actors/`. Cubre desarrollo local, val
 
 ## Actor principal vs fallback
 
-**Principal en producción**: `sofascore-webshare-proxy` (ID `N8vUChlhok5JU3cnL`, build 1.0.7). Proxy Webshare residencial rotativo, fetch directo a `api.sofascore.com/api/v1/event/{id}` y `/incidents`. Cookies de SofaScore reutilizables (no IP-bound). Latencia ~5–10s, coste ~$0.001/run.
+**Principal en producción**: `sofascore-webshare-proxy` (ID `N8vUChlhok5JU3cnL`, build 1.0.10). Proxy Webshare residencial rotativo, fetch a `api.sofascore.com/api/v1/event/{id}` y `/incidents` vía Playwright. Acepta batch `eventIds[]` (un item de dataset por evento). Cookies de SofaScore reutilizables (no IP-bound). Latencia ~10s/run, coste ~$0.001/run. Credenciales Webshare en env vars secret del actor (`WEBSHARE_PROXY_USER`/`WEBSHARE_PROXY_PASS`), NUNCA hardcodeadas.
 
 **Fallback**: `sofascore-live-proxy` (ID `BYLtYcOxYkruVipwr`) basado en Playwright + proxy Apify residencial. Más caro (~$0.03/run) y lento (~30–44s) pero robusto si Webshare falla. Detalle del pipeline en `docs/live-scoring.md`.
 
 ## Contrato I/O del actor Webshare
 
-**Input**: `{ "eventId": "15832749" }` (identificador numérico SofaScore).
+**Input**: `{ "eventId": "15832749" }` (single), `{ "eventIds": ["...", "..."] }` (batch por slot — flujo de producción vía `porra-match-live`) o `{ "matchUrl": "...#id:XXXXX" }`. Opcional `mode: "normal" | "capture" | "reuse"` (cookies KV Store `sofascore-cookies`).
 
-**Output**: dataset Apify con dos items:
+**Output**: dataset Apify con **un item por eventId**, cada uno con:
 - `item.event` = `{ status, ok, data: { event: {...} } }` con el evento completo (homeTeam, awayTeam, scores, status).
 - `item.incidents` = `{ status, ok, data: { incidents: [...] } }` con timeline de incidencias (goles, tarjetas, sustituciones).
 
-Ambas respuestas llevan campos `status: "ok"` para manejo de errores.
+Si un evento del batch falla, su item lleva `status: 0, ok: false, data.error` y el resto del batch continúa.
 
 ## Build y push del actor
+
+⚠️ **Verificar drift antes de push**: el deploy en Apify puede divergir del repo (pasó entre 1.0.7→1.0.10: el batch `eventIds[]` se añadió fuera del repo). Antes de `apify push`, ejecutar `apify pull N8vUChlhok5JU3cnL` en un directorio temporal y diffear contra el repo para no machacar cambios desplegados.
 
 Tras modificar código del actor Webshare:
 
