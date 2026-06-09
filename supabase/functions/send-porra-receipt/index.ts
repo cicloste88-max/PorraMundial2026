@@ -18,7 +18,7 @@
 //                                             destinatario; el comprobante se
 //                                             construye con los datos reales del
 //                                             user_id indicado. Para pruebas sin
-//                                             dominio verificado en Resend.
+//                                             remitente verificado en Brevo.
 //
 // Idempotencia: UNIQUE(user_id, league_id) en sent_receipts. 2ª llamada → skipped.
 
@@ -44,7 +44,7 @@ function cors(origin: string | null): Record<string, string> {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_FROM = "Porra Mundial 2026 <onboarding@resend.dev>";
+const DEFAULT_FROM = "Porra Mundial 2026 <adminmundialapp@gmail.com>";
 
 // deno-lint-ignore no-explicit-any
 function jsonResponse(body: any, status: number, origin: string | null): Response {
@@ -54,33 +54,48 @@ function jsonResponse(body: any, status: number, origin: string | null): Respons
   });
 }
 
-// ─── Resend ──────────────────────────────────────────────────────────────────
+// ─── Brevo ───────────────────────────────────────────────────────────────────
+// Parsea "Name <email>" → { name, email } para el campo sender de Brevo.
+function parseSender(from: string): { name: string; email: string } {
+  const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m && m[2]) {
+    return { name: (m[1] || "").trim() || "Porra Mundial 2026", email: m[2].trim() };
+  }
+  const bare = from.trim();
+  if (bare.includes("@")) return { name: "Porra Mundial 2026", email: bare };
+  return { name: "Porra Mundial 2026", email: "adminmundialapp@gmail.com" };
+}
+
+// apiKey = BREVO_API_KEY (llega en cfg.resendKey por compat de firma legacy).
+// SIN adjunto: el comprobante completo va por hosted link (uploadReceipt, ver A).
 async function sendEmail(
-  resendKey: string,
+  apiKey: string,
   from: string,
   to: string,
   subject: string,
   bodyHtml: string,
 ): Promise<string> {
-  const res = await fetch("https://api.resend.com/emails", {
+  const sender = parseSender(from);
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
+      "api-key": apiKey,
+      "accept": "application/json",
+      "content-type": "application/json",
     },
     body: JSON.stringify({
-      from,
-      to: [to],
+      sender,
+      to: [{ email: to }],
       subject,
-      html: bodyHtml, // cuerpo ligero con botón al comprobante alojado (sin adjunto)
+      htmlContent: bodyHtml,
     }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`resend_http_${res.status}:${t.slice(0, 240)}`);
+    throw new Error(`brevo_http_${res.status}:${t.slice(0, 240)}`);
   }
   const j = await res.json().catch(() => ({}));
-  return j?.id ?? "";
+  return j?.messageId ?? "";
 }
 
 // ─── Supabase Storage: comprobante alojado ──────────────────────────────────
@@ -118,7 +133,7 @@ async function uploadReceipt(
 }
 
 interface SendConfig {
-  resendKey: string;
+  resendKey: string; // legacy: el campo se mantiene pero contiene la BREVO_API_KEY
   from: string;
   supabaseUrl: string;
   serviceKey: string;
@@ -268,10 +283,11 @@ serve(async (req: Request) => {
     toOverride = candidate; // honrado: la request ya pasó requireAdminOrCron
   }
 
-  // ── Config Resend (env → Vault → fallback from) ──────────────────────────
+  // ── Config Brevo (env → Vault → fallback from) ───────────────────────────
+  // resendKey = nombre legacy del campo; contiene la BREVO_API_KEY.
   const resendKey =
-    (Deno.env.get("RESEND_API_KEY") || "").trim() ||
-    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "RESEND_API_KEY")) ||
+    (Deno.env.get("BREVO_API_KEY") || "").trim() ||
+    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "BREVO_API_KEY")) ||
     "";
   const from =
     (Deno.env.get("PORRA_FROM_EMAIL") || "").trim() ||
@@ -297,7 +313,7 @@ serve(async (req: Request) => {
     const results: ProcessResult[] = [];
     for (const id of targets) {
       results.push(await processReceipt(supa, id, leagueId, toOverride, cfg));
-      // Throttle suave para no chocar con el rate-limit de Resend.
+      // Throttle suave para no chocar con el rate-limit de Brevo.
       await new Promise((r) => setTimeout(r, 350));
     }
     const tally = {
