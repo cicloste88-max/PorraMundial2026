@@ -3,5 +3,9 @@
   "name": "sofascore-webshare-proxy",
   "version": "1.0",
   "buildTag": "latest",
-  "dockerfile": "../Dockerfile"
+  "dockerfile": "../Dockerfile",
+  "environmentVariables": {
+    "WEBSHARE_PROXY_USER": "@webshareProxyUser",
+    "WEBSHARE_PROXY_PASS": "@webshareProxyPass"
+  }
 }

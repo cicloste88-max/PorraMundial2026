@@ -4,7 +4,7 @@
 
 | Componente | Versión | Estado |
 |---|---|---|
-| Actor `sofascore-webshare-proxy` `N8vUChlhok5JU3cnL` | build 1.0.10 | PRODUCCIÓN — proxy Webshare residencial (~$0.001/run), batch `eventIds[]` |
+| Actor `sofascore-webshare-proxy` `N8vUChlhok5JU3cnL` | build 1.0.13 | PRODUCCIÓN — proxy Webshare residencial, batch `eventIds[]`, modo `auto` self-healing, 2048MB/300s default |
 | Actor `sofascore-live-proxy` `BYLtYcOxYkruVipwr` | build 1.0.19 | FALLBACK — proxies Apify residenciales (~$0.03/run) |
 | `porra-match-live` EF | v18 | async + webhook (Webshare principal + fallback automático). Disparada batched por `dispatch-live-slots` (ver §Bloque crítico) |
 | `porra-apify-webhook` EF | v9 | logging completo, detecta goles + status, llama Twilio directo. Aún no persiste `home_team_name` / `away_team_name` / `competition` / `match_start_ts` (cosmético — **ya NO bloquea el puente**, que resuelve equipos vía `wc_matches` por `match_key`) |
@@ -28,17 +28,19 @@ Webshare reduce coste ~96% respecto al proxy datacenter porque las IPs residenci
 ## Actor principal — sofascore-webshare-proxy
 
 **ID**: `N8vUChlhok5JU3cnL`
-**Build**: 1.0.10 (reconciliado al repo 10-jun-2026 vía `apify pull` — entre 1.0.7 y 1.0.10 se añadió batch `eventIds[]` fuera del repo)
+**Build**: 1.0.13 (10-jun-2026: reconciliado drift 1.0.7→1.0.10 vía `apify pull` + refactor Nivel 1 — modo `auto`, batch paralelo, timeouts, env vars)
 
-**Técnica**: proxy Webshare residencial rotativo (Playwright + `page.evaluate(fetch)`). Fetch a `api.sofascore.com/api/v1/event/{eventId}` y `/incidents` desde IP residencial; cookies SofaScore reutilizables (modos `capture`/`reuse` vía KV Store `sofascore-cookies`).
+**Técnica**: proxy Webshare residencial rotativo (Playwright + `page.evaluate(fetch)`). Fetch a `api.sofascore.com/api/v1/event/{eventId}` y `/incidents` desde IP residencial. **Modo `auto` (default)**: inyecta cookies del KV Store `sofascore-cookies` SIN cargar sofascore.com (run ~5-6s, mínimo bandwidth Webshare); si no hay cookies o un fetch devuelve 403 → captura cookies frescas (goto + espera de `__cf_bm`) y reintenta solo los ids fallidos (self-healing). Cookies muy longevas (validado reuse con cookies de 2 meses → 200). Modos `capture`/`reuse`/`normal` se mantienen para debug.
 
-**Credenciales**: `WEBSHARE_PROXY_USER` / `WEBSHARE_PROXY_PASS` en env vars secret del actor (Apify Console → Environment variables). El user lleva el sufijo de rotación por países (`-US-GB-DE-NL-FR-rotate`). Fail-fast si faltan.
+**Credenciales**: `WEBSHARE_PROXY_USER` / `WEBSHARE_PROXY_PASS` en env vars secret del actor, pusheadas vía `apify secrets` + referencias `@webshareProxyUser`/`@webshareProxyPass` en `.actor/actor.json` (la referencia es committeable; el valor vive en el CLI local y cifrado en Apify). El user lleva el sufijo de rotación por países (`-US-GB-DE-NL-FR-rotate`). Fail-fast si faltan. **Rotación**: `apify secrets rm` + `apify secrets add` con los valores nuevos + `apify push` (o editar env vars en Console).
+
+**Run options default** (vía API, 10-jun): `memoryMbytes: 2048` (antes 4096 — coste/run a la mitad), `timeoutSecs: 300` (antes 3600 — un run colgado ya no factura 1h). Caveat: si `porra-match-live` pasa `memory`/`timeout` explícitos en su llamada a la API de Apify, esos prevalecen sobre el default.
 
 **Contrato I/O**:
 
-- Input: `{ "eventId": "15832749" }` (single) **o** `{ "eventIds": ["158...", "158..."] }` (batch por slot — así lo invoca `porra-match-live` v18 vía `dispatch-live-slots`) o `{ "matchUrl": "...#id:XXXXX" }`. Opcional `mode: "normal" | "capture" | "reuse"` (default `normal`).
-- Output: **un item del dataset por eventId**: `{ eventId, event: {status, ok, data: {event: {...}}}, incidents: {status, ok, data: {incidents: [...]}} }`. Si un ID falla, su item lleva `status: 0, ok: false` y el resto del batch continúa.
-- Latencia: ~10 segundos por run (batch incluido; el coste de Playwright + goto se paga una vez por run, no por evento)
+- Input: `{ "eventId": "15832749" }` (single) **o** `{ "eventIds": ["158...", "158..."] }` (batch por slot — así lo invoca `porra-match-live` v18 vía `dispatch-live-slots`) o `{ "matchUrl": "...#id:XXXXX" }`. Opcional `mode: "auto" | "capture" | "reuse" | "normal"` (default `auto`).
+- Output: **un item del dataset por eventId**: `{ eventId, event: {status, ok, data: {event: {...}}}, incidents: {status, ok, data: {incidents: [...]}} }`. Si un ID falla, su item lleva `status: 0, ok: false` y el resto del batch continúa. Los ids del batch se fetchean **en paralelo** (1 `page.evaluate`, `AbortSignal.timeout(15s)` por fetch).
+- Latencia: ~5-6s por run en camino feliz (reuse), ~15s si toca capture.
 
 ## Actor fallback — sofascore-live-proxy
 

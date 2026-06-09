@@ -12,13 +12,13 @@ Al modificar cualquier fichero bajo `apify-actors/`. Cubre desarrollo local, val
 
 ## Actor principal vs fallback
 
-**Principal en producción**: `sofascore-webshare-proxy` (ID `N8vUChlhok5JU3cnL`, build 1.0.10). Proxy Webshare residencial rotativo, fetch a `api.sofascore.com/api/v1/event/{id}` y `/incidents` vía Playwright. Acepta batch `eventIds[]` (un item de dataset por evento). Cookies de SofaScore reutilizables (no IP-bound). Latencia ~10s/run, coste ~$0.001/run. Credenciales Webshare en env vars secret del actor (`WEBSHARE_PROXY_USER`/`WEBSHARE_PROXY_PASS`), NUNCA hardcodeadas.
+**Principal en producción**: `sofascore-webshare-proxy` (ID `N8vUChlhok5JU3cnL`, build 1.0.13). Proxy Webshare residencial rotativo, fetch a `api.sofascore.com/api/v1/event/{id}` y `/incidents` vía Playwright. Acepta batch `eventIds[]` (fetch paralelo, un item de dataset por evento). Modo `auto` default: reuse de cookies KV sin cargar sofascore.com + recapture self-healing si 403. Latencia ~5-6s/run (reuse), defaults 2048MB/300s. Credenciales Webshare en env vars secret (`WEBSHARE_PROXY_USER`/`WEBSHARE_PROXY_PASS` vía `apify secrets` + refs `@` en `.actor/actor.json`), NUNCA hardcodeadas.
 
 **Fallback**: `sofascore-live-proxy` (ID `BYLtYcOxYkruVipwr`) basado en Playwright + proxy Apify residencial. Más caro (~$0.03/run) y lento (~30–44s) pero robusto si Webshare falla. Detalle del pipeline en `docs/live-scoring.md`.
 
 ## Contrato I/O del actor Webshare
 
-**Input**: `{ "eventId": "15832749" }` (single), `{ "eventIds": ["...", "..."] }` (batch por slot — flujo de producción vía `porra-match-live`) o `{ "matchUrl": "...#id:XXXXX" }`. Opcional `mode: "normal" | "capture" | "reuse"` (cookies KV Store `sofascore-cookies`).
+**Input**: `{ "eventId": "15832749" }` (single), `{ "eventIds": ["...", "..."] }` (batch por slot — flujo de producción vía `porra-match-live`) o `{ "matchUrl": "...#id:XXXXX" }`. Opcional `mode: "auto" | "capture" | "reuse" | "normal"` (default `auto`; cookies KV Store `sofascore-cookies`).
 
 **Output**: dataset Apify con **un item por eventId**, cada uno con:
 - `item.event` = `{ status, ok, data: { event: {...} } }` con el evento completo (homeTeam, awayTeam, scores, status).
