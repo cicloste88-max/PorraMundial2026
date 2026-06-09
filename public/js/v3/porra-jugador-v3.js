@@ -45,6 +45,7 @@
   function _mk(m) { return (typeof getMatchKey === 'function') ? getMatchKey(m) : (m.group + '_' + m.home + '_' + m.away); }
 
   var CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12 L5 8 L10 4"/></svg>';
+  var SEP = '<span class="pcb-sep">–</span>'; // separador de marcador discreto
 
   // ── PRNG determinista (seed por string) ──
   function _seed(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -201,8 +202,8 @@
       : '';
 
     var foot;
-    if (isFinal) foot = '<span class="up-foot__real">Resultado <b>' + m.real.h + '–' + m.real.a + '</b></span><span class="up-foot__pts">' + (m.pts || 0) + ' pts' + (m.boosted ? ' · ⚡×2' : '') + '</span>';
-    else if (isLive) foot = '<span class="up-foot__real">En directo <b>' + m.live.h + '–' + m.live.a + '</b></span><span class="up-foot__pts">' + (m.pts || 0) + ' pts prov.</span>';
+    if (isFinal) foot = '<span class="up-foot__real">Resultado <b>' + m.real.h + SEP + m.real.a + '</b></span><span class="up-foot__pts">' + (m.pts || 0) + ' pts' + (m.boosted ? ' · ⚡×2' : '') + '</span>';
+    else if (isLive) foot = '<span class="up-foot__real">En directo <b>' + m.live.h + SEP + m.live.a + '</b></span><span class="up-foot__pts">' + (m.pts || 0) + ' pts prov.</span>';
     else foot = '<span class="up-foot__real">Aún por jugar</span>';
 
     return '<div class="' + cls.join(' ') + '">' +

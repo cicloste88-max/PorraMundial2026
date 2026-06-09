@@ -44,6 +44,7 @@
   const codeFor = (name) => (PCS().codeFor ? PCS().codeFor(name) : String(name || '').slice(0, 3).toUpperCase());
 
   const CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12 L5 8 L10 4"/></svg>';
+  const SEP = '<span class="pcb-sep">–</span>'; // separador de marcador discreto
 
   function findMatch(matchKey) {
     const arr = _partidos();
@@ -232,7 +233,7 @@
       const exact = final && m.real && s.home === m.real.home && s.away === m.real.away;
       return '<div class="pcb-restrow sign' + sign + (exact ? ' is-exact' : '') + '">' +
         '<span class="pcb-restrow__rank">' + (i + 2) + '</span>' +
-        '<span class="pcb-restrow__score">' + s.home + '–' + s.away + (exact ? ' ✓' : '') + '</span>' +
+        '<span class="pcb-restrow__score">' + s.home + SEP +s.away + (exact ? ' ✓' : '') + '</span>' +
         '<span class="pcb-restrow__track"><span class="pcb-restrow__fill" style="width:' + Math.round(s.count / max * 100) + '%"></span></span>' +
         '<span class="pcb-restrow__cnt">' + s.count + '</span></div>';
     }).join('');
@@ -241,7 +242,7 @@
         '<div class="pcb-top' + (topExact ? ' is-exact' : '') + '">' +
           '<div class="pcb-top__head"><span class="pcb-top__rank">#1 · Más jugado</span>' +
             (topExact ? '<span class="pcb-tag pcb-tag--exact">✓ Exacto</span>' : '') + '</div>' +
-          '<div class="pcb-top__main"><span class="pcb-top__score">' + top.home + '–' + top.away + '</span>' +
+          '<div class="pcb-top__main"><span class="pcb-top__score">' + top.home + SEP +top.away + '</span>' +
             '<span class="pcb-top__count"><span class="pcb-top__countnum">' + top.count + '</span>' +
             '<span class="pcb-top__countlbl">jugadores</span></span></div>' +
           '<div class="pcb-names">' + names + '</div>' +
@@ -275,7 +276,7 @@
             '<span class="pcb-gcard__v">' + esc(g.sign.winner === '1' ? m.home.code : g.sign.winner === '2' ? m.away.code : 'X') + '</span>' +
             '<span class="pcb-gcard__pct">' + g.sign.pct + '%</span></div>' +
           '<div class="pcb-gcard"><span class="pcb-gcard__k">Marcador top</span>' +
-            '<span class="pcb-gcard__v">' + g.topScore.home + '–' + g.topScore.away + '</span>' +
+            '<span class="pcb-gcard__v">' + g.topScore.home + SEP +g.topScore.away + '</span>' +
             '<span class="pcb-gcard__pct">' + g.topScore.pct + '%</span></div>' +
         '</div>' +
       '</div>'
@@ -288,7 +289,7 @@
       '<div class="pcb-ia">' +
         '<div class="pcb-ia__badge">✦</div>' +
         '<div class="pcb-ia__k">Resultado más probable · IA + estadística</div>' +
-        '<div class="pcb-ia__score">' + ia.score.home + ' – ' + ia.score.away + '</div>' +
+        '<div class="pcb-ia__score">' + ia.score.home + SEP + ia.score.away + '</div>' +
         '<div class="pcb-ia__ring"><div class="pcb-ia__bartrack"><div class="pcb-ia__barfill" style="width:' + ia.confidence + '%"></div></div>' +
           '<span class="pcb-ia__conf">' + ia.confidence + '%</span></div>' +
         (hit ? '<div class="pcb-ia__hit">✓ La IA clavó el marcador</div>' : '') +
@@ -307,7 +308,7 @@
         : '<span style="color:var(--ink-500)"> · Fallado</span>';
     }
     const val = mine
-      ? esc(m.home.code) + ' <b>' + mine.home + '–' + mine.away + '</b> ' + esc(m.away.code) + tag
+      ? esc(m.home.code) + ' <b>' + mine.home + SEP +mine.away + '</b> ' + esc(m.away.code) + tag
       : '<span style="color:var(--ink-500)">Sin pronóstico</span>';
     return (
       '<div class="pc-footer"><div class="pc-footer__l">' +

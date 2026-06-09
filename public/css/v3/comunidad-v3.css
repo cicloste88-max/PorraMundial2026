@@ -113,6 +113,8 @@
 /* tag reutilizable (del podio: "✓ Exacto") — portado de .a-tag del mock */
 .pcb-tag { font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; padding: 2px 5px; border-radius: 4px; }
 .pcb-tag--exact { color: var(--ink-900); background: var(--fifa-gold); }
+/* separador de marcador (entre cifras) — discreto, sin pegarse a los números */
+.pcb-sep { color: var(--ink-500); font-weight: 600; margin: 0 .1em; }
 
 /* ============================================================
    SCREEN 1 — Predicciones de la liga (.pcb-*  ·  ex-variante B)
