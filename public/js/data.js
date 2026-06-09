@@ -507,58 +507,13 @@ window.loadLeagueRanking = loadLeagueRanking;
 //     contextuales para la sección DESTACADOS DE TU LIGA. ===
 async function loadLeagueHighlights(leagueId, userId) {
   if (!leagueId || !userId || !window._porraDb) return [];
-  var db = window._porraDb;
   var items = [];
 
-  // Item A — Pick contrarian en KO: equipos que solo 1-2 miembros eligen
-  // y el usuario actual está entre ellos.
-  try {
-    var koRes = await db
-      .from('ko_predictions')
-      .select('user_id, winner_team, round')
-      .eq('league_id', leagueId);
-    var koPreds = (koRes && koRes.data) || [];
-    if (koPreds.length > 0) {
-      var byTeam = {};
-      for (var i = 0; i < koPreds.length; i++) {
-        var t = koPreds[i].winner_team;
-        if (!t) continue;
-        if (!byTeam[t]) byTeam[t] = { users: [], round: koPreds[i].round || 'Eliminatorias' };
-        if (byTeam[t].users.indexOf(koPreds[i].user_id) === -1) byTeam[t].users.push(koPreds[i].user_id);
-      }
-      var teams = Object.keys(byTeam);
-      for (var j = 0; j < teams.length; j++) {
-        var info = byTeam[teams[j]];
-        if ((info.users.length === 1 || info.users.length === 2) && info.users.indexOf(userId) !== -1) {
-          if (info.users.length === 1) {
-            items.push({ icon: '🎯', text: 'Solo tú apuestas por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
-          } else {
-            items.push({ icon: '🎯', text: 'Solo tú y otro apostáis por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
-          }
-          break;
-        }
-      }
-    }
-  } catch (e) { console.warn('[highlights] item A', e); }
-
-  // Item B — Coincidencia campeón.
-  try {
-    var awRes = await db
-      .from('award_picks')
-      .select('user_id, champion')
-      .eq('league_id', leagueId);
-    var aw = (awRes && awRes.data) || [];
-    var mine = aw.find ? aw.find(function (a) { return a.user_id === userId; }) : null;
-    if (mine && mine.champion) {
-      var others = aw.filter(function (a) { return a.champion === mine.champion && a.user_id !== userId; }).length;
-      var total = aw.length;
-      if (others === 0) {
-        items.push({ icon: '🥇', text: 'Solo tú apuestas por ' + mine.champion + ' campeón.' });
-      } else {
-        items.push({ icon: '🥇', text: 'Tu campeón ' + mine.champion + ' coincide con ' + others + ' de ' + total + ' de tu liga.' });
-      }
-    }
-  } catch (e) { console.warn('[highlights] item B', e); }
+  // Items A (contrarian KO sobre ko_predictions) y B (coincidencia campeón
+  // sobre award_picks) ELIMINADOS — NO reintroducir conteos client-side sobre
+  // esas tablas: su RLS SELECT (auth.uid() = user_id) capa la query a la fila
+  // propia y cualquier "solo tú" sale falso (ERR-85). El agregado real de liga
+  // exige RPC/EF service_role; reconstrucción = deuda post-11-jun.
 
   // Item C — IA Zayu en top 3 (depende de window._leagueRanking poblado).
   try {

@@ -12,9 +12,12 @@ agregado de liga es estructuralmente irrealizable desde el cliente (Gallos
 real vía service_role: 17 miembros, 15 cerradas / 2 pendientes). Fix (opción
 A): item eliminado de `loadLeagueHighlights` (`data.js`); el slot cae al
 genérico "Tu liga está lista para jugar". Contador real futuro → RPC SECURITY
-DEFINER o EF service_role (patrón `get-league-standings`). Items A
-(`ko_predictions`) y B (`award_picks`) de la misma función comparten el cap
-own-rows-only y quedan señalados, sin tocar, en **ERR-85**.
+DEFINER o EF service_role (patrón `get-league-standings`). Segunda pasada el
+mismo día: items A (`ko_predictions`, contrarian KO) y B (`award_picks`,
+coincidencia campeón) **neutralizados también** — mismo cap own-rows-only, los
+"solo tú" salían falsos (B ya visible en lanzamiento). Sobrevive solo el item C
+(IA Zayu, lee `window._leagueRanking`, agregado legítimo). Reconstrucción vía
+EF service_role = deuda post-11-jun. → **ERR-85**.
 
 ## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
 
