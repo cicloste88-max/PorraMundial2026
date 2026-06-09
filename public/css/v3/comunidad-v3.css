@@ -102,6 +102,12 @@
 .pc-section__title:has(.pc-section__count)::after { display: none; }
 .pc-section__empty { font-family: var(--font-text); font-size: 10px; color: var(--ink-500); text-align: center; padding: 8px 0; }
 
+/* estados de carga / error (F5 wire real) */
+.pc-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 16px; color: var(--ink-400); font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.pc-spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--ink-700); border-top-color: var(--fifa-gold); animation: pc-spin .8s linear infinite; }
+@keyframes pc-spin { to { transform: rotate(360deg); } }
+.pc-retry { margin-top: 6px; font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--fifa-gold); background: rgba(201,169,97,.1); border: 1px solid rgba(201,169,97,.4); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+
 /* footer · pronóstico propio */
 .pc-footer { padding: 13px 16px 16px; background: rgba(0,0,0,.35); border-top: 1px solid var(--ink-700); display: flex; gap: 8px; align-items: center; }
 .pc-footer__l { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -195,6 +201,9 @@
 .pcb-ia__barfill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); box-shadow: 0 0 10px rgba(201,169,97,.4); }
 .pcb-ia__conf { font-family: var(--font-display); font-size: 13px; font-weight: 900; color: var(--fifa-gold); font-variant-numeric: tabular-nums; }
 .pcb-ia__hit { font-family: var(--font-display); font-size: 9px; font-weight: 900; letter-spacing: .08em; color: var(--win); text-transform: uppercase; }
+/* veredicto IA: signo+confianza (F5; ia_predictions no guarda marcador/goleador) */
+.pcb-ia__verdict { font-family: var(--font-display); font-size: 22px; font-weight: 900; letter-spacing: -.01em; color: var(--ink-100); text-align: center; }
+.pcb-ia__verdict b { color: var(--fifa-gold); }
 
 /* ============================================================
    SCREEN 2 — Porra de un jugador (.up-*)

@@ -2,26 +2,22 @@
  * porra-jugador-v3.js  ·  Screen 2 — "Porra de un jugador"
  * ------------------------------------------------------------
  * Todos los pronósticos de grupos de un jugador (consultable por
- * cualquier miembro tras el cierre). Selector de jornada J1/J2/J3
+ * cualquier miembro tras el cierre del TARGET). Selector J1/J2/J3
  * (matchday, modelo V3_MATCH_DAY de grupos-v3.js).
  *
- * Expone:
- *   window.openPorraJugador(userId, nameHint)
- *   window.closePorraJugador()
- *   window.porraJugadorSetJornada(jornadaId)   (selector de jornada)
+ * Expone openPorraJugador(userId, hints) / closePorraJugador() /
+ * porraJugadorSetJornada(id). Entrada: fila del ranking del predictor
+ * (delegación document; lee data-pl-user/name/rank/total).
  *
- * Entrada: fila del ranking del predictor (ui-pred-shell.js
- * _renderRanking), clicable vía delegación a nivel document.
- *
- * Puntuación: motor real. v3CalcMatchPointsGrupos(pred, matchConReal)
- * da {total, types}; total via calcMatchPoints (scoring.js). NO se usa
- * PCutil.chips() del mock (brief 4.3).
- *
- * Datos (F3): mock. Resolución:
- *   1) window.fetchPorraJugador(userId)   -> Promise (F5, real)
- *   2) window._porraJugadorMock[userId]   -> override manual QA
- *   3) _synthPorra(userId)                 -> sintetizado (PARTIDOS+motor)
- * Forma payload = brief 4.4 (solo jornadas de grupos).
+ * F5 — datos REALES vía Edge Function get-user-predictions
+ * (PCShared.invokeEF, cliente JWT). league_id OBLIGATORIO (liga activa).
+ *   - gated:true (porra del TARGET abierta) → empty-state.
+ *   - gated:false → predictions[] crudas overlaid sobre los fixtures de
+ *     grupos (PARTIDOS), + chip boost si el match_id está en boost_picks[].
+ * Chips: motor real v3CalcMatchPointsGrupos → {types}; el total se
+ * reconstruye del breakdown para aplicar el boost ×2 del TARGET (no el
+ * boostPicks global del viewer que leería calcMatchPoints). Resultados
+ * reales desde live_scores / PARTIDOS. Header (nombre) desde profiles.
  * ============================================================ */
 (function () {
   'use strict';
@@ -32,33 +28,39 @@
   var STATE_LABEL = { done: 'Cerrada', live: 'En juego', upcoming: 'Próximamente' };
 
   var returnTo = PAGE_PREDICTOR_ID;
+  var _currentUid = null;
   var _state = { userId: null, payload: null, active: 'j1' };
 
-  // ── globals seguros ──
   function _partidos() { return (typeof PARTIDOS !== 'undefined') ? PARTIDOS : (window.PARTIDOS || []); }
   function _equipos() { return (typeof EQUIPOS !== 'undefined') ? EQUIPOS : (window.EQUIPOS || []); }
+  function _live() { return window._liveScoresByMatchKey || {}; }
   var PCS = function () { return window.PCShared || {}; };
   var esc = function (s) { return PCS().esc ? PCS().esc(s) : String(s == null ? '' : s); };
-  var fmt = function (n) { return PCS().fmt ? PCS().fmt(n) : String(n); };
   var flagImg = function (name, cls) { return PCS().flagImg ? PCS().flagImg(name, cls) : ''; };
   var codeFor = function (name) { return PCS().codeFor ? PCS().codeFor(name) : String(name || '').slice(0, 3).toUpperCase(); };
   function _mk(m) { return (typeof getMatchKey === 'function') ? getMatchKey(m) : (m.group + '_' + m.home + '_' + m.away); }
 
   var CHEVRON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12 L5 8 L10 4"/></svg>';
-  var SEP = '<span class="pcb-sep">–</span>'; // separador de marcador discreto
+  var SEP = '<span class="pcb-sep">–</span>';
 
-  // ── PRNG determinista (seed por string) ──
-  function _seed(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-  function _rng(seed) { var s = seed >>> 0; return function () { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; }
   function _cleanName(s) { return String(s || '').replace(/^\s*\d+\s*·\s*/, '').trim(); }
   function _initials(name) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '?';
-    var s = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]) : parts[0].slice(0, 1);
-    return s.toUpperCase();
+    return (parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]) : parts[0].slice(0, 1)).toUpperCase();
+  }
+  function _scorerName(key, matchObj) {
+    if (!key) return '';
+    var teams = [matchObj.home, matchObj.away];
+    for (var i = 0; i < teams.length; i++) {
+      var e = _equipos().find(function (t) { return t.name === teams[i]; });
+      var p = ((e && e.players) || []).find(function (pp) { return pp.key === key; });
+      if (p) return _cleanName(p.name || p.key);
+    }
+    return key;
   }
   function _timeLabel(match) {
-    if (!match || !match.date) return match && match.time || '';
+    if (!match || !match.date) return (match && match.time) || '';
     var d = new Date(match.date);
     if (isNaN(d.getTime())) return match.time || '';
     var dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
@@ -67,7 +69,7 @@
     return dow + ' ' + d.getDate() + ' · ' + hh + ':' + mm;
   }
 
-  // ── Jornadas de grupos = matchday J1/J2/J3 (modelo V3_MATCH_DAY) ──
+  // Jornadas de grupos = matchday J1/J2/J3 (V3_MATCH_DAY).
   function _matchDayMap() { return (typeof V3_MATCH_DAY !== 'undefined') ? V3_MATCH_DAY : (window.V3_MATCH_DAY || ['J1','J1','J2','J2','J3','J3']); }
   function _gruposJornadas() {
     var arr = _partidos().filter(function (m) { return m && m.group; });
@@ -90,84 +92,95 @@
     return (f.getDate() === l.getDate() ? String(f.getDate()) : f.getDate() + '–' + l.getDate()) + ' ' + mon;
   }
 
-  function _fallbackCalc(pred, ref) {
-    var types = [], total = 0;
-    var exact = pred.l === ref.h && pred.v === ref.a;
-    var signOk = Math.sign(pred.l - pred.v) === Math.sign(ref.h - ref.a);
-    if (exact) { types.push('exact'); total += 3; } else if (signOk) { types.push('win'); total += 1; }
-    return { total: Math.min(total, 7), types: types };
+  // Resultado real del fixture (finished/live) desde live_scores / PARTIDOS.
+  function _realFor(matchObj, matchKey) {
+    var live = _live()[matchKey];
+    if (live && live.status === 'finished') {
+      var h = (live.score_home != null) ? live.score_home : (matchObj.realHome != null ? matchObj.realHome : null);
+      var a = (live.score_away != null) ? live.score_away : (matchObj.realAway != null ? matchObj.realAway : null);
+      if (h != null && a != null) return { h: h, a: a, phase: 'final' };
+    }
+    if (live && (live.status === 'inprogress' || live.status === 'halftime' || live.status === 'overtime' || live.status === 'penalties')) {
+      return { h: live.score_home != null ? live.score_home : 0, a: live.score_away != null ? live.score_away : 0, phase: 'live', minute: live.minute || null };
+    }
+    return null;
   }
 
-  // ── Mock sintetizado (QA) ──
-  function _synthMatch(userId, match, phase, isBoost) {
-    var rnd = _rng(_seed(userId + '|' + _mk(match)));
-    var ph = Math.floor(rnd() * 4), pa = Math.floor(rnd() * 3);
-    var homeEq = _equipos().find(function (e) { return e.name === match.home; });
-    var awayEq = _equipos().find(function (e) { return e.name === match.away; });
-    var roster = ((rnd() < 0.6 ? homeEq : awayEq) || {}).players || [];
-    var golObj = roster.length ? roster[Math.floor(rnd() * Math.min(roster.length, 5))] : null;
-    var pred = { l: ph, v: pa, gol: golObj ? golObj.key : null, saved: true, home: match.home, away: match.away };
+  // base del motor reconstruida del breakdown de tipos (para aplicar el boost
+  // del TARGET, no el boostPicks global del viewer). Espejo de scoring.js:
+  // signo +1, exacto +3 adicional (=4), goleador +2, vs-IA +1, cap 7.
+  function _baseFromTypes(types) {
+    var b = types.indexOf('exact') !== -1 ? 4 : types.indexOf('win') !== -1 ? 1 : 0;
+    if (types.indexOf('gole') !== -1) b += 2;
+    if (types.indexOf('bonus') !== -1) b += 1;
+    return Math.min(b, 7);
+  }
+
+  function buildMatchCard(matchObj, pred, boostSet) {
+    var matchKey = _mk(matchObj);
+    var home = { n: matchObj.home, c: codeFor(matchObj.home) };
+    var away = { n: matchObj.away, c: codeFor(matchObj.away) };
+    var rf = _realFor(matchObj, matchKey);
+    var phase = rf ? rf.phase : 'pre';
+    if (!pred) {
+      return { home: home, away: away, time: _timeLabel(matchObj), phase: 'pre', pred: null, real: null, scorer: '', boost: false, boosted: false, pts: 0, scoringTypes: [] };
+    }
     var out = {
-      home: { n: match.home, c: codeFor(match.home) }, away: { n: match.away, c: codeFor(match.away) },
-      time: phase === 'live' ? (10 + Math.floor(rnd() * 80)) + '′' : _timeLabel(match),
-      phase: phase, pred: { h: ph, a: pa }, real: null,
-      scorer: golObj ? _cleanName(golObj.name || golObj.key) : '', boost: !!isBoost, boosted: false, pts: 0, scoringTypes: [],
+      home: home, away: away,
+      time: phase === 'live' ? (rf.minute ? rf.minute + '′' : 'directo') : _timeLabel(matchObj),
+      phase: phase,
+      pred: { h: pred.local, a: pred.visitante },
+      real: phase === 'final' ? { h: rf.h, a: rf.a } : null,
+      scorer: pred.scorer ? _scorerName(pred.scorer, matchObj) : '',
+      boost: boostSet.has(matchKey), boosted: false, pts: 0, scoringTypes: [],
     };
-    if (phase === 'pre') return out;
-
-    var rh = Math.floor(rnd() * 4), ra = Math.floor(rnd() * 3);
-    if (rh === 0 && ra === 0) ra = 1; // evita sentinel 0-0 (no jugado) del motor v3
-    var ref = { h: rh, a: ra };
-    if (phase === 'live') out.live = ref; else out.real = ref;
-
-    var mWithReal = Object.assign({}, match, { realHome: ref.h, realAway: ref.a });
-    var calc = (typeof window.v3CalcMatchPointsGrupos === 'function') ? window.v3CalcMatchPointsGrupos(pred, mWithReal) : _fallbackCalc(pred, ref);
-    var base = calc.total || 0, types = calc.types || [];
-    var exact = types.indexOf('exact') !== -1;
-    // El motor aplica ×2 si boostPicks real coincide (base>7). Si no, simulamos
-    // el ×2 cosmético en el match marcado boost+exacto. No doble-aplicar.
-    if (base > 7) { out.boosted = true; out.pts = base; }
-    else if (isBoost && exact) { out.boosted = true; out.pts = base * 2; }
-    else out.pts = base;
-    out.scoringTypes = types;
+    if (phase === 'live') out.live = { h: rf.h, a: rf.a };
+    if (phase !== 'pre') {
+      var predObj = { l: pred.local, v: pred.visitante, gol: pred.scorer, saved: true, home: matchObj.home, away: matchObj.away };
+      var mWithReal = Object.assign({}, matchObj, { realHome: rf.h, realAway: rf.a });
+      var calc = (typeof window.v3CalcMatchPointsGrupos === 'function') ? window.v3CalcMatchPointsGrupos(predObj, mWithReal) : { total: 0, types: [] };
+      var types = calc.types || [];
+      var base = _baseFromTypes(types);
+      var exact = types.indexOf('exact') !== -1;
+      out.scoringTypes = types;
+      out.boosted = out.boost && exact;     // boost ×2 del TARGET
+      out.pts = out.boosted ? base * 2 : base;
+    }
     return out;
   }
 
-  function _synthPorra(userId, nameHint) {
+  function buildPorra(ef, userId, hints, name) {
+    var predByKey = {};
+    (ef.predictions || []).forEach(function (p) { predByKey[p.match_id] = p; });
+    var boostSet = new Set(ef.boost_picks || []);
     var md = _gruposJornadas();
-    var meId = window.currentUser && window.currentUser.id;
-    var isMe = !!(meId && String(meId) === String(userId));
-    var name = nameHint
-      || (isMe && window.currentUser && (window.currentUser.nombre || window.currentUser.name))
-      || ('Jugador ' + String(userId || '').slice(0, 4));
-    var leagueName = window._plLeagueName || '';
     var defs = [
-      { id: 'j1', short: 'J1', label: 'Jornada 1', state: 'done', key: 'J1' },
-      { id: 'j2', short: 'J2', label: 'Jornada 2', state: 'live', key: 'J2' },
-      { id: 'j3', short: 'J3', label: 'Jornada 3', state: 'upcoming', key: 'J3' },
+      { id: 'j1', short: 'J1', label: 'Jornada 1', key: 'J1' },
+      { id: 'j2', short: 'J2', label: 'Jornada 2', key: 'J2' },
+      { id: 'j3', short: 'J3', label: 'Jornada 3', key: 'J3' },
     ];
     var jornadas = defs.map(function (def) {
-      var ms0 = (md[def.key] || []).slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
-      var brnd = _rng(_seed(userId + '|' + def.id));
-      var boostIdx = ms0.length ? Math.floor(brnd() * ms0.length) : -1;
-      var matches = ms0.map(function (m, i) {
-        var phase = def.state === 'done' ? 'final'
-          : def.state === 'upcoming' ? 'pre'
-          : (i < 5 ? 'final' : i === 5 ? 'live' : 'pre'); // jornada en juego: mezcla
-        return _synthMatch(userId, m, phase, i === boostIdx);
-      });
-      return { id: def.id, short: def.short, label: def.label, dates: _jornadaDates(ms0), state: def.state, matches: matches };
+      var ms = (md[def.key] || []).slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
+      var matches = ms.map(function (mo) { return buildMatchCard(mo, predByKey[_mk(mo)], boostSet); });
+      var state = 'upcoming';
+      if (matches.some(function (x) { return x.phase === 'live'; })) state = 'live';
+      else if (matches.some(function (x) { return x.phase === 'final'; })) state = 'done';
+      return { id: def.id, short: def.short, label: def.label, dates: _jornadaDates(ms), state: state, matches: matches };
     });
-    var rnd = _rng(_seed(String(userId)));
-    var totalPlayers = 8 + Math.floor(rnd() * 18);
-    var rank = 1 + Math.floor(rnd() * totalPlayers);
-    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas };
-  }
 
-  function _resolvePayload(userId, nameHint) {
-    if (typeof window.fetchPorraJugador === 'function') return window.fetchPorraJugador(userId);
-    var ov = window._porraJugadorMock && window._porraJugadorMock[userId];
-    return ov || _synthPorra(userId, nameHint);
+    var rank = (hints && hints.rank != null) ? hints.rank : null;
+    var totalPlayers = (hints && hints.total != null) ? hints.total : null;
+    if (rank == null || totalPlayers == null) {
+      var sb = window._sbData;
+      if (Array.isArray(sb) && sb.length) {
+        if (totalPlayers == null) totalPlayers = sb.length;
+        if (rank == null) { var idx = sb.findIndex(function (r) { return String(r.uid) === String(userId); }); if (idx >= 0) rank = idx + 1; }
+      }
+    }
+    var meId = window.currentUser && window.currentUser.id;
+    var isMe = !!(meId && String(meId) === String(userId));
+    var leagueName = (window._activeLeague && window._activeLeague.nombre) || '';
+    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas };
   }
 
   // ── Render ──
@@ -176,7 +189,7 @@
   function renderMatchCard(m) {
     var isFinal = m.phase === 'final', isLive = m.phase === 'live';
     var types = m.scoringTypes || [];
-    var signo = isFinal || isLive ? (types.indexOf('win') !== -1 || types.indexOf('exact') !== -1) : false;
+    var signo = (isFinal || isLive) ? (types.indexOf('win') !== -1 || types.indexOf('exact') !== -1) : false;
     var exact = types.indexOf('exact') !== -1;
     var gole = types.indexOf('gole') !== -1;
     var vsIA = types.indexOf('bonus') !== -1;
@@ -206,11 +219,15 @@
     else if (isLive) foot = '<span class="up-foot__real">En directo <b>' + m.live.h + SEP + m.live.a + '</b></span><span class="up-foot__pts">' + (m.pts || 0) + ' pts prov.</span>';
     else foot = '<span class="up-foot__real">Aún por jugar</span>';
 
+    var predHtml = m.pred
+      ? '<span class="up-pred__score">' + m.pred.h + '<span class="up-pred__sep">–</span>' + m.pred.a + '</span>'
+      : '<span class="up-pred__score" style="color:var(--ink-500)">—<span class="up-pred__sep">–</span>—</span>';
+
     return '<div class="' + cls.join(' ') + '">' +
       '<div class="up-match__head"><span class="up-match__status">' + status + '</span>' + (m.boost ? '<span class="up-boost">⚡ Boost ×2</span>' : '') + '</div>' +
       '<div class="up-match__teams">' +
         '<div class="up-team up-team--home">' + flagImg(m.home.n, 'up-team__flag') + '<span class="up-team__code">' + esc(m.home.c) + '</span></div>' +
-        '<div class="up-pred"><span class="up-pred__lbl">Pronóstico</span><span class="up-pred__score">' + m.pred.h + '<span class="up-pred__sep">–</span>' + m.pred.a + '</span></div>' +
+        '<div class="up-pred"><span class="up-pred__lbl">Pronóstico</span>' + predHtml + '</div>' +
         '<div class="up-team up-team--away"><span class="up-team__code">' + esc(m.away.c) + '</span>' + flagImg(m.away.n, 'up-team__flag') + '</div>' +
       '</div>' +
       scorerHtml + chipsHtml +
@@ -218,7 +235,27 @@
     '</div>';
   }
 
-  function renderScreen(uc, active) {
+  function _nav(name) {
+    return '<nav class="pc-nav"><button class="pc-nav__back" type="button" onclick="closePorraJugador()">' + CHEVRON + '<span>Predictor</span></button>' +
+      '<div class="pc-nav__title">Porra de ' + esc(name) + '</div><div class="pc-nav__spacer"></div></nav>';
+  }
+  function _profile(name, isMe) {
+    var lg = (window._activeLeague && window._activeLeague.nombre) || 'Liga';
+    return '<div class="up-profile"><div class="up-avatar">' + esc(_initials(name)) + '</div>' +
+      '<div class="up-id"><div class="up-id__name">' + esc(name) + '</div><div class="up-id__meta">' + esc(lg) + (isMe ? ' · <b>Tú</b>' : '') + '</div></div></div>';
+  }
+
+  function renderLoadingScreen(name) {
+    return '<div class="pc-screen up-app"><div class="up-fixed">' + _nav(name) + _profile(name, false) + '</div>' +
+      '<div class="up-scroll"><div class="pc-loading"><div class="pc-spinner"></div>Cargando porra…</div></div></div>';
+  }
+  function renderMsgScreen(name, msg, retryUid) {
+    var retry = retryUid ? '<br><button class="pc-retry" type="button" onclick="openPorraJugador(\'' + retryUid + '\')">Reintentar</button>' : '';
+    return '<div class="pc-screen up-app"><div class="up-fixed">' + _nav(name) + _profile(name, false) + '</div>' +
+      '<div class="up-scroll"><div class="pc-body"><div class="pc-section__empty" style="padding:40px 0">' + esc(msg) + retry + '</div></div></div></div>';
+  }
+
+  function renderFullScreen(uc, active) {
     var aj = null;
     for (var i = 0; i < uc.jornadas.length; i++) { if (uc.jornadas[i].id === active) { aj = uc.jornadas[i]; break; } }
     if (!aj) aj = uc.jornadas[0];
@@ -237,17 +274,16 @@
         '<span class="up-tab__t">' + esc(j.short) + '</span><span class="up-tab__s">' + sub + '</span></button>';
     }).join('');
 
-    var meta = esc(uc.user.leagueName || 'Liga') + (uc.user.isMe ? ' · <b>Tú</b>' : '');
+    var rankNum = (uc.rank != null) ? '#' + uc.rank : '—';
+    var rankLbl = (uc.totalPlayers != null) ? 'de ' + uc.totalPlayers + ' · liga' : 'liga';
+    var footPos = (uc.rank != null) ? ' · posición #' + uc.rank : '';
 
     return '<div class="pc-screen up-app">' +
       '<div class="up-fixed">' +
-        '<nav class="pc-nav"><button class="pc-nav__back" type="button" onclick="closePorraJugador()">' + CHEVRON + '<span>Predictor</span></button>' +
-          '<div class="pc-nav__title">Porra de ' + esc(uc.user.name) + '</div><div class="pc-nav__spacer"></div></nav>' +
-        '<div class="up-profile"><div class="up-avatar">' + esc(uc.user.initials) + '</div>' +
-          '<div class="up-id"><div class="up-id__name">' + esc(uc.user.name) + '</div><div class="up-id__meta">' + meta + '</div></div></div>' +
+        _nav(uc.user.name) + _profile(uc.user.name, uc.user.isMe) +
         '<div class="up-stats">' +
           '<div class="up-stat"><span class="up-stat__num"><b>' + totalPts + '</b></span><span class="up-stat__lbl">Puntos torneo</span></div>' +
-          '<div class="up-stat"><span class="up-stat__num">#' + uc.rank + '</span><span class="up-stat__lbl">de ' + uc.totalPlayers + ' · liga</span></div>' +
+          '<div class="up-stat"><span class="up-stat__num">' + rankNum + '</span><span class="up-stat__lbl">' + rankLbl + '</span></div>' +
           '<div class="up-stat"><span class="up-stat__num">' + exactos + '<small>/' + settled + '</small></span><span class="up-stat__lbl">Exactos</span></div>' +
         '</div>' +
         '<div class="up-tabs">' + tabs + '</div>' +
@@ -257,7 +293,7 @@
         '<div class="up-list">' + aj.matches.map(renderMatchCard).join('') + '</div>' +
       '</div></div>' +
       '<div class="pc-footer"><div class="pc-footer__l">' +
-        '<div class="pc-footer__lbl">Total torneo · posición #' + uc.rank + '</div>' +
+        '<div class="pc-footer__lbl">Total torneo' + footPos + '</div>' +
         '<div class="pc-footer__val"><b>' + totalPts + '</b> pts · ' + exactos + ' exactos</div>' +
       '</div></div>' +
     '</div>';
@@ -274,27 +310,53 @@
     var back = document.getElementById(returnTo);
     if (back) { back.style.display = back.dataset.pjPrevDisplay || 'block'; delete back.dataset.pjPrevDisplay; }
   }
+  function _paint(uid, html) {
+    if (_currentUid !== uid) return;
+    var w = document.getElementById(WRAP_ID);
+    if (!w) return;
+    w.innerHTML = html;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
 
-  function openPorraJugador(userId, nameHint) {
+  function openPorraJugador(userId, hints) {
     if (!userId) { console.warn('[porra-jugador] userId vacío'); return; }
-    Promise.resolve().then(function () { return _resolvePayload(userId, nameHint); }).then(function (payload) {
-      if (!payload) payload = _synthPorra(userId, nameHint);
-      _state.userId = userId;
-      _state.payload = payload;
-      var liveJ = payload.jornadas.find(function (j) { return j.state === 'live'; });
-      _state.active = (liveJ || payload.jornadas[0] || { id: 'j1' }).id;
+    _currentUid = userId;
+    var visible = HIDE_IDS.find(function (id) { var el = document.getElementById(id); return el && el.style.display !== 'none'; });
+    returnTo = visible || PAGE_PREDICTOR_ID;
 
-      var visible = HIDE_IDS.find(function (id) { var el = document.getElementById(id); return el && el.style.display !== 'none'; });
-      returnTo = visible || PAGE_PREDICTOR_ID;
+    var name = (hints && hints.name) || 'Jugador';
 
-      var prev = document.getElementById(WRAP_ID); if (prev) prev.remove();
-      hideOtherPages();
-      var wrap = document.createElement('div');
-      wrap.id = WRAP_ID;
-      wrap.innerHTML = renderScreen(payload, _state.active);
-      document.body.appendChild(wrap);
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }).catch(function (err) { console.error('[porra-jugador] fallo:', err); });
+    document.getElementById(WRAP_ID) && document.getElementById(WRAP_ID).remove();
+    hideOtherPages();
+    var wrap = document.createElement('div');
+    wrap.id = WRAP_ID;
+    document.body.appendChild(wrap);
+    _paint(userId, renderLoadingScreen(name));
+
+    var leagueId = PCS().activeLeagueId ? PCS().activeLeagueId() : (window._activeLeague && window._activeLeague.id);
+    if (!leagueId) { _paint(userId, renderMsgScreen(name, 'Selecciona una liga para ver la porra.', null)); return; }
+
+    PCS().invokeEF('get-user-predictions', { user_id: userId, league_id: leagueId })
+      .then(function (ef) {
+        if (_currentUid !== userId) return null;
+        // Nombre autoritativo desde profiles (fallback al hint).
+        return PCS().resolveNames([userId]).catch(function () { return {}; }).then(function (nm) {
+          if (nm && nm[userId]) name = nm[userId];
+          if (_currentUid !== userId) return;
+          if (!ef) { _paint(userId, renderMsgScreen(name, 'Respuesta vacía del servidor.', userId)); return; }
+          if (ef.gated) { _paint(userId, renderMsgScreen(name, 'Disponible tras el cierre de su porra.', null)); return; }
+          var payload = buildPorra(ef, userId, hints, name);
+          _state.userId = userId;
+          _state.payload = payload;
+          var liveJ = payload.jornadas.find(function (j) { return j.state === 'live'; });
+          _state.active = (liveJ || payload.jornadas[0] || { id: 'j1' }).id;
+          _paint(userId, renderFullScreen(payload, _state.active));
+        });
+      })
+      .catch(function (err) {
+        console.error('[porra-jugador] invoke falló:', err);
+        _paint(userId, renderMsgScreen(name, 'No se pudo cargar. Inténtalo de nuevo.', userId));
+      });
   }
 
   function porraJugadorSetJornada(id) {
@@ -302,17 +364,18 @@
     _state.active = id;
     var wrap = document.getElementById(WRAP_ID);
     if (wrap) {
-      wrap.innerHTML = renderScreen(_state.payload, id);
+      wrap.innerHTML = renderFullScreen(_state.payload, id);
       var sc = wrap.querySelector('.up-scroll'); if (sc) sc.scrollTop = 0;
     }
   }
 
   function closePorraJugador() {
+    _currentUid = null;
     var prev = document.getElementById(WRAP_ID); if (prev) prev.remove();
     restoreOtherPages();
   }
 
-  // ── Fila del ranking clicable (delegación document, sobrevive re-render) ──
+  // ── Fila del ranking clicable (delegación document; sobrevive re-render) ──
   if (!document._pjRowDelegated) {
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
@@ -320,7 +383,14 @@
       var row = e.target.closest('.pred-ranking-row[data-pl-user]');
       if (!row) return;
       var uid = row.getAttribute('data-pl-user');
-      if (uid) openPorraJugador(uid, row.getAttribute('data-pl-name') || '');
+      if (!uid) return;
+      var rankAttr = row.getAttribute('data-pl-rank');
+      var totalAttr = row.getAttribute('data-pl-total');
+      openPorraJugador(uid, {
+        name: row.getAttribute('data-pl-name') || '',
+        rank: rankAttr ? parseInt(rankAttr, 10) : null,
+        total: totalAttr ? parseInt(totalAttr, 10) : null,
+      });
     });
     document._pjRowDelegated = true;
   }
