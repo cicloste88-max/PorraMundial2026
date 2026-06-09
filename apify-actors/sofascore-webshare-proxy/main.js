@@ -17,10 +17,19 @@ if (!eventId) {
 
 console.log(`[sofascore-webshare] event=${eventId} mode=${mode}`);
 
+// Credenciales en env vars secret del actor (Apify Console → Environment variables).
+// WEBSHARE_PROXY_USER debe incluir el sufijo de rotación por países (e.g. xxxx-US-GB-DE-NL-FR-rotate).
+const proxyUser = process.env.WEBSHARE_PROXY_USER;
+const proxyPass = process.env.WEBSHARE_PROXY_PASS;
+if (!proxyUser || !proxyPass) {
+  console.error('[sofascore-webshare] Faltan WEBSHARE_PROXY_USER / WEBSHARE_PROXY_PASS en env vars del actor');
+  await Actor.exit({ exitCode: 1 });
+}
+
 const proxy = {
   server: 'http://p.webshare.io:80',
-  username: 'nkbtcztk-US-GB-DE-NL-FR-rotate',
-  password: '6b1lhjc8eou2',
+  username: proxyUser,
+  password: proxyPass,
 };
 
 const browser = await chromium.launch({ proxy });
