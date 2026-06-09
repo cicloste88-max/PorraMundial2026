@@ -21,10 +21,12 @@ Referencia: ERR-16.
 Deployments de Edge Functions con payload superior a 70 KB no se pueden procesar a través del MCP `deploy_edge_function` (timeout). En estos casos, ejecutar desde terminal local:
 
 ```bash
-npx supabase functions deploy <function-name>
+npx supabase functions deploy <function-name> --project-ref cmyfyswystjgzdwbqyyb --no-verify-jwt
 ```
 
 Este workflow preventivo evita bloqueos. Referencia: ERR-29.
+
+⚠️ **`--no-verify-jwt` es OBLIGATORIO en cada deploy CLI** (vivido 10-jun-2026 con `porra-ia-compute`): sin el flag, el CLI resetea `verify_jwt=true` aunque la función ya estuviera desplegada con `false` (no hay `config.toml` en el repo que lo fije). Eso rompe los callers con `X-Cron-Key` (pg_cron) y el bypass service_role manual (ERR-16). Verificar tras deploy si hay duda: el dashboard o una invocación con el flujo del cron.
 
 ## Secrets: Vault vs EF secrets
 

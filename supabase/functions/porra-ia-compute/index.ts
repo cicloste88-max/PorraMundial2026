@@ -37,13 +37,14 @@ import {
 } from "./lib/scorer-keys.ts";
 
 // ─── CORS whitelist ────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = new Set([
-  "https://porramundial2026-seven.vercel.app",
-  "http://localhost:5173",
-]);
+const ALLOWED_ORIGIN_REGEXES: RegExp[] = [
+  /^https:\/\/porramundial2026-seven\.vercel\.app$/,
+  /^https:\/\/porramundial2026[\w-]*\.vercel\.app$/,
+  /^http:\/\/localhost:5173$/,
+];
 
 function cors(origin: string | null): Record<string, string> {
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  if (origin && ALLOWED_ORIGIN_REGEXES.some((re) => re.test(origin))) {
     return {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Headers":
@@ -528,9 +529,11 @@ async function handleScrapeLast5(supa: any, body: any) {
     }
 
     const rawLimit = Number(body?.limit);
+    // Default 10 desde 10-jun-2026 (pre-torneo): captura los amistosos de la
+    // semana previa sin diluir la señal de racha (rango admitido 1-20).
     const limit = Number.isFinite(rawLimit) && rawLimit > 0
       ? Math.min(20, Math.max(1, Math.floor(rawLimit)))
-      : 8;
+      : 10;
 
     // opposition_name.toLowerCase() → iso3. Mismo map que Fase D.2: sirve tanto
     // para detectar al owner (home/away) como para resolver al rival.
