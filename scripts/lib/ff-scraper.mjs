@@ -238,15 +238,23 @@ export function parseStartingXISlotsFromHtml(html) {
     //      "N. Williams" del juggador.pos-0). Validado en HTML real ESP/JPN.
     //   2) Fallback a a.juggador.pos-0 si no hay img alt utilizable.
     //   3) Fallback final a slug del href.
+    // 10-jun-2026: FF añadió un overlay "Más info" cuyo alt/texto se colaba
+    // como nombre de titular (6 selecciones afectadas en el refresh pre-torneo).
+    // Cualquier texto de UI (no-nombre) se descarta y se cae al siguiente fallback.
+    const isUiArtifact = (s) => /^(m[áa]s\s+info|ver\s+m[áa]s|info)$/i.test(String(s || '').trim());
     let titular = '';
     const altName = $el
       .find('img[alt]')
-      .filter((_, img) => ($(img).attr('alt') || '').trim() !== '')
+      .filter((_, img) => {
+        const alt = ($(img).attr('alt') || '').trim();
+        return alt !== '' && !isUiArtifact(alt);
+      })
       .first()
       .attr('alt');
     if (altName) titular = decodeHtml(altName).trim();
 
     if (!titular) titular = juggadorText($el, 'pos-0');
+    if (isUiArtifact(titular)) titular = '';
 
     if (!titular) {
       const href = $el.find('a.camiseta').first().attr('href') || '';
@@ -262,7 +270,15 @@ export function parseStartingXISlotsFromHtml(html) {
     // ALTERNATIVA — sólo desde a.juggador.pos-1 (no hay otra fuente). El
     // truncado "M. Penders" del juggador funciona bien para el matcher (path
     // last-name) cuando pos-0 no está convocado oficialmente.
-    const alternativa = juggadorText($el, 'pos-1') || null;
+    let alternativa = juggadorText($el, 'pos-1') || null;
+    if (isUiArtifact(alternativa)) alternativa = null;
+
+    // Si el titular quedó vacío (artefacto UI descartado) pero hay alternativa,
+    // promoverla: mejor un candidato real que perder el slot entero.
+    if (!titular && alternativa) {
+      titular = alternativa;
+      alternativa = null;
+    }
 
     if (titular) {
       const slot = { titular, x, y, isGK };
@@ -291,7 +307,9 @@ export function parseStartingXIFromHtml(html) {
  * directamente sobre el HTML cacheado por fetch_sources.py.
  */
 export async function parseStartingXI(slug, opts = {}) {
-  const url = `${FF_BASE}/equipos/${slug}`;
+  // 10-jun-2026: FF movió las páginas de equipo a /world-cup/equipos/<slug>
+  // (la ruta /equipos/<slug> devuelve 404 desde ~jun-2026).
+  const url = `${FF_BASE}/world-cup/equipos/${slug}`;
   const html = await fetchText(url, opts);
   return parseStartingXIFromHtml(html);
 }
@@ -307,7 +325,7 @@ async function getFFLineupHtml(slug, { iso3, verbose = false } = {}) {
       if (verbose) console.log(`  [ff] cache miss para ${iso3} (${e.message.slice(0, 60)}), fallback fetch live`);
     }
   }
-  return await fetchText(`${FF_BASE}/equipos/${slug}`, { verbose });
+  return await fetchText(`${FF_BASE}/world-cup/equipos/${slug}`, { verbose });
 }
 
 // Devuelve sólo los slots del once-tipo (titular + alternativa? + x/y/isGK) sin
