@@ -293,3 +293,6 @@
 /* Fila del ranking del predictor → clicable (abre "Porra de un jugador", F3) */
 .pred-ranking-row[data-pl-user] { cursor: pointer; }
 .pred-ranking-row[data-pl-user]:active { background: rgba(201,169,97,.06); }
+/* clasificación del trofeo (Predictor) → abre "Porra de un jugador" (F5.1) */
+.tf-row[data-pl-user], .tf-pod[data-pl-user] { cursor: pointer; }
+.tf-row[data-pl-user]:active { background: rgba(201,169,97,.06); }

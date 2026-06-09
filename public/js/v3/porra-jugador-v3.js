@@ -380,7 +380,9 @@
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
       if (e.target.closest('.pred-ranking-share')) return;
-      var row = e.target.closest('.pred-ranking-row[data-pl-user]');
+      // pred-ranking-row (ranking inline) + tf-row/tf-pod (clasificación del
+      // trofeo del Predictor, F5.1) — mismo handler, sin duplicar lógica.
+      var row = e.target.closest('.pred-ranking-row[data-pl-user], .tf-row[data-pl-user], .tf-pod[data-pl-user]');
       if (!row) return;
       var uid = row.getAttribute('data-pl-user');
       if (!uid) return;

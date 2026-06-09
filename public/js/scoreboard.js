@@ -166,8 +166,11 @@ function sbRender(rows) {
     const m = meta[i];
     const tr = _sbTrendInfo(u.trend);
     const first = (u.nombre || '?').split(' ')[0];
+    // F5.1: fila del podio clicable → openPorraJugador(uid) (delegación en
+    // porra-jugador-v3.js, mismo patrón que pred-ranking-row). uid de _sbData.
+    const plAttr = u.uid ? (' data-pl-user="' + _sbEsc(u.uid) + '" data-pl-name="' + _sbEsc(u.nombre || '') + '" data-pl-rank="' + m.medal + '" data-pl-total="' + rows.length + '"') : '';
     return '' +
-      '<div class="tf-pod ' + m.cls + '">' +
+      '<div class="tf-pod ' + m.cls + '"' + plAttr + '>' +
         '<div class="tf-pod__medal">' + m.medal + '</div>' +
         '<div class="tf-pod__ring">' +
           (m.cls === 'tf-pod--1' ? '<div class="tf-pod__crown">👑</div>' : '') +
@@ -192,8 +195,10 @@ function sbRender(rows) {
     let badges = '';
     if (typeof u.boosts === 'number') badges += '<span class="tf-badge">🔥 <b>' + u.boosts + '</b></span>';
     if (typeof u.exa === 'number') badges += '<span class="tf-badge">🎯 <b>' + u.exa + '</b> exactos</span>';
+    // F5.1: fila de la lista clicable → openPorraJugador(uid). uid de _sbData.
+    const plAttr = u.uid ? (' data-pl-user="' + _sbEsc(u.uid) + '" data-pl-name="' + _sbEsc(u.nombre || '') + '" data-pl-rank="' + rank + '" data-pl-total="' + rows.length + '"') : '';
     return '' +
-      '<div class="tf-row' + topCls + (isMe ? ' is-me' : '') + '">' +
+      '<div class="tf-row' + topCls + (isMe ? ' is-me' : '') + '"' + plAttr + '>' +
         '<div class="tf-row__rank">' + rank + '</div>' +
         '<div class="tf-row__l">' +
           '<div class="tf-av" style="background:' + _sbAvColor(u.nombre) + '">' + _sbEsc(_sbInitials(u.nombre)) + '</div>' +
