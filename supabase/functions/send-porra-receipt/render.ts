@@ -4,12 +4,13 @@
 //   renderReceiptBody(d)  → CUERPO ejecutivo ligero del email (~6-8 KB). Entra
 //                           entero en Gmail sin recorte (Gmail corta a ~102 KB).
 //                           Cabecera + nota + resumen de conteos + PODIO (4) +
-//                           PREMIOS (4) + código de verificación + BOTÓN al
-//                           comprobante completo alojado. SIN tablas 72/32.
+//                           PREMIOS (4) + código de verificación + aviso de que
+//                           el comprobante completo va ADJUNTO en PDF. SIN
+//                           tablas 72/32.
 //   renderReceiptHtml(d)  → COMPROBANTE completo (chuleta): + 72 grupos + 32 KO.
-//                           Se ALOJA en Supabase Storage (bucket público
-//                           `receipts`) y se enlaza desde el cuerpo; el usuario
-//                           lo abre en el navegador (Imprimir → Guardar como PDF).
+//                           index.ts lo convierte a PDF (PDFShift) y lo envía
+//                           ADJUNTO; el usuario lo abre desde su cliente de
+//                           correo (verlo con el diseño, guardarlo o imprimirlo).
 //
 // NO incluye puntuación (al cierre no se ha jugado nada). SÍ marca los partidos
 // de grupos con Boost ×2 (⚡) elegidos por el usuario.
@@ -109,20 +110,14 @@ function summaryBlock(d: ReceiptData): string {
   );
 }
 
-// Botón prominente al comprobante completo alojado en Storage (sustituye al
-// antiguo aviso de adjunto: el .html adjunto era ilegible en móvil).
-function receiptButton(d: ReceiptData): string {
-  const url = d.receiptUrl ?? "";
+// Aviso de que el comprobante completo va ADJUNTO en PDF (lo genera index.ts vía
+// PDFShift). El cuerpo del email es solo el resumen ejecutivo.
+function attachmentNotice(_d: ReceiptData): string {
   return (
-    `<div style="margin-top:18px;text-align:center">` +
-    `<a href="${esc(url)}" target="_blank" rel="noopener" ` +
-    `style="display:inline-block;background:#c1121f;color:#ffffff;text-decoration:none;` +
-    `font-size:15px;font-weight:700;padding:13px 28px;border-radius:10px">` +
-    `Ver comprobante completo</a>` +
-    `<p style="font-size:13px;color:#374151;margin:10px 0 0;line-height:1.5">` +
-    `Tu comprobante completo (todos los pronósticos + premios + boosts) se abre en ` +
-    `el navegador. Puedes imprimirlo o guardarlo como PDF desde tu navegador si ` +
-    `quieres archivo offline.</p>` +
+    `<div style="margin-top:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e3a8a;line-height:1.5">` +
+    `📎 Tu comprobante completo (todos los pronósticos · premios · boosts) va ` +
+    `adjunto en PDF. Ábrelo desde tu cliente de correo para verlo con el diseño, ` +
+    `guardarlo o imprimirlo.` +
     `</div>`
   );
 }
@@ -279,7 +274,7 @@ export function renderReceiptBody(d: ReceiptData): string {
   const inner = [
     disclaimerBlock(),
     summaryBlock(d),
-    receiptButton(d),
+    attachmentNotice(d),
     sectionTitle("🥇", "Podio pronosticado"),
     renderPodium(d),
     sectionTitle("🏆", "Premios individuales"),

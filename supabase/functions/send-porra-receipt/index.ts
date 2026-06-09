@@ -1,9 +1,9 @@
 // send-porra-receipt — Acuse de recibo (comprobante) de la porra.
 //
 // Cuando se cierra la porra, envía a cada usuario un email ligero (resumen +
-// podio + premios + código) con un BOTÓN al comprobante completo, que se ALOJA
-// en Supabase Storage (bucket público `receipts`): la chuleta íntegra de sus
-// pronósticos (72 grupos + 32 KO + premios + boosts). NO es puntuación: al
+// podio + premios + código) con el comprobante completo ADJUNTO en PDF
+// (generado vía PDFShift a partir del HTML de render.ts): la chuleta íntegra de
+// sus pronósticos (72 grupos + 32 KO + premios + boosts). NO es puntuación: al
 // cierre aún no se ha jugado nada. Feature ADITIVA (función + tabla
 // sent_receipts + 1 paso de cron). No toca el motor de puntuación ni el cierre.
 //
@@ -23,6 +23,7 @@
 // Idempotencia: UNIQUE(user_id, league_id) en sent_receipts. 2ª llamada → skipped.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { readVaultSecret, requireAdminOrCron } from "./auth.ts";
@@ -45,8 +46,6 @@ function cors(origin: string | null): Record<string, string> {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_FROM = "Porra Mundial 2026 <adminmundialapp@gmail.com>";
-// Origen del front (Vercel) que sirve la página de render del comprobante.
-const FRONT_BASE = "https://porramundial2026-seven.vercel.app";
 
 // deno-lint-ignore no-explicit-any
 function jsonResponse(body: any, status: number, origin: string | null): Response {
@@ -69,13 +68,15 @@ function parseSender(from: string): { name: string; email: string } {
 }
 
 // apiKey = BREVO_API_KEY (llega en cfg.resendKey por compat de firma legacy).
-// SIN adjunto: el comprobante completo va por hosted link (uploadReceipt, ver A).
+// El comprobante completo va ADJUNTO en PDF (attachmentPdfBase64 = base64 puro).
 async function sendEmail(
   apiKey: string,
   from: string,
   to: string,
   subject: string,
   bodyHtml: string,
+  attachmentPdfBase64: string,
+  attachmentName: string,
 ): Promise<string> {
   const sender = parseSender(from);
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -89,7 +90,8 @@ async function sendEmail(
       sender,
       to: [{ email: to }],
       subject,
-      htmlContent: bodyHtml,
+      htmlContent: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
+      attachment: [{ name: attachmentName, content: attachmentPdfBase64 }], // comprobante PDF
     }),
   });
   if (!res.ok) {
@@ -100,45 +102,31 @@ async function sendEmail(
   return j?.messageId ?? "";
 }
 
-// ─── Supabase Storage: comprobante alojado ──────────────────────────────────
-// Sube el HTML completo al bucket público `receipts` (PUT REST) y devuelve la
-// URL pública. Las keys sb_secret_ exigen AMBAS cabeceras apikey + Authorization
-// (gotcha conocido). Fail-loud: lanza si la respuesta no es 2xx — el caller NO
-// registra sent_receipts y la EF retorna failed (sin fallback a adjunto).
-//
-// Content-Type = "text/html" SIN "; charset=utf-8": el bucket tiene
-// allowed_mime_types=["text/html"] y storage-api (validateMimeType) compara el
-// subtipo EXACTO contra la cabecera cruda — "html; charset=utf-8" !== "html"
-// daría InvalidMimeType (422) y, fail-loud, abortaría todos los envíos. El
-// charset es irrelevante para el render: el documento ya lleva <meta charset>.
-async function uploadReceipt(
-  supabaseUrl: string,
-  serviceKey: string,
-  filename: string,
-  html: string,
-): Promise<string> {
-  const res = await fetch(`${supabaseUrl}/storage/v1/object/receipts/${filename}`, {
-    method: "PUT",
+// ─── PDFShift: HTML → PDF ────────────────────────────────────────────────────
+// Convierte el comprobante HTML a PDF (A4, márgenes 15mm) vía PDFShift. Basic
+// auth = base64("api:" + API_KEY_PDFSHIFT) (usuario fijo "api"). Fail-loud:
+// lanza si la respuesta no es 2xx — el caller NO envía ni registra sent_receipts.
+async function generatePdfFromHtml(apiKey: string, html: string): Promise<Uint8Array> {
+  const auth = btoa(`api:${apiKey}`);
+  const res = await fetch("https://api.pdfshift.io/v3/convert/pdf", {
+    method: "POST",
     headers: {
-      "apikey": serviceKey,
-      "Authorization": `Bearer ${serviceKey}`,
-      "Content-Type": "text/html",
-      "x-upsert": "true",
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/json",
     },
-    body: html,
+    body: JSON.stringify({ source: html, format: "A4", margin: "15mm" }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`storage_http_${res.status}:${t.slice(0, 240)}`);
+    throw new Error(`pdfshift_http_${res.status}:${t.slice(0, 240)}`);
   }
-  return `${supabaseUrl}/storage/v1/object/public/receipts/${filename}`;
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 interface SendConfig {
   resendKey: string; // legacy: el campo se mantiene pero contiene la BREVO_API_KEY
+  pdfShiftKey: string;
   from: string;
-  supabaseUrl: string;
-  serviceKey: string;
 }
 
 interface ProcessResult {
@@ -148,7 +136,6 @@ interface ProcessResult {
   resend_id?: string;
   code?: string;
   error?: string;
-  receipt_url?: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -184,41 +171,36 @@ async function processReceipt(
     return { user_id: userId, status: "failed", error: "no_recipient_email" };
   }
 
-  // 4. Render del comprobante completo + alojamiento en Storage + envío.
+  // 4. Render del comprobante completo → PDF (PDFShift) → email con adjunto.
   if (!cfg.resendKey) {
     return { user_id: userId, status: "failed", error: "resend_key_missing" };
   }
-  const fullHtml = renderReceiptHtml(data); // comprobante completo (se aloja)
+  if (!cfg.pdfShiftKey) {
+    return { user_id: userId, status: "failed", error: "pdfshift_key_missing" };
+  }
+  const fullHtml = renderReceiptHtml(data); // comprobante completo (→ PDF)
 
-  // 4a. Subir a Storage. Nombre NO adivinable: code + slice de UUID. Fail-loud:
-  //     si la subida falla NO se envía ni se registra (sin fallback a adjunto).
-  const filename = `${data.verificationCode}-${crypto.randomUUID().slice(0, 8)}.html`;
-  let storageUrl: string;
+  // 4a. HTML → PDF. Fail-loud: si la conversión falla NO se envía ni se registra.
+  let pdfBytes: Uint8Array;
   try {
-    storageUrl = await uploadReceipt(cfg.supabaseUrl, cfg.serviceKey, filename, fullHtml);
+    pdfBytes = await generatePdfFromHtml(cfg.pdfShiftKey, fullHtml);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
-  // URL pública para el cliente = página del front (Vercel) que renderiza el
-  // comprobante. NO se enlaza ni Storage ni la EF directamente: Supabase fuerza
-  // text/html → text/plain + CSP sandbox (anti-phishing) tanto en Storage como en
-  // Functions, así que el HTML se pinta client-side. comprobante.html hace fetch
-  // a get-receipt (que resuelve code → storageUrl) y lo inyecta en un <iframe
-  // srcdoc>. Es función pura del code, no hace falta guardarla.
-  const viewUrl = `${FRONT_BASE}/comprobante.html?code=${data.verificationCode}`;
-  data.receiptUrl = viewUrl; // el cuerpo lleva el botón → página de render
+  const pdfBase64 = base64Encode(pdfBytes);
+  const attachmentName = `comprobante-${data.verificationCode}.pdf`;
 
-  // 4b. Cuerpo ejecutivo ligero (con botón al comprobante) + envío SIN adjunto.
+  // 4b. Cuerpo ejecutivo ligero + envío con el comprobante PDF adjunto.
   const bodyHtml = renderReceiptBody(data);
   const subject = `Comprobante de tu porra · ${data.leagueName}`;
   let resendId = "";
   try {
-    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml);
+    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml, pdfBase64, attachmentName);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
 
-  // 5. Registrar el envío (idempotencia + auditoría). Guarda receipt_url.
+  // 5. Registrar el envío (idempotencia + auditoría).
   const { error: insErr } = await supa.from("sent_receipts").insert({
     user_id: userId,
     league_id: leagueId,
@@ -228,7 +210,6 @@ async function processReceipt(
       code: data.verificationCode,
       counts: data.counts,
       override: !!toOverride,
-      receipt_url: storageUrl, // URL de Storage que get-receipt resuelve y proxya
     },
   });
   if (insErr) {
@@ -242,7 +223,6 @@ async function processReceipt(
     email: recipient,
     resend_id: resendId,
     code: data.verificationCode,
-    receipt_url: viewUrl,
   };
 }
 
@@ -292,17 +272,21 @@ serve(async (req: Request) => {
     toOverride = candidate; // honrado: la request ya pasó requireAdminOrCron
   }
 
-  // ── Config Brevo (env → Vault → fallback from) ───────────────────────────
+  // ── Config Brevo + PDFShift (env → Vault → fallback from) ─────────────────
   // resendKey = nombre legacy del campo; contiene la BREVO_API_KEY.
   const resendKey =
     (Deno.env.get("BREVO_API_KEY") || "").trim() ||
     (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "BREVO_API_KEY")) ||
     "";
+  const pdfShiftKey =
+    (Deno.env.get("API_KEY_PDFSHIFT") || "").trim() ||
+    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "API_KEY_PDFSHIFT")) ||
+    "";
   const from =
     (Deno.env.get("PORRA_FROM_EMAIL") || "").trim() ||
     (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "PORRA_FROM_EMAIL")) ||
     DEFAULT_FROM;
-  const cfg: SendConfig = { resendKey, from, supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY };
+  const cfg: SendConfig = { resendKey, pdfShiftKey, from };
 
   // ── BULK ────────────────────────────────────────────────────────────────
   if (bulk) {
@@ -344,7 +328,7 @@ serve(async (req: Request) => {
   }
   const result = await processReceipt(supa, userId, leagueId, toOverride, cfg);
   const httpStatus = result.status === "failed"
-    ? (result.error === "resend_key_missing" ? 500 : 502)
+    ? ((result.error === "resend_key_missing" || result.error === "pdfshift_key_missing") ? 500 : 502)
     : 200;
   return jsonResponse({ ok: result.status !== "failed", ...result }, httpStatus, origin);
 });
