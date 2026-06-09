@@ -2355,3 +2355,15 @@ Las funciones que asumen lo segundo (`if (!uid) return;` con `uid = window.curre
 **Patrón detectable**: grep `window.currentUser?.id` y `window.currentUser && window.currentUser.id`. En el repo (post-#139): 3 sitios restantes en `data.js` L435 y `ui-groups.js` L807/L830 — ahora funcionan gracias al espejo pero conviene normalizar.
 
 **Caso real**: PR #139 commit `606ea7f` (08-jun). Bug latente desde el inicio; descubierto al investigar por qué `boost_picks` seguía vacía incluso tras arreglar ERR-83.
+
+## ERR-85 — Agregado de liga calculado en cliente sobre tabla con RLS own-rows-only
+
+**Síntoma**: "DESTACADOS DE TU LIGA" muestra "Tu liga tiene 0 porras cerradas / 1 pendientes" para cualquier usuario y cualquier liga, sea cual sea el estado real (Gallos vía service_role: 17 miembros, 15 cerradas / 2 pendientes).
+
+**Causa**: `loadLeagueHighlights` (`data.js`) contaba `porra_cerrada` con un SELECT de cliente a `league_members` filtrado por `league_id`. La policy `lm_select` es `auth.uid() = user_id` → la query devuelve como máximo la fila propia. El agregado de liga es estructuralmente irrealizable desde el cliente: siempre 0/1 (porra abierta) ó 1/0 (cerrada), nunca el total. NO es bug del flag (lee el canónico `league_members.porra_cerrada`) ni un error de query: RLS capa el resultset en silencio, indistinguible de "la liga tiene 1 miembro".
+
+**Fix**: eliminado el item del contador (opción A, 09-jun); el slot cae al fallback genérico "Tu liga está lista para jugar". Un contador real exige RPC SECURITY DEFINER o EF service_role con verja de membresía (patrón `get-league-standings` / `is_porra_abierta`).
+
+**Patrón detectable**: `.from('<tabla own-rows-only>')` desde cliente + `.filter()`/`.length` pretendiendo agregar sobre TODA la liga. Tablas own-rows-only confirmadas en SELECT: `league_members`, `predictions`, `ko_predictions`, `boost_picks`, `award_picks`. **Afecta también a los items A y B de la misma función** (contrarian KO sobre `ko_predictions`, coincidencia campeón sobre `award_picks`): solo ven filas propias → "Solo tú apuestas por X" puede ser falso con datos. Pendiente decidir si se eliminan o se sirven vía EF (los agregados legítimos de liga ya viven en `get-league-predictions`).
+
+**Fecha detección**: 09 jun 2026.

@@ -2,6 +2,20 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [09-jun-2026] fix(highlights): contador "porras cerradas/pendientes" falso por RLS
+
+"DESTACADOS DE TU LIGA" mostraba "Tu liga tiene 0 porras cerradas / 1
+pendientes" en cualquier liga y para cualquier usuario. NO es bug del flag (lee
+el canónico `league_members.porra_cerrada`): la policy `lm_select`
+(`auth.uid() = user_id`) capa el SELECT de cliente a la fila propia → el
+agregado de liga es estructuralmente irrealizable desde el cliente (Gallos
+real vía service_role: 17 miembros, 15 cerradas / 2 pendientes). Fix (opción
+A): item eliminado de `loadLeagueHighlights` (`data.js`); el slot cae al
+genérico "Tu liga está lista para jugar". Contador real futuro → RPC SECURITY
+DEFINER o EF service_role (patrón `get-league-standings`). Items A
+(`ko_predictions`) y B (`award_picks`) de la misma función comparten el cap
+own-rows-only y quedan señalados, sin tocar, en **ERR-85**.
+
 ## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
 
 EF `send-porra-receipt` v3: al cierre envía al usuario un email con copia íntegra

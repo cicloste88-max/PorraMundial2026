@@ -569,24 +569,10 @@ async function loadLeagueHighlights(leagueId, userId) {
     }
   } catch (e) { console.warn('[highlights] item C', e); }
 
-  // Fallback hasta llegar a 3.
-  if (items.length < 3) {
-    try {
-      var lmRes = await db
-        .from('league_members')
-        .select('porra_cerrada')
-        .eq('league_id', leagueId);
-      var lm = (lmRes && lmRes.data) || [];
-      var cerradas = lm.filter(function (m) { return m.porra_cerrada === true; }).length;
-      var totalLm = lm.length;
-      var pendientes = totalLm - cerradas;
-      while (items.length < 3) {
-        items.push({ icon: '📊', text: 'Tu liga tiene ' + cerradas + ' porras cerradas / ' + pendientes + ' pendientes.' });
-        break;
-      }
-    } catch (e) { console.warn('[highlights] fallback', e); }
-  }
-
+  // Fallback hasta llegar a 3. NO reintroducir aquí el contador de porras
+  // cerradas/pendientes: la RLS de league_members (SELECT = solo fila propia)
+  // capa la query a 1 fila y el contador saldría siempre 0/1 ó 1/0 (ERR-85).
+  // Un conteo real de liga requiere RPC/EF con service_role.
   while (items.length < 3) items.push({ icon: '📊', text: 'Tu liga está lista para jugar.' });
   return items.slice(0, 3);
 }
