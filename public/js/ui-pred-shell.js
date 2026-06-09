@@ -1207,7 +1207,9 @@
         var meCls = (r.user_id === userId) ? ' pred-ranking-row--me' : '';
         var botBadge = r.is_bot ? '🤖 ' : '';
         listHtml +=
-          '<li class="pred-ranking-row' + meCls + '">' +
+          // F3 comunidad: fila clicable → window.openPorraJugador(user_id) vía
+          // delegación document en porra-jugador-v3.js (lee data-pl-*).
+          '<li class="pred-ranking-row' + meCls + '" data-pl-user="' + _esc(String(r.user_id == null ? '' : r.user_id)) + '" data-pl-name="' + _esc(r.nombre || '') + '" data-pl-rank="' + r.position + '" data-pl-total="' + rows.length + '">' +
             '<span class="pred-ranking-pos">' + r.position + 'º</span>' +
             '<span class="pred-ranking-name">' + botBadge + _esc(r.nombre) + '</span>' +
             '<span class="pred-ranking-pts">' + (r.points || 0) + ' pts</span>' +
