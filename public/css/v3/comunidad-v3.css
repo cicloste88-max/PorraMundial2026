@@ -278,3 +278,7 @@
 .up-tab.active { border-color: var(--fifa-gold); background: rgba(201,169,97,.12); }
 .up-tab.active .up-tab__t { color: var(--fifa-gold); }
 .up-tab.locked { opacity: .4; cursor: default; }
+
+/* Fila del ranking del predictor → clicable (abre "Porra de un jugador", F3) */
+.pred-ranking-row[data-pl-user] { cursor: pointer; }
+.pred-ranking-row[data-pl-user]:active { background: rgba(201,169,97,.06); }

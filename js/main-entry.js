@@ -105,6 +105,7 @@ loadScript('/js/leagues.js')
   // Comunidad (grupos): helper de banderas compartido + pantallas (F2/F3).
   .then(() => loadScript('/js/v3/comunidad-shared-v3.js'))
   .then(() => loadScript('/js/v3/predicciones-liga-v3.js'))
+  .then(() => loadScript('/js/v3/porra-jugador-v3.js'))
   .then(() => {
     // Safety net: garantizar que la UI welcome arranca tras cargar toda
     // la chain. Idempotente con el fix readyState de auth.js — si auth.js
