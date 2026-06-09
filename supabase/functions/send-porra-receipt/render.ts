@@ -125,7 +125,7 @@ function attachmentNotice(_d: ReceiptData): string {
 function auditBlock(d: ReceiptData): string {
   const generated = fmtMadrid(d.generatedAt);
   return (
-    `<div style="margin-top:26px;border-top:1px dashed #d1d5db;padding-top:14px">` +
+    `<div style="margin-top:18px;page-break-inside:avoid;break-inside:avoid;border-top:1px dashed #d1d5db;padding-top:14px">` +
     `<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Copia de auditoría</div>` +
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;font-size:13px;color:#374151">` +
     `<tr><td style="padding:3px 0;width:170px;color:#6b7280">Código de verificación</td>` +
@@ -145,7 +145,7 @@ function auditBlock(d: ReceiptData): string {
 
 function footerBlock(): string {
   return (
-    `<div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px">` +
+    `<div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px;page-break-inside:avoid;break-inside:avoid">` +
     `Porra Mundial 2026 · porramundial2026-seven.vercel.app</div>`
   );
 }

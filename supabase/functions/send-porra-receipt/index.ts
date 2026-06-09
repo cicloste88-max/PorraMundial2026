@@ -102,7 +102,7 @@ async function sendEmail(
   return j?.messageId ?? "";
 }
 
-// ─── PDFShift: HTML → PDF ─────────────────────────────────────────────
+// ─── PDFShift: HTML → PDF ──────────────────────
 // Convierte el comprobante HTML a PDF (A4, márgenes 15mm) vía PDFShift. Basic
 // auth = base64("api:" + API_KEY_PDFSHIFT) (usuario fijo "api"). Fail-loud:
 // lanza si la respuesta no es 2xx — el caller NO envía ni registra sent_receipts.
