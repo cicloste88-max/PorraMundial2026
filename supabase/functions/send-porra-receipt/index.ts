@@ -191,13 +191,18 @@ async function processReceipt(
   // 4a. Subir a Storage. Nombre NO adivinable: code + slice de UUID. Fail-loud:
   //     si la subida falla NO se envía ni se registra (sin fallback a adjunto).
   const filename = `${data.verificationCode}-${crypto.randomUUID().slice(0, 8)}.html`;
-  let receiptUrl: string;
+  let storageUrl: string;
   try {
-    receiptUrl = await uploadReceipt(cfg.supabaseUrl, cfg.serviceKey, filename, fullHtml);
+    storageUrl = await uploadReceipt(cfg.supabaseUrl, cfg.serviceKey, filename, fullHtml);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
-  data.receiptUrl = receiptUrl; // el cuerpo lleva el botón → esta URL
+  // URL pública para el cliente = proxy EF `get-receipt` (NO el enlace directo a
+  // Storage: el bucket público sirve text/plain por política anti-phishing y el
+  // HTML no renderiza). get-receipt resuelve el code → storageUrl y lo proxya con
+  // Content-Type text/html. Es función pura del code, no hace falta guardarlo.
+  const proxyUrl = `${cfg.supabaseUrl}/functions/v1/get-receipt?code=${data.verificationCode}`;
+  data.receiptUrl = proxyUrl; // el cuerpo lleva el botón → proxy (renderiza)
 
   // 4b. Cuerpo ejecutivo ligero (con botón al comprobante) + envío SIN adjunto.
   const bodyHtml = renderReceiptBody(data);
@@ -219,7 +224,7 @@ async function processReceipt(
       code: data.verificationCode,
       counts: data.counts,
       override: !!toOverride,
-      receipt_url: receiptUrl,
+      receipt_url: storageUrl, // URL de Storage que get-receipt resuelve y proxya
     },
   });
   if (insErr) {
@@ -233,7 +238,7 @@ async function processReceipt(
     email: recipient,
     resend_id: resendId,
     code: data.verificationCode,
-    receipt_url: receiptUrl,
+    receipt_url: proxyUrl,
   };
 }
 
