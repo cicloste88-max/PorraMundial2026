@@ -5,13 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = IA on-demand KO + A.1-bis (fix cache inverso GER/HAI), goleador dorsal, Pizarra, tarjeta 103/104; boost = #137 receipt + #138 gate boosts cierre v3 + #139 cliente JWT `getQueryDb` + espejo `window.currentUser` (ERR-83/84). CORS `porra-ia-compute` regex previews (runtime, sin commit). **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
+Main HEAD `6f04b85`. **09-jun — Saneamiento Supabase**: incidente Disk IO 8-jun 21:50 UTC (restart San 22:41) → 8 migraciones M1-M8 (RLS/índices/grants/search_path) + healthcheck H1-H7 + cron 27 `purge_http_response`. Advisor Perf 5→0 WARN · Sec 4→3 ERROR. **Crones 20-26 PAUSADOS, reactivar (top-3)**. ERR-85; doc `db/saneamiento-supabase-09jun2026.md`. **08-jun**: #140 ko-card-polish + boost #137/#138/#139 (ERR-83/84). **02-jun — P4 puente**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
 
 ## Top-3 pendientes inmediatos
 
-1. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, vía INDEPENDIENTE (P4 puente ya cerrado; simulacro puente OK).
-2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
-3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
+1. **Reactivar crones Mundial PAUSADOS** — 26 cierre porras 10-jun 21:59 UTC · 21/22 IA 11-jun 00:00/00:10 · 24/25 live+puente + 20 cleanup 11-jun ~16:00 UTC. `cron.alter_job(id,active:=true)`. Doc §7.
+2. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, INDEPENDIENTE del puente (ya cerrado).
+3. **JO-6 ficha lenta** + **QA picker premios** (10-jun display-only) + **PR-3 ver pronósticos** (read-only post-cierre).
 
 ## Pendientes — Bugs UI
 
@@ -22,7 +22,7 @@ Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = 
 1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
 2. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
 3. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
-4. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
+4. IDs SofaScore KO (~28-jun, post grupos).
 
 ## Backlog post-launch / Deuda técnica
 
@@ -30,8 +30,8 @@ Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = 
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
-5. **ERR-79 cerrado** (motor OK; v1.1.0 = boost grupos + overrides + reader jsonb; paridad tests 3 funcs). Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
-6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
+5. **ERR-79 residual**: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md` (motor OK; v1.1.0 cerrado).
+6. **Hardening Supabase** (post-saneamiento 09-jun): leaked-pwd, `unaccent`→schema, 3 views DEFINER, fan-out UPSERTs. Ver `docs/db/saneamiento-supabase-09jun2026.md` §8.
 7. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
 
 ## Auth & Secrets
@@ -67,8 +67,6 @@ apify call N8vUChlhok5JU3cnL -i '{"eventId":"15832749"}' -t 90
 
 Dispatch manual del sync vía GitHub UI: `Actions → Sync Squads → Run workflow` (4 inputs configurables).
 
-Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`.
-
 ## Mapa de la documentación
 
 ### `docs/` — referencia por dominio
@@ -81,12 +79,13 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `live-scoring.md` | Pipeline async+webhook + actores Apify + SofaScore IDs | Bugs en live scores o nuevos eventIds |
 | `scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA | Cambios reglas de puntuación |
 | `db-schema.md` | Schemas SQL + RLS + helpers `schedule_match_crons` | Cambios en tablas o crons de partidos |
+| `db/saneamiento-supabase-09jun2026.md` | Incidente Disk IO + 8 migraciones RLS/grants + advisors + crones + monitoring | Saturación BD, reactivar crones, audit seguridad |
 | `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
 | `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
-| `globo-mundial.md` | Globo 3D — factory globe.gl, OVERRIDE/ALIAS, polygonsData re-render, panel detalle, banderas Supabase, WIKI_BIO v3 | Cambios en globo o países |
-| `sync-squads.md` | CLI scripts/sync-squads.mjs + workflow CI: modos, pipeline FF/TM, calendario operativo, casos especiales | Cambios en sync de plantillas o frecuencia cron |
-| `v3-vs-legacy.md` | Inventario funcionalidades v3 vs legacy + reminiscencias + gaps + roadmap consolidación estética | Audit redesign v3 / decidir recolocación de features |
+| `globo-mundial.md` | Globo 3D — globe.gl, OVERRIDE/ALIAS, re-render polygonsData, panel, banderas, WIKI_BIO v3 | Cambios en globo o países |
+| `sync-squads.md` | CLI sync-squads.mjs + workflow CI: modos, pipeline FF/TM, calendario, casos especiales | Cambios en sync de plantillas o cron |
+| `v3-vs-legacy.md` | Inventario v3 vs legacy + reminiscencias + gaps + roadmap estética | Audit redesign v3 / recolocación features |
 
 ### `.claude/rules/` — auto-cargadas por path-scoping
 
@@ -101,13 +100,13 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..84: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84).
+ERR-01..85: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), IO/saturación BD (85).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..84 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..85 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol

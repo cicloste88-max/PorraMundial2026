@@ -2,6 +2,38 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [09-jun-2026] Saneamiento Supabase — incidente Disk IO + hardening RLS/seguridad (ERR-85)
+
+Sesión técnica 8–9 jun (Claude.ai + MCP Supabase, supervisa San). Solo cambios en
+BD (sin commits de código). Doc completo: `docs/db/saneamiento-supabase-09jun2026.md`.
+
+- **Incidente (8-jun 21:50–22:41 UTC)**: Disk IO budget agotado → cascada de
+  `job startup timeout` en pg_cron (hasta 628s/job), Auth `i/o timeout`,
+  `realtime.list_changes` 11.5s. Restart manual de Postgres por San (22:41).
+  Causa raíz = combinación, NO una query única: Realtime polling sobre
+  `live_scores` (75.8% del tiempo de PG) + RLS subóptima + multiple permissive
+  policies + bursts de UPSERTs `predictions` (245 rows/save) + Auth pool fijo 10.
+- **8 migraciones M1-M8** (vía `apply_migration`, en migration history): drop de
+  policies `service_role` inútiles (bypassRLS) + índice duplicado en `live_scores`
+  (M1) y `whatsapp_subscribers` (M2); separación admin write/SELECT en `squads`
+  (M3); drop de 2 tablas backup vacías (M4); RLS on en `_h2h_scrape_map` (M5);
+  REVOKE de grants ALL excesivos en las 3 views agregadoras (M6); REVOKE EXECUTE
+  en funciones internas SECURITY DEFINER (M7); `search_path` fijo en
+  `get_user_top_scorers` (M8).
+- **Advisors**: Performance 5 WARN → **0** (`auth_rls_initplan`,
+  `multiple_permissive_policies`, `duplicate_index` resueltos). Security 4 ERROR →
+  **3** (los 3 `security_definer_view` se mantienen DEFINER por necesidad
+  funcional, mitigados por M6) + 12 WARN → 4.
+- **Crones**: 27 `purge_http_response` reactivado a `*/30`. El resto
+  (20/21/22/24/25/26) quedan **PAUSADOS** pendientes de reactivar pre-Mundial
+  (deadlines en CLAUDE.md top-3 + doc §7).
+- **Patrón nuevo → ERR-85**: `job startup timeout` = pool saturado (no cron
+  lento); `service_role` bypassa RLS; `net._http_response` UNLOGGED y sin índice
+  en `id` → leer siempre con `WHERE created`.
+- **Healthcheck previo (H1-H7)**: índice composite `predictions`, VACUUM, fixes de
+  schema (`award_picks.champion`, `ko_predictions.winner_team`), advisory locks en
+  los 2 crones de barrido.
+
 ## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
 
 EF `send-porra-receipt` v3: al cierre envía al usuario un email con copia íntegra

@@ -2355,3 +2355,28 @@ Las funciones que asumen lo segundo (`if (!uid) return;` con `uid = window.curre
 **Patrón detectable**: grep `window.currentUser?.id` y `window.currentUser && window.currentUser.id`. En el repo (post-#139): 3 sitios restantes en `data.js` L435 y `ui-groups.js` L807/L830 — ahora funcionan gracias al espejo pero conviene normalizar.
 
 **Caso real**: PR #139 commit `606ea7f` (08-jun). Bug latente desde el inicio; descubierto al investigar por qué `boost_picks` seguía vacía incluso tras arreglar ERR-83.
+
+## ERR-85 — Disk IO budget agotado: cascada `job startup timeout` por RLS subóptima + Realtime polling
+
+**Síntoma**: Dashboard Supabase avisa "Project is using its Disk IO budget and may become unresponsive". pg_cron empieza a fallar con `job startup timeout` (duraciones anómalas: 10s → 25s → 628s en un solo job), Auth devuelve `dial tcp [::1]:5432: i/o timeout`, `realtime.list_changes` tarda >10s, queries normales con timeout. Cascada que se autoalimenta hasta que solo un restart de Postgres lo corta.
+
+**Causa**: NO hay una única query culpable. Es la suma de overhead estructural + carga:
+- **Realtime polling** sobre la tabla en la publication `supabase_realtime` (aquí `live_scores`): `realtime.list_changes` pollea el WAL ~2 veces/seg de forma constante (75.8% del tiempo total de Postgres incluso con BD "tranquila").
+- **RLS subóptima** amplifica cada poll: `auth_rls_initplan` (re-evalúa `auth.<fn>()` por row en vez de `(SELECT auth.<fn>())`), `multiple_permissive_policies` (2+ policies PERMISSIVE por SELECT), `duplicate_index` (mantenimiento doble en cada write).
+- **Bursts de UPSERTs** con fan-out (en `predictions`, 1 save → hasta 245 rows por replicar a 5-6 ligas) generan WAL masivo.
+- **`job startup timeout` ≠ cron lento**: significa que pg_cron no consiguió una conexión del pool a tiempo. El pool estaba saturado por queries lentas concurrentes que no terminaban.
+
+**Fix aplicado (sesión 8-9 jun, M1-M8)**:
+- Eliminar policies `USING (auth.role()='service_role')` (son inútiles: `service_role` tiene `rolbypassrls=true`) y el índice duplicado del pkey.
+- Colapsar policies permisivas redundantes; separar admin-write de SELECT abierto.
+- Envolver `auth.uid()`/`auth.role()` en subquery `(SELECT ...)` para que se evalúen una vez por query, no por row (ver `docs/db/audit_28abr_section26_rls_planning.md`).
+- Cron `purge_http_response` (`*/30`) para retención 1h en `net._http_response`.
+- Advisory locks en los crones de barrido (anti-solapamiento bajo concurrencia).
+
+**Patrón / prevención**:
+- **`net._http_response` y `net.http_request_queue` son UNLOGGED** (sin WAL, se vacían en restart). Leerlas SIEMPRE con `WHERE created > now() - interval '...'`: NO tienen índice en `id` (solo en `created`), y el owner es `supabase_admin` (no se puede añadir índice desde el rol postgres). Un `WHERE id = N` solo = Seq Scan + parseo JSONB.
+- **`service_role` bypassa RLS** → tabla con RLS habilitado y SIN policies = default-deny válido para tablas internas (solo service_role accede). NO añadir policies `auth.role()='service_role'`.
+- Ante saturación: correr las monitoring queries A-E de `docs/db/saneamiento-supabase-09jun2026.md` §9 (top consumidores `pg_stat_statements`, replication lag, conexiones activas, crones >2s).
+- Si "marcadores en tiempo real" es opcional, desactivar Realtime de la tabla libera ~75% del tiempo de Postgres (post-Mundial, ver doc §8).
+
+**Caso real**: incidente 8-jun-2026 21:50–22:41 UTC (restart manual de San). Diagnóstico y remediación completos en `docs/db/saneamiento-supabase-09jun2026.md`.
