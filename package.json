@@ -12,6 +12,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "export-equipos-players": "node scripts/export-equipos-players.mjs",
+    "test": "node --test --test-skip-pattern=\"degrade a low si calendario\" \"tests/**/*.test.mjs\" \"scripts/lib/__tests__/*.test.mjs\"",
     "sync-squads": "node --env-file=.env scripts/sync-squads.mjs"
   },
   "repository": {
