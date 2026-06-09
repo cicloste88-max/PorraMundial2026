@@ -18,6 +18,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CODE_RE = /^[A-F0-9]{12}$/;
 
+// CORS abierto: el comprobante es público (el code es la auth) y lo consume el
+// front (porramundial2026-seven.vercel.app/comprobante.html) vía fetch para
+// renderizarlo. Necesario porque Supabase fuerza text/plain + CSP sandbox en las
+// respuestas de Functions (igual que Storage): el HTML se pinta client-side.
+const CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+};
+
 function htmlResponse(
   body: string,
   status: number,
@@ -28,14 +38,16 @@ function htmlResponse(
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
+      ...CORS,
       ...extraHeaders,
     },
   });
 }
 
 serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "GET" && req.method !== "HEAD") {
-    return new Response("method_not_allowed", { status: 405 });
+    return new Response("method_not_allowed", { status: 405, headers: CORS });
   }
 
   // Code: normalizado a mayúsculas y validado estricto (no enumerable + barato).

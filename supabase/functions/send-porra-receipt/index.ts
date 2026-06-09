@@ -45,6 +45,8 @@ function cors(origin: string | null): Record<string, string> {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_FROM = "Porra Mundial 2026 <adminmundialapp@gmail.com>";
+// Origen del front (Vercel) que sirve la página de render del comprobante.
+const FRONT_BASE = "https://porramundial2026-seven.vercel.app";
 
 // deno-lint-ignore no-explicit-any
 function jsonResponse(body: any, status: number, origin: string | null): Response {
@@ -197,12 +199,14 @@ async function processReceipt(
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
-  // URL pública para el cliente = proxy EF `get-receipt` (NO el enlace directo a
-  // Storage: el bucket público sirve text/plain por política anti-phishing y el
-  // HTML no renderiza). get-receipt resuelve el code → storageUrl y lo proxya con
-  // Content-Type text/html. Es función pura del code, no hace falta guardarlo.
-  const proxyUrl = `${cfg.supabaseUrl}/functions/v1/get-receipt?code=${data.verificationCode}`;
-  data.receiptUrl = proxyUrl; // el cuerpo lleva el botón → proxy (renderiza)
+  // URL pública para el cliente = página del front (Vercel) que renderiza el
+  // comprobante. NO se enlaza ni Storage ni la EF directamente: Supabase fuerza
+  // text/html → text/plain + CSP sandbox (anti-phishing) tanto en Storage como en
+  // Functions, así que el HTML se pinta client-side. comprobante.html hace fetch
+  // a get-receipt (que resuelve code → storageUrl) y lo inyecta en un <iframe
+  // srcdoc>. Es función pura del code, no hace falta guardarla.
+  const viewUrl = `${FRONT_BASE}/comprobante.html?code=${data.verificationCode}`;
+  data.receiptUrl = viewUrl; // el cuerpo lleva el botón → página de render
 
   // 4b. Cuerpo ejecutivo ligero (con botón al comprobante) + envío SIN adjunto.
   const bodyHtml = renderReceiptBody(data);
@@ -238,7 +242,7 @@ async function processReceipt(
     email: recipient,
     resend_id: resendId,
     code: data.verificationCode,
-    receipt_url: proxyUrl,
+    receipt_url: viewUrl,
   };
 }
 
