@@ -735,9 +735,11 @@ function _buildJCard(m, idx, date, boostKey, live) {
   }
 
   const boostRowCls = isBoost ? 'jv2-boost active' : 'jv2-boost';
+  // Rótulo recortado a "Boost" para dejar sitio al chip "Liga" (brief §3.1).
+  // El estado activo se distingue por la clase .active (CSS) + checkbox checked.
   const boostLabel = isBoost
-    ? '<span class="jv2-boost-label active">🔥 Boost activo</span>'
-    : '<span class="jv2-boost-label">🔥 Boost a este partido</span>';
+    ? '<span class="jv2-boost-label active">🔥 Boost</span>'
+    : '<span class="jv2-boost-label">🔥 Boost</span>';
   const chkChecked = isBoost ? 'checked' : '';
 
   return (
@@ -769,6 +771,7 @@ function _buildJCard(m, idx, date, boostKey, live) {
           'onchange="jcardBoostToggle(\'' + matchKey + '\',\'' + date + '\',this)" ' +
           'class="jv2-boost-check">' +
         boostLabel +
+        '<button onclick="openPrediccionesLiga(\'' + matchKey + '\')" class="jv2-card-link" type="button">📊 Liga</button>' +
         '<button onclick="openTarjetaStats(\'' + matchKey + '\')" class="jv2-card-link" type="button">🔍 Ver tarjeta</button>' +
       '</div>' +
     '</div>'

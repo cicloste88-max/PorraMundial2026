@@ -100,6 +100,7 @@
 .pc-section__title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--ink-700), transparent); }
 .pc-section__count { font-family: var(--font-display); font-size: 9px; font-weight: 700; color: var(--ink-500); letter-spacing: .1em; margin-left: auto; white-space: nowrap; }
 .pc-section__title:has(.pc-section__count)::after { display: none; }
+.pc-section__empty { font-family: var(--font-text); font-size: 11px; color: var(--ink-500); text-align: center; padding: 8px 0; }
 
 /* footer · pronóstico propio */
 .pc-footer { padding: 13px 16px 16px; background: rgba(0,0,0,.35); border-top: 1px solid var(--ink-700); display: flex; gap: 8px; align-items: center; }
