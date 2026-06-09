@@ -1,0 +1,385 @@
+/* ============================================================
+   Pronósticos · La comunidad
+   Tokens y estilos heredados del sistema PorraMundial 2026
+   (elim-tokens.css + tarjeta-stats.css). Tema premium FIFA oscuro.
+   ============================================================ */
+
+:root {
+  --fifa-red: #E30613;
+  --fifa-green: #006341;
+  --fifa-blue: #0A4595;
+  --fifa-gold: #C9A961;
+  --fifa-gold-deep: #9A7B3A;
+
+  --ink-900: #0A0E1A;
+  --ink-800: #141826;
+  --ink-700: #1F2433;
+  --ink-600: #2A3142;
+  --ink-500: #4A5163;
+  --ink-400: #7A8194;
+  --ink-300: #B8BEC9;
+  --ink-200: #E2E5EB;
+  --ink-100: #F2F4F8;
+
+  --win:  #4ade80;
+  --draw: #B7860B;
+
+  --font-display: "Saira", "SF Pro Display", -apple-system, system-ui, sans-serif;
+  --font-text:    "Inter", -apple-system, system-ui, sans-serif;
+}
+
+/* ── Flags emblema (gradientes CSS simples, no SVG) ───────── */
+.pc-flag {
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--ink-700);
+  background-size: cover;
+  background-position: center;
+}
+.pc-flag[data-c="FRA"] { background-image: linear-gradient(90deg, #0055A4 0 33.34%, #fff 33.34% 66.66%, #EF4135 66.66% 100%); }
+.pc-flag[data-c="ESP"] { background-image: linear-gradient(180deg, #AA151B 0 25%, #F1BF00 25% 75%, #AA151B 75% 100%); }
+.pc-flag[data-c="ARG"] { background-image: linear-gradient(180deg, #6CACE4 0 33.34%, #fff 33.34% 66.66%, #6CACE4 66.66% 100%); }
+.pc-flag[data-c="CRO"] { background-image: linear-gradient(180deg, #FF0000 0 33.34%, #fff 33.34% 66.66%, #171796 66.66% 100%); }
+.pc-flag[data-c="POR"] { background-image: linear-gradient(90deg, #006600 0 40%, #FF0000 40% 100%); }
+.pc-flag[data-c="GER"] { background-image: linear-gradient(180deg, #000 0 33.34%, #DD0000 33.34% 66.66%, #FFCE00 66.66% 100%); }
+.pc-flag[data-c="NED"] { background-image: linear-gradient(180deg, #AE1C28 0 33.34%, #fff 33.34% 66.66%, #21468B 66.66% 100%); }
+.pc-flag[data-c="MEX"] { background-image: linear-gradient(90deg, #006847 0 33.34%, #fff 33.34% 66.66%, #CE1126 66.66% 100%); }
+.pc-flag[data-c="JPN"] { background-image: radial-gradient(circle at 50% 50%, #BC002D 0 26%, #fff 26% 100%); }
+.pc-flag[data-c="ENG"] { background-color: #fff; background-image: linear-gradient(#CE1124,#CE1124), linear-gradient(#CE1124,#CE1124); background-size: 100% 26%, 26% 100%; background-position: center, center; background-repeat: no-repeat; }
+.pc-flag[data-c="BRA"] { background-image: radial-gradient(circle at 50% 50%, #FFDF00 0 17%, #009C3B 17% 100%); }
+.pc-flag[data-c="MAR"] { background-color: #C1272D; }
+
+/* ============================================================
+   SCREEN SHELL — común a ambas variantes
+   ============================================================ */
+.pc-screen {
+  --team-a: #2851E1;
+  --team-b: #E30613;
+  position: relative;
+  width: 100%;
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
+  border: 1px solid var(--ink-700);
+  border-radius: 22px;
+  box-shadow: 0 0 24px rgba(201,169,97,.10), inset 0 0 0 1px rgba(255,255,255,.02);
+  overflow: hidden;
+  font-family: var(--font-text);
+  color: var(--ink-100);
+}
+.pc-screen::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--team-a) 18%, var(--fifa-gold) 50%, var(--team-b) 82%, transparent 100%);
+  z-index: 3;
+}
+
+/* nav */
+.pc-nav { display: flex; align-items: center; gap: 10px; padding: 16px 16px 4px; }
+.pc-nav__back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 0; padding: 4px 4px 4px 0;
+  color: var(--ink-300); font-family: var(--font-display);
+  font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; cursor: pointer;
+}
+.pc-nav__back svg { display: block; }
+.pc-nav__title {
+  flex: 1; text-align: center; font-family: var(--font-display);
+  font-size: 9px; font-weight: 800; letter-spacing: .22em; color: var(--fifa-gold); text-transform: uppercase;
+}
+.pc-nav__spacer { width: 54px; }
+
+/* meta */
+.pc-meta { text-align: center; padding: 10px 16px 0; }
+.pc-meta__eyebrow { font-family: var(--font-display); font-size: 9px; font-weight: 800; letter-spacing: .24em; color: var(--fifa-gold); text-transform: uppercase; }
+.pc-meta__time { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--ink-300); text-transform: uppercase; margin-top: 4px; }
+.pc-meta__stadium { font-size: 10px; font-weight: 500; color: var(--ink-400); margin-top: 3px; }
+
+/* hero */
+.pc-hero { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 14px 16px 10px; }
+.pc-team { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.pc-team__flag {
+  width: 60px; height: 60px; border: 2px solid var(--ink-700);
+  box-shadow: 0 0 22px var(--team-glow), 0 8px 16px rgba(0,0,0,.5);
+}
+.pc-team--a .pc-team__flag { border-color: var(--team-a); --team-glow: rgba(40,81,225,.45); }
+.pc-team--b .pc-team__flag { border-color: var(--team-b); --team-glow: rgba(227,6,19,.45); }
+.pc-team__name { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--ink-100); text-transform: uppercase; }
+.pc-team__sub { font-size: 9px; font-weight: 500; color: var(--ink-400); letter-spacing: .04em; }
+
+.pc-score { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 4px; }
+.pc-score__label { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--fifa-gold); }
+.pc-score--final .pc-score__label { color: var(--win); }
+.pc-score__nums {
+  display: flex; align-items: baseline; gap: 8px; font-family: var(--font-display);
+  font-size: 34px; font-weight: 900; line-height: 1; letter-spacing: -.04em; color: var(--ink-100);
+  font-variant-numeric: tabular-nums; text-shadow: 0 2px 12px rgba(201,169,97,.25);
+}
+.pc-score__nums.is-empty { color: var(--ink-500); }
+.pc-score__sep { font-size: 20px; color: var(--ink-500); font-weight: 700; }
+
+/* body + sections */
+.pc-body { padding: 4px 16px 16px; }
+.pc-section { padding: 16px 0; border-bottom: 1px solid var(--ink-700); }
+.pc-section:last-child { border-bottom: 0; }
+.pc-section__title {
+  font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: .14em;
+  color: var(--ink-300); text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap;
+}
+.pc-section__title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--ink-700), transparent); }
+.pc-section__count { font-family: var(--font-display); font-size: 9px; font-weight: 700; color: var(--ink-500); letter-spacing: .1em; margin-left: auto; white-space: nowrap; }
+.pc-section__title:has(.pc-section__count)::after { display: none; }
+
+/* footer · pronóstico propio */
+.pc-footer { padding: 13px 16px 16px; background: rgba(0,0,0,.35); border-top: 1px solid var(--ink-700); display: flex; gap: 8px; align-items: center; }
+.pc-footer__l { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-footer__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .2em; color: var(--ink-400); text-transform: uppercase; }
+.pc-footer__val { font-family: var(--font-display); font-size: 14px; font-weight: 800; color: var(--ink-100); letter-spacing: -.01em; }
+.pc-footer__val b { color: var(--fifa-gold); font-weight: 900; }
+.pc-chip-ok { color: var(--win) !important; }
+
+/* ============================================================
+   VARIANTE A — Compacta / barras
+   ============================================================ */
+
+/* sign · barra segmentada tri-stack */
+.a-signbar { display: flex; height: 30px; border-radius: 8px; overflow: hidden; border: 1px solid var(--ink-700); }
+.a-signbar__seg { display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 13px; color: #fff; letter-spacing: -.01em; position: relative; min-width: 30px; }
+.a-signbar__seg--1 { background: linear-gradient(180deg, var(--team-a), color-mix(in srgb, var(--team-a) 72%, black)); }
+.a-signbar__seg--x { background: linear-gradient(180deg, var(--ink-500), var(--ink-600)); }
+.a-signbar__seg--2 { background: linear-gradient(180deg, var(--team-b), color-mix(in srgb, var(--team-b) 72%, black)); }
+.a-signbar__seg.is-correct::after { content: '✓'; position: absolute; top: 2px; right: 4px; font-size: 9px; color: var(--win); }
+.a-signlegend { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 11px; gap: 8px; }
+.a-signlegend__item { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); min-width: 0; }
+.a-signlegend__dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.a-signlegend__dot--1 { background: var(--team-a); }
+.a-signlegend__dot--x { background: var(--ink-400); }
+.a-signlegend__dot--2 { background: var(--team-b); }
+.a-signlegend__lbl { font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-300); white-space: nowrap; }
+.a-signlegend__tag { font-size: 7px; font-weight: 900; letter-spacing: .1em; color: var(--fifa-gold); text-transform: uppercase; border: 1px solid rgba(201,169,97,.4); border-radius: 4px; padding: 1px 4px; white-space: nowrap; }
+.a-signlegend__item.mine .a-signlegend__lbl { color: var(--fifa-gold); }
+.a-signlegend__item.mine .a-signlegend__dot { box-shadow: 0 0 0 2px rgba(201,169,97,.45); }
+
+/* scoreline ranking compacto */
+.a-rank { display: flex; flex-direction: column; gap: 7px; }
+.a-row { display: grid; grid-template-columns: 86px 1fr 26px; align-items: center; gap: 10px; }
+.a-row__score { font-family: var(--font-display); font-size: 15px; font-weight: 900; letter-spacing: -.02em; color: var(--ink-200); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.a-row__bartrack { height: 8px; background: rgba(0,0,0,.4); border: 1px solid var(--ink-700); border-radius: 4px; overflow: hidden; }
+.a-row__barfill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--ink-500), var(--ink-400)); }
+.a-row__cnt { font-family: var(--font-display); font-size: 13px; font-weight: 800; color: var(--ink-300); text-align: right; font-variant-numeric: tabular-nums; }
+.a-row__names { grid-column: 1 / -1; font-size: 10px; color: var(--ink-500); margin: -2px 0 2px 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-row.sign1 .a-row__barfill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-a) 55%, var(--ink-600)), var(--team-a)); }
+.a-row.sign2 .a-row__barfill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-b) 55%, var(--ink-600)), var(--team-b)); }
+.a-row.is-exact .a-row__barfill { background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); box-shadow: 0 0 10px rgba(201,169,97,.45); }
+.a-row.is-exact .a-row__score, .a-row.is-exact .a-row__cnt { color: var(--fifa-gold); }
+.a-tag { font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; padding: 2px 5px; border-radius: 4px; }
+.a-tag--exact { color: var(--ink-900); background: var(--fifa-gold); }
+
+/* global strip compacto */
+.a-global { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.a-global__head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; padding-bottom: 4px; }
+.a-global__num { font-family: var(--font-display); font-size: 30px; font-weight: 900; letter-spacing: -.03em; color: var(--ink-100); line-height: 1; font-variant-numeric: tabular-nums; }
+.a-global__numlbl { font-family: var(--font-display); font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-400); }
+.a-pill { background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 3px; }
+.a-pill__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400); }
+.a-pill__v { font-family: var(--font-display); font-size: 14px; font-weight: 900; color: var(--ink-100); letter-spacing: -.01em; }
+.a-pill__v small { font-size: 11px; color: var(--ink-400); font-weight: 700; margin-left: 3px; }
+
+/* IA callout compacto */
+.a-ia { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 13px; border-radius: 12px; background: rgba(201,169,97,.08); border: 1px solid rgba(201,169,97,.32); }
+.a-ia__badge { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(201,169,97,.16); border: 1px solid rgba(201,169,97,.4); font-size: 16px; }
+.a-ia__mid { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.a-ia__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--fifa-gold); }
+.a-ia__score { font-family: var(--font-display); font-size: 19px; font-weight: 900; letter-spacing: -.02em; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.a-ia__score b { color: var(--fifa-gold); }
+.a-ia__conf { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.a-ia__confnum { font-family: var(--font-display); font-size: 20px; font-weight: 900; color: var(--fifa-gold); line-height: 1; font-variant-numeric: tabular-nums; }
+.a-ia__conflbl { font-family: var(--font-display); font-size: 7px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400); }
+.a-ia__hit { font-family: var(--font-display); font-size: 8px; font-weight: 900; letter-spacing: .08em; color: var(--win); text-transform: uppercase; }
+
+/* ============================================================
+   VARIANTE B — Espaciosa / donut + podio
+   ============================================================ */
+
+/* sign · donut */
+.b-sign { display: grid; grid-template-columns: 120px 1fr; gap: 18px; align-items: center; }
+.b-donut { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; }
+.b-donut::after { content: ''; position: absolute; inset: 19px; border-radius: 50%; background: var(--ink-900); box-shadow: inset 0 0 0 1px var(--ink-700); }
+.b-donut__center { position: relative; z-index: 1; text-align: center; }
+.b-donut__pct { font-family: var(--font-display); font-size: 23px; font-weight: 900; color: var(--ink-100); line-height: 1; letter-spacing: -.03em; }
+.b-donut__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-300); margin-top: 3px; }
+.b-signleg { display: flex; flex-direction: column; gap: 9px; }
+.b-signleg__row { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px; }
+.b-signleg__dot { width: 12px; height: 12px; border-radius: 4px; }
+.b-signleg__dot--1 { background: var(--team-a); }
+.b-signleg__dot--x { background: var(--ink-400); }
+.b-signleg__dot--2 { background: var(--team-b); }
+.b-signleg__name { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--ink-200); }
+.b-signleg__pct { font-family: var(--font-display); font-size: 16px; font-weight: 900; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.b-signleg__row.mine .b-signleg__name, .b-signleg__row.mine .b-signleg__pct { color: var(--fifa-gold); }
+.b-signleg__row.mine::after { content: 'TU PICK'; font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .1em; color: var(--fifa-gold); }
+
+/* podio scorelines */
+.b-podium { display: flex; flex-direction: column; gap: 12px; }
+.b-top { background: linear-gradient(135deg, rgba(201,169,97,.10), rgba(0,0,0,.25)); border: 1px solid var(--ink-600); border-radius: 16px; padding: 16px; }
+.b-top.is-exact { border-color: rgba(201,169,97,.55); box-shadow: 0 0 22px rgba(201,169,97,.18); }
+.b-top__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.b-top__rank { font-family: var(--font-display); font-size: 9px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: var(--fifa-gold); }
+.b-top__main { display: flex; align-items: baseline; gap: 14px; }
+.b-top__score { font-family: var(--font-display); font-size: 46px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.b-top.is-exact .b-top__score { color: var(--fifa-gold); }
+.b-top__count { display: flex; flex-direction: column; }
+.b-top__countnum { font-family: var(--font-display); font-size: 22px; font-weight: 900; color: var(--ink-200); line-height: 1; }
+.b-top__countlbl { font-family: var(--font-display); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-400); }
+.b-names { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.b-name { font-family: var(--font-text); font-size: 10px; font-weight: 600; color: var(--ink-300); background: rgba(255,255,255,.05); border: 1px solid var(--ink-700); border-radius: 999px; padding: 3px 9px; }
+.b-rest { display: flex; flex-direction: column; gap: 8px; }
+.b-restrow { display: grid; grid-template-columns: 22px 54px 1fr auto; align-items: center; gap: 10px; }
+.b-restrow__rank { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--ink-500); text-align: center; }
+.b-restrow__score { font-family: var(--font-display); font-size: 15px; font-weight: 900; color: var(--ink-200); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 4px; }
+.b-restrow__track { height: 6px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; }
+.b-restrow__fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--ink-500), var(--ink-400)); }
+.b-restrow.sign1 .b-restrow__fill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-a) 55%, var(--ink-600)), var(--team-a)); }
+.b-restrow.sign2 .b-restrow__fill { background: linear-gradient(90deg, color-mix(in srgb, var(--team-b) 55%, var(--ink-600)), var(--team-b)); }
+.b-restrow.is-exact .b-restrow__score { color: var(--fifa-gold); }
+.b-restrow.is-exact .b-restrow__fill { background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); }
+.b-restrow__cnt { font-family: var(--font-display); font-size: 13px; font-weight: 800; color: var(--ink-300); }
+
+/* global hero */
+.b-global { text-align: center; }
+.b-global__num { font-family: var(--font-display); font-size: 44px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.b-global__sub { font-family: var(--font-display); font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-400); margin-top: 6px; }
+.b-global__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.b-gcard { background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.b-gcard__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400); }
+.b-gcard__v { font-family: var(--font-display); font-size: 20px; font-weight: 900; color: var(--ink-100); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.b-gcard__pct { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--fifa-gold); }
+
+/* IA card prominente */
+.b-ia { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 16px; border-radius: 18px; background: radial-gradient(120% 120% at 50% 0%, rgba(201,169,97,.16), rgba(0,0,0,.25)); border: 1px solid rgba(201,169,97,.35); text-align: center; }
+.b-ia__badge { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(201,169,97,.16); border: 1px solid rgba(201,169,97,.45); font-size: 22px; }
+.b-ia__k { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--fifa-gold); }
+.b-ia__score { font-family: var(--font-display); font-size: 40px; font-weight: 900; letter-spacing: -.04em; line-height: 1; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.b-ia__ring { display: flex; align-items: center; gap: 8px; }
+.b-ia__bartrack { width: 120px; height: 7px; background: rgba(0,0,0,.4); border: 1px solid var(--ink-700); border-radius: 4px; overflow: hidden; }
+.b-ia__barfill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--fifa-gold-deep), var(--fifa-gold)); box-shadow: 0 0 10px rgba(201,169,97,.4); }
+.b-ia__conf { font-family: var(--font-display); font-size: 14px; font-weight: 900; color: var(--fifa-gold); font-variant-numeric: tabular-nums; }
+.b-ia__hit { font-family: var(--font-display); font-size: 9px; font-weight: 900; letter-spacing: .08em; color: var(--win); text-transform: uppercase; }
+
+/* ============================================================
+   SCREEN · Pronósticos por jugador
+   ============================================================ */
+.u-sorthint { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-500); margin-bottom: 12px; }
+
+.u-summary { display: flex; gap: 8px; margin-bottom: 14px; }
+.u-sumchip { flex: 1; background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 12px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.u-sumchip__num { font-family: var(--font-display); font-size: 22px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink-100); }
+.u-sumchip__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); }
+.u-sumchip--exact .u-sumchip__num { color: var(--fifa-gold); }
+.u-sumchip--sign .u-sumchip__num { color: var(--win); }
+.u-sumchip--fail .u-sumchip__num { color: var(--ink-400); }
+
+.u-list { display: flex; flex-direction: column; gap: 6px; }
+.u-row { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.22); border: 1px solid var(--ink-700); border-radius: 11px; padding: 9px 12px; }
+.u-row.you { border-color: rgba(201,169,97,.5); background: rgba(201,169,97,.08); }
+.u-rank { font-family: var(--font-display); font-size: 12px; font-weight: 800; color: var(--ink-500); width: 18px; text-align: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.u-name { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.u-name__txt { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--ink-100); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-badge { font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; }
+.u-badge--you { color: var(--ink-900); background: var(--fifa-gold); }
+.u-badge--boost { color: var(--fifa-gold); border: 1px solid rgba(201,169,97,.45); background: rgba(201,169,97,.08); }
+.u-score { font-family: var(--font-display); font-size: 17px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink-100); flex-shrink: 0; }
+.u-sign { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 11px; color: #fff; flex-shrink: 0; }
+.u-sign--1 { background: var(--team-a); }
+.u-sign--x { background: var(--ink-500); }
+.u-sign--2 { background: var(--team-b); }
+.u-res { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; width: 50px; flex-shrink: 0; }
+.u-res__pts { font-family: var(--font-display); font-size: 15px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink-300); }
+.u-res__tag { font-family: var(--font-display); font-size: 7px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-500); }
+.u-row.k-exact { box-shadow: inset 3px 0 0 var(--fifa-gold); }
+.u-row.k-exact .u-res__pts, .u-row.k-exact .u-res__tag, .u-row.k-exact .u-score { color: var(--fifa-gold); }
+.u-row.k-sign { box-shadow: inset 3px 0 0 var(--win); }
+.u-row.k-sign .u-res__pts, .u-row.k-sign .u-res__tag { color: var(--win); }
+.u-row.k-fail .u-res__pts, .u-row.k-fail .u-res__tag { color: var(--ink-500); }
+
+/* ============================================================
+   SCREEN · Porra de un jugador (todos sus pronósticos)
+   ============================================================ */
+.up-profile { display: flex; align-items: center; gap: 14px; padding: 14px 16px 6px; }
+.up-avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink-900); background: linear-gradient(150deg, var(--fifa-gold), var(--fifa-gold-deep)); box-shadow: 0 6px 16px rgba(201,169,97,.35); }
+.up-id { min-width: 0; }
+.up-id__name { font-family: var(--font-display); font-size: 21px; font-weight: 900; letter-spacing: -.01em; color: var(--ink-100); line-height: 1.05; }
+.up-id__meta { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); margin-top: 4px; }
+.up-id__meta b { color: var(--fifa-gold); }
+
+.up-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 16px 4px; }
+.up-stat { background: rgba(0,0,0,.28); border: 1px solid var(--ink-700); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.up-stat__num { font-family: var(--font-display); font-size: 22px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink-100); }
+.up-stat__num b { color: var(--fifa-gold); }
+.up-stat__lbl { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); text-align: center; }
+
+.up-jornada { font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-300); padding: 0 0 12px; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+.up-jornada::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--ink-700), transparent); }
+.up-jornada span { color: var(--ink-500); letter-spacing: .12em; }
+
+.up-list { display: flex; flex-direction: column; gap: 9px; }
+.up-match { background: rgba(0,0,0,.22); border: 1px solid var(--ink-700); border-radius: 13px; overflow: hidden; }
+.up-match__head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 0; }
+.up-match__status { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400); }
+.up-match.live .up-match__status { color: var(--fifa-red); }
+.up-match__status .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--fifa-red); margin-right: 5px; vertical-align: middle; box-shadow: 0 0 8px var(--fifa-red); }
+.up-boost { font-family: var(--font-display); font-size: 8px; font-weight: 900; letter-spacing: .08em; color: var(--fifa-gold); border: 1px solid rgba(201,169,97,.45); background: rgba(201,169,97,.08); border-radius: 999px; padding: 2px 7px; }
+
+.up-match__teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 12px 10px; }
+.up-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.up-team--home { justify-content: flex-end; }
+.up-team--away { justify-content: flex-start; }
+.up-team__flag { width: 26px; height: 26px; border: 1.5px solid var(--ink-600); }
+.up-team__code { font-family: var(--font-display); font-size: 13px; font-weight: 800; letter-spacing: .04em; color: var(--ink-100); }
+.up-pred { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 4px; }
+.up-pred__lbl { font-family: var(--font-display); font-size: 7px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-500); }
+.up-pred__score { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 24px; font-weight: 900; line-height: 1; letter-spacing: -.03em; color: var(--ink-100); font-variant-numeric: tabular-nums; }
+.up-pred__sep { color: var(--ink-500); font-size: 16px; }
+
+.up-match__foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--ink-700); background: rgba(0,0,0,.25); }
+.up-foot__real { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--ink-400); text-transform: uppercase; }
+.up-foot__real b { color: var(--ink-100); font-weight: 900; font-size: 12px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.up-foot__pts { font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.up-match.k-exact { box-shadow: inset 3px 0 0 var(--fifa-gold); }
+.up-match.k-exact .up-pred__score, .up-match.k-exact .up-foot__pts { color: var(--fifa-gold); }
+.up-match.k-sign { box-shadow: inset 3px 0 0 var(--win); }
+.up-match.k-sign .up-foot__pts { color: var(--win); }
+.up-match.k-fail .up-foot__pts { color: var(--ink-500); }
+.up-match.live { box-shadow: inset 3px 0 0 var(--fifa-red); }
+.up-match.live .up-foot__pts { color: var(--fifa-gold); }
+.up-match.pre .up-match__foot { background: transparent; }
+.up-match.pre .up-foot__pts { color: var(--ink-500); }
+
+/* goleador previsto + chips de puntuación (4 chips oficiales) */
+.up-scorer { display: flex; align-items: center; gap: 6px; padding: 0 12px 9px; font-family: var(--font-text); font-size: 10px; color: var(--ink-400); }
+.up-scorer b { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; color: var(--ink-200); }
+.up-scorer .gol-ok { color: var(--win); }
+.up-chips { display: flex; gap: 5px; padding: 0 12px 10px; flex-wrap: wrap; }
+.up-chip { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--ink-700); color: var(--ink-500); background: rgba(0,0,0,.22); white-space: nowrap; }
+.up-chip.on { color: var(--win); border-color: rgba(74,222,128,.4); background: rgba(0,131,74,.16); }
+.up-chip.on.gold { color: var(--fifa-gold); border-color: rgba(201,169,97,.45); background: rgba(201,169,97,.12); }
+.up-chip__x { opacity: .5; }
+
+/* App interactiva: cabecera fija + selector de jornadas + lista scroll */
+.pc-screen.up-app { display: flex; flex-direction: column; height: min(880px, calc(100vh - 40px)); width: 390px; }
+.up-fixed { flex: 0 0 auto; border-bottom: 1px solid var(--ink-700); }
+.up-scroll { flex: 1 1 auto; overflow-y: auto; scrollbar-width: none; }
+.up-scroll::-webkit-scrollbar { display: none; }
+.up-app .pc-body { padding-top: 12px; }
+
+.up-tabs { display: flex; gap: 7px; padding: 4px 16px 14px; overflow-x: auto; scrollbar-width: none; }
+.up-tabs::-webkit-scrollbar { display: none; }
+.up-tab { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 13px; border-radius: 10px; border: 1px solid var(--ink-700); background: rgba(0,0,0,.25); cursor: pointer; transition: border-color .15s, background .15s; }
+.up-tab__t { font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--ink-200); }
+.up-tab__s { font-family: var(--font-display); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-500); white-space: nowrap; }
+.up-tab.done .up-tab__s { color: var(--win); }
+.up-tab.live .up-tab__s { color: var(--fifa-red); }
+.up-tab.active { border-color: var(--fifa-gold); background: rgba(201,169,97,.12); }
+.up-tab.active .up-tab__t { color: var(--fifa-gold); }
+.up-tab.locked { opacity: .4; cursor: default; }
