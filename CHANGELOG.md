@@ -2,6 +2,29 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [10-jun-2026] Fix barra IA PREDICE invertida en el único fixture teams_swapped (BRA-ESC J3) — rama `fix/ia-bar-orientation`
+
+- **Síntoma**: en `wc2026_gC_15186861` (Brasil-Escocia, J3, grupo C) la barra
+  mostraba LOCAL 19 / EMP 10 / VISITANTE 71 con quip "Brasil ganará" (Brasil
+  ES el local). Único partido de 72 con `ia_predictions.home_code` (SCO, orden
+  SofaScore con el que computó la IA) distinto de `wc_matches.home_iso3` (BRA);
+  los otros 71 alineados ocultaban el caso límite.
+- **Causa**: `v3RenderIABlock` (eliminatoria-v3.js) mapeaba `breakdown.p_home`
+  →LOCAL / `p_away`→VISITANTE en crudo. La re-key a legacy key en
+  `loadIAPredictions` (auth.js) reorienta la KEY (`home_es/away_es`) pero no
+  los valores. Regresión del mismo desfase que ya corrigió el flip del sign en
+  la EF `get-league-predictions` (`home_code !== home_iso3`).
+- **Fix (solo presentación)**: `loadIAPredictions` selecciona `home_code` y
+  adjunta `ia_home_code`/`wc_home_iso3` a cada entry (crudos intactos);
+  helper nuevo `v3IAOrientProbs` (eliminatoria-v3.js) intercambia
+  p_home↔p_away solo si `ia_home_code !== wc_home_iso3` — misma condición que
+  el flip del sign de la EF. Entries on-demand KO (sin metadata) passthrough.
+  Sign/confidence/motor/BD sin tocar.
+- **Regresión**: `tests/ia-bar-orientation.test.mjs` (9 tests) — unit del
+  helper con datos reales de BD, end-to-end del HTML (LOCAL 71 / EMP 10 /
+  VISITANTE 19), invariante del JSON (único swapped) y wiring guards en
+  auth.js + eliminatoria-v3.js.
+
 ## [10-jun-2026] Destacados de liga REALES — EF `get-league-highlights` v1.0.0 + rewrite `loadLeagueHighlights` (rama `claude/vibrant-turing-qcbhp3`)
 
 El panel DESTACADOS DE TU LIGA del Predictor montaba frases falsas: los items

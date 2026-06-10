@@ -66,7 +66,7 @@ async function loadIAPredictions() {
     try { window._iaActiveSnapshotId = snap.id; } catch (_) {}
     const [{ data: preds }, matchesJson] = await Promise.all([
       db.from('ia_predictions')
-        .select('match_id, sign, confidence, breakdown, used_fallback')
+        .select('match_id, sign, confidence, breakdown, used_fallback, home_code')
         .eq('snapshot_id', snap.id),
       fetch('/data/worldcup-2026-matches.json')
         .then(r => r.ok ? r.json() : {})
@@ -74,9 +74,11 @@ async function loadIAPredictions() {
     ]);
     if (!preds || preds.length === 0) return {};
     const legacyByMatchId = {};
+    const homeIso3ByMatchId = {};
     for (const [mid, m] of Object.entries(matchesJson || {})) {
       if (m?.group && m?.home_es && m?.away_es) {
         legacyByMatchId[mid] = `${m.group}_${m.home_es}_${m.away_es}`;
+        homeIso3ByMatchId[mid] = m.home_iso3 || null;
       }
     }
     const out = {};
@@ -91,6 +93,16 @@ async function loadIAPredictions() {
         p_home: b.p_home,
         p_draw: b.p_draw,
         p_away: b.p_away,
+        // Fix barra IA 10-jun: el breakdown está en la orientación
+        // home_code/away_code con la que computó la IA (orden SofaScore), que
+        // en el único fixture teams_swapped (wc2026_gC_15186861, BRA-ESC J3)
+        // es la INVERSA de la card (home_es/away_es, como indexa esta key).
+        // Metadata para reorientar en presentación (v3IAOrientProbs,
+        // eliminatoria-v3.js) con la MISMA condición que el flip del sign en
+        // la EF get-league-predictions. Crudos intactos: sign/confidence/p_*
+        // se guardan tal y como vienen de BD.
+        ia_home_code: p.home_code || null,
+        wc_home_iso3: homeIso3ByMatchId[p.match_id] || null,
         // Post-F commit 1: raw context para el tooltip explainer (commit 3).
         // Opcional: entries computed pre-v10 no tendrán estos campos y el
         // tooltip hará fallback a no mostrar trigger.
