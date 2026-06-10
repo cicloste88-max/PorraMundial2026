@@ -868,6 +868,26 @@ function _v3IAEmptyInner(loading) {
     + '</div>' + body;
 }
 
+// Fix barra IA 10-jun: reorienta p_home/p_away a la orientación de la card
+// (wc_matches home/away) cuando la IA computó con el orden inverso, es decir
+// ia_predictions.home_code !== wc_matches.home_iso3 — único caso real:
+// wc2026_gC_15186861 (BRA-ESC, J3, teams_swapped). MISMA condición que el
+// flip del sign en la EF get-league-predictions: barra y sign salen de la
+// misma fuente de verdad. Entries sin metadata (on-demand KO, ya orientadas
+// a la card) pasan tal cual. Presentación pura: NO muta la entry — los
+// crudos (sign, confidence, p_*) quedan como vienen de BD.
+function v3IAOrientProbs(pred) {
+  if (!pred) return { p_home: null, p_draw: null, p_away: null };
+  var swapped = !!(pred.ia_home_code && pred.wc_home_iso3
+    && pred.ia_home_code !== pred.wc_home_iso3);
+  return {
+    p_home: swapped ? pred.p_away : pred.p_home,
+    p_draw: pred.p_draw,
+    p_away: swapped ? pred.p_home : pred.p_away,
+  };
+}
+window.v3IAOrientProbs = v3IAOrientProbs;
+
 // Polish v1 Fix-3: acepta string key (grupos: "A_México_Sudáfrica") o
 // objeto match (KO: construye key "ondemand_{ISO3_A}_{ISO3_B}_<snap>" desde
 // slots resueltos). Para KO sin entrada cacheada dispara compute_match
@@ -947,7 +967,8 @@ function v3RenderIABlock(matchKeyOrMatch) {
       + '</div>';
   }
 
-  var pcts = _v3DistributeTo100([pred.p_home, pred.p_draw, pred.p_away]);
+  var probs = v3IAOrientProbs(pred);
+  var pcts = _v3DistributeTo100([probs.p_home, probs.p_draw, probs.p_away]);
   var pHome = pcts[0], pDraw = pcts[1], pAway = pcts[2];
   var quip = pred.quip || '';
   var quipSafe = (typeof escapeHtml === 'function')
