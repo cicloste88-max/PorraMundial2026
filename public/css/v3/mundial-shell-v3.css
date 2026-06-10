@@ -162,6 +162,60 @@
   text-transform: lowercase;
   letter-spacing: 0.02em;
 }
+/* ─── Carrusel partidos del día (post-kickoff — mismo slot que el countdown) ── */
+.phone .v3-fifa-bar__carousel {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 27px; /* alto cd-num(16)+lbl(8)+margin(3) — sin layout shift vs countdown */
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.phone .v3-carousel-slide {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .3s ease, transform .3s ease;
+}
+.phone .v3-carousel-slide.is-leaving {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.phone .v3-carousel-team {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 92px; /* Sudáfrica / Estados Unidos no rompen la barra en 390px */
+  flex: 0 1 auto;
+}
+.phone .v3-carousel-time {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.phone .v3-carousel-live.is-live {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  color: #0b1407;
+  background: var(--lime);
+  padding: 4px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* Slot user-mount (badge avatar+nombre+admin+logout — D13 corregida) */
 .phone .v3-fifa-bar__user {
   display: flex;
@@ -183,6 +237,11 @@
   .phone .v3-fifa-bar__eyebrow { font-size: 8px; letter-spacing: 0.14em; }
   .phone .v3-fifa-bar__nextmatch { font-size: 11px; }
   .phone .v3-fifa-bar__countdown { max-width: 58%; }
+  .phone .v3-carousel-team { font-size: 11px; max-width: 70px; }
+  .phone .v3-carousel-slide { gap: 5px; }
+  .phone .v3-carousel-time { gap: 4px; }
+  .phone .v3-fifa-bar__carousel { min-height: 22px; } /* cd-num 13 + lbl 7 + 2 */
+  .phone .v3-carousel-live.is-live { font-size: 8px; padding: 3px 7px; }
 }
 
 /* ─── Qualified CTA (acceso al globo 3D — solo en grupos) ── */
