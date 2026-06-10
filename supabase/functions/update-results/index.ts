@@ -1,20 +1,4 @@
-// supabase/functions/update-results/index.ts
-// Sync football-data.org → tabla `results`. pg_cron lo activa el 11-jun (lane
-// Claude.ai/P4). Traído al repo desde el deploy v5 (estaba drifted) — B2/T2.
-//
-// CAMBIO B2/T2 (01-jun-2026): se escribe `match_results` como OBJETO (sin
-// JSON.stringify) para la migración results→jsonb (lane Claude.ai/P1). El
-// reader de get-league-standings ya es type-tolerant (asObj), así que funciona
-// con la columna en TEXT (hoy) y en jsonb (tras P1).
-//
-// FUERA DE SCOPE (NO TOCAR — lane Claude.ai/P3): el keying KO 73-104 y la
-// serialización de `ko_results`/`classification` (derivados del array
-// koByTeams) los rehace el puente P3. Se dejan con JSON.stringify a propósito
-// para no colisionar con ese trabajo; cuando P1+P3 estén, P3 quita esos
-// JSON.stringify restantes.
-//
-// JWT: el deploy v5 tiene verify_jwt=true (invocación vía pg_cron/service role).
-// No se cambia aquí — es config de deploy, no de código.
+// Supabase Edge Function: update-results
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const FOOTBALL_API_KEY = Deno.env.get("FOOTBALL_DATA_API_KEY") ?? "";
@@ -210,12 +194,7 @@ Deno.serve(async (req: Request) => {
 
     const { error: upsertError } = await supabase.from("results").upsert({
       id: 1,
-      // B2/T2: objeto directo para la migración results→jsonb (lane P1).
-      // get-league-standings lo lee con asObj (type-tolerant TEXT|jsonb).
-      match_results: matchResults,
-      // NO TOCAR (lane Claude.ai/P3): keying KO 73-104 + serialización.
-      // koByTeams es array-por-equipos; P3 lo reescribe a dict-por-73-104 y,
-      // junto con P1, quitará estos JSON.stringify.
+      match_results: JSON.stringify(matchResults),
       ko_results: JSON.stringify(koByTeams),
       classification: JSON.stringify(classification),
       updated_at: new Date().toISOString(),

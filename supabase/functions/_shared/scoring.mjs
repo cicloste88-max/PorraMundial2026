@@ -1,15 +1,5 @@
 // supabase/functions/_shared/scoring.mjs
 // Motor de puntuación Porra Mundial 2026 — funciones puras (sin globals).
-//
-// Fuente de verdad SEMÁNTICA compartida entre:
-//   - Edge Function `get-league-standings` (server-side, este import).
-//   - public/js/scoring.js (browser, sigue siendo classic script con
-//     globals; tests/scoring.test.mjs valida parity 1:1 contra este módulo
-//     para evitar divergencia).
-//
-// NO importa nada del runtime de la app — todo viene por parámetro. El
-// caller resuelve fechas (boost-day), nombres (scorers fallback) y el
-// predicate IA (iaBonusWillApply) y se los pasa ya evaluados.
 
 export const KO_ROUND_PTS = {
   groups:         5,
@@ -34,23 +24,6 @@ export const FINAL_CLASSIFICATION_PTS = {
   fourth:    10,
 };
 
-// ─── calcMatchPoints ─────────────────────────────────────────────────
-// Espejo de public/js/scoring.js:51-91 (calcMatchPoints browser).
-//
-// pred:    { saved, l, v, gol, home, away }
-// realL/R: ints (resultado real del partido)
-// opts:
-//   - scorers: string[] | null  player keys de goleadores reales.
-//   - iaBonus: boolean          resultado de iaBonusWillApply ya evaluado.
-//   - boost:   boolean          true si este match es el boost del día del usuario.
-//
-// Reglas (San 21-may-2026, ERR-67):
-//   +1 signo correcto (1·X·2)
-//   +3 marcador exacto APILA sobre el +1 del signo
-//   +2 goleador correcto (si pred.gol y scorers incluye pred.gol)
-//   +1 bonus vs IA (caller evalúa iaBonusWillApply)
-//   cap 7 por partido antes del boost
-//   boost: si exacto Y opts.boost → pts × 2 (máx 14)
 export function calcMatchPoints(pred, realL, realR, opts = {}) {
   if (!pred || !pred.saved) return 0;
   let pts = 0;
@@ -79,23 +52,20 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
   return pts;
 }
 
-// ─── calcKOMatchPoints ───────────────────────────────────────────────
-// Espejo de public/js/scoring.js:109-130.
-//
-// round: 'r32'|'r16'|'qf'|'sf'|'third'|'final'
-//   - Cada ronda con valor > 0 en KO_ROUND_PTS suma roundPts si el
-//     ganador predicho coincide con el real (incluido classifier en
-//     empate predicho).
-//   - 'sf' añade además KO_ROUND_PTS.final_advance (25 pts extra por
-//     meter al equipo en la final).
-//   - 'third' y 'final' NO suman roundPts (cubiertos por classification).
-//
-// opts: mismo que calcMatchPoints.
+// calcKOMatchPoints: puntos base de marcador (calcMatchPoints) + avance de ronda.
+// El ganador REAL se determina, por prioridad:
+//   1) opts.winner ('home'|'away') — lo provee el puente con el desenlace real
+//      (incluye prorroga/penaltis). Imprescindible para KO que acaba en empate.
+//   2) fallback: derivado de realL/realR (KO sin desempate, o datos antiguos).
+// El ganador PREDICHO: del marcador del usuario, o su classifier si predijo empate.
 export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
   if (!pred || !pred.saved) return 0;
   let pts = calcMatchPoints(pred, realL, realR, opts);
 
-  const realWinner = realL > realR ? 'home' : realR > realL ? 'away' : null;
+  const realWinner = (opts.winner === 'home' || opts.winner === 'away')
+    ? opts.winner
+    : (realL > realR ? 'home' : realR > realL ? 'away' : null);
+
   const predWinner = pred.l > pred.v ? 'home'
                    : pred.v > pred.l ? 'away'
                    : pred.classifier;
@@ -112,12 +82,6 @@ export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
   return pts;
 }
 
-// ─── calcAwardPoints ─────────────────────────────────────────────────
-// Espejo de public/js/scoring.js:145-156.
-//
-// userPicks: { golden_ball, golden_boot, golden_glove, young_player } strings
-// realWinners: idem (claves que falten = 0 pts)
-// awardsPts: { golden_ball: 15, ... } — default DEFAULT_AWARDS_PTS.
 export function calcAwardPoints(userPicks, realWinners, awardsPts = DEFAULT_AWARDS_PTS) {
   if (!userPicks || !realWinners) return 0;
   let pts = 0;
@@ -129,9 +93,6 @@ export function calcAwardPoints(userPicks, realWinners, awardsPts = DEFAULT_AWAR
   return pts;
 }
 
-// ─── calcClassificationPoints ────────────────────────────────────────
-// Espejo de public/js/scoring.js:159-170. Reservado para post-launch
-// cuando exista `realResults.classification` derivada de KO.
 export function calcClassificationPoints(userPicks, realResults) {
   if (!userPicks || !realResults) return 0;
   let pts = 0;
@@ -143,14 +104,6 @@ export function calcClassificationPoints(userPicks, realResults) {
   return pts;
 }
 
-// ─── iaBonusPredicate (helper opcional) ──────────────────────────────
-// Espejo de public/js/data.js:323-332 (iaBonusWillApply). El caller del
-// server-side puede usar este helper para evaluar iaBonus desde una row
-// de ia_predictions; el browser legacy sigue usando la versión global.
-//
-// iaPred: { sign: '1'|'X'|'2' } o null
-// pred:   { l, v } (predicción del usuario)
-// realL/R: ints
 export function iaBonusPredicate(iaPred, pred, realL, realR) {
   if (!iaPred || !iaPred.sign) return false;
   if (iaPred.sign !== '1' && iaPred.sign !== 'X' && iaPred.sign !== '2') return false;

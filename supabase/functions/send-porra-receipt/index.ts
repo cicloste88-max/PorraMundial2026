@@ -1,9 +1,11 @@
 // send-porra-receipt — Acuse de recibo (comprobante) de la porra.
 //
-// Cuando se cierra la porra, envía a cada usuario un email con la copia íntegra
-// de sus pronósticos (chuleta + copia de auditoría). NO es puntuación: al cierre
-// aún no se ha jugado nada. Feature ADITIVA (función + tabla sent_receipts +
-// 1 paso de cron). No toca el motor de puntuación ni el flujo de cierre.
+// Cuando se cierra la porra, envía a cada usuario un email ligero (resumen +
+// podio + premios + código) con el comprobante completo ADJUNTO en PDF
+// (generado vía PDFShift a partir del HTML de render.ts): la chuleta íntegra de
+// sus pronósticos (72 grupos + 32 KO + premios + boosts). NO es puntuación: al
+// cierre aún no se ha jugado nada. Feature ADITIVA (función + tabla
+// sent_receipts + 1 paso de cron). No toca el motor de puntuación ni el cierre.
 //
 // Auth: requireAdminOrCron (./auth.ts) — header X-Cron-Key == Vault IA_CRON_KEY,
 //       o service_role, o JWT admin. verify_jwt=false en deploy (ERR-16).
@@ -16,7 +18,7 @@
 //                                             destinatario; el comprobante se
 //                                             construye con los datos reales del
 //                                             user_id indicado. Para pruebas sin
-//                                             dominio verificado en Resend.
+//                                             remitente verificado en Brevo.
 //
 // Idempotencia: UNIQUE(user_id, league_id) en sent_receipts. 2ª llamada → skipped.
 
@@ -43,13 +45,7 @@ function cors(origin: string | null): Record<string, string> {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_FROM = "Porra Mundial 2026 <onboarding@resend.dev>";
-
-function slugify(s: string): string {
-  return String(s || "porra")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "porra";
-}
+const DEFAULT_FROM = "Porra Mundial 2026 <adminmundialapp@gmail.com>";
 
 // deno-lint-ignore no-explicit-any
 function jsonResponse(body: any, status: number, origin: string | null): Response {
@@ -59,43 +55,77 @@ function jsonResponse(body: any, status: number, origin: string | null): Respons
   });
 }
 
-// ─── Resend ──────────────────────────────────────────────────────────────────
+// ─── Brevo ───────────────────────────────────────────────────────────────────
+// Parsea "Name <email>" → { name, email } para el campo sender de Brevo.
+function parseSender(from: string): { name: string; email: string } {
+  const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m && m[2]) {
+    return { name: (m[1] || "").trim() || "Porra Mundial 2026", email: m[2].trim() };
+  }
+  const bare = from.trim();
+  if (bare.includes("@")) return { name: "Porra Mundial 2026", email: bare };
+  return { name: "Porra Mundial 2026", email: "adminmundialapp@gmail.com" };
+}
+
+// apiKey = BREVO_API_KEY (llega en cfg.resendKey por compat de firma legacy).
+// El comprobante completo va ADJUNTO en PDF (attachmentPdfBase64 = base64 puro).
 async function sendEmail(
-  resendKey: string,
+  apiKey: string,
   from: string,
   to: string,
   subject: string,
   bodyHtml: string,
-  attachmentHtml: string,
+  attachmentPdfBase64: string,
   attachmentName: string,
 ): Promise<string> {
-  const res = await fetch("https://api.resend.com/emails", {
+  const sender = parseSender(from);
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
+      "api-key": apiKey,
+      "accept": "application/json",
+      "content-type": "application/json",
     },
     body: JSON.stringify({
-      from,
-      to: [to],
+      sender,
+      to: [{ email: to }],
       subject,
-      html: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
-      attachments: [{
-        filename: attachmentName,
-        content: base64Encode(new TextEncoder().encode(attachmentHtml)), // comprobante completo
-      }],
+      htmlContent: bodyHtml, // cuerpo ligero (no se recorta en Gmail)
+      attachment: [{ name: attachmentName, content: attachmentPdfBase64 }], // comprobante PDF
     }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw new Error(`resend_http_${res.status}:${t.slice(0, 240)}`);
+    throw new Error(`brevo_http_${res.status}:${t.slice(0, 240)}`);
   }
   const j = await res.json().catch(() => ({}));
-  return j?.id ?? "";
+  return j?.messageId ?? "";
+}
+
+// ─── PDFShift: HTML → PDF ──────────────────────
+// Convierte el comprobante HTML a PDF (A4, márgenes 15mm) vía PDFShift. Basic
+// auth = base64("api:" + API_KEY_PDFSHIFT) (usuario fijo "api"). Fail-loud:
+// lanza si la respuesta no es 2xx — el caller NO envía ni registra sent_receipts.
+async function generatePdfFromHtml(apiKey: string, html: string): Promise<Uint8Array> {
+  const auth = btoa(`api:${apiKey}`);
+  const res = await fetch("https://api.pdfshift.io/v3/convert/pdf", {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ source: html, format: "A4", margin: "15mm" }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`pdfshift_http_${res.status}:${t.slice(0, 240)}`);
+  }
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 interface SendConfig {
-  resendKey: string;
+  resendKey: string; // legacy: el campo se mantiene pero contiene la BREVO_API_KEY
+  pdfShiftKey: string;
   from: string;
 }
 
@@ -141,17 +171,31 @@ async function processReceipt(
     return { user_id: userId, status: "failed", error: "no_recipient_email" };
   }
 
-  // 4. Render + envío.
+  // 4. Render del comprobante completo → PDF (PDFShift) → email con adjunto.
   if (!cfg.resendKey) {
     return { user_id: userId, status: "failed", error: "resend_key_missing" };
   }
-  const bodyHtml = renderReceiptBody(data);   // cuerpo ejecutivo ligero
-  const fullHtml = renderReceiptHtml(data);   // comprobante completo (adjunto)
-  const filename = `comprobante-${slugify(data.leagueName)}-${data.verificationCode}.html`;
+  if (!cfg.pdfShiftKey) {
+    return { user_id: userId, status: "failed", error: "pdfshift_key_missing" };
+  }
+  const fullHtml = renderReceiptHtml(data); // comprobante completo (→ PDF)
+
+  // 4a. HTML → PDF. Fail-loud: si la conversión falla NO se envía ni se registra.
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = await generatePdfFromHtml(cfg.pdfShiftKey, fullHtml);
+  } catch (e) {
+    return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
+  }
+  const pdfBase64 = base64Encode(pdfBytes);
+  const attachmentName = `comprobante-${data.verificationCode}.pdf`;
+
+  // 4b. Cuerpo ejecutivo ligero + envío con el comprobante PDF adjunto.
+  const bodyHtml = renderReceiptBody(data);
   const subject = `Comprobante de tu porra · ${data.leagueName}`;
   let resendId = "";
   try {
-    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml, fullHtml, filename);
+    resendId = await sendEmail(cfg.resendKey, cfg.from, recipient, subject, bodyHtml, pdfBase64, attachmentName);
   } catch (e) {
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
@@ -228,16 +272,21 @@ serve(async (req: Request) => {
     toOverride = candidate; // honrado: la request ya pasó requireAdminOrCron
   }
 
-  // ── Config Resend (env → Vault → fallback from) ──────────────────────────
+  // ── Config Brevo + PDFShift (env → Vault → fallback from) ─────────────────
+  // resendKey = nombre legacy del campo; contiene la BREVO_API_KEY.
   const resendKey =
-    (Deno.env.get("RESEND_API_KEY") || "").trim() ||
-    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "RESEND_API_KEY")) ||
+    (Deno.env.get("BREVO_API_KEY") || "").trim() ||
+    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "BREVO_API_KEY")) ||
+    "";
+  const pdfShiftKey =
+    (Deno.env.get("API_KEY_PDFSHIFT") || "").trim() ||
+    (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "API_KEY_PDFSHIFT")) ||
     "";
   const from =
     (Deno.env.get("PORRA_FROM_EMAIL") || "").trim() ||
     (await readVaultSecret(SUPABASE_URL, SERVICE_KEY, "PORRA_FROM_EMAIL")) ||
     DEFAULT_FROM;
-  const cfg: SendConfig = { resendKey, from };
+  const cfg: SendConfig = { resendKey, pdfShiftKey, from };
 
   // ── BULK ────────────────────────────────────────────────────────────────
   if (bulk) {
@@ -257,7 +306,7 @@ serve(async (req: Request) => {
     const results: ProcessResult[] = [];
     for (const id of targets) {
       results.push(await processReceipt(supa, id, leagueId, toOverride, cfg));
-      // Throttle suave para no chocar con el rate-limit de Resend.
+      // Throttle suave para no chocar con el rate-limit de Brevo.
       await new Promise((r) => setTimeout(r, 350));
     }
     const tally = {
@@ -279,7 +328,7 @@ serve(async (req: Request) => {
   }
   const result = await processReceipt(supa, userId, leagueId, toOverride, cfg);
   const httpStatus = result.status === "failed"
-    ? (result.error === "resend_key_missing" ? 500 : 502)
+    ? ((result.error === "resend_key_missing" || result.error === "pdfshift_key_missing") ? 500 : 502)
     : 200;
   return jsonResponse({ ok: result.status !== "failed", ...result }, httpStatus, origin);
 });
