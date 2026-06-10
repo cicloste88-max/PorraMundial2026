@@ -5,13 +5,15 @@
 //                           entero en Gmail sin recorte (Gmail corta a ~102 KB).
 //                           Cabecera + nota + resumen de conteos + PODIO (4) +
 //                           PREMIOS (4) + código de verificación + aviso de que
-//                           el detalle va en el adjunto. SIN tablas 72/32.
+//                           el comprobante completo va ADJUNTO en PDF. SIN
+//                           tablas 72/32.
 //   renderReceiptHtml(d)  → COMPROBANTE completo (chuleta): + 72 grupos + 32 KO.
-//                           Se manda como ADJUNTO .html (abre con el diseño;
-//                           Imprimir → Guardar como PDF en el navegador).
+//                           index.ts lo convierte a PDF (PDFShift) y lo envía
+//                           ADJUNTO; el usuario lo abre desde su cliente de
+//                           correo (verlo con el diseño, guardarlo o imprimirlo).
 //
-// NO incluye puntuación (al cierre no se ha jugado nada) ni badge de Boost ×2
-// (boosts fuera de este comprobante).
+// NO incluye puntuación (al cierre no se ha jugado nada). SÍ marca los partidos
+// de grupos con Boost ×2 (⚡) elegidos por el usuario.
 
 import type { KoPred, ReceiptData } from "./build-data.ts";
 
@@ -101,16 +103,21 @@ function summaryBlock(d: ReceiptData): string {
   return (
     `<p style="font-size:14px;color:#374151;margin:16px 0 0">` +
     `Generado el <b>${esc(generated)}</b>. Resumen: <b>${esc(summary)}</b>.` +
+    `</p>` +
+    `<p style="font-size:14px;color:#374151;margin:6px 0 0">` +
+    `Boosts elegidos: <b>${d.counts.boosts}/${d.counts.boostsTotal}</b>.` +
     `</p>`
   );
 }
 
-function attachmentNotice(d: ReceiptData): string {
+// Aviso de que el comprobante completo va ADJUNTO en PDF (lo genera index.ts vía
+// PDFShift). El cuerpo del email es solo el resumen ejecutivo.
+function attachmentNotice(_d: ReceiptData): string {
   return (
-    `<div style="margin-top:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:11px 13px;font-size:13px;color:#1e3a8a">` +
-    `📎 El <b>detalle completo</b> (${d.groups.length} partidos de grupos + ${d.ko.length} cruces de fase final, con marcadores y goleadores) ` +
-    `va en el <b>archivo adjunto</b> <code>.html</code>. Ábrelo en el navegador para verlo con el diseño ` +
-    `(Imprimir → Guardar como PDF si quieres un PDF).` +
+    `<div style="margin-top:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;font-size:13px;color:#1e3a8a;line-height:1.5">` +
+    `📎 Tu comprobante completo (todos los pronósticos · premios · boosts) va ` +
+    `adjunto en PDF. Ábrelo desde tu cliente de correo para verlo con el diseño, ` +
+    `guardarlo o imprimirlo.` +
     `</div>`
   );
 }
@@ -118,7 +125,7 @@ function attachmentNotice(d: ReceiptData): string {
 function auditBlock(d: ReceiptData): string {
   const generated = fmtMadrid(d.generatedAt);
   return (
-    `<div style="margin-top:26px;border-top:1px dashed #d1d5db;padding-top:14px">` +
+    `<div style="margin-top:18px;page-break-inside:avoid;break-inside:avoid;border-top:1px dashed #d1d5db;padding-top:14px">` +
     `<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Copia de auditoría</div>` +
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;font-size:13px;color:#374151">` +
     `<tr><td style="padding:3px 0;width:170px;color:#6b7280">Código de verificación</td>` +
@@ -126,18 +133,19 @@ function auditBlock(d: ReceiptData): string {
     `<tr><td style="padding:3px 0;color:#6b7280">Pronósticos grupos</td><td style="padding:3px 0">${d.groups.length} / 72</td></tr>` +
     `<tr><td style="padding:3px 0;color:#6b7280">Pronósticos fase final</td><td style="padding:3px 0">${d.ko.length} / 32</td></tr>` +
     `<tr><td style="padding:3px 0;color:#6b7280">Premios elegidos</td><td style="padding:3px 0">${d.counts.awards} / 4</td></tr>` +
+    `<tr><td style="padding:3px 0;color:#6b7280">Boosts elegidos</td><td style="padding:3px 0">${d.counts.boosts} / ${d.counts.boostsTotal}</td></tr>` +
     `<tr><td style="padding:3px 0;color:#6b7280">Generado</td><td style="padding:3px 0">${esc(generated)}</td></tr>` +
     `</table>` +
     `<p style="font-size:12px;color:#9ca3af;margin:10px 0 0">` +
     `El código de verificación es un hash de tus pronósticos guardados: si no cambian, el código no cambia. ` +
-    `Conserva este correo (y el adjunto) como comprobante.</p>` +
+    `Conserva este correo como comprobante.</p>` +
     `</div>`
   );
 }
 
 function footerBlock(): string {
   return (
-    `<div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px">` +
+    `<div style="text-align:center;font-size:11px;color:#9ca3af;padding:14px 6px;page-break-inside:avoid;break-inside:avoid">` +
     `Porra Mundial 2026 · porramundial2026-seven.vercel.app</div>`
   );
 }
@@ -190,9 +198,12 @@ function renderGroups(d: ReceiptData): string {
     const scorer = g.scorer
       ? `<span style="color:#374151">⚽ ${esc(g.scorer)}</span>`
       : `<span style="color:#cbd5e1">—</span>`;
+    const boost = g.boosted
+      ? `<span title="Boost ×2" style="color:#f59e0b">⚡</span> `
+      : "";
     rows +=
       `<tr><td style="${CELL}">${match}</td>` +
-      `<td style="${CELL_C}font-weight:700">${score(g.l, g.v)}</td>` +
+      `<td style="${CELL_C}font-weight:700">${boost}${score(g.l, g.v)}</td>` +
       `<td style="${CELL}">${scorer}</td></tr>`;
   }
   return (
@@ -273,7 +284,7 @@ export function renderReceiptBody(d: ReceiptData): string {
   return wrapDoc(d, inner);
 }
 
-// ─── COMPROBANTE completo (adjunto .html) ──────────────────────────────────
+// ─── COMPROBANTE completo (chuleta → PDF) ─────────────────────────────────
 export function renderReceiptHtml(d: ReceiptData): string {
   const inner = [
     disclaimerBlock(),

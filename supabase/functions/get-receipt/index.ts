@@ -1,0 +1,130 @@
+// Versionado desde runtime el 10-jun-2026 (v2). Origen: deploy vía MCP sin commit previo.
+// Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
+// get-receipt — Proxy público del comprobante de porra alojado en Storage.
+//
+// Por qué existe: Supabase Storage sirve los objetos públicos con
+// Content-Type: text/plain + X-Content-Type-Options: nosniff + CSP sandbox
+// (política anti-phishing del producto, NO configurable por bucket). Un enlace
+// directo al .html del bucket se muestra como CÓDIGO, no renderizado. Esta EF
+// hace de proxy: resuelve el `code` → URL de Storage (guardada en
+// sent_receipts.meta.receipt_url), descarga el HTML y lo devuelve.
+//
+// NOTA: Supabase también fuerza text/plain + CSP sandbox en respuestas de
+// Functions, así que este body lo consume el front (comprobante.html) vía fetch
+// y lo pinta client-side (de ahí el CORS abierto).
+//
+// Auth: verify_jwt=false (público). El `code` (12 hex = ~48 bits) es la auth de
+// facto: enlace no enumerable, validado contra sent_receipts.meta.code.
+//
+// Uso: GET /functions/v1/get-receipt?code=XXXXXXXXXXXX
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const CODE_RE = /^[A-F0-9]{12}$/;
+
+// CORS abierto: el comprobante es público (el code es la auth) y lo consume el
+// front (porramundial2026-seven.vercel.app/comprobante.html) vía fetch para
+// renderizarlo. Necesario porque Supabase fuerza text/plain + CSP sandbox en las
+// respuestas de Functions (igual que Storage): el HTML se pinta client-side.
+const CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+};
+
+function htmlResponse(
+  body: string,
+  status: number,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(body, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+      ...CORS,
+      ...extraHeaders,
+    },
+  });
+}
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return new Response("method_not_allowed", { status: 405, headers: CORS });
+  }
+
+  // Code: normalizado a mayúsculas y validado estricto (no enumerable + barato).
+  const code = (new URL(req.url).searchParams.get("code") || "").trim().toUpperCase();
+  if (!CODE_RE.test(code)) {
+    return htmlResponse(
+      "<!doctype html><meta charset='utf-8'><p>Código de comprobante inválido.</p>",
+      400,
+    );
+  }
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    return htmlResponse(
+      "<!doctype html><meta charset='utf-8'><p>Error de configuración.</p>",
+      500,
+    );
+  }
+
+  // deno-lint-ignore no-explicit-any
+  let supa: any;
+  try {
+    supa = createClient(SUPABASE_URL, SERVICE_KEY);
+  } catch {
+    return htmlResponse("<!doctype html><meta charset='utf-8'><p>Error interno.</p>", 500);
+  }
+
+  // Lookup por code en sent_receipts.meta (jsonb, sintaxis PostgREST meta->>code).
+  // limit(1): el code es un hash del contenido del pronóstico — dos usuarios con
+  // picks idénticos colisionarían; cualquiera de esas filas sirve el mismo HTML,
+  // así que tomamos la primera (evita el throw de .single() ante colisión).
+  const { data, error } = await supa
+    .from("sent_receipts")
+    .select("meta")
+    .eq("meta->>code", code)
+    .limit(1);
+  if (error) {
+    return htmlResponse("<!doctype html><meta charset='utf-8'><p>Error de consulta.</p>", 500);
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const fileUrl: string | undefined = row?.meta?.receipt_url;
+  if (!fileUrl) {
+    return htmlResponse(
+      "<!doctype html><meta charset='utf-8'><p>Comprobante no encontrado.</p>",
+      404,
+    );
+  }
+
+  // Descargar el HTML de Storage. El bucket es público (fetch sin auth basta),
+  // pero pasamos apikey + Authorization por consistencia/resiliencia.
+  let upstream: Response;
+  try {
+    upstream = await fetch(fileUrl, {
+      headers: { "apikey": SERVICE_KEY, "Authorization": `Bearer ${SERVICE_KEY}` },
+    });
+  } catch {
+    return htmlResponse(
+      "<!doctype html><meta charset='utf-8'><p>No se pudo recuperar el comprobante.</p>",
+      502,
+    );
+  }
+  if (!upstream.ok) {
+    return htmlResponse(
+      "<!doctype html><meta charset='utf-8'><p>No se pudo recuperar el comprobante.</p>",
+      502,
+    );
+  }
+  const html = await upstream.text();
+
+  // Servir con el Content-Type CORRECTO + CORS (el front lo lee con fetch). El
+  // runtime de Supabase puede degradarlo a text/plain, por eso el render final
+  // ocurre en comprobante.html (Vercel) vía <iframe srcdoc>.
+  return htmlResponse(html, 200, { "Cache-Control": "private, max-age=300" });
+});
