@@ -1,5 +1,12 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.2.1
+// PR-1 · Leaderboard de liga · v1.3.0
+//   v1.3.0 (Fase 2 pre-kickoff): puente del bono anti-IA. ia_predictions usa
+//     claves wc2026_g{X}_{sofascore_id} y predictions usa el formato legacy
+//     {grupo}_{home_es}_{away_es}: el lookup directo daba overlap 0 y el +1
+//     anti-IA no se pagó nunca en el scoreboard (el frontend sí lo pinta).
+//     iaByMatchId se construye ahora vía ia-bridge.mjs (wc_matches como
+//     diccionario + flipSign 1<->2 en el fixture teams_swapped BRA-ESC J3,
+//     misma condición home_code !== home_iso3 que get-league-predictions).
 //   v1.2.1 (ERR-86, Fase 1 pre-kickoff): paginación .range(1000)+.order en las
 //     lecturas sin cota (predictions, ko_predictions, ia_predictions del
 //     snapshot activo). PostgREST corta en db-max-rows (1000): Porra gallos
@@ -24,6 +31,7 @@ import {
   iaBonusPredicate,
 } from "../_shared/scoring.mjs";
 import { fetchAllRows } from "./fetch-all.mjs";
+import { buildIaSignByLegacyKey } from "./ia-bridge.mjs";
 
 // ERR-86: shape { data, error } compatible con el manejo de errores existente
 // (loop [err, label]); pageFn debe aplicar .order() estable + .range(from, to).
@@ -194,6 +202,7 @@ serve(async (req: Request) => {
     { data: resultRow, error: rErr },
     { data: iaPreds,   error: iaErr },
     { data: boosts,    error: bErr },
+    { data: wcRows,    error: wcErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
     fetchAllCompat((from, to) => supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId).order("id").range(from, to)),
@@ -201,9 +210,13 @@ serve(async (req: Request) => {
     supa.from("award_picks").select("user_id, golden_ball, golden_boot, golden_glove, young_player").eq("league_id", leagueId),
     supa.from("results").select("match_results, ko_results, award_winners, overrides").limit(1).maybeSingle(),
     activeSnapshotId != null
-      ? fetchAllCompat((from, to) => supa.from("ia_predictions").select("match_id, sign").eq("snapshot_id", activeSnapshotId).order("match_id").range(from, to))
+      ? fetchAllCompat((from, to) => supa.from("ia_predictions").select("match_id, sign, home_code").eq("snapshot_id", activeSnapshotId).order("match_id").range(from, to))
       : Promise.resolve({ data: [], error: null }),
     supa.from("boost_picks").select("user_id, match_id").eq("league_id", leagueId),
+    // Fase 2: diccionario wc_matches para el puente IA (72-104 filas, <1000,
+    // sin fetchAll). teams_swapped acompaña como dato; el flip del bridge usa
+    // la condición canónica home_code !== home_iso3 (get-league-predictions).
+    supa.from("wc_matches").select("match_key, group_letter, home_es, away_es, home_iso3, away_iso3, teams_swapped"),
   ]);
 
   for (const [err, label] of [
@@ -214,6 +227,7 @@ serve(async (req: Request) => {
     [rErr, "results"],
     [iaErr, "ia_predictions"],
     [bErr, "boost_picks"],
+    [wcErr, "wc_matches"],
   ] as const) {
     if (err) {
       return new Response(JSON.stringify({ error: "query_failed", table: label, detail: err.message }), {
@@ -248,10 +262,11 @@ serve(async (req: Request) => {
     }
   }
 
-  const iaByMatchId: Record<string, { sign: string }> = {};
-  for (const ia of iaPreds ?? []) {
-    if (ia.match_id && ia.sign) iaByMatchId[ia.match_id] = { sign: ia.sign };
-  }
+  // Fase 2: puente ia_predictions (wc2026_*) -> claves legacy de predictions
+  // "{grupo}_{home_es}_{away_es}", con flip 1<->2 en el fixture swapped
+  // (ia-bridge.mjs). El lookup iaByMatchId[matchId] del bucle de scoring
+  // encuentra ahora el sign en orientación porra.
+  const iaByMatchId: Record<string, { sign: string }> = buildIaSignByLegacyKey(iaPreds ?? [], wcRows ?? []);
 
   const boostByUser: Record<string, Set<string>> = {};
   for (const b of boosts ?? []) {
@@ -351,7 +366,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.2.1" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.3.0" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
