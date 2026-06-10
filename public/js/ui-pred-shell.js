@@ -1267,6 +1267,14 @@
             '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:75%"></div></li>' +
           '</ul>' +
         '</div>';
+    } else if (items[0] && items[0].gated) {
+      // Verja de cierre (mirror F4): porra del caller abierta → la EF devuelve
+      // gated sin insights. Mensaje bloqueado en vez de tarjetas.
+      html =
+        '<div class="pred-destacados">' +
+          '<h3 class="pred-destacados__title">DESTACADOS DE TU LIGA</h3>' +
+          '<div class="pred-destacados__empty">' + _esc((items[0].icon ? items[0].icon + ' ' : '') + (items[0].text || 'Cierra tu porra para desbloquear los highlights de tu liga')) + '</div>' +
+        '</div>';
     } else {
       var list = '';
       for (var i = 0; i < items.length && i < 5; i++) {

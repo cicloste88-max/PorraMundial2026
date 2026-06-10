@@ -26,6 +26,16 @@ ERR-86). Sustituye a la rama great-wozniak (neutralización; OBSOLETA, no mergea
   oráculo bot Zayu 72/72 signos vs IA con el puente+flip replicado en SQL;
   Gallos tiene 16 solo-picks reales de signo (16 votantes) → frases "eres el único"
   verdaderas; `npm run build` + grep dist (ERR-22) + 137/137 tests OK.
+- **v1.0.1 — verja de cierre (mirror F4, aprobada San)**: tras la verja de
+  membresía y ANTES de computar, RPC `is_porra_abierta(caller, league)` con
+  service_role (solo invocación; sin tocar GRANTs — la usan policies RLS).
+  Porra ABIERTA → `{ gated: true, highlights: [] }` sin computar (no filtra
+  señal agregada); cerrada → `gated: false` + insights (gate por request, la
+  caché solo guarda agregados). Frontend: con `gated:true` el panel pinta
+  "🔒 Cierra tu porra para desbloquear los highlights de tu liga"
+  (`pred-destacados__empty`), NO el fallback genérico. Verificado RPC vs flag
+  canónico sobre los 47 miembros reales: 30 cerradas→false (insights) /
+  17 abiertas→true (gated), 0 incoherencias.
 
 ## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
 

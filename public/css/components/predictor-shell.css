@@ -1353,3 +1353,12 @@
   border-radius: 4px;
   opacity: 0.5;
 }
+
+/* Verja de cierre (gated): mensaje bloqueado en vez de tarjetas */
+.pred-destacados__empty {
+  padding: 14px 8px;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: 13px;
+  line-height: 1.4;
+}

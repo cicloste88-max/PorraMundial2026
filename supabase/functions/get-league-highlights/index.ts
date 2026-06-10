@@ -1,6 +1,6 @@
 // supabase/functions/get-league-highlights/index.ts
 // Highlights "DESTACADOS DE TU LIGA" — hasta 5 insights VERDADEROS del user vs su liga.
-// Versión 1.0.0 — 10-jun-2026
+// Versión 1.0.1 — 10-jun-2026 (1.0.1: verja de cierre mirror F4, aprobada San)
 //
 // Sustituye los agregados client-side de loadLeagueHighlights (data.js), que
 // leían predictions/award_picks/league_members con RLS own-rows-only
@@ -14,6 +14,14 @@
 // membresía del caller (y del user objetivo) en league_id, service_role para
 // leer. Nunca se afirma "solo tú" sobre el resultset propio: todo cálculo
 // corre sobre el universo vía service_role.
+//
+// Verja dura de cierre (mirror F4, Opción A): si la porra del CALLER en la
+// liga NO está cerrada (is_porra_abierta(caller, league)=true), responde
+// { gated: true, highlights: [] } SIN computar — las frases filtran señal
+// agregada (distribuciones de signo/marcador/premio) que un caller con porra
+// abierta podría usar para ajustar picks. El gate canónico es
+// league_members.porra_cerrada vía RPC is_porra_abierta(uid, league_id)
+// (true = abierta; NO revocar EXECUTE de authenticated — la usan policies RLS).
 //
 // Universo de comparación: miembros con porra COMPLETA (league_members.
 // porra_cerrada=true). Si hay menos de MIN_CLOSED cerradas se amplía a
@@ -392,17 +400,31 @@ serve(async (req: Request) => {
     if (!m) return json({ error: "target_not_a_member" }, 403, corsHeaders);
   }
 
-  // ── Caché 5 min por league|user ──
+  // ── Verja: cierre del CALLER en esta liga (canónico vía RPC, mirror F4).
+  //    El gate se evalúa por request — la caché solo guarda agregados. ──
+  let open = true;
+  try {
+    const { data: ab, error } = await supa.rpc("is_porra_abierta", { p_user_id: callerUid, p_league_id: leagueId });
+    if (error) return json({ error: "gate_check_failed", detail: error.message }, 500, corsHeaders);
+    open = ab === true;
+  } catch (e) { return json({ error: "gate_check_failed", detail: String(e) }, 500, corsHeaders); }
+
+  if (open) {
+    // Porra del caller ABIERTA → gated SIN computar (no filtrar señal agregada).
+    return json({ gated: true, highlights: [], league_id: leagueId, user_id: targetUid, version: "1.0.1" }, 200, corsHeaders);
+  }
+
+  // ── Cerrada → insights completos (caché 5 min por league|user) ──
   const cacheKey = `${leagueId}|${targetUid}`;
   const cached = hlCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < TTL_MS) {
-    return json({ league_id: leagueId, user_id: targetUid, ...cached.data, cached: true, version: "1.0.0" }, 200, corsHeaders);
+    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...cached.data, cached: true, version: "1.0.1" }, 200, corsHeaders);
   }
 
   try {
     const data = await computeHighlights(supa, leagueId, targetUid);
     hlCache.set(cacheKey, { ts: Date.now(), data });
-    return json({ league_id: leagueId, user_id: targetUid, ...data, version: "1.0.0" }, 200, corsHeaders);
+    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...data, version: "1.0.1" }, 200, corsHeaders);
   } catch (e) {
     return json({ error: "highlights_failed", detail: String(e) }, 500, corsHeaders);
   }

@@ -528,13 +528,21 @@ async function loadLeagueHighlights(leagueId, userId) {
     });
     if (res && res.error) {
       console.warn('[highlights] EF get-league-highlights error', res.error.message || res.error);
-    } else if (res && res.data && Array.isArray(res.data.highlights)) {
-      var items = res.data.highlights.filter(function (h) {
-        return h && typeof h.text === 'string' && h.text;
-      }).slice(0, 5).map(function (h) {
-        return { icon: h.icon || '•', text: h.text };
-      });
-      if (items.length) return items;
+    } else if (res && res.data) {
+      if (res.data.gated === true) {
+        // Verja de cierre (mirror F4): la porra del caller sigue ABIERTA y la
+        // EF no computa nada. El shell detecta el flag `gated` y pinta el
+        // estado bloqueado en lugar de tarjetas (NO el fallback genérico).
+        return [{ gated: true, icon: '🔒', text: 'Cierra tu porra para desbloquear los highlights de tu liga' }];
+      }
+      if (Array.isArray(res.data.highlights)) {
+        var items = res.data.highlights.filter(function (h) {
+          return h && typeof h.text === 'string' && h.text;
+        }).slice(0, 5).map(function (h) {
+          return { icon: h.icon || '•', text: h.text };
+        });
+        if (items.length) return items;
+      }
     }
   } catch (e) {
     console.warn('[highlights] EF get-league-highlights excepción', e);
