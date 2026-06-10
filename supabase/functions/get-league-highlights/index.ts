@@ -1,6 +1,11 @@
 // supabase/functions/get-league-highlights/index.ts
 // Highlights "DESTACADOS DE TU LIGA" — hasta 5 insights VERDADEROS del user vs su liga.
-// Versión 1.0.1 — 10-jun-2026 (1.0.1: verja de cierre mirror F4, aprobada San)
+// Versión 1.0.2 — 10-jun-2026 (1.0.1: verja de cierre mirror F4, aprobada San;
+// 1.0.2 Stream 2: insights 1 y 2 conscientes del tiempo — solo partidos con
+// kickoff futuro, restringidos a la jornada más baja con pendientes, para que
+// el destacado rote J1→J2→J3 y nunca mencione un partido pasado. Selección
+// factorizada PURA en ./select.mjs con `now` inyectado; smoke en
+// tests/highlights-select.test.mjs. Insights 3/4/5 = torneo completo, sin tocar).
 //
 // Sustituye los agregados client-side de loadLeagueHighlights (data.js), que
 // leían predictions/award_picks/league_members con RLS own-rows-only
@@ -55,6 +60,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { selectUpcomingRound } from "./select.mjs";
 
 // ─── CORS ───────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set([
@@ -124,8 +130,10 @@ function matchNames(wcByLegacy: Map<string, any>, matchId: string) {
   return null;
 }
 
+// `now` inyectado desde el handler (una sola lectura de reloj) — la selección
+// time-aware de insights 1 y 2 es pura (./select.mjs).
 // deno-lint-ignore no-explicit-any
-async function computeHighlights(supa: any, leagueId: string, userId: string) {
+async function computeHighlights(supa: any, leagueId: string, userId: string, now: Date) {
   // ── Universo ──
   const { data: lm, error: lmErr } = await supa
     .from("league_members")
@@ -172,10 +180,10 @@ async function computeHighlights(supa: any, leagueId: string, userId: string) {
   }
   const MIN_VOTERS = Math.max(4, Math.min(8, M));
 
-  // ── wc_matches: nombres + puente IA ──
+  // ── wc_matches: nombres + puente IA + kickoff/jornada (Stream 2) ──
   const { data: wcRows, error: wcErr } = await supa
     .from("wc_matches")
-    .select("match_key, group_letter, home_es, away_es, home_iso3");
+    .select("match_key, group_letter, home_es, away_es, home_iso3, date_utc, round");
   if (wcErr) throw new Error("wc_matches: " + wcErr.message);
   // deno-lint-ignore no-explicit-any
   const wcByLegacy = new Map<string, any>();
@@ -183,10 +191,24 @@ async function computeHighlights(supa: any, leagueId: string, userId: string) {
     wcByLegacy.set(`${w.group_letter}_${w.home_es}_${w.away_es}`, w);
   }
 
+  // ── Stream 2 (v1.0.2): elegibilidad time-aware SOLO para insights 1 y 2 ──
+  // Partidos con kickoff futuro de la jornada más baja con pendientes; null
+  // tras el último de grupos (~28-jun) → 1 y 2 no se emiten. Insights 3/4/5
+  // siguen siendo de torneo completo (agg íntegro).
+  const upcoming = selectUpcomingRound(
+    [...agg.keys()].map((id) => {
+      const wc = wcByLegacy.get(id);
+      return { matchId: id, dateUtc: wc?.date_utc ?? null, round: wc?.round ?? null };
+    }),
+    now,
+  );
+  const eligible1y2: Set<string> = upcoming ? upcoming.ids : new Set<string>();
+
   // ── Insight 1 · Pick más solitario (signo) ──
   // deno-lint-ignore no-explicit-any
   let best1: any = null;
   for (const [matchId, a] of agg) {
+    if (!eligible1y2.has(matchId)) continue;
     if (a.voters < MIN_VOTERS) continue;
     const userSign = a.signByUser.get(userId);
     if (!userSign) continue;
@@ -223,6 +245,7 @@ async function computeHighlights(supa: any, leagueId: string, userId: string) {
   // deno-lint-ignore no-explicit-any
   let best2: any = null;
   for (const [matchId, a] of agg) {
+    if (!eligible1y2.has(matchId)) continue;
     if (a.voters < MIN_VOTERS) continue;
     const userScore = a.scoreByUser.get(userId);
     if (!userScore) continue;
@@ -411,20 +434,20 @@ serve(async (req: Request) => {
 
   if (open) {
     // Porra del caller ABIERTA → gated SIN computar (no filtrar señal agregada).
-    return json({ gated: true, highlights: [], league_id: leagueId, user_id: targetUid, version: "1.0.1" }, 200, corsHeaders);
+    return json({ gated: true, highlights: [], league_id: leagueId, user_id: targetUid, version: "1.0.2" }, 200, corsHeaders);
   }
 
   // ── Cerrada → insights completos (caché 5 min por league|user) ──
   const cacheKey = `${leagueId}|${targetUid}`;
   const cached = hlCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < TTL_MS) {
-    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...cached.data, cached: true, version: "1.0.1" }, 200, corsHeaders);
+    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...cached.data, cached: true, version: "1.0.2" }, 200, corsHeaders);
   }
 
   try {
-    const data = await computeHighlights(supa, leagueId, targetUid);
+    const data = await computeHighlights(supa, leagueId, targetUid, new Date());
     hlCache.set(cacheKey, { ts: Date.now(), data });
-    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...data, version: "1.0.1" }, 200, corsHeaders);
+    return json({ gated: false, league_id: leagueId, user_id: targetUid, ...data, version: "1.0.2" }, 200, corsHeaders);
   } catch (e) {
     return json({ error: "highlights_failed", detail: String(e) }, 500, corsHeaders);
   }

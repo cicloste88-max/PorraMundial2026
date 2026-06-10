@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.1 (5 insights service_role + verja cierre F4, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR #148 gate San.
+**10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.2 (5 insights service_role + verja cierre F4 + insights 1-2 time-aware J1→J3, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR #148 gate San.
 
 Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun**: XIs 48 + `squads.xi` rebuild + 18 formaciones; `ia_last5` N=10. Deploy CLI EF: SIEMPRE `--no-verify-jwt`. **08-jun**: ko-card-polish #140 + boost #137/#138/#139 (ERR-83/84). **02-jun — P4 puente CERRADO** (ERR-82). `update-results` indep. 11-jun.
 

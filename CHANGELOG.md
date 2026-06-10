@@ -36,6 +36,19 @@ ERR-86). Sustituye a la rama great-wozniak (neutralización; OBSOLETA, no mergea
   (`pred-destacados__empty`), NO el fallback genérico. Verificado RPC vs flag
   canónico sobre los 47 miembros reales: 30 cerradas→false (insights) /
   17 abiertas→true (gated), 0 incoherencias.
+- **v1.0.2 — Stream 2, insights 1 y 2 conscientes del tiempo**: candidatos =
+  solo partidos con kickoff FUTURO (parse de `wc_matches.date_utc` como UTC
+  EXPLÍCITO — el TEXT "2026-06-11T19:00" sin Z se desfasaría horas como hora
+  local; regex previa porque el parser de Date acepta basura), restringidos a
+  la jornada (`round` 1/2/3) más baja con pendientes → el destacado rota solo
+  J1→J2→J3 y nunca menciona un partido pasado; sin pendientes (post-28-jun)
+  los insights 1-2 no se emiten y quedan 3/4/5 (torneo completo, intactos).
+  Umbral de votantes intacto, aplicado dentro del subconjunto. Selección
+  factorizada PURA en `select.mjs` (`now` inyectado, compartido Deno/Node) +
+  smoke `tests/highlights-select.test.mjs` (6 tests: pasado excluido, J1
+  jugada→J2, hoy→J1, post-grupos→null, parse UTC, date_utc malformado).
+  Verificado vs BD: 24/24/24 por round, 0 `date_utc` no parseables; paridad
+  deploy↔repo de los 2 ficheros + boot 401 OK. Suite 143/143.
 
 ## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
 
