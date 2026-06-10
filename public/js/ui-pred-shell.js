@@ -1255,6 +1255,7 @@
     var items = window._leagueHighlights;
     var html;
     if (!items || !items.length) {
+      // 5 skeletons — la EF get-league-highlights devuelve hasta 5 insights.
       html =
         '<div class="pred-destacados">' +
           '<h3 class="pred-destacados__title">DESTACADOS DE TU LIGA</h3>' +
@@ -1262,11 +1263,21 @@
             '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:80%"></div></li>' +
             '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:90%"></div></li>' +
             '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:70%"></div></li>' +
+            '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:85%"></div></li>' +
+            '<li class="pred-destacados__item"><div class="pred-destacados__skeleton" style="width:75%"></div></li>' +
           '</ul>' +
+        '</div>';
+    } else if (items[0] && items[0].gated) {
+      // Verja de cierre (mirror F4): porra del caller abierta → la EF devuelve
+      // gated sin insights. Mensaje bloqueado en vez de tarjetas.
+      html =
+        '<div class="pred-destacados">' +
+          '<h3 class="pred-destacados__title">DESTACADOS DE TU LIGA</h3>' +
+          '<div class="pred-destacados__empty">' + _esc((items[0].icon ? items[0].icon + ' ' : '') + (items[0].text || 'Cierra tu porra para desbloquear los highlights de tu liga')) + '</div>' +
         '</div>';
     } else {
       var list = '';
-      for (var i = 0; i < items.length && i < 3; i++) {
+      for (var i = 0; i < items.length && i < 5; i++) {
         var it = items[i] || {};
         list +=
           '<li class="pred-destacados__item">' +
@@ -1297,26 +1308,27 @@
     _renderList(st);
     _renderShareCtas(st);
 
-    // Sprint A · async kickoffs encadenados:
+    // Sprint A · async kickoffs (paralelos desde highlights EF v1.0.0 — el
+    // insight IA lo computa get-league-highlights server-side, ya no depende
+    // de _leagueRanking):
     //   1) loadLeagueRanking → window._leagueRanking → re-render Ranking
-    //   2) loadLeagueHighlights (depende de _leagueRanking para item C IA Zayu)
-    //      → window._leagueHighlights → re-render Destacados
+    //   2) loadLeagueHighlights (EF) → window._leagueHighlights → re-render Destacados
     var leagueId = (window._activeLeague && window._activeLeague.id) || null;
     var userId = (window.currentUser && window.currentUser.id) || null;
     if (leagueId && typeof window.loadLeagueRanking === 'function') {
       window.loadLeagueRanking(leagueId).then(function (rows) {
         window._leagueRanking = rows || [];
         _renderRanking(_computeStateForCurrentPage());
-        if (userId && typeof window.loadLeagueHighlights === 'function') {
-          window.loadLeagueHighlights(leagueId, userId).then(function (items) {
-            window._leagueHighlights = items || [];
-            _renderDestacados(_computeStateForCurrentPage());
-          }).catch(function (err) {
-            console.warn('[predictor] loadLeagueHighlights failed', err);
-          });
-        }
       }).catch(function (err) {
         console.warn('[predictor] loadLeagueRanking failed', err);
+      });
+    }
+    if (leagueId && userId && typeof window.loadLeagueHighlights === 'function') {
+      window.loadLeagueHighlights(leagueId, userId).then(function (items) {
+        window._leagueHighlights = items || [];
+        _renderDestacados(_computeStateForCurrentPage());
+      }).catch(function (err) {
+        console.warn('[predictor] loadLeagueHighlights failed', err);
       });
     }
 
