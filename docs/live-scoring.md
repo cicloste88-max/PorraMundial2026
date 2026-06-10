@@ -227,8 +227,13 @@ results.match_results["{group_letter}_{home_es}_{away_es}"]
 ### Normalización del goleador
 
 1. **`extractScorers(events)`**: recorre los incidents de SofaScore quedándose
-   con los tipos de gol válidos (`goal`, `inGamePenalty`, `penaltyShootout`) e
-   **ignora `ownGoal`** (gol en propia puerta no cuenta para el +2 de goleador).
+   con los goles válidos e **ignora `ownGoal`** (gol en propia puerta no cuenta
+   para el +2 de goleador). **Modelo de incidencias SofaScore**: el gol de
+   penalti en juego es `incidentType='goal'` con **`incidentClass='penalty'`**
+   (NO existe un tipo `inGamePenalty`); el gol normal es `incidentClass='regular'`;
+   la tanda de penaltis KO es `penaltyShootout`. Se ignora el resto
+   (`card`/`substitution`/`period`/`injuryTime`/`varDecision`). El marcador se
+   toma de `event.homeScore/awayScore.current`, nunca contando incidents.
 2. **iso3 del autor**: derivado de `isHome` del incident combinado con
    `teams_swapped` → resuelve a `home_iso3` / `away_iso3` de `wc_matches`.
 3. **`playerToShortKey(name, iso3)`** (port de `scorer-keys.ts`): busca al
@@ -267,15 +272,18 @@ viejos.
 
 Ambos crons se programan vía `schedule_match_crons(match_key, start_ts)` (helper documentado en `docs/db-schema.md`). Nunca duplicar manualmente.
 
-> ⚠️ **Reconciliación pendiente (drift)**: en runtime el disparo live lo hace
-> hoy el cron **`dispatch-live-slots`** (`cron.job` jobid 24, `*/3min`) vía
-> `dispatch_live_slots()`, que agrupa partidos por `match_start_ts` en slots y
-> lanza `porra-match-live` **batched** (ver §Bloque crítico). Entre los 6 crons
-> activos NO hay `poll_<key>`/`prematch_<key>` per-match a 02-jun (pre-Mundial,
-> sin partidos programados aún). La relación exacta `dispatch-live-slots` ↔
-> `schedule_match_crons` (¿el slot batched sustituye al per-match, o conviven?)
-> queda **pendiente de reconciliar + backfill al repo** — `dispatch_live_slots()`
-> tampoco está versionada en `supabase/migrations/`.
+> **Reconciliado (10-jun, vía docs del PR #131)**: el cron **`dispatch-live-slots`**
+> (`cron.job` jobid 24, `*/3min`) **SUPERSEDE a `schedule_match_crons`** para el flujo
+> live de grupos (evita doble polling). El helper se conserva para simulacros/ad-hoc.
+> `dispatch_live_slots()` agrupa `live_scores` por `match_start_ts` (slot), filtra vivos
+> por ventana `[start-45min, start+window]` (grupos 150min / KO 210min) y hace early-exit
+> barato si 0 vivos (auto-gating: no dispara nada hasta el 11-jun T-45 del inaugural).
+> **Seed**: `live_scores` sembrada con los 72 partidos de grupos desde `wc_matches` +
+> índice único `live_scores_match_key_uidx` (imprescindible para los upserts del webhook).
+> **Clustering**: 72 partidos → 60 slots (48 de 1 + 12 de 2 en jornada 3) → concurrencia
+> Apify ≤ 2 runs (su límite). **KO ~28-jun pendiente**: sembrar 32 filas con sus eventId +
+> resolución de marcador prórroga/penaltis en el webhook. Backfill de
+> `dispatch_live_slots()` a `supabase/migrations/` sigue pendiente.
 
 ## SofaScore IDs
 
@@ -294,7 +302,9 @@ Ambos crons se programan vía `schedule_match_crons(match_key, start_ts)` (helpe
 
 SofaScore no expone API pública para obtener el ID por equipos + fecha. Workflow manual probado para KO + simulacros:
 
-1. **Búsqueda web**: `web_search` Google con `site:sofascore.com <home> <away> <fecha>`. En el snippet aparece el hash `#id:XXXXXXX` de la URL pública — copiar el número.
+1. **Búsqueda web**: `web_search` Google con `site:sofascore.com <home> <away> <fecha>`. **El `#id:` ya NO aparece** (SofaScore migró a URLs `/match/{slug}/{customId}` sin hash). Dos métodos validados para obtener el ID numérico:
+   - `web_fetch` de la página del partido y extraer el ID del `<meta og:image>` (apunta a `…/api/v1/event/{ID}/share-image`).
+   - **API de búsqueda** (validado 10-jun, Ponte Preta-Cuiabá): `https://api.sofascore.com/api/v1/search/all?q=<equipo1>%20<equipo2>` devuelve los eventos con su `id` numérico directamente. Ojo: el `status` de esta respuesta puede venir cacheado (decía `notstarted` con el partido en el min 65); el dato live real lo da el actor.
 2. **Validación**: ejecutar el actor Webshare con ese ID:
    ```
    apify call N8vUChlhok5JU3cnL -i '{"eventId":"XXXXXXX"}' -t 30
@@ -302,6 +312,8 @@ SofaScore no expone API pública para obtener el ID por equipos + fecha. Workflo
    Si `event.homeTeam.name` y `event.awayTeam.name` cuadran con los equipos esperados, confirmado. Si Cloudflare devuelve 403 (ver ERR-05), reintentar con el fallback `sofascore-live-proxy`.
 3. **Registro**: añadir el ID al JSON `worldcup-2026-sofascore-ids.json` + crear fila en `live_scores` con `match_key=wc2026_g{LETRA}_{sofascore_id}` + programar crons con `SELECT schedule_match_crons(match_key, start_ts)`.
 
-URL pública SofaScore (input del workflow, nunca la construimos internamente): `https://www.sofascore.com/{home-slug}-{away-slug}/{match-code}#id:{sofascore_id}`. Solo importa el número tras `#id:`.
+URL pública SofaScore (input del workflow, nunca la construimos internamente): `https://www.sofascore.com/match/{slug}/{customId}` (SofaScore retiró el viejo `…#id:{sofascore_id}`). El `sofascore_id` numérico que necesita el actor **NO es** el `{customId}` de la URL — obtenerlo por `og:image` o por la API de búsqueda (ver paso 1).
+
+> **EF `porra-sofascore-proxy` (v9) — MUERTA**: el fetch directo a `api.sofascore.com` desde Supabase devuelve challenge 403 de Cloudflare (ERR-05). El **actor Apify es el único camino** para datos SofaScore server-side; no reintroducir un proxy en EF.
 
 **Nota**: los simulacros (`is_historic=true` en `live_scores`) usan exactamente este mismo workflow. La única diferencia es el flag `is_historic` que filtra de la UI live del Mundial. Detalle de simulacros en `docs/simulacros.md`.

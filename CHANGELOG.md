@@ -2,6 +2,33 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [10-jun-2026] Actor webshare 1.0.13 — drift cerrado + modo auto + secrets (rama `claude/upbeat-hopper-s4qe2t`)
+
+**Drift descubierto**: el repo tenía el actor pre-batch (1.0.7) mientras producción corría
+1.0.10 (`eventIds[]`) — el PR #131 que portaba el batch al repo quedó abierto sin mergear.
+Reconciliado vía `apify pull` + refactor Nivel 1 encima, **deploy build 1.0.13**:
+
+- **Modo `auto` (default)**: reuse de cookies del KV Store SIN cargar sofascore.com
+  (~5-6s/run, mínimo bandwidth Webshare); self-healing — si 403/timeout, recapture +
+  retry solo de los ids fallidos. `capture`/`reuse`/`normal` quedan para debug.
+- **Batch paralelo**: todos los ids en 1 `page.evaluate` con `AbortSignal.timeout(15s)`
+  por fetch (antes serial, sin timeout). 3 partidos en ~1,7s.
+- **Credenciales Webshare fuera del código** → `apify secrets` + refs `@` en
+  `.actor/actor.json` (rotación de password pendiente, trámite documentado).
+- **Dockerfile**: `COPY package.json` + `--no-package-lock` → **ERR-85** (lockfile
+  rompía el build por API Y por `apify push`; supersede la lección "ERR-82" del PR #131).
+- **defaultRunOptions vía API**: 2048MB (antes 4096 → ~50% coste/run) + timeout 300s
+  (antes 3600 — un run colgado facturaba 1h).
+
+**Validación**: smokes single/batch/capture/reuse 200 + **partido EN DIRECTO**
+(Ponte Preta-Cuiabá, `inprogress` 2nd half, 1-2 live con goleadores correctos, ~2s).
+
+**Docs portadas del PR #131** (que se cierra sin merge — superseded): §Batching por slot
+(seed 72, índice `live_scores_match_key_uidx`, clustering 60 slots, supersede
+`schedule_match_crons` para grupos), descubrimiento eventId vía `og:image` (SofaScore
+retiró `#id:` de URLs), EF `porra-sofascore-proxy` MUERTA, modelo `incidentClass` del
+goleador. Pendiente heredado del #131: **rotar `APIFY_TOKEN`** (quedó expuesto en chat MCP).
+
 ## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
 
 EF `send-porra-receipt` v3: al cierre envía al usuario un email con copia íntegra
