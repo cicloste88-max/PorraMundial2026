@@ -2520,3 +2520,4 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 - Run 48 selecciones: **18 cambios de formacion** (CRO 4-2-3-1→3-5-2, CUW→3-5-2, CZE/JPN 3-4-2-1→3-4-3, GER 4-1-3-2→4-3-3, PAN 5-4-1→3-4-3, SUI→3-4-3, SCO/URU→4-4-2, COD/JOR/KSA/MEX/NED/NOR/PAR/POR/QAT→4-3-3). maxDist anomalos resueltos (MEX 61→15, KSA 49→20, SCO 45→18, QAT 43→15).
 - BD verificada: distribucion 4-3-3=23 / 4-2-3-1=9 / 3-4-3=8 / 4-4-2=4 / 3-5-2=4 (todas en catalogo 12), 48/48 xi=11 sin placeholders, 48/48 es_titular=11. Smoke get-squad CRO → formacion 3-5-2, 11 jugadores, 0 placeholders. Paridad catalogo 12 formaciones verificada en script/get-squad/ui-pizarra-tactica. Tests lib 113/113.
 - docs/sync-squads.md: +seccion build-xi/deteccion.
+[02:09] ACCION: abierto PR #146 (claude/upbeat-hopper-s4qe2t -> main): sprint actor 1.0.13 completo (codigo+docs). Merge no reconstruye el actor (ya desplegado y validado).
