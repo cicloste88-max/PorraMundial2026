@@ -1300,7 +1300,8 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   Group 4 · DESTACADOS DE TU LIGA (static list)
+   Group 4 · DESTACADOS DE TU LIGA (hasta 5 insights vía EF
+   get-league-highlights; items como tarjetas para que 5 respiren bien)
    ────────────────────────────────────────────────────────────────────── */
 
 .pred-destacados {
@@ -1327,7 +1328,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .pred-destacados__item {
@@ -1337,6 +1338,10 @@
   font-size: 13px;
   line-height: 1.4;
   color: var(--ink-100);
+  background: var(--ink-900);
+  border: 1px solid var(--ink-700);
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 
 .pred-destacados__icon { font-size: 18px; flex-shrink: 0; line-height: 1.2; }

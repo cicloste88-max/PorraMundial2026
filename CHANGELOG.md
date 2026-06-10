@@ -2,6 +2,31 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [10-jun-2026] Destacados de liga REALES — EF `get-league-highlights` v1.0.0 + rewrite `loadLeagueHighlights` (rama `claude/vibrant-turing-qcbhp3`)
+
+El panel DESTACADOS DE TU LIGA del Predictor montaba frases falsas: los items
+client-side agregaban sobre tablas con RLS own-rows-only (`ko_predictions`,
+`award_picks`, `league_members` — SELECT `auth.uid()=user_id` → solo la fila propia;
+ERR-86). Sustituye a la rama great-wozniak (neutralización; OBSOLETA, no mergear).
+
+- **EF `get-league-highlights` v1.0.0** (patrón F4: `verify_jwt=false` + JWT manual +
+  verja de membresía + service_role; caché 5 min). Universo = miembros
+  `porra_cerrada=true` (si <8, amplía a quien tenga predictions; el user objetivo
+  siempre entra si tiene preds). Devuelve hasta 5 insights formateados y ordenados
+  por impacto ("solo tú" primero): 🎯 signo más solitario por partido (≥8 votantes),
+  🔥 marcador exacto más raro, 🥇 premio donde está más solo (4 dims; `champion`
+  vacía NO se usa), 🤖 sintonía de signos con la IA (snapshot activo + flip
+  Brasil-Escocia F4), ⚡ ranking de signos-minoría. Paginación `.range()` en
+  predictions (Gallos 1224 filas > max-rows 1000 PostgREST).
+- **Frontend**: `loadLeagueHighlights` (`data.js`) reescrito a `functions.invoke`
+  con cliente `getQueryDb` (F5); fuera los 3 items capados + contador falso. Panel
+  3→5 tarjetas (`ui-pred-shell.js` + `predictor-shell.css`, items como cards).
+  Fallback genérico "Tu liga está lista para jugar." si EF falla o vacía.
+- **Verificado**: 401 `missing_bearer`/`invalid_token` sin auth (vía pg_net);
+  oráculo bot Zayu 72/72 signos vs IA con el puente+flip replicado en SQL;
+  Gallos tiene 16 solo-picks reales de signo (16 votantes) → frases "eres el único"
+  verdaderas; `npm run build` + grep dist (ERR-22) + 137/137 tests OK.
+
 ## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
 
 Refresh pre-torneo completo de XIs y datos IA, con 4 bugs cerrados por el camino

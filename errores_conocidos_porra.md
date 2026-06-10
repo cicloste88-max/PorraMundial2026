@@ -2383,3 +2383,40 @@ lockfile en el directorio también falla. El fix de Dockerfile cubre ambos camin
 
 **Contexto operativo:** el actor NO está Git-connected — mergear un PR del repo NO
 reconstruye el actor; el deploy es siempre manual (`apify push N8vUChlhok5JU3cnL`).
+
+## ERR-86 — Agregado de liga calculado en cliente sobre tablas con RLS own-rows-only (highlights falsos)
+
+**Síntoma**: "DESTACADOS DE TU LIGA" (Predictor) muestra frases falsas para cualquier
+usuario y cualquier liga: "Tu liga tiene 0 porras cerradas / 1 pendientes" sea cual sea
+el estado real (Gallos vía service_role: 17 miembros, 16 cerradas), y los items
+contrarian-KO/campeón nunca o casi nunca encuentran "rivales" porque solo ven 1 fila.
+
+**Causa**: `loadLeagueHighlights` (`data.js`) agregaba con SELECTs de cliente sobre
+`ko_predictions`, `award_picks` y `league_members` filtrando por `league_id`. Las
+policies de SELECT de esas tablas son `auth.uid() = user_id` → cada query devuelve como
+máximo la fila propia. El agregado de liga es estructuralmente irrealizable desde el
+cliente: RLS capa el resultset en silencio, indistinguible de "la liga tiene 1 miembro".
+NO es bug del flag (lee el canónico `league_members.porra_cerrada`) ni de la query.
+Además, el item campeón leía `award_picks.champion`, columna VACÍA (0/36 a 10-jun) —
+las 4 dims pobladas son `golden_boot`/`golden_ball`/`golden_glove`/`young_player`.
+
+**Fix** (10-jun-2026, rama `claude/highlights` → `claude/vibrant-turing-qcbhp3`): EF
+`get-league-highlights` v1.0.0 (patrón F4 `get-league-predictions`: `verify_jwt=false`
+ERR-16 + JWT manual + verja de membresía caller/objetivo + service_role) que computa
+hasta 5 insights VERDADEROS sobre el universo real (miembros `porra_cerrada=true`;
+ampliado a quien tenga predictions si hay <8 cerradas) y devuelve las frases ya
+montadas `{ highlights: [{icon,text}] }` ordenadas por impacto. `loadLeagueHighlights`
+reescrito a `functions.invoke` (cliente `getQueryDb`, ERR-83) con fallback genérico;
+panel 3→5 tarjetas. Paginación `.range()` en predictions: Gallos 17×72=1224 filas
+supera el max-rows 1000 de PostgREST — un SELECT plano habría truncado en silencio.
+Nota numeración: en la rama obsoleta great-wozniak este error se anotó como "ERR-85"
+(neutralización parcial de los items A/B); renumerado a 86 porque main asignó 85 al
+lockfile del actor Apify (PR #146).
+
+**Patrón detectable**: `.from('<tabla own-rows-only>')` desde cliente +
+`.filter()`/`.length` pretendiendo agregar sobre TODA la liga. Tablas own-rows-only
+confirmadas en SELECT: `league_members`, `predictions`, `ko_predictions`, `boost_picks`,
+`award_picks`. Todo agregado de liga va por EF service_role con verja de membresía
+(`get-league-standings` / `get-league-predictions` / `get-league-highlights`).
+
+**Fecha detección**: 09-jun-2026 (great-wozniak). **Resuelto**: 10-jun-2026 vía EF.

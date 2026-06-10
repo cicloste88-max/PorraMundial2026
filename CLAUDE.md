@@ -5,9 +5,9 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**10-jun**: XIs 48 re-marcados + `squads.xi` rebuild (FF→`/world-cup/`, +aliases); `ia_last5` N=10 + elo/h2h refresh. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
+**10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.0 (5 insights service_role, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR gate San.
 
-Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = IA on-demand KO + A.1-bis (fix cache inverso GER/HAI), goleador dorsal, Pizarra, tarjeta 103/104; boost = #137 receipt + #138 gate boosts cierre v3 + #139 cliente JWT `getQueryDb` + espejo `window.currentUser` (ERR-83/84). **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
+Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun**: XIs 48 + `squads.xi` rebuild + 18 formaciones; `ia_last5` N=10. Deploy CLI EF: SIEMPRE `--no-verify-jwt`. **08-jun**: ko-card-polish #140 + boost #137/#138/#139 (ERR-83/84). **02-jun — P4 puente CERRADO** (ERR-82). `update-results` indep. 11-jun.
 
 ## Top-3 pendientes inmediatos
 
@@ -103,7 +103,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..85: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85).
+ERR-01..86: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86).
 
 ### Otros ficheros de contexto
 
