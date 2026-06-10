@@ -15,8 +15,8 @@
   var KICKOFF_UTC = '2026-06-11T19:00:00Z';
   var KICKOFF_MS  = new Date(KICKOFF_UTC).getTime();
 
-  // SHELL_PAGES donde la fifa-bar es visible (OQ#1 — welcome excluido; F3-I2 — predictor excluido, mantiene ui-pred-shell.js).
-  var SHELL_PAGES = ['grupos', 'jornada', 'directo', 'elim'];
+  // SHELL_PAGES donde la fifa-bar es visible (OQ#1 — welcome excluido; predictor incluido desde este fix, antes excluido F3-I2 — convive con ui-pred-shell.js).
+  var SHELL_PAGES = ['grupos', 'jornada', 'directo', 'elim', 'predictor'];
 
   var FLAGS_BASE = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/flags/redesign%20v3/'; // F2.1: Supabase Storage bucket `flags/redesign v3/` con espacio URL-encoded (%20). Antes era path local que no existía.
   var FIFA_LOGO  = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Logos/fifa-logo_brandlogos.net_flczz-512x512.png';
@@ -306,6 +306,7 @@
       case 'jornada':   return '● JORNADA';
       case 'directo':   return '● EN DIRECTO';
       case 'elim':      return '● FASE FINAL';
+      case 'predictor': return '● PREDICTOR';
       default:          return '● MUNDIAL';
     }
   }
