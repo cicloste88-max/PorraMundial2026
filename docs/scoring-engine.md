@@ -24,6 +24,21 @@ El **+2 por goleador correcto** se aplica cuando `pred.gol` acierta a **cualquie
 
 **Justificación**: equipara oportunidades de puntos entre usuarios. Si un usuario pronostica 0-0 sin goleador y otro pronostica 0-0 con goleador, ambos pueden tener acceso al +2.
 
+### Regla 0-0 — goleador opcional (canónica, confirmada por San 10-jun-2026)
+
+Al pronosticar **0-0**, el goleador es **opcional**: dejarlo vacío es la apuesta a **"sin goleador"**.
+
+| Pronóstico | Real | Puntos |
+|---|---|---|
+| 0-0 **sin** goleador | 0-0 | 1 (signo) + 3 (exacto) + **2 (goleador "sin goleador" acertado)** = **6** |
+| 0-0 **con** goleador | 0-0 | 1 + 3 = **4** (la apuesta de goleador falla: no hubo goles) |
+| 0-0 sin goleador, **con boost** | 0-0 | (1+3+2) × 2 = **12** |
+| 1-1 sin goleador | 0-0 | **1** (solo signo X; la regla exige pred 0-0 exacto) |
+
+El **cap 7** (pre-boost) y el **×2 del boost sobre exacto** se aplican igual que siempre. Las rondas KO heredan la regla vía `calcKOMatchPoints` (que delega los puntos de marcador en `calcMatchPoints`).
+
+**Implementación con paridad obligatoria**: `supabase/functions/_shared/scoring.mjs` (motor compartido, lo consume la EF `get-league-standings`) y `public/js/scoring.js` (frontend). Casos canónicos en `tests/scoring.test.mjs`.
+
 **Excepción en rondas KO**: los goles en **tanda de penaltis** NO cuentan como goles del partido. El array `realScorers` que alimenta al motor debe contener solo goleadores de 90' + prórroga. Es responsabilidad del pipeline que llena `ko_results` / `live_scores` (porra-apify-webhook + EF `update-results`).
 
 **Estado actual del pipeline**: `realScorers` aún no se hidrata desde producción. El motor usa un **fallback placeholder** (`_hf09FallbackScorers` en `scoring.js`: `players[0]` de los equipos relevantes del partido) hasta que la hidratación real se implemente. Esto mantiene backwards compat: si `realScorers` no se pasa, el motor sigue funcionando con la heurística placeholder pero ya **no bloquea empates** (regresión pre-HF-09 corregida). Trabajo aguas arriba pendiente fuera de F2.9.

@@ -137,7 +137,10 @@
     if (phase === 'live') out.live = { h: rf.h, a: rf.a };
     if (phase !== 'pre') {
       var predObj = { l: pred.local, v: pred.visitante, gol: pred.scorer, saved: true, home: matchObj.home, away: matchObj.away };
-      var mWithReal = Object.assign({}, matchObj, { realHome: rf.h, realAway: rf.a });
+      // played:true — resultados REALES de live_scores (phase live/post): el
+      // sentinel 0-0-placeholder de v3CalcMatchPointsGrupos no aplica aquí,
+      // un 0-0 real puntúa y pinta chip (regla 0-0, fix 10-jun).
+      var mWithReal = Object.assign({}, matchObj, { realHome: rf.h, realAway: rf.a, played: true });
       var calc = (typeof window.v3CalcMatchPointsGrupos === 'function') ? window.v3CalcMatchPointsGrupos(predObj, mWithReal) : { total: 0, types: [] };
       var types = calc.types || [];
       var base = _baseFromTypes(types);
