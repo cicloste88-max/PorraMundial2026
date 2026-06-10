@@ -54,12 +54,29 @@ test('crossValidate — reject con roster < 22 jugadores', () => {
   assert.equal(r.confidence, 'reject');
 });
 
-test('crossValidate — degrade a low si calendario no la incluye', () => {
+// Semántica canónica de `opts.calendar` (docstring cross-validate.mjs L10-13 +
+// caller único sync-squads.mjs runDetect + parser calendar.mjs): el set contiene
+// los iso3 cuya "(definitiva)" está anunciada en fecha FUTURA (pendingDefinitiveByDate)
+// — SOLO esos se degradan high→low aunque 2+ fuentes coincidan (posible lista
+// provisional). El test original (skipped en PR #145) leía el set invertido
+// ("calendario de confirmadas", degradar al ausente) y esperaba degradar a CRO
+// con calendar=Set(['AUT']) — semántica inversa a impl+docstring+caller.
+test('crossValidate — degrade a low si el calendario marca su "(definitiva)" como pendiente (futura)', () => {
   const fakeAS = { source: 'as', byIso3: { CRO: { players: mkRoster(NAMES_ESP) } } };
   const fakeOly = { source: 'olympics', byIso3: { CRO: { players: mkRoster(NAMES_ESP) } } };
-  const calendar = new Set(['AUT']);
+  const calendar = new Set(['CRO']); // CRO pendiente según calendario Olympics
   const out = crossValidate([fakeAS, fakeOly], { calendar });
   const r = out.get('CRO');
   assert.equal(r.confidence, 'low');
   assert.match(r.reason, /calendario/i);
+});
+
+test('crossValidate — NO degrade si el iso3 no está en el set de pendientes', () => {
+  const fakeAS = { source: 'as', byIso3: { CRO: { players: mkRoster(NAMES_ESP) } } };
+  const fakeOly = { source: 'olympics', byIso3: { CRO: { players: mkRoster(NAMES_ESP) } } };
+  const calendar = new Set(['AUT']); // CRO ausente → su definitiva no está pendiente
+  const out = crossValidate([fakeAS, fakeOly], { calendar });
+  const r = out.get('CRO');
+  assert.equal(r.confidence, 'high');
+  assert.equal(r.reason, undefined);
 });
