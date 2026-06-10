@@ -740,6 +740,11 @@
   // ─────────────────────────────────────────────────────────────
   let _expandedKey = null;
 
+  // Fechas (YYYY-MM-DD) de secciones colapsables expandidas por el usuario.
+  // Mismo patrón que _expandedKey: variable de módulo, sobrevive los
+  // re-render disparados por live-sync.
+  const _expandedDays = new Set();
+
   // ─────────────────────────────────────────────────────────────
   // Render completo de la vista Directo
   // ─────────────────────────────────────────────────────────────
@@ -794,7 +799,12 @@
         otherLive.push({ m, idx });
       }
     });
-    const otherLiveKeys = new Set(otherLive.map(x => getDirectoKey(x.m)));
+    // Solo se extraen de su sección cuando el bloque "Otros partidos en vivo"
+    // existe (hay card expandida); sin expandida, el live se queda en su
+    // jornada — si no, desaparecería de la vista (badge "EN VIVO" sin fila).
+    const otherLiveKeys = expandedEntry
+      ? new Set(otherLive.map(x => getDirectoKey(x.m)))
+      : new Set();
 
     // Reusa la función de ranking de jornada si existe
     const sidebarHtml = (typeof window._buildJornadaRanking === 'function')
@@ -815,8 +825,35 @@
 
     // ── Listado por día con mini-rows ──
     // Excluir: el expandido y los inprogress que ya están en "Otros en vivo".
+    //
+    // Colapso de jornadas: solo se renderizan DOS secciones — la jornada EN
+    // CURSO (expandida, como siempre) y la siguiente (contraída, header
+    // toggleable). Si la en curso es la última, la contraída es la ANTERIOR.
+    // El resto de jornadas no se pinta. La agrupación canónica por m.date
+    // (17 jornadas) NO cambia: solo cambia qué secciones se materializan.
+    const _liveCountOf = (date) => {
+      let n = 0;
+      jornadasMap[date].forEach(({ m }) => {
+        const dk = getDirectoKey(m);
+        const row = dk ? window._liveScoresByMatchKey[dk] : null;
+        if (row && (row.status === 'inprogress' || row.status === 'halftime' ||
+                    row.status === 'overtime'   || row.status === 'penalties')) n++;
+      });
+      return n;
+    };
+
+    // Jornada en curso, por prioridad: (a) primera con partido live →
+    // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+    const todayMadrid = _madridDateStr(Date.now());
+    let currentIdx = dias.findIndex(d => _liveCountOf(d) > 0);
+    if (currentIdx === -1) currentIdx = dias.indexOf(todayMadrid);
+    if (currentIdx === -1) currentIdx = dias.findIndex(d => d > todayMadrid);
+    if (currentIdx === -1) currentIdx = dias.length - 1;
+    const secondaryIdx = (currentIdx + 1 < dias.length) ? currentIdx + 1 : currentIdx - 1;
+
     let sectionsHtml = '';
     dias.forEach((date, dIdx) => {
+      if (dIdx !== currentIdx && dIdx !== secondaryIdx) return;
       const jNum = dIdx + 1;
       const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {
         weekday: 'long', day: 'numeric', month: 'long'
@@ -830,22 +867,23 @@
       });
       if (matchesOfDay.length === 0) return;
 
-      let liveCount = 0;
-      jornadasMap[date].forEach(({ m }) => {
-        const dk = getDirectoKey(m);
-        const row = dk ? window._liveScoresByMatchKey[dk] : null;
-        if (row && (row.status === 'inprogress' || row.status === 'halftime' ||
-                    row.status === 'overtime'   || row.status === 'penalties')) liveCount++;
-      });
+      const liveCount = _liveCountOf(date);
       const liveBadge = liveCount > 0
         ? '<span class="directo-live-count">🔴 ' + liveCount + ' EN VIVO</span>'
         : '';
 
-      sectionsHtml += '<div class="directo-section" id="directo-' + date + '">';
-      sectionsHtml += '<div class="directo-header">';
+      const isCollapsible = dIdx === secondaryIdx;
+      const isCollapsed = isCollapsible && !_expandedDays.has(date);
+
+      sectionsHtml += '<div class="directo-section' + (isCollapsed ? ' is-collapsed' : '') +
+                      '" id="directo-' + date + '" data-date="' + date + '">';
+      sectionsHtml += isCollapsible
+        ? '<div class="directo-header is-collapsible" role="button" tabindex="0" aria-expanded="' + String(!isCollapsed) + '">'
+        : '<div class="directo-header">';
       sectionsHtml += '<span class="directo-label">J' + jNum + '</span>';
       sectionsHtml += '<span class="directo-date">' + dayLabel + '</span>';
       sectionsHtml += liveBadge;
+      if (isCollapsible) sectionsHtml += '<span class="directo-chevron" aria-hidden="true">▾</span>';
       sectionsHtml += '</div>';
       sectionsHtml += '<div class="dv2-mini-list">';
       matchesOfDay.forEach(({ m, idx }) => { sectionsHtml += _buildDMini(m, idx); });
@@ -897,6 +935,19 @@
     if (collapseBtn) {
       _expandedKey = null;
       renderVistaDirecto();
+      return;
+    }
+    // Toggle de la sección colapsable (header de la jornada secundaria).
+    // In-place (sin re-render): solo cambia visibilidad de la lista; el Set
+    // _expandedDays conserva la elección a través de los re-render de live-sync.
+    const collHeader = e.target.closest('.directo-header.is-collapsible');
+    if (collHeader) {
+      const section = collHeader.closest('.directo-section');
+      const date = section ? section.getAttribute('data-date') : '';
+      if (!section || !date) return;
+      const collapsed = section.classList.toggle('is-collapsed');
+      if (collapsed) _expandedDays.delete(date); else _expandedDays.add(date);
+      collHeader.setAttribute('aria-expanded', String(!collapsed));
       return;
     }
     const mini = e.target.closest('.dv2-mini');
