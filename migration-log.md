@@ -2532,3 +2532,5 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 ## Sesión 10-jun-2026 — Fix pizarra desde Vista Directo (local)
 
 [12:56] ACCION: fix banderas Vista Directo → pizarra táctica 404. Los botones `.dv2-mini-flag-btn`/`.dv2-exp-flag-btn` guardaban el código ISO3 (MEX, RSA) en `data-iso2` y el handler llamaba `openPizarraTactica({iso2})` → get-squad filtraba `squads.iso2='MEX'` → 404. Renombrado atributo a `data-iso3` (3 templates en ui-directo.js) + handler pasa `{iso3}` (paridad con scoring.js:802). Grep confirmó cero otros consumidores de `data-iso2`. Validado en localhost:5173 por San (pizarra abre con alineación).
+
+[13:09] ACCION: PR #150 MERGEADO (squash) -> main `6d4557f` (fix pizarra desde Vista Directo). Ramas borradas: fix/pizarra-directo-iso3 (auto-delete GitHub) + duplicada fix/directo-pizarra-iso3 (local+remoto) + prune de 15 refs remotas obsoletas. San reinició Vite + hard-reload: validado OK en main.
