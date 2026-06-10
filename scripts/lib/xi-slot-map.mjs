@@ -80,6 +80,7 @@ export function assignSlotsByCoords(ffSlots, coords) {
   const target = Math.min(n, pts.length);
   let mapped = 0;
   let maxD = 0;
+  let sumD = 0;
   for (const e of edges) {
     if (slotTaken[e.si] || ptTaken[e.pi]) continue;
     assigned[e.si] = pts[e.pi].s;
@@ -87,9 +88,54 @@ export function assignSlotsByCoords(ffSlots, coords) {
     ptTaken[e.pi] = true;
     mapped++;
     if (e.d > maxD) maxD = e.d;
+    sumD += Math.sqrt(e.d);
     if (mapped === target) break;
   }
-  return { assigned, maxDist: Math.sqrt(maxD), mapped, unmappable };
+  return { assigned, maxDist: Math.sqrt(maxD), sumDist: sumD, mapped, unmappable };
+}
+
+/**
+ * Detecta la formación que mejor encaja con las coordenadas FF del once-tipo,
+ * probando todas las rejillas de FORMATION_COORDS y comparando la distancia
+ * total de la asignación geométrica global (10-jun-2026 — "solo posicionar
+ * jugadores si hay nueva formación").
+ *
+ * Conservador a propósito: devuelve `stored` salvo que (a) FF aporte los 11
+ * titulares con coords (detección sobre XI parcial no es fiable) y (b) la
+ * mejor candidata mejore la rejilla almacenada por un margen claro (15%),
+ * para no flipar entre dibujos casi equivalentes.
+ *
+ * @param {Array<{x:number,y:number}>} ffSlots
+ * @param {Record<string, Array<[number,number]>>} coordsMap  FORMATION_COORDS
+ * @param {{stored?: string|null, margin?: number}} opts
+ * @returns {{formacion: string, changed: boolean, bestSum: number, storedSum: number|null}}
+ */
+export function detectFormacion(ffSlots, coordsMap, { stored = null, margin = 0.85 } = {}) {
+  const candidates = Object.keys(coordsMap).filter((k) => !k.startsWith('_'));
+  const fallback = stored && coordsMap[stored] ? stored : '4-3-3';
+  const withCoords = (ffSlots || []).filter((s) => Number.isFinite(s.x) && Number.isFinite(s.y));
+  if (withCoords.length < 11) {
+    return { formacion: fallback, changed: false, bestSum: NaN, storedSum: null };
+  }
+  let best = null;
+  let bestSum = Infinity;
+  let storedSum = null;
+  for (const f of candidates) {
+    const { sumDist, mapped } = assignSlotsByCoords(ffSlots, coordsMap[f]);
+    if (mapped < 11) continue;
+    if (f === fallback) storedSum = sumDist;
+    if (sumDist < bestSum) {
+      bestSum = sumDist;
+      best = f;
+    }
+  }
+  if (!best || best === fallback) {
+    return { formacion: fallback, changed: false, bestSum, storedSum };
+  }
+  if (storedSum != null && bestSum > storedSum * margin) {
+    return { formacion: fallback, changed: false, bestSum, storedSum };
+  }
+  return { formacion: best, changed: true, bestSum, storedSum };
 }
 
 // Candidatos del roster (no usados) que matchean `name` por encima de minScore.

@@ -47,7 +47,7 @@ import {
   replaceSquadRoster,
 } from './lib/squads-db.mjs';
 import { buildFifaRoster, formatFifaReport } from './lib/fifa-loader.mjs';
-import { buildXi } from './lib/xi-slot-map.mjs';
+import { buildXi, detectFormacion } from './lib/xi-slot-map.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
 import * as parserOlympics from './lib/parsers/olympics.mjs';
@@ -646,14 +646,24 @@ async function buildXiForTargets(targetsArg) {
       console.log(`    ${iso3} — sin roster, skip`);
       continue;
     }
-    const formacion = row.formacion || '4-3-3';
-    const coords = FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
     try {
       const ffSlots = await fetchStartingXISlots(slug, { iso3, verbose: VERBOSE });
       if (ffSlots.length === 0) {
         console.log(`    ${iso3} — FF sin once-tipo, skip (xi sin tocar)`);
         continue;
       }
+      // Detección de cambio de dibujo desde las coords FF (10-jun-2026):
+      // conservadora — solo con 11 titulares con coords y mejora ≥15% sobre
+      // la rejilla almacenada (ver detectFormacion).
+      const stored = row.formacion || '4-3-3';
+      const det = detectFormacion(ffSlots, FORMATION_COORDS, { stored });
+      const formacion = det.formacion;
+      if (det.changed) {
+        console.log(
+          `    ${iso3} — formación ${stored} → ${formacion} (sumDist ${Math.round(det.storedSum ?? -1)} → ${Math.round(det.bestSum)})`,
+        );
+      }
+      const coords = FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
       const { xi, warnings, stats } = buildXi({
         ffSlots,
         formacion,
@@ -662,7 +672,9 @@ async function buildXiForTargets(targetsArg) {
         iso3,
         aliases,
       });
-      if (!DRY_RUN) await updateSquadXi(iso3, xi, { dryRun: false });
+      if (!DRY_RUN) {
+        await updateSquadXi(iso3, xi, { dryRun: false, formacion: det.changed ? formacion : null });
+      }
       console.log(
         `    ${iso3.padEnd(4)} (${formacion.padEnd(7)}) — xi ${stats.matched}/11 match, ${stats.conFoto} foto, maxDist=${stats.maxDist}${DRY_RUN ? ' [dry-run]' : ''}`,
       );
@@ -992,7 +1004,8 @@ async function main() {
     results = await runScrape(targets);
     // --build-xi también disponible en scrape (10-jun-2026): reconstruye
     // squads.xi tras el re-marcado de es_titular sin pasar por detect.
-    if (BUILD_XI && !DRY_RUN) await buildXiForTargets(targets);
+    // (buildXiForTargets respeta DRY_RUN internamente.)
+    if (BUILD_XI) await buildXiForTargets(targets);
   } else if (MODE === 'enrich-tm') {
     const targets = await resolveTargets();
     if (targets.length === 0) {
