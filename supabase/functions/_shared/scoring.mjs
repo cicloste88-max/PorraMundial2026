@@ -41,6 +41,14 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
   if (pred.gol) {
     const scorers = opts.scorers;
     if (Array.isArray(scorers) && scorers.includes(pred.gol)) pts += 2;
+  } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
+    // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
+    // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si el
+    // real también es 0-0, paga el +2 de goleador (un 0-0 clavado vale
+    // 1+3+2=6 base, paridad con cualquier otro exacto). Si el usuario SÍ
+    // registró goleador y el real es 0-0, su apuesta falla (rama de arriba:
+    // scorers vacío → no suma). Cap 7 y boost ×2 sobre exacto, como siempre.
+    pts += 2;
   }
 
   if (opts.iaBonus) pts += 1;

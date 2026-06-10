@@ -1,5 +1,19 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.2.0
+// PR-1 · Leaderboard de liga · v1.2.1
+//   v1.2.1 (fix scoring assembly, 10-jun pre-kickoff):
+//     - ERR-86: TODAS las queries paginadas con fetchAllRows (.range 1000 +
+//       .order por columnas únicas). Un SELECT plano truncaba en db-max-rows
+//       1000 de PostgREST: Porra gallos (17×72=1224 filas de predictions)
+//       perdía 3 usuarios completos + 1 parcial del scoreboard, según orden
+//       físico del heap (no determinista).
+//     - Bono anti-IA: el lookup cruzaba match_id legacy contra claves
+//       wc2026_g* (miss 100% — el +1 no se pagó nunca). Puente vía wc_matches
+//       (ia-bridge.mjs) replicando computeIA+flipSign de get-league-predictions,
+//       con flip 1<->2 en el fixture teams_swapped (BRA-ESC J3).
+//     - ia_predictions: filtro por snapshot activo + match_id like 'wc2026_%'
+//       (excluye ~491 filas ondemand_* de KO que inflaban la query hacia el
+//       cap; la PK match_id ya impide duplicados entre snapshots — el filtro
+//       es blindaje + higiene).
 //   v1.2.0 (P4/D): KO con desempate. Pasa real.winner ('home'|'away') a
 //     calcKOMatchPoints para que el avance de ronda puntue tambien cuando el
 //     partido acaba en empate y se decide por prorroga/penaltis (el usuario
@@ -17,6 +31,8 @@ import {
   calcAwardPoints,
   iaBonusPredicate,
 } from "../_shared/scoring.mjs";
+import { fetchAllRows } from "./fetch-all.mjs";
+import { buildIaSignByLegacyKey } from "./ia-bridge.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://porramundial2026-seven.vercel.app",
@@ -151,48 +167,100 @@ serve(async (req: Request) => {
     }
   }
 
-  const [
-    { data: members,   error: meErr },
-    { data: preds,     error: pErr },
-    { data: koPreds,   error: koErr },
-    { data: awards,    error: aErr },
-    { data: resultRow, error: rErr },
-    { data: iaPreds,   error: iaErr },
-    { data: boosts,    error: bErr },
-  ] = await Promise.all([
-    supa.from("league_members").select("user_id").eq("league_id", leagueId),
-    supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId),
-    supa.from("ko_predictions").select("user_id, match_id, local, visitante, scorer, classifier").eq("league_id", leagueId),
-    supa.from("award_picks").select("user_id, golden_ball, golden_boot, golden_glove, young_player").eq("league_id", leagueId),
-    supa.from("results").select("match_results, ko_results, award_winners, overrides").limit(1).maybeSingle(),
-    supa.from("ia_predictions").select("match_id, sign"),
-    supa.from("boost_picks").select("user_id, match_id").eq("league_id", leagueId),
-  ]);
-
-  for (const [err, label] of [
-    [meErr, "league_members"],
-    [pErr, "predictions"],
-    [koErr, "ko_predictions"],
-    [aErr, "award_picks"],
-    [rErr, "results"],
-    [iaErr, "ia_predictions"],
-    [bErr, "boost_picks"],
-  ] as const) {
-    if (err) {
-      return new Response(JSON.stringify({ error: "query_failed", table: label, detail: err.message }), {
+  // Snapshot IA activo (mismo mecanismo que el frontend, auth.js
+  // loadIAPredictions). Sin snapshot activo → sin bono IA (iaRows vacío).
+  let activeSnapshotId: number | string | null = null;
+  {
+    const { data: snap, error: snapErr } = await supa
+      .from("ia_snapshots")
+      .select("id")
+      .eq("is_active", true)
+      .maybeSingle();
+    if (snapErr) {
+      return new Response(JSON.stringify({ error: "query_failed", table: "ia_snapshots", detail: snapErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    activeSnapshotId = snap?.id ?? null;
+  }
+
+  // ERR-86: TODAS las listas via fetchAllRows (.range 1000) con .order por
+  // columnas únicas (offset sin orden estable puede duplicar/saltar filas).
+  // PKs: predictions/ko_predictions/award_picks/boost_picks = id;
+  // league_members = (league_id,user_id) — league fijada, user_id basta;
+  // ia_predictions = match_id; wc_matches = match_key.
+  let members: { user_id: string }[];
+  let preds: { user_id: string; match_id: string; local: number; visitante: number; scorer: string | null }[];
+  let koPreds: { user_id: string; match_id: number; local: number; visitante: number; scorer: string | null; classifier: string | null }[];
+  let awards: { user_id: string; golden_ball: string | null; golden_boot: string | null; golden_glove: string | null; young_player: string | null }[];
+  let iaRows: { match_id: string; sign: string; home_code: string | null }[];
+  let boosts: { user_id: string; match_id: string }[];
+  let wcRows: { match_key: string; group_letter: string; home_es: string; away_es: string; home_iso3: string | null }[];
+  let resultRow: { match_results: unknown; ko_results: unknown; award_winners: unknown; overrides: unknown } | null;
+
+  try {
+    const [membersR, predsR, koPredsR, awardsR, iaRowsR, boostsR, wcRowsR, resultR] = await Promise.all([
+      fetchAllRows((from: number, to: number) => supa
+        .from("league_members").select("user_id")
+        .eq("league_id", leagueId)
+        .order("user_id").range(from, to)),
+      fetchAllRows((from: number, to: number) => supa
+        .from("predictions").select("user_id, match_id, local, visitante, scorer")
+        .eq("league_id", leagueId)
+        .order("id").range(from, to)),
+      fetchAllRows((from: number, to: number) => supa
+        .from("ko_predictions").select("user_id, match_id, local, visitante, scorer, classifier")
+        .eq("league_id", leagueId)
+        .order("id").range(from, to)),
+      fetchAllRows((from: number, to: number) => supa
+        .from("award_picks").select("user_id, golden_ball, golden_boot, golden_glove, young_player")
+        .eq("league_id", leagueId)
+        .order("id").range(from, to)),
+      activeSnapshotId != null
+        ? fetchAllRows((from: number, to: number) => supa
+            .from("ia_predictions").select("match_id, sign, home_code")
+            .eq("snapshot_id", activeSnapshotId)
+            .like("match_id", "wc2026_%")
+            .order("match_id").range(from, to))
+        : Promise.resolve({ rows: [] as never[], pages: 0 }),
+      fetchAllRows((from: number, to: number) => supa
+        .from("boost_picks").select("user_id, match_id")
+        .eq("league_id", leagueId)
+        .order("id").range(from, to)),
+      fetchAllRows((from: number, to: number) => supa
+        .from("wc_matches").select("match_key, group_letter, home_es, away_es, home_iso3")
+        .order("match_key").range(from, to)),
+      supa.from("results").select("match_results, ko_results, award_winners, overrides").limit(1).maybeSingle(),
+    ]);
+    if (resultR.error) throw new Error(`results: ${resultR.error.message}`);
+    members  = membersR.rows as typeof members;
+    preds    = predsR.rows as typeof preds;
+    koPreds  = koPredsR.rows as typeof koPreds;
+    awards   = awardsR.rows as typeof awards;
+    iaRows   = iaRowsR.rows as typeof iaRows;
+    boosts   = boostsR.rows as typeof boosts;
+    wcRows   = wcRowsR.rows as typeof wcRows;
+    resultRow = resultR.data as typeof resultRow;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ error: "query_failed", detail: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const memberUids = (members ?? []).map((m: { user_id: string }) => m.user_id);
-  const { data: profiles, error: profErr } = await supa
-    .from("profiles")
-    .select("id, nombre")
-    .in("id", memberUids.length ? memberUids : ["00000000-0000-0000-0000-000000000000"]);
-  if (profErr) {
-    return new Response(JSON.stringify({ error: "profiles_query_failed", detail: profErr.message }), {
+  let profiles: { id: string; nombre: string | null }[];
+  try {
+    const profilesR = await fetchAllRows((from: number, to: number) => supa
+      .from("profiles").select("id, nombre")
+      .in("id", memberUids.length ? memberUids : ["00000000-0000-0000-0000-000000000000"])
+      .order("id").range(from, to));
+    profiles = profilesR.rows as typeof profiles;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ error: "profiles_query_failed", detail: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -211,10 +279,9 @@ serve(async (req: Request) => {
     }
   }
 
-  const iaByMatchId: Record<string, { sign: string }> = {};
-  for (const ia of iaPreds ?? []) {
-    if (ia.match_id && ia.sign) iaByMatchId[ia.match_id] = { sign: ia.sign };
-  }
+  // Puente IA: claves wc2026_* -> legacy "{grupo}_{home_es}_{away_es}" con
+  // flip 1<->2 en el fixture teams_swapped (ia-bridge.mjs).
+  const iaByMatchId: Record<string, { sign: string }> = buildIaSignByLegacyKey(iaRows, wcRows);
 
   const boostByUser: Record<string, Set<string>> = {};
   for (const b of boosts ?? []) {
@@ -314,7 +381,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.2.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.2.1" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
