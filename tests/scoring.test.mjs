@@ -369,4 +369,84 @@ const {
   );
 }
 
-console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW) + EF assembly (scorer→gol + boost)');
+// ════════════════════════════════════════════════════════════════════
+// 9. REGLA 0-0 — goleador opcional (canónica, confirmada San 10-jun-2026)
+//
+// Al pronosticar 0-0 el goleador es opcional: su ausencia es la apuesta
+// "sin goleador". pred 0-0 + real 0-0 + sin gol → +2 de goleador (6 base).
+// Con gol registrado y real 0-0, la apuesta de goleador falla (4). Cap 7 y
+// boost ×2 sobre exacto intactos. Ver docs/scoring-engine.md §Regla 0-0.
+// ════════════════════════════════════════════════════════════════════
+{
+  // Caso 1 (brief): pred 0-0 sin goleador vs real 0-0 → 1+3+2 = 6.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, { scorers: [] }),
+    6,
+    'regla00 #1: 0-0 sin goleador vs real 0-0 = 6',
+  );
+  // Caso 2 (brief): pred 0-0 CON goleador vs real 0-0 → la apuesta falla → 4.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: 'lozano' }, 0, 0, { scorers: [] }),
+    4,
+    'regla00 #2: 0-0 con goleador vs real 0-0 = 4 (apuesta de gol falla)',
+  );
+  // Caso 3 (brief): pred 0-0 sin goleador + boost vs real 0-0 → (1+3+2)×2 = 12.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, { scorers: [], boost: true }),
+    12,
+    'regla00 #3: 0-0 sin goleador + boost = 12',
+  );
+  // Caso 4 (brief): pred 1-1 sin goleador vs real 0-0 → solo signo X = 1.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 1, gol: null }, 0, 0, { scorers: [] }),
+    1,
+    'regla00 #4: 1-1 sin goleador vs real 0-0 = 1 (la regla exige pred 0-0 exacto)',
+  );
+  // Defensivos: la regla NO dispara si el real no es 0-0…
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 1, 1, { scorers: ['lozano'] }),
+    1,
+    'regla00 #5: pred 0-0 vs real 1-1 = 1 (solo signo; sin +2)',
+  );
+  // …y con iaBonus el cap 7 sigue mandando: 1+3+2+1 = 7.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, { scorers: [], iaBonus: true }),
+    7,
+    'regla00 #6: 0-0 sin gol + iaBonus = 7 (cap)',
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 9b. PARIDAD shared↔legacy de la regla 0-0 — si un motor la lleva y el
+//     otro no, pita aquí (mismo patrón que la sección 6).
+// ════════════════════════════════════════════════════════════════════
+{
+  globalThis.iaBonusWillApply = () => false;
+  globalThis.PARTIDOS = [{ group: 'Z', home: 'AAA', away: 'BBB', date: '2026-06-20T20:00:00Z' }];
+  globalThis.boostPicks = { '2026-06-20': 'Z_AAA_BBB' };
+
+  const zeroCases = [
+    { name: '0-0 sin gol vs 0-0',         pred: { saved: true, l: 0, v: 0, gol: null },     rl: 0, rv: 0, scorers: [], boost: false, mk: null        },
+    { name: '0-0 con gol vs 0-0',         pred: { saved: true, l: 0, v: 0, gol: 'lozano' }, rl: 0, rv: 0, scorers: [], boost: false, mk: null        },
+    { name: '0-0 sin gol + boost vs 0-0', pred: { saved: true, l: 0, v: 0, gol: null },     rl: 0, rv: 0, scorers: [], boost: true,  mk: 'Z_AAA_BBB' },
+    { name: '1-1 sin gol vs 0-0',         pred: { saved: true, l: 1, v: 1, gol: null },     rl: 0, rv: 0, scorers: [], boost: false, mk: null        },
+    { name: '0-0 sin gol vs 1-1',         pred: { saved: true, l: 0, v: 0, gol: null },     rl: 1, rv: 1, scorers: [], boost: false, mk: null        },
+  ];
+  for (const c of zeroCases) {
+    const sharedPts = sharedCalcMatchPoints(c.pred, c.rl, c.rv, { scorers: c.scorers, iaBonus: false, boost: c.boost });
+    const legacyPts = legacyCMP(c.pred, c.rl, c.rv, c.mk, c.scorers);
+    assert.strictEqual(
+      sharedPts, legacyPts,
+      `PARITY regla00 [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
+    );
+  }
+  // KO hereda la regla vía calcKOMatchPoints: 0-0 sin gol + classifier 'home'
+  // acertado en r32 → 6 (marcador con regla) + 5 (avance) = 11, en ambos motores.
+  const sharedKo = sharedCalcKOMatchPoints(
+    { saved: true, l: 0, v: 0, classifier: 'home', gol: null }, 0, 0, 'r32',
+    { scorers: [], iaBonus: false, boost: false, winner: 'home' },
+  );
+  assert.strictEqual(sharedKo, 11, 'regla00 KO shared: 0-0 sin gol + avance r32 (winner) = 6+5');
+}
+
+console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost + regla 0-0) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW+regla00) + EF assembly (scorer→gol + boost)');

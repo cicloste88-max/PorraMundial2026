@@ -64,13 +64,19 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   if(isExact) pts += 3;
 
   // F2.9 HF-09 — Goleador: +2 si pred.gol acierta a CUALQUIER goleador real
-  // del partido. Independiente del marcador (incluido 0-0 si se registra
-  // un goleador) y del equipo (ganador, perdedor, empatado).
+  // del partido, del equipo que sea (ganador, perdedor, empatado).
+  // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
+  // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si pred
+  // 0-0 Y real 0-0 Y sin goleador, paga el +2 (0-0 clavado = 1+3+2 = 6 base,
+  // paridad con cualquier otro exacto). Si registró goleador y el real es
+  // 0-0, su apuesta falla (scorers vacío). Paridad con _shared/scoring.mjs.
   // Excepción KO: los goles en tanda de penaltis NO cuentan — responsabilidad
   // del pipeline alimentar realScorers solo con goles de 90' + prórroga.
   if(pred.gol) {
     const scorers = realScorers ?? _hf09FallbackScorers(pred, realL, realR);
     if(scorers.includes(pred.gol)) pts += 2;
+  } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
+    pts += 2;
   }
 
   // Bonus vs IA (F.4). iaBonusWillApply valida que ia.sign !== null,

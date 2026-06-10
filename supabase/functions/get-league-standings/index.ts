@@ -1,5 +1,11 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.2.0
+// PR-1 · Leaderboard de liga · v1.2.1
+//   v1.2.1 (ERR-86, Fase 1 pre-kickoff): paginación .range(1000)+.order en las
+//     lecturas sin cota (predictions, ko_predictions, ia_predictions del
+//     snapshot activo). PostgREST corta en db-max-rows (1000): Porra gallos
+//     (17×72=1224 filas de predictions) perdía 3 usuarios completos + 1
+//     parcial del scoreboard según orden físico del heap. Ensamblaje v1.1.0
+//     (ERR-79) INTACTO: asObj, boost_picks, merge overrides, KO/awards.
 //   v1.2.0 (P4/D): KO con desempate. Pasa real.winner ('home'|'away') a
 //     calcKOMatchPoints para que el avance de ronda puntue tambien cuando el
 //     partido acaba en empate y se decide por prorroga/penaltis (el usuario
@@ -17,6 +23,19 @@ import {
   calcAwardPoints,
   iaBonusPredicate,
 } from "../_shared/scoring.mjs";
+import { fetchAllRows } from "./fetch-all.mjs";
+
+// ERR-86: shape { data, error } compatible con el manejo de errores existente
+// (loop [err, label]); pageFn debe aplicar .order() estable + .range(from, to).
+// deno-lint-ignore no-explicit-any
+async function fetchAllCompat(pageFn: (from: number, to: number) => any) {
+  try {
+    const { rows } = await fetchAllRows(pageFn);
+    return { data: rows, error: null };
+  } catch (e) {
+    return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+  }
+}
 
 const ALLOWED_ORIGINS = new Set([
   "https://porramundial2026-seven.vercel.app",
@@ -151,6 +170,22 @@ serve(async (req: Request) => {
     }
   }
 
+  // ERR-86: snapshot IA activo para acotar ia_predictions (sin snapshot
+  // activo → sin filas, mismo efecto neto que hoy). Mecanismo espejo del
+  // frontend (auth.js loadIAPredictions).
+  let activeSnapshotId: number | string | null = null;
+  {
+    const { data: snap, error: snapErr } = await supa
+      .from("ia_snapshots").select("id").eq("is_active", true).maybeSingle();
+    if (snapErr) {
+      return new Response(JSON.stringify({ error: "query_failed", table: "ia_snapshots", detail: snapErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    activeSnapshotId = snap?.id ?? null;
+  }
+
   const [
     { data: members,   error: meErr },
     { data: preds,     error: pErr },
@@ -161,11 +196,13 @@ serve(async (req: Request) => {
     { data: boosts,    error: bErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
-    supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId),
-    supa.from("ko_predictions").select("user_id, match_id, local, visitante, scorer, classifier").eq("league_id", leagueId),
+    fetchAllCompat((from, to) => supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId).order("id").range(from, to)),
+    fetchAllCompat((from, to) => supa.from("ko_predictions").select("user_id, match_id, local, visitante, scorer, classifier").eq("league_id", leagueId).order("id").range(from, to)),
     supa.from("award_picks").select("user_id, golden_ball, golden_boot, golden_glove, young_player").eq("league_id", leagueId),
     supa.from("results").select("match_results, ko_results, award_winners, overrides").limit(1).maybeSingle(),
-    supa.from("ia_predictions").select("match_id, sign"),
+    activeSnapshotId != null
+      ? fetchAllCompat((from, to) => supa.from("ia_predictions").select("match_id, sign").eq("snapshot_id", activeSnapshotId).order("match_id").range(from, to))
+      : Promise.resolve({ data: [], error: null }),
     supa.from("boost_picks").select("user_id, match_id").eq("league_id", leagueId),
   ]);
 
@@ -314,7 +351,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.2.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.2.1" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

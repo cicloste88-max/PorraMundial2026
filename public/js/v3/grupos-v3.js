@@ -647,8 +647,11 @@ function v3RenderStandingsTable(grupo) {
 function v3CalcMatchPointsGrupos(prediction, match) {
   if (!prediction || !prediction.saved) return { total: 0, types: [] };
   if (!match || match.realHome == null || match.realAway == null) return { total: 0, types: [] };
-  // Sentinel: si realHome=0 AND realAway=0, asumimos no jugado (placeholder).
-  if (match.realHome === 0 && match.realAway === 0) return { total: 0, types: [] };
+  // Sentinel: realHome=0 AND realAway=0 = no jugado (placeholder de PARTIDOS,
+  // que nadie hidrata en runtime). EXCEPTO si el caller marca match.played
+  // (porra-jugador-v3 pasa resultados reales de live_scores con señal de fase
+  // propia): un 0-0 REAL debe puntuar — regla 0-0 incluida (fix 10-jun).
+  if (match.played !== true && match.realHome === 0 && match.realAway === 0) return { total: 0, types: [] };
 
   var realL = match.realHome;
   var realR = match.realAway;
@@ -673,6 +676,10 @@ function v3CalcMatchPointsGrupos(prediction, match) {
     var team = EQUIPOS.find(function(e) { return e.name === winnerTeam; });
     var realScorer = team && team.players && team.players[0] ? team.players[0].key : null;
     if (realScorer && prediction.gol === realScorer) types.push('gole');
+  } else if (!prediction.gol && prediction.l === 0 && prediction.v === 0 && realL === 0 && realR === 0) {
+    // Regla 0-0 (canónica, San 10-jun): sin goleador + 0-0 clavado → +2.
+    // Paridad con calcMatchPoints (scoring.js) y _shared/scoring.mjs.
+    types.push('gole');
   }
 
   // Bonus IA contrario (+1). Sólo si iaBonusWillApply existe globalmente.
@@ -701,9 +708,11 @@ function v3CalcMatchPointsGrupos(prediction, match) {
 // Render chips de puntuación bajo cada match-card.
 // 3 estados: pre-kickoff (nada) / 0 pts gris / N pts stack con tipos + total.
 function v3RenderChipsGrupos(match, prediction) {
-  // Estado 1: pre-kickoff o placeholder 0-0 → no chip.
+  // Estado 1: pre-kickoff o placeholder 0-0 → no chip. Mismo sentinel
+  // condicionado que v3CalcMatchPointsGrupos: con match.played un 0-0 real
+  // SÍ pinta chip (regla 0-0, fix 10-jun).
   if (!match || match.realHome == null || match.realAway == null) return '';
-  if (match.realHome === 0 && match.realAway === 0) return '';
+  if (match.played !== true && match.realHome === 0 && match.realAway === 0) return '';
 
   var pts = v3CalcMatchPointsGrupos(prediction, match);
 
