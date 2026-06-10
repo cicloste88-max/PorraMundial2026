@@ -30,15 +30,24 @@
   color: var(--ink-900);
   font-family: var(--font-text);
   min-height: 100vh;
-  padding: 56px 18px 96px;  /* top safe-area iOS · lateral 18 (consistente F7.X) · bottom hueco bottom-tab */
+  /* Shell v3 (PR #155): top/lateral movidos a .fc-pred-shell. El mount
+     .v3-shell-host es hijo directo de esta page y con padding aquí salía
+     36px más estrecho y 56px más bajo que en el resto de SHELL_PAGES,
+     donde la page no aporta padding (solo body 24px 16px). Bottom se
+     conserva: hueco bottom-tab bajo todo el contenido. */
+  padding: 0 0 96px;
 }
 
 #page-predictor .fc-pred-shell {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 720px;
+  max-width: 756px;  /* 720 de contenido + 36 del padding lateral (border-box global ko.css). */
   margin: 0 auto;
+  /* Hereda el espaciado que daba la page: lateral 18 (consistente F7.X);
+     top 18 (≈ respiro .phone) en vez de 56 — el safe-area top ya lo cubre
+     la fifa-bar montada encima. */
+  padding: 18px 18px 0;
 }
 
 /* ──────────────────────────────────────────────────────────────────────
