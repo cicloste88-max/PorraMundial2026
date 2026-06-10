@@ -503,92 +503,51 @@ async function loadLeagueRanking(leagueId) {
 }
 window.loadLeagueRanking = loadLeagueRanking;
 
-// === [Sprint A · Group 4] loadLeagueHighlights — 3 frases dinámicas
-//     contextuales para la sección DESTACADOS DE TU LIGA. ===
+// === [Sprint A · Group 4 → EF v1.0.0] loadLeagueHighlights — hasta 5 insights
+//     VERDADEROS user-vs-liga para DESTACADOS DE TU LIGA, vía EF
+//     get-league-highlights (service_role).
+//     Los items client-side anteriores (contrarian KO, campeón, contador
+//     cerradas/pendientes) agregaban sobre tablas con RLS own-rows-only
+//     (predictions/award_picks/ko_predictions/league_members) → veían solo la
+//     fila propia y montaban frases falsas (ERR-86). El item C (IA Zayu top 3)
+//     se retira también: la EF ya devuelve 5 insights, incluida la sintonía
+//     con la IA. La EF responde { highlights: [{ icon, text }] } ya formateado
+//     y ordenado por impacto. ===
 async function loadLeagueHighlights(leagueId, userId) {
-  if (!leagueId || !userId || !window._porraDb) return [];
-  var db = window._porraDb;
-  var items = [];
-
-  // Item A — Pick contrarian en KO: equipos que solo 1-2 miembros eligen
-  // y el usuario actual está entre ellos.
+  var fallback = [{ icon: '📊', text: 'Tu liga está lista para jugar.' }];
+  if (!leagueId || !userId) return fallback;
+  // Cliente JWT authenticated (auth.js getQueryDb), mismo invoke que F5 —
+  // adjunta el token del usuario en functions.invoke. NO fetch manual.
+  var db = (typeof getQueryDb === 'function') ? getQueryDb()
+    : (typeof window.getQueryDb === 'function') ? window.getQueryDb()
+    : window._porraDb;
+  if (!db || !db.functions) return fallback;
   try {
-    var koRes = await db
-      .from('ko_predictions')
-      .select('user_id, winner_team, round')
-      .eq('league_id', leagueId);
-    var koPreds = (koRes && koRes.data) || [];
-    if (koPreds.length > 0) {
-      var byTeam = {};
-      for (var i = 0; i < koPreds.length; i++) {
-        var t = koPreds[i].winner_team;
-        if (!t) continue;
-        if (!byTeam[t]) byTeam[t] = { users: [], round: koPreds[i].round || 'Eliminatorias' };
-        if (byTeam[t].users.indexOf(koPreds[i].user_id) === -1) byTeam[t].users.push(koPreds[i].user_id);
+    var res = await db.functions.invoke('get-league-highlights', {
+      body: { league_id: leagueId, user_id: userId }
+    });
+    if (res && res.error) {
+      console.warn('[highlights] EF get-league-highlights error', res.error.message || res.error);
+    } else if (res && res.data) {
+      if (res.data.gated === true) {
+        // Verja de cierre (mirror F4): la porra del caller sigue ABIERTA y la
+        // EF no computa nada. El shell detecta el flag `gated` y pinta el
+        // estado bloqueado en lugar de tarjetas (NO el fallback genérico).
+        return [{ gated: true, icon: '🔒', text: 'Cierra tu porra para desbloquear los highlights de tu liga' }];
       }
-      var teams = Object.keys(byTeam);
-      for (var j = 0; j < teams.length; j++) {
-        var info = byTeam[teams[j]];
-        if ((info.users.length === 1 || info.users.length === 2) && info.users.indexOf(userId) !== -1) {
-          if (info.users.length === 1) {
-            items.push({ icon: '🎯', text: 'Solo tú apuestas por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
-          } else {
-            items.push({ icon: '🎯', text: 'Solo tú y otro apostáis por ' + teams[j] + ' en ' + info.round + '. El resto se ríe.' });
-          }
-          break;
-        }
+      if (Array.isArray(res.data.highlights)) {
+        var items = res.data.highlights.filter(function (h) {
+          return h && typeof h.text === 'string' && h.text;
+        }).slice(0, 5).map(function (h) {
+          return { icon: h.icon || '•', text: h.text };
+        });
+        if (items.length) return items;
       }
     }
-  } catch (e) { console.warn('[highlights] item A', e); }
-
-  // Item B — Coincidencia campeón.
-  try {
-    var awRes = await db
-      .from('award_picks')
-      .select('user_id, champion')
-      .eq('league_id', leagueId);
-    var aw = (awRes && awRes.data) || [];
-    var mine = aw.find ? aw.find(function (a) { return a.user_id === userId; }) : null;
-    if (mine && mine.champion) {
-      var others = aw.filter(function (a) { return a.champion === mine.champion && a.user_id !== userId; }).length;
-      var total = aw.length;
-      if (others === 0) {
-        items.push({ icon: '🥇', text: 'Solo tú apuestas por ' + mine.champion + ' campeón.' });
-      } else {
-        items.push({ icon: '🥇', text: 'Tu campeón ' + mine.champion + ' coincide con ' + others + ' de ' + total + ' de tu liga.' });
-      }
-    }
-  } catch (e) { console.warn('[highlights] item B', e); }
-
-  // Item C — IA Zayu en top 3 (depende de window._leagueRanking poblado).
-  try {
-    var ranking = window._leagueRanking || [];
-    var bot = ranking.find ? ranking.find(function (r) { return r.is_bot === true; }) : null;
-    if (bot && bot.position && bot.position <= 3) {
-      items.push({ icon: '🤖', text: 'IA Zayu va Nº' + bot.position + ' — atento, te puede pasar.' });
-    }
-  } catch (e) { console.warn('[highlights] item C', e); }
-
-  // Fallback hasta llegar a 3.
-  if (items.length < 3) {
-    try {
-      var lmRes = await db
-        .from('league_members')
-        .select('porra_cerrada')
-        .eq('league_id', leagueId);
-      var lm = (lmRes && lmRes.data) || [];
-      var cerradas = lm.filter(function (m) { return m.porra_cerrada === true; }).length;
-      var totalLm = lm.length;
-      var pendientes = totalLm - cerradas;
-      while (items.length < 3) {
-        items.push({ icon: '📊', text: 'Tu liga tiene ' + cerradas + ' porras cerradas / ' + pendientes + ' pendientes.' });
-        break;
-      }
-    } catch (e) { console.warn('[highlights] fallback', e); }
+  } catch (e) {
+    console.warn('[highlights] EF get-league-highlights excepción', e);
   }
-
-  while (items.length < 3) items.push({ icon: '📊', text: 'Tu liga está lista para jugar.' });
-  return items.slice(0, 3);
+  return fallback;
 }
 window.loadLeagueHighlights = loadLeagueHighlights;
 

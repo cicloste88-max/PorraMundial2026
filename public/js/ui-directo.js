@@ -330,7 +330,7 @@
       '<div class="' + classes + '" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<span class="dv2-mini-team">' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + hCode + '"' + hFlagRectStyle + ' aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso3="' + hCode + '"' + hFlagRectStyle + ' aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
           '<span class="dv2-mini-code">' + hCode + '</span>' +
         '</span>' +
         '<span class="dv2-mini-score">' +
@@ -340,7 +340,7 @@
         '</span>' +
         '<span class="dv2-mini-team right">' +
           '<span class="dv2-mini-code">' + aCode + '</span>' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso2="' + aCode + '"' + aFlagRectStyle + ' aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
+          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso3="' + aCode + '"' + aFlagRectStyle + ' aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
         '</span>' +
         '<span class="dv2-mini-right">' + rightHtml + '</span>' +
       '</div>'
@@ -358,7 +358,8 @@
   //   · .dv2-exp recibe modificador .dv2-exp--kits
   //   · meta + scorers + pred + collapse SIN cambios
   // Compat: id="dcard-N", data-match-key, data-match-idx, .dv2-exp-flag-btn,
-  //         data-iso2, data-collapse → todo preservado, wiring intacto
+  //         data-iso3 (código de 3 letras, antes mal llamado data-iso2),
+  //         data-collapse → todo preservado, wiring intacto
   // ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
@@ -535,7 +536,7 @@
       const flagRectUrl = iso2 ? SB + '/miniatures/flags-sm/' + iso2 + '.webp' : '';
       const flagStyleAttr = flagRectUrl ? ' style="--flag-rect-url:url(\'' + flagRectUrl + '\')"' : '';
       const flagBtn = isoCode
-        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso2="' + isoCode + '"' + flagStyleAttr + ' aria-label="Ver plantilla ' + (teamName || '') + '">' +
+        ? '<button type="button" class="dv2-exp-half-flag dv2-exp-flag-btn" data-iso3="' + isoCode + '"' + flagStyleAttr + ' aria-label="Ver plantilla ' + (teamName || '') + '">' +
             (flagUrl ? '<img src="' + flagUrl + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
           '</button>'
         : '';
@@ -922,11 +923,11 @@
   // ── Click delegado en banderas → abre pizarra táctica
   document.addEventListener('click', function (e) {
     const btn = e.target.closest && e.target.closest('.dv2-mini-flag-btn, .dv2-exp-flag-btn');
-    if (!btn || !btn.dataset.iso2) return;
+    if (!btn || !btn.dataset.iso3) return;
     if (typeof window.openPizarraTactica === 'function') {
       e.preventDefault();
       e.stopPropagation();
-      window.openPizarraTactica({ iso2: btn.dataset.iso2 });
+      window.openPizarraTactica({ iso3: btn.dataset.iso3 });
     }
   });
 
