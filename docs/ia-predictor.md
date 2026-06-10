@@ -55,7 +55,7 @@ Sobre `raw_home_pct` (probabilidad bruta post-softmax para el equipo local):
 
 ### Profundidad racha dinámica
 
-Default `N=8` (lo que 11v11.com sirve hoy). Ampliable a `N=10` antes del 11 jun cuando se publique el primer amistoso pre-Mundial, vía `{"action":"scrape_last5","limit":10}`. Activación **manual** (no automática). Rango admitido por el endpoint: 1–20.
+Default `N=10` desde el 10-jun-2026 (antes 8): aplicado el plan de ampliación pre-torneo al publicarse los amistosos de la semana previa. El default vive en `handleScrapeLast5` (`porra-ia-compute/index.ts`) y aplica también al re-scrape que dispara `freeze_snapshot`. Override puntual vía `{"action":"scrape_last5","limit":N}`. Rango admitido por el endpoint: 1–20.
 
 ### Headers obligatorios para 11v11.com
 
@@ -167,7 +167,7 @@ Grupos: `(dateStr, matchStr "Home v Away", W|D|L, home_score, away_score, compet
 
 **Caveat**: Argentina devuelve 7 partidos en lugar de 8 por caché interno de 11v11.
 
-**Ampliable**: `body.limit` 1-20 (default 8). Bumpear manualmente a 10 cuando salgan amistosos pre-Mundial.
+**Ampliable**: `body.limit` 1-20 (default 10 desde 10-jun-2026; antes 8).
 
 **Consume**: acción `scrape_last5`. **Destino**: tabla `ia_last5_results` (48 filas, `results JSONB` ascendente con `{date, opponent_name, opponent_iso3, venue H/A, result, gf, ga, competition}`).
 

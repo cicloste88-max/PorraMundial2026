@@ -112,12 +112,16 @@ export async function listAllSquads() {
 // NO toca jugadores/es_titular/fuente/synced_at: el detect 6h sigue siendo dueño
 // del roster y del flag es_titular; xi se construye aparte con --build-xi y es
 // inmune al re-scrape. Devuelve { changed, dryRun }.
-export async function updateSquadXi(iso3, xiArray, { dryRun = false } = {}) {
+export async function updateSquadXi(iso3, xiArray, { dryRun = false, formacion = null } = {}) {
   if (dryRun) return { changed: true, dryRun: true };
   const supa = getClient();
+  const patch = { xi: xiArray, updated_at: new Date().toISOString() };
+  // 10-jun-2026: --build-xi puede detectar cambio de dibujo desde las coords FF
+  // y persistirlo junto al xi (la Pizarra posiciona con squads.formacion).
+  if (formacion) patch.formacion = formacion;
   const { error } = await supa
     .from('squads')
-    .update({ xi: xiArray, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('iso3', iso3);
   if (error) throw error;
   return { changed: true, dryRun: false };

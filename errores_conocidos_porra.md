@@ -2355,3 +2355,31 @@ Las funciones que asumen lo segundo (`if (!uid) return;` con `uid = window.curre
 **Patrón detectable**: grep `window.currentUser?.id` y `window.currentUser && window.currentUser.id`. En el repo (post-#139): 3 sitios restantes en `data.js` L435 y `ui-groups.js` L807/L830 — ahora funcionan gracias al espejo pero conviene normalizar.
 
 **Caso real**: PR #139 commit `606ea7f` (08-jun). Bug latente desde el inicio; descubierto al investigar por qué `boost_picks` seguía vacía incluso tras arreglar ERR-83.
+
+## ERR-85 — `package-lock.json` rompe el build del actor Apify (API y `apify push`)
+
+**Síntoma:** el build remoto del actor `sofascore-webshare-proxy` falla en `npm install`
+con `exit code 243`. Dos variantes confirmadas:
+- **Vía API** (`sourceType=SOURCE_FILES`, build 1.0.10, 02-jun): `operation rejected by OS`.
+- **Vía `apify push`** (build 1.0.11, 10-jun): `EACCES: permission denied, open
+  '/home/myuser/package-lock.json'` — npm corre como `myuser` e intenta reescribir el
+  lockfile copiado como root (lockfile desincronizado → `saveIdealTree` → writeFile).
+
+**Causa raíz común:** un `package-lock.json` presente en el contexto de build que el
+builder de Apify no puede regenerar/reescribir.
+
+**Fix permanente** (build 1.0.12+, en el repo): Dockerfile copia SOLO `package.json` y
+usa `--no-package-lock`:
+```dockerfile
+COPY package.json ./
+RUN npm install --omit=dev --no-package-lock
+```
+Con esto el lockfile versionado en el repo deja de afectar al build por cualquier vía.
+
+**Nota histórica:** la primera versión de esta lección (PR #131, como "ERR-82" — número
+luego reasignado al puente P4) afirmaba que `apify push` no sufría el problema porque el
+deploy de entonces omitía el lockfile manualmente. Refutado el 10-jun: `apify push` con
+lockfile en el directorio también falla. El fix de Dockerfile cubre ambos caminos.
+
+**Contexto operativo:** el actor NO está Git-connected — mergear un PR del repo NO
+reconstruye el actor; el deploy es siempre manual (`apify push N8vUChlhok5JU3cnL`).

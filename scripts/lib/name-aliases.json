@@ -3,19 +3,39 @@
     "_doc": "Aliases por iso3 — diccionario canónico para reconciliar nombres FF vs roster. Consultado por name-matcher.mjs ANTES de Levenshtein. Caso de uso: apodos (Bono → Yassine Bounou), iniciales (Deedson L. → Louicius Deedson), transcripción divergente (Fattouh vs Ahmed Fotouh), prefijos árabes (Al Nadi → Mohammad Abualnadi). Las claves en MAYÚSCULAS (p.ej. 'Damián Emiliano MARTÍNEZ') son nombres_oficial de la lista FIFA, añadidas para --mode=load-fifa (apodos no derivables/iniciales: Dibu, JK; resolveAlias hace match exacto → inertes para el path FF). Formato: { iso3: { 'candidate': 'roster canonical' } }. Búsqueda case-sensitive sobre el string trimmed exacto. Semilla 28-may-2026 desde auditoría manual 48 países por San; ampliado 03-jun-2026 (load-fifa).",
     "_versioned": "actualizar este fichero con nuevos casos según aparezcan en logs/audits. NO incluir aliases ambiguos sin verificación contra fuente oficial."
   },
+  "ALG": {
+    "Rayan Aït Nouri": "Rayan Aït-Nouri"
+  },
   "ARG": {
     "Damián Emiliano MARTÍNEZ": "Dibu Martínez"
   },
+  "BRA": {
+    "Vinicius Junior": "Vinicius Jr"
+  },
+  "COD": {
+    "Lionel Mpasi-Nzau": "Lionel Mpasi"
+  },
+  "KSA": {
+    "Firas Al-Buraikan": "Feras Albrikan",
+    "Nasser Al Dawsari": "Nasser Aldawsari",
+    "Salem Al Dawsari": "Salem Aldawsari"
+  },
   "MAR": {
-    "Bono": "Yassine Bounou"
+    "Bono": "Yassine Bounou",
+    "Yassine Bono": "Yassine Bounou"
+  },
+  "SCO": {
+    "Ben Doak": "Ben Gannon-Doak"
   },
   "CPV": {
     "Pico Lopes": "Roberto Lopes",
-    "Vozinha": "Josimar Dias"
+    "Vozinha": "Josimar Dias",
+    "Kevin Lenini": "Kevin Pina"
   },
   "HAI": {
     "Deedson L.": "Louicius Deedson",
     "Jean Jacques": "Jean-Jacques Danley",
+    "Danley Jean Jacques": "Jean-Jacques Danley",
     "Markhus LACROIX": "Duke Lacroix",
     "Jean-Kévin DUVERNE": "JK Duverne"
   },
@@ -23,19 +43,23 @@
     "Sorloth": "Alexander Sorloth"
   },
   "KOR": {
-    "Kim Tae-hyeon": "Kim Tae-Hwan"
+    "Kim Tae-hyeon": "Taehyeon KIM"
   },
   "EGY": {
-    "Fattouh": "Ahmed Fotouh"
+    "Fattouh": "Ahmed Fotouh",
+    "Marwan Ateya": "Marwan Attia"
   },
   "JOR": {
     "Al Nadi": "Mohammad Abualnadi"
   },
   "GHA": {
     "Thomas": "Thomas Partey",
-    "Ati Zigi": "Lawrence Ati-Zigi"
+    "Thomas Teye": "Thomas Partey",
+    "Ati Zigi": "Lawrence Ati-Zigi",
+    "Lawrence Ati Zigi": "Lawrence Ati-Zigi"
   },
   "QAT": {
+    "Jassem Gaber Abdulsallam": "Jassim Gaber",
     "Ayoub Mohamed ALOUI": "Ayoub Al Alawi",
     "Ahmed Mohamed H K ALGANEHI": "Ahmed Al Janhi",
     "Ahmed Alaaeldin B M ABDELMOTAAL": "Ahmed Alaa"

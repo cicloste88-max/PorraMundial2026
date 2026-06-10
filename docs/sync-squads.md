@@ -266,3 +266,22 @@ diff perpetuo contra BD con ASCII `'`. `decodeHtml()` normaliza
 - Errores: ERR-46/47/48/49/50 en `errores_conocidos_porra.md`.
 - Sprint changelog: entrada 2026-05-16 en `CHANGELOG.md`.
 - Reglas operativas: `.claude/rules/sync-squads.md`.
+
+## --build-xi y detección de formación (10-jun-2026)
+
+`--build-xi` (disponible tras `--mode=detect` y `--mode=scrape`) reconstruye
+`squads.xi` (11 entradas ordenadas por slot, consumidas por `get-squad` v7.2+
+como fuente autoritativa de la Pizarra) desde el once-tipo de FF.
+
+Desde el 10-jun además **detecta el dibujo real** comparando las coords FF
+(`data-onceff-x/y`) contra las 12 rejillas de `scripts/lib/formation-coords.json`
+(asignación geométrica global, menor distancia total gana). Conservador: solo
+cambia `squads.formacion` si FF aporta 11 titulares con coords Y la mejor
+rejilla mejora la almacenada en ≥15% (`detectFormacion`, `xi-slot-map.mjs`).
+El cambio se persiste junto al xi (`updateSquadXi` con `formacion`).
+
+Flujo canónico de refresh XI pre-torneo (roster FIFA-official intacto):
+
+```bash
+node --env-file=.env scripts/sync-squads.mjs --mode=scrape --refresh-final --reseed-xi --build-xi --verbose
+```

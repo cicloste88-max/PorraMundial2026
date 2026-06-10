@@ -2,6 +2,63 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
+
+Refresh pre-torneo completo de XIs y datos IA, con 4 bugs cerrados por el camino
+(QA San en localhost OK):
+
+- **FF movió las páginas de equipo a `/world-cup/equipos/<slug>`** — la ruta vieja
+  devolvía 404 y el scrape de XI fallaba silenciosamente. Fix en `ff-scraper.mjs`.
+- **Artefacto "Más info"**: overlay nuevo de FF cuyo `img[alt]` se colaba como nombre
+  de titular (6 selecciones, slot PO sobre todo). Filtro `isUiArtifact` + promoción de
+  la alternativa al slot vacío.
+- **Aliases post-load-fifa** (+13): los nombres FIFA del 03-jun rompieron matches FF
+  (Vinicius Junior→Vinicius Jr, Ben Doak→Ben Gannon-Doak, Kevin Lenini→Kevin Pina
+  confirmado por San…) y un alias KOR apuntaba a un nombre extinto (→Taehyeon KIM).
+  **Gemelo Aldawsari (KSA)**: el fuzzy ponía a Nasser en el xi cuando FF alinea a
+  Salem ("Salem Al Dawsari" con espacios).
+- **18 formaciones desfasadas** (pin de mayo): nueva `detectFormacion()` en
+  `xi-slot-map.mjs` — prueba las 12 rejillas contra las coords FF, cambia
+  `squads.formacion` solo con 11 coords + mejora ≥15%. CRO/CUW→3-5-2,
+  JPN/CZE/PAN/SUI→3-4-3, SCO/URU→4-4-2, GER/NED/POR/MEX/KSA/QAT/JOR/COD/NOR/PAR→4-3-3.
+  maxDist anómalos resueltos (MEX 61→15, KSA 49→20).
+- **Pipeline**: `--reseed-xi` ahora funciona en `scrape --refresh-final` (re-marca XI
+  pineados con el roster FIFA-official ÍNTEGRO — NUNCA usar detect para esto:
+  pisaría nombre_camiseta/estatura_cm/posicion_fifa) + `--build-xi` tras scrape.
+- **IA/rachas**: default `scrape_last5` 8→10 + re-scrape elo/h2h/last5 (amistosos
+  hasta 09-jun en BD). ⚠️ Deploy CLI de EFs: **SIEMPRE `--no-verify-jwt`** — el 1er
+  deploy sin flag reseteó `verify_jwt=true` y habría tumbado el cron freeze del 11-jun.
+
+Final BD: 48/48 `squads.xi`=11 sin placeholders · 48/48 `es_titular`=11 · formaciones
+4-3-3×23 / 4-2-3-1×9 / 3-4-3×8 / 4-4-2×4 / 3-5-2×4. Smoke `get-squad` CRO OK.
+
+## [10-jun-2026] Actor webshare 1.0.13 — drift cerrado + modo auto + secrets (rama `claude/upbeat-hopper-s4qe2t`)
+
+**Drift descubierto**: el repo tenía el actor pre-batch (1.0.7) mientras producción corría
+1.0.10 (`eventIds[]`) — el PR #131 que portaba el batch al repo quedó abierto sin mergear.
+Reconciliado vía `apify pull` + refactor Nivel 1 encima, **deploy build 1.0.13**:
+
+- **Modo `auto` (default)**: reuse de cookies del KV Store SIN cargar sofascore.com
+  (~5-6s/run, mínimo bandwidth Webshare); self-healing — si 403/timeout, recapture +
+  retry solo de los ids fallidos. `capture`/`reuse`/`normal` quedan para debug.
+- **Batch paralelo**: todos los ids en 1 `page.evaluate` con `AbortSignal.timeout(15s)`
+  por fetch (antes serial, sin timeout). 3 partidos en ~1,7s.
+- **Credenciales Webshare fuera del código** → `apify secrets` + refs `@` en
+  `.actor/actor.json` (rotación de password pendiente, trámite documentado).
+- **Dockerfile**: `COPY package.json` + `--no-package-lock` → **ERR-85** (lockfile
+  rompía el build por API Y por `apify push`; supersede la lección "ERR-82" del PR #131).
+- **defaultRunOptions vía API**: 2048MB (antes 4096 → ~50% coste/run) + timeout 300s
+  (antes 3600 — un run colgado facturaba 1h).
+
+**Validación**: smokes single/batch/capture/reuse 200 + **partido EN DIRECTO**
+(Ponte Preta-Cuiabá, `inprogress` 2nd half, 1-2 live con goleadores correctos, ~2s).
+
+**Docs portadas del PR #131** (que se cierra sin merge — superseded): §Batching por slot
+(seed 72, índice `live_scores_match_key_uidx`, clustering 60 slots, supersede
+`schedule_match_crons` para grupos), descubrimiento eventId vía `og:image` (SofaScore
+retiró `#id:` de URLs), EF `porra-sofascore-proxy` MUERTA, modelo `incidentClass` del
+goleador. Pendiente heredado del #131: **rotar `APIFY_TOKEN`** (quedó expuesto en chat MCP).
+
 ## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
 
 EF `send-porra-receipt` v3: al cierre envía al usuario un email con copia íntegra

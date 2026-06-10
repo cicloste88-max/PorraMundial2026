@@ -5,11 +5,13 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = IA on-demand KO + A.1-bis (fix cache inverso GER/HAI), goleador dorsal, Pizarra, tarjeta 103/104; boost = #137 receipt + #138 gate boosts cierre v3 + #139 cliente JWT `getQueryDb` + espejo `window.currentUser` (ERR-83/84). CORS `porra-ia-compute` regex previews (runtime, sin commit). **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
+**10-jun**: XIs 48 re-marcados + `squads.xi` rebuild (FF→`/world-cup/`, +aliases); `ia_last5` N=10 + elo/h2h refresh. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
+
+Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = IA on-demand KO + A.1-bis (fix cache inverso GER/HAI), goleador dorsal, Pizarra, tarjeta 103/104; boost = #137 receipt + #138 gate boosts cierre v3 + #139 cliente JWT `getQueryDb` + espejo `window.currentUser` (ERR-83/84). **02-jun — P4 puente CERRADO**: `porra-bridge-results` v4 + `get-league-standings` v1.2.0 (ERR-82). `update-results` indep. 11-jun.
 
 ## Top-3 pendientes inmediatos
 
-1. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, vía INDEPENDIENTE (P4 puente ya cerrado; simulacro puente OK).
+1. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, vía INDEPENDIENTE.
 2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
 3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
 
@@ -30,7 +32,7 @@ Main HEAD `6f04b85` (08-jun). **08-jun — 2 sprints**: ko-card-polish (#140) = 
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
-5. **ERR-79 cerrado** (motor OK; v1.1.0 = boost grupos + overrides + reader jsonb; paridad tests 3 funcs). Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
+5. **ERR-79 cerrado**. Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
 6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
 7. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
 
@@ -101,13 +103,13 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..84: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84).
+ERR-01..85: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..84 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..85 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol

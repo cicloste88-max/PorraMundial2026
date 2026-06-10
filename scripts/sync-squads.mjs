@@ -47,7 +47,7 @@ import {
   replaceSquadRoster,
 } from './lib/squads-db.mjs';
 import { buildFifaRoster, formatFifaReport } from './lib/fifa-loader.mjs';
-import { buildXi } from './lib/xi-slot-map.mjs';
+import { buildXi, detectFormacion } from './lib/xi-slot-map.mjs';
 import * as parserAS from './lib/parsers/as.mjs';
 import * as parserSport from './lib/parsers/sport.mjs';
 import * as parserOlympics from './lib/parsers/olympics.mjs';
@@ -92,10 +92,13 @@ const MODE = argv.mode;
 const VERBOSE = !!argv.verbose;
 const DRY_RUN = !!argv['dry-run'];
 const FORCE = !!argv.force;
-// --reseed-xi (PL-3 backfill): en detect, fuerza el re-marcado de es_titular vía
-// FF también en squads pineados (que por defecto se saltan en el paso enrich-xi
-// para preservar el pin manual). One-time: re-siembra el XI borrado por detects
-// previos. NO toca xi_pinned/xi_pinned_at — el pin sigue activo.
+// --reseed-xi (PL-3 backfill): en detect y en scrape --refresh-final, fuerza el
+// re-marcado de es_titular vía FF también en squads pineados (que por defecto
+// se saltan para preservar el pin manual). NO toca xi_pinned/xi_pinned_at — el
+// pin sigue activo. Post load-fifa (03-jun) el camino seguro es scrape
+// --refresh-final (preserva el roster FIFA-official íntegro); detect re-upserta
+// rosters de prensa y pisaría nombre_camiseta/estatura_cm/posicion_fifa (no
+// están en PRESERVE_FIELDS).
 const RESEED_XI = !!argv['reseed-xi'];
 // --build-xi (Sprint A2 FIX C): tras detect, construye squads.xi (XI ordenado
 // por slot, con foto) desde el once-tipo FF + roster. One-time/idempotente; el
@@ -130,6 +133,7 @@ Uso:
   node scripts/sync-squads.mjs --mode=detect --build-xi --iso3=JPN   (construye squads.xi Pizarra)
   node scripts/sync-squads.mjs --mode=scrape --iso3=FRA      [LEGACY]
   node scripts/sync-squads.mjs --mode=scrape --refresh-final [LEGACY]
+  node scripts/sync-squads.mjs --mode=scrape --refresh-final --reseed-xi --build-xi  (refresh XI post-FIFA, roster intacto)
   node scripts/sync-squads.mjs --mode=enrich-tm --iso3=FRA   [LEGACY 1-país]
   node scripts/sync-squads.mjs --mode=enrich-tm --all        [LEGACY]
   node scripts/sync-squads.mjs --mode=enrich-tm-mw                   (recomendado)
@@ -234,17 +238,24 @@ async function runScrape(targets) {
           // Preservar es_titular ORIGINAL si xi_pinned (Capa C 28-may): el
           // refresh-final no debe machacar el pin manual de San. Si NO está
           // pineado, reset a false (lo recalcula el matcher abajo).
+          // --reseed-xi (10-jun-2026): bypassa el pin SOLO para re-marcar
+          // es_titular con el XI actual de FF (lesiones/cambios de once la
+          // semana pre-torneo). El roster y xi_pinned/xi_pinned_at quedan
+          // intactos. Si FF no devuelve XI, se preserva el marcado previo
+          // (nunca dejar la selección a 0 titulares).
           const isPinned = existing.xi_pinned === true;
+          const hasXi = scrape.xi_slots?.length > 0 || scrape.xi_names.length > 0;
+          const remark = (!isPinned || RESEED_XI) && hasXi;
           players = existing.jugadores.map((p) => ({
             ...p,
             nombre: decodeName(p.nombre),
             club: decodeName(p.club),
-            es_titular: isPinned ? !!p.es_titular : false,
+            es_titular: remark ? false : !!p.es_titular,
           }));
           isFinal = !!existing.jugadores_is_final;
           fuente = existing.jugadores_fuente || 'ff';
 
-          if (!isPinned && (scrape.xi_slots?.length > 0 || scrape.xi_names.length > 0)) {
+          if (remark) {
             const { matchAgainstRoster } = await import('./lib/name-matcher.mjs');
             // Lazy-load alias dict (Capa B). Inofensivo si falta el fichero.
             let aliases = null;
@@ -274,10 +285,11 @@ async function runScrape(targets) {
               players[matchIdx].es_titular = true;
             }
             scrape.titulares = matches.length;
-          } else if (isPinned) {
-            // Reportar titulares conservados (count del roster preservado).
+          } else {
+            // Sin re-marcado (pin activo sin --reseed-xi, o FF sin XI):
+            // reportar titulares conservados del roster preservado.
             scrape.titulares = players.filter((p) => p.es_titular).length;
-            if (VERBOSE) console.log(`  ${iso3} — xi_pinned=true, preservados ${scrape.titulares} titulares`);
+            if (VERBOSE) console.log(`  ${iso3} — sin re-marcado (pin=${isPinned}, ffXi=${hasXi}), preservados ${scrape.titulares} titulares`);
           }
         }
         // Si no hay existing roster, players queda con scrape.roster del flujo
@@ -634,14 +646,24 @@ async function buildXiForTargets(targetsArg) {
       console.log(`    ${iso3} — sin roster, skip`);
       continue;
     }
-    const formacion = row.formacion || '4-3-3';
-    const coords = FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
     try {
       const ffSlots = await fetchStartingXISlots(slug, { iso3, verbose: VERBOSE });
       if (ffSlots.length === 0) {
         console.log(`    ${iso3} — FF sin once-tipo, skip (xi sin tocar)`);
         continue;
       }
+      // Detección de cambio de dibujo desde las coords FF (10-jun-2026):
+      // conservadora — solo con 11 titulares con coords y mejora ≥15% sobre
+      // la rejilla almacenada (ver detectFormacion).
+      const stored = row.formacion || '4-3-3';
+      const det = detectFormacion(ffSlots, FORMATION_COORDS, { stored });
+      const formacion = det.formacion;
+      if (det.changed) {
+        console.log(
+          `    ${iso3} — formación ${stored} → ${formacion} (sumDist ${Math.round(det.storedSum ?? -1)} → ${Math.round(det.bestSum)})`,
+        );
+      }
+      const coords = FORMATION_COORDS[formacion] || FORMATION_COORDS['4-3-3'];
       const { xi, warnings, stats } = buildXi({
         ffSlots,
         formacion,
@@ -650,7 +672,9 @@ async function buildXiForTargets(targetsArg) {
         iso3,
         aliases,
       });
-      if (!DRY_RUN) await updateSquadXi(iso3, xi, { dryRun: false });
+      if (!DRY_RUN) {
+        await updateSquadXi(iso3, xi, { dryRun: false, formacion: det.changed ? formacion : null });
+      }
       console.log(
         `    ${iso3.padEnd(4)} (${formacion.padEnd(7)}) — xi ${stats.matched}/11 match, ${stats.conFoto} foto, maxDist=${stats.maxDist}${DRY_RUN ? ' [dry-run]' : ''}`,
       );
@@ -978,6 +1002,10 @@ async function main() {
       process.exit(0);
     }
     results = await runScrape(targets);
+    // --build-xi también disponible en scrape (10-jun-2026): reconstruye
+    // squads.xi tras el re-marcado de es_titular sin pasar por detect.
+    // (buildXiForTargets respeta DRY_RUN internamente.)
+    if (BUILD_XI) await buildXiForTargets(targets);
   } else if (MODE === 'enrich-tm') {
     const targets = await resolveTargets();
     if (targets.length === 0) {
