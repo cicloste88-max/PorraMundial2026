@@ -137,6 +137,45 @@
     }
   }
 
+  // Epoch ms del kickoff canónico desde live_scores.match_start_ts.
+  // m.date (PARTIDOS, data.js legacy) lleva hora de sede SIN timezone y NO
+  // sirve para formatear horas reales. Misma detección seg/ms que formatStartCEST.
+  function _kickoffMs(liveRow) {
+    const ts = liveRow ? liveRow.match_start_ts : null;
+    if (ts == null) return null;
+    const num = Number(ts);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    return num > 1e12 ? num : num * 1000;
+  }
+
+  // Solo-hora en Europe/Madrid, 24h (para fecha+hora usar formatStartCEST).
+  function _formatHoraMadrid(ms) {
+    const d = new Date(ms);
+    try {
+      return new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).format(d);
+    } catch {
+      return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  // Fecha YYYY-MM-DD en Europe/Madrid (en-CA emite formato ISO). Usada para
+  // el sufijo +1 de kickoffs de madrugada y para elegir la jornada en curso.
+  // NO se usa para agrupar: la jornada canónica sigue siendo m.date (sede).
+  function _madridDateStr(ms) {
+    const d = new Date(ms);
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(d);
+    } catch {
+      return d.toISOString().substring(0, 10);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // F7.4-D-1: setVistaGruposExtended eliminado. El toggle entre pages
   // grupos/jornada/directo lo gobierna showPage desde el bottom-tab.
@@ -320,7 +359,19 @@
     } else if (ctx.isFinal) {
       rightHtml = '<span class="dv2-mini-status final">FINAL</span>';
     } else {
-      const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      // Hora Madrid desde el ts canónico de live_scores. m.date (hora de sede,
+      // sin TZ) queda solo como fallback para no dejar la fila sin hora.
+      const koMs = _kickoffMs(ctx.liveRow);
+      let hora;
+      if (koMs != null) {
+        hora = _formatHoraMadrid(koMs);
+        // Kickoff de madrugada: en Madrid cae en el día siguiente al día
+        // canónico de la sección (la agrupación por jornada no cambia).
+        const canonDate = m.date ? m.date.substring(0, 10) : '';
+        if (canonDate && _madridDateStr(koMs) > canonDate) hora += ' +1';
+      } else {
+        hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      }
       rightHtml = '<span class="dv2-mini-status">⏰ ' + hora + '</span>';
     }
 
