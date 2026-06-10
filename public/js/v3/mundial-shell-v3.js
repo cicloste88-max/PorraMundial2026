@@ -1,4 +1,4 @@
-/* F1.1c · Shell global v3 — fifa-bar (countdown → next-match) + qualified-cta
+/* F1.1c · Shell global v3 — fifa-bar (countdown → carrusel partidos del día) + qualified-cta
    + stage-pill + zoom-overlay wiring + user-badge mount.
    Procedencia: design/v3-prototype/{mundial,eliminatorias}-app.js (countdown)
    + decisiones D1/D8/D11/D12/D13 + OQ#1/OQ#4 bundle (13 may 2026).
@@ -34,8 +34,34 @@
   var _tickInterval = null;
   var _kickoffPassed = false;
 
+  // Carrusel partidos del día (fifa-bar-day-carousel, 10-jun).
+  var ROTATE_MS = 6000;
+  var _carouselInterval = null;
+  var _carouselIdx = 0;
+  var _madridTimeFmt = null;
+
+  // Hook de QA: window._v3CarouselDebugNow (número) simula cualquier instante
+  // del torneo desde consola — afecta al cálculo de kickoff y al carrusel.
+  window._v3CarouselDebugNow = window._v3CarouselDebugNow || null;
+  function nowMs() {
+    return typeof window._v3CarouselDebugNow === 'number'
+      ? window._v3CarouselDebugNow
+      : Date.now();
+  }
+
   // ── Utils ──────────────────────────────────────────────
   function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function madridHM(ts) {
+    // Hora kickoff en Europe/Madrid → {h, m} para los bloques v3-cd-num.
+    if (!_madridTimeFmt) {
+      _madridTimeFmt = new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      });
+    }
+    var parts = _madridTimeFmt.format(new Date(ts)).split(':');
+    return { h: pad2(parts[0]), m: pad2(parts[1]) };
+  }
 
   function flagPath(slug) {
     // encodeURIComponent solo en filename (D3) — el bucket lleva espacio %20.
@@ -107,18 +133,20 @@
          + '</div>';
   }
 
-  // ── Countdown / next-match tick ────────────────────────
+  // ── Countdown / carrusel tick ──────────────────────────
   function tickCountdown() {
-    var now = Date.now();
+    var now = nowMs();
     var diff = KICKOFF_MS - now;
 
     if (diff <= 0) {
-      // Post-kickoff: sustituir countdown por texto next-match (state pre/live/next).
+      // Post-kickoff: parar el tick 1s y arrancar modo carrusel (rotación 6s).
       if (!_kickoffPassed) {
         _kickoffPassed = true;
+        if (_tickInterval) { clearInterval(_tickInterval); _tickInterval = null; }
         applyPostKickoffMode();
+        refreshCarouselUI();
+        startCarouselRotation();
       }
-      refreshNextMatchUI();
       return;
     }
 
@@ -134,34 +162,114 @@
   }
 
   function applyPostKickoffMode() {
-    // F1.1h: 2 líneas verticales — eyebrow (estado) + nextmatch (equipos).
+    // Carrusel partidos del día: eyebrow (estado) + slide rotatorio.
+    // Idempotente por elemento — re-mounts del shell (cambio de page) pasan
+    // por aquí vía refreshCarouselUI sin machacar el slide en transición.
     document.querySelectorAll('[data-v3-bar-countdown]').forEach(function (el) {
+      if (el.querySelector('[data-v3-carousel]')) return;
       el.innerHTML = ''
-        + '<span class="v3-fifa-bar__eyebrow" data-v3-bar-eyebrow>PRÓXIMO</span>'
-        + '<div class="v3-fifa-bar__nextmatch" data-v3-next-match>—</div>';
+        + '<span class="v3-fifa-bar__eyebrow" data-v3-bar-eyebrow>MUNDIAL</span>'
+        + '<div class="v3-fifa-bar__carousel" data-v3-carousel>'
+        +   '<div class="v3-carousel-slide"></div>'
+        + '</div>';
     });
   }
 
-  function refreshNextMatchUI() {
-    if (typeof window.resolveNextMatchV3 !== 'function') return;
-    try {
-      var info = window.resolveNextMatchV3(Date.now());
-      if (!info || !info.match) return;
-      var match = info.match;
-      var isLive = info.state === 'live';
-      var eyebrowText = isLive ? 'EN VIVO' : 'PRÓXIMO';
-      var label = (match.home_es || match.home_en) + ' vs ' + (match.away_es || match.away_en);
+  function carouselSlideHTML(match) {
+    var home = match.home_es || match.home_en || '—';
+    var away = match.away_es || match.away_en || '—';
+    var mid;
+    if (match.isLive) {
+      mid = '<span class="v3-carousel-live is-live">EN VIVO</span>';
+    } else {
+      var t = madridHM(match.date_utc_ms);
+      mid = '<div class="v3-carousel-time">'
+        + '<div class="v3-cd-block"><span class="v3-cd-num">' + t.h + '</span><span class="v3-cd-lbl">h</span></div>'
+        + '<div class="v3-cd-block"><span class="v3-cd-num">' + t.m + '</span><span class="v3-cd-lbl">min</span></div>'
+        + '</div>';
+    }
+    return '<span class="v3-carousel-team">' + home + '</span>'
+      + mid
+      + '<span class="v3-carousel-team">' + away + '</span>';
+  }
 
-      document.querySelectorAll('[data-v3-bar-eyebrow]').forEach(function (el) {
-        el.textContent = eyebrowText;
-        el.classList.toggle('is-live', isLive);
-      });
-      document.querySelectorAll('[data-v3-next-match]').forEach(function (el) {
-        el.textContent = label;
-      });
-      // Event para que otras vistas (Vista Directo, Pichichi banner) puedan reaccionar.
-      window.dispatchEvent(new CustomEvent('mundial:next-match-changed', { detail: info }));
+  // Swap con fade 300ms — keyed para no re-animar si el contenido no cambia
+  // (refreshCarouselUI se llama también en mounts, no solo en rotación).
+  function setSlideContent(carouselEl, key, html) {
+    var slide = carouselEl.querySelector('.v3-carousel-slide');
+    if (!slide) return;
+    if (slide.getAttribute('data-slide-key') === key) return;
+    if (!slide.innerHTML) {
+      // Primer render del slide — sin fade-out previo.
+      slide.setAttribute('data-slide-key', key);
+      slide.innerHTML = html;
+      return;
+    }
+    slide.setAttribute('data-slide-key', key);
+    slide.classList.add('is-leaving');
+    setTimeout(function () {
+      // Guard: si otro refresh re-keyó el slide durante el fade, ese timeout gana.
+      if (slide.getAttribute('data-slide-key') !== key) return;
+      slide.innerHTML = html;
+      slide.classList.remove('is-leaving');
+    }, 300);
+  }
+
+  function refreshCarouselUI() {
+    if (typeof window.resolveDayMatchesV3 !== 'function') return;
+    try {
+      applyPostKickoffMode(); // mounts nuevos post-kickoff reciben el markup carrusel.
+      var n = nowMs();
+      var day = window.resolveDayMatchesV3(n);
+      var eyebrows = document.querySelectorAll('[data-v3-bar-eyebrow]');
+      var carousels = document.querySelectorAll('[data-v3-carousel]');
+
+      if (!day || day.state === 'pre' || !day.matches.length) {
+        // 'pre' (fixtures cargando) o 'post' (torneo acabado): neutro.
+        eyebrows.forEach(function (el) {
+          el.textContent = 'MUNDIAL';
+          el.classList.remove('is-live');
+        });
+        carousels.forEach(function (el) {
+          setSlideContent(el, 'empty', '<span class="v3-carousel-team">—</span>');
+        });
+      } else {
+        var N = day.matches.length;
+        _carouselIdx = ((_carouselIdx % N) + N) % N;
+        var match = day.matches[_carouselIdx];
+        var isLive = !!match.isLive;
+        var counter = (_carouselIdx + 1) + '/' + N;
+        var eyebrowText = isLive
+          ? ('EN VIVO · ' + counter)
+          : ((day.state === 'upcoming' ? 'PRÓXIMOS' : 'HOY') + ' · ' + counter);
+        var key = match.key + (isLive ? ':live' : ':time');
+        var html = carouselSlideHTML(match);
+
+        eyebrows.forEach(function (el) {
+          el.textContent = eyebrowText;
+          el.classList.toggle('is-live', isLive);
+        });
+        carousels.forEach(function (el) { setSlideContent(el, key, html); });
+      }
+
+      // CONTRATO LEGACY: mundial:next-match-changed sigue despachándose para
+      // consumidores externos (Vista Directo, Pichichi banner).
+      if (typeof window.resolveNextMatchV3 === 'function') {
+        var info = window.resolveNextMatchV3(n);
+        if (info && info.match) {
+          window.dispatchEvent(new CustomEvent('mundial:next-match-changed', { detail: info }));
+        }
+      }
     } catch (e) { /* swallow — resolver puede fallar pre-fetch */ }
+  }
+
+  function startCarouselRotation() {
+    // Patrón idempotente idéntico a _tickInterval: clear antes de set.
+    if (_carouselInterval) clearInterval(_carouselInterval);
+    _carouselInterval = setInterval(function () {
+      _carouselIdx++;
+      refreshCarouselUI();
+    }, ROTATE_MS);
   }
 
   // ── Mounting (idempotente por page) ────────────────────
@@ -186,6 +294,9 @@
 
     pageEl.insertBefore(mount, pageEl.firstChild);
     refreshShellUserChips(mount); // F3-I1.6
+    // Post-kickoff: el mount nuevo nace con markup countdown — pintarle el
+    // carrusel YA (no esperar hasta 6s al siguiente tick de rotación).
+    if (_kickoffPassed) refreshCarouselUI();
     return mount;
   }
 
@@ -370,13 +481,21 @@
     if (current) ensureShellMount(current);
 
     // Countdown — tick inmediato + cada 1s (UNA sola instancia).
-    if (_tickInterval) clearInterval(_tickInterval);
-    if (Date.now() >= KICKOFF_MS) applyPostKickoffMode();
-    tickCountdown();
-    _tickInterval = setInterval(tickCountdown, 1000);
+    // Si init() ya es post-kickoff: sin tick 1s, directo a modo carrusel.
+    if (_tickInterval) { clearInterval(_tickInterval); _tickInterval = null; }
+    if (nowMs() >= KICKOFF_MS) {
+      _kickoffPassed = true;
+      applyPostKickoffMode();
+      refreshCarouselUI();
+      startCarouselRotation();
+    } else {
+      tickCountdown();
+      _tickInterval = setInterval(tickCountdown, 1000);
+    }
 
     window.addEventListener('beforeunload', function () {
       if (_tickInterval) { clearInterval(_tickInterval); _tickInterval = null; }
+      if (_carouselInterval) { clearInterval(_carouselInterval); _carouselInterval = null; }
     });
   }
   window.mundialShellV3Init = init;
