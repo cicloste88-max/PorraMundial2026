@@ -842,10 +842,13 @@
 /* ============================================================
    ITEM C (PR #156) — Marcador: dígitos menores + balón Trionda
    ────────────────────────────────────────────────────────────
-   · Dígitos ~15% menores y más gap entre ambos números.
-   · El ':' (.dv2-*-score-sep) se sustituye en el markup por
-     .dv2-score-ball (emitido por _buildScoreBall, ui-directo.js):
+   · Dígitos ~15% menores y más gap entre ambos números (mini y
+     expandida).
+   · Balón Trionda como separador SOLO en la card expandida
+     (.dv2-score-ball, emitido por _buildScoreBall, ui-directo.js):
      wrapper = oscilación vertical, img interna = rotación 6s.
+     En mini-rows el balón se solapaba con los '—' placeholder
+     (QA San 11-jun) → la mini conserva el ':' legacy.
    · El wrapper conserva la clase -sep legacy → el fallback
      onerror (':') hereda el estilo del separador de siempre
      (.is-fallback apaga la animación del wrapper).
@@ -863,12 +866,10 @@
 }
 .dv2-score-ball img {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 32px;
+  height: 32px;
   animation: dv2BallSpin 6s linear infinite;
 }
-/* Proporcional al contexto: mayor en la card expandida (hero kits) */
-.dv2-exp-score .dv2-score-ball img { width: 32px; height: 32px; }
 .dv2-score-ball.is-fallback { animation: none; }
 
 @keyframes dv2BallSpin {
@@ -887,6 +888,5 @@
 
 @media (max-width: 380px) {
   .dv2-mini-score { font-size: 11px; }
-  .dv2-score-ball img { width: 13px; height: 13px; }
-  .dv2-exp-score .dv2-score-ball img { width: 28px; height: 28px; }
+  .dv2-score-ball img { width: 28px; height: 28px; }
 }

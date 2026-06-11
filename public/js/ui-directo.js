@@ -203,6 +203,8 @@
 
   // ─────────────────────────────────────────────────────────────
   // Separador del marcador = balón Trionda (ITEM C, PR #156).
+  // SOLO en la card expandida: en mini-rows el balón se solapaba con
+  // los '—' placeholder (QA San 11-jun) y la mini conserva el ':'.
   // Mismo asset que la timeline del Predictor (TRIONDA_URL en
   // ui-pred-shell.js; CSS legacy ballSpin en base.css/.vs-ball).
   // Estructura: wrapper .dv2-score-ball (oscilación translateY) + img
@@ -410,7 +412,7 @@
         '</span>' +
         '<span class="dv2-mini-score">' +
           '<span class="dv2-mini-score-num">' + lTxt + '</span>' +
-          _buildScoreBall('dv2-mini-score-sep') +
+          '<span class="dv2-mini-score-sep">:</span>' +
           '<span class="dv2-mini-score-num">' + vTxt + '</span>' +
         '</span>' +
         '<span class="dv2-mini-team right">' +
