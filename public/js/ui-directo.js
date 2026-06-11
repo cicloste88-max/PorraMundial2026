@@ -348,7 +348,7 @@
                     pred.v !== null && pred.v !== undefined;
 
     return { directoKey, liveRow, status, isLive, isFinal, scoreH, scoreA,
-             events, hasScore, minuteStr, matchKey, pred, hasPred };
+             events, hasScore, minuteStr, matchKey, pred, hasPred, teamsSwapped };
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -359,13 +359,36 @@
     if (!ctx.hasPred || !ctx.hasScore || !(ctx.isLive || ctx.isFinal)) return null;
     if (typeof calcMatchPoints !== 'function') return null;
     const predWithFlag = Object.assign({}, ctx.pred, { saved: ctx.pred.saved !== false });
-    const pts = calcMatchPoints(predWithFlag, ctx.scoreH, ctx.scoreA, ctx.matchKey);
+    const realScorers = _realScorersFor(ctx, m);
+    const pts = calcMatchPoints(predWithFlag, ctx.scoreH, ctx.scoreA, ctx.matchKey, realScorers);
     const bpSource = (typeof boostPicks !== 'undefined') ? boostPicks : {};
     const boostKey = bpSource[m.date?.substring(0, 10)];
     const isBoost  = boostKey === ctx.matchKey;
     const isExact  = ctx.pred.l === ctx.scoreH && ctx.pred.v === ctx.scoreA;
     // calcMatchPoints ya aplica el x2 internamente cuando boost+exact.
     return { pts, isExact, isBoost, finalPts: pts };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Goleadores reales para el +2 (Item 3+5 post-J1). Sin 5º argumento,
+  // calcMatchPoints caía a _hf09FallbackScorers (primer jugador de plantilla
+  // del ganador) y el +2 de goleador no se concedía nunca en Directo.
+  //   - finished: scorers canónicos del bridge (results.match_results, key
+  //     legacy == ctx.matchKey), cargados por live-sync en
+  //     window._matchResultsByKey.
+  //   - en vivo (o finished aún sin bridge): derivados de los events crudos
+  //     de live_scores vía deriveScorersFromEvents (scoring.js, espejo del
+  //     extractScorers del bridge). [] = aún sin goles (NO usar fallback).
+  // ─────────────────────────────────────────────────────────────
+  function _realScorersFor(ctx, m) {
+    if (ctx.isFinal && ctx.matchKey && window._matchResultsByKey) {
+      const entry = window._matchResultsByKey[ctx.matchKey];
+      if (entry && Array.isArray(entry.scorers)) return entry.scorers;
+    }
+    if (typeof deriveScorersFromEvents !== 'function' || !ctx.liveRow) return undefined;
+    const hIso3 = (EQUIPOS.find(e => e.name === m.home) || {}).flag || null;
+    const aIso3 = (EQUIPOS.find(e => e.name === m.away) || {}).flag || null;
+    return deriveScorersFromEvents(ctx.liveRow.events, ctx.teamsSwapped, hIso3, aIso3);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -589,7 +612,9 @@
         const cls = live.finalPts > 0 ? 'win' : 'zero';
         const verb = ctx.isFinal ? (live.finalPts > 0 ? 'GANASTE' : 'SIN PUNTOS')
                                  : (live.finalPts > 0 ? 'VAS GANANDO' : '0 PTS POR AHORA');
-        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isBoost && live.isExact ? ' ×2' : '') : '';
+        // Copy boost: la cifra YA lleva el ×2 aplicado — "(boost ×2)" como
+        // aclaración, nunca "pts ×2" (sugería multiplicación pendiente).
+        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isBoost && live.isExact ? ' (boost ×2)' : '') : '';
         predStatusHtml = '<div class="dv2-exp-pred-status ' + cls + '">' + verb + (ptsTxt ? ' ' + ptsTxt : '') + '</div>';
       }
 

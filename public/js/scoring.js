@@ -109,6 +109,33 @@ function _hf09FallbackScorers(pred, realL, realR) {
     .filter(Boolean);
 }
 
+// ── Goleadores reales desde el pipeline live (Item 3+5 post-J1) ──────────
+// events crudos de live_scores → scorer keys. Espejo de extractScorers del
+// bridge porra-bridge-results: cuentan goal + inGamePenalty; ownGoal y
+// penaltyShootout NO (los penaltis de tanda no son gol de jugador a efectos
+// de la porra). El mapeo nombre→key REUSA playerToShortKey (este fichero,
+// §Sprint Combos & Awards): lookup en EQUIPOS[iso3].players con fallback NFD
+// sin diacríticos + último token ('Raúl Jiménez' → 'Jimenez') — mismo patrón
+// que el bridge. homeIso3/awayIso3 en orientación PROYECTO; el flag
+// teamsSwapped reorienta el isHome de SofaScore/ESPN igual que el bridge.
+function deriveScorersFromEvents(rawEvents, teamsSwapped, homeIso3, awayIso3) {
+  if (!Array.isArray(rawEvents)) return [];
+  const out = [];
+  for (const e of rawEvents) {
+    if (!e || typeof e !== 'object') continue;
+    const itype = String(e.incidentType || '');
+    if (itype !== 'goal' && itype !== 'inGamePenalty') continue;
+    if (String(e.incidentClass || '') === 'ownGoal') continue;
+    const pname = e.player && typeof e.player.name === 'string' ? e.player.name : '';
+    if (!pname) continue;
+    const sofaIsHome = e.isHome === true;
+    const projIsHome = teamsSwapped ? !sofaIsHome : sofaIsHome;
+    const key = playerToShortKey(pname, projIsHome ? homeIso3 : awayIso3);
+    if (key) out.push(key);
+  }
+  return out;
+}
+
 // ── Puntos KO por ronda ───────────────────────────────────
 // Calcula los pts de un pronóstico KO dado un resultado real
 // round: 'r32'|'r16'|'qf'|'sf'|'final'
@@ -1480,7 +1507,7 @@ function playerToShortKey(nombre, iso3) {
   }
   // 2. Fallback: último token sin diacríticos. ̀-ͯ = bloque
   //    Unicode "Combining Diacritical Marks" producido por NFD.
-  const norm = String(nombre).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = String(nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const parts = norm.trim().split(/\s+/);
   return parts[parts.length - 1] || '';
 }

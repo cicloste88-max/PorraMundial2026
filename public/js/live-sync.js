@@ -34,6 +34,11 @@
   // La expone window.getSimulacros() como array.
   window._simulacrosByKey = {};
 
+  // Cache de results.match_results (scorers canónicos del bridge, key legacy
+  // "{grupo}_{home_es}_{away_es}"). La consume _realScorersFor (ui-directo.js)
+  // para el +2 de goleador en partidos finished (Item 3+5 post-J1).
+  window._matchResultsByKey = {};
+
   // ─────────────────────────────────────────────────────────────
   // Detectar row de simulacro (histórica con nombres rellenos)
   // ─────────────────────────────────────────────────────────────
@@ -108,10 +113,54 @@
       // salvo via `raw` (ERR-87).
       match_start_ts: row.match_start_ts,
       events:         Array.isArray(row.events) ? row.events : [],
-      minute:         null, // pendiente: SofaScore pone minuto en status.time.played (no está en la tabla actual)
+      // Desde el poller ESPN (12-jun) la columna live_scores.minute viene
+      // poblada en vivo; ui-directo la pinta en la píldora live.
+      minute:         row.minute ?? null,
       _teams_swapped: !!meta.teams_swapped,
       raw:            row
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // RESULTS (match_results del bridge) — scorers canónicos finished
+  // ─────────────────────────────────────────────────────────────
+  async function loadMatchResults() {
+    const db = window._porraDb;
+    if (!db) return;
+    try {
+      const { data, error } = await db.from('results').select('match_results').eq('id', 1).maybeSingle();
+      if (error) {
+        console.error('[live-sync] Error cargando match_results:', error);
+        return;
+      }
+      // Lector defensivo (patrón asObj): si un writer regresara a jsonb
+      // double-encoded (string), parsear en vez de romper el badge de puntos.
+      let mr = data ? data.match_results : null;
+      if (typeof mr === 'string') {
+        try { mr = JSON.parse(mr); } catch (_) { mr = null; }
+      }
+      if (mr && typeof mr === 'object') {
+        window._matchResultsByKey = mr;
+        console.log('[live-sync] match_results:', Object.keys(mr).length, 'partidos bridgeados');
+      }
+    } catch (err) {
+      console.error('[live-sync] match_results exception:', err);
+    }
+  }
+
+  // Al pasar un partido a finished, el bridge escribe results en segundos
+  // (trigger bridge_on_finished). Re-cargamos una vez con margen y repintamos
+  // la tarjeta para promocionar el badge de events-derivados → canónicos.
+  let _mrRefetchTimer = null;
+  function scheduleMatchResultsRefresh(matchKey) {
+    if (_mrRefetchTimer) clearTimeout(_mrRefetchTimer);
+    _mrRefetchTimer = setTimeout(async () => {
+      _mrRefetchTimer = null;
+      await loadMatchResults();
+      if (typeof window.updateDirectoCard === 'function') {
+        window.updateDirectoCard(matchKey);
+      }
+    }, 8000);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -135,6 +184,7 @@
     const norm = normalizeRow(row);
     if (!norm) return; // silencioso: match_key no del Mundial ni simulacro válido
     window._liveScoresByMatchKey[norm.match_key] = norm;
+    if (norm.status === 'finished') scheduleMatchResultsRefresh(norm.match_key);
     if (typeof window.updateDirectoCard === 'function') {
       window.updateDirectoCard(norm.match_key);
     }
@@ -258,7 +308,7 @@
       return;
     }
 
-    await loadInitialSnapshot();
+    await Promise.all([loadInitialSnapshot(), loadMatchResults()]);
     subscribe();
 
     // Si la vista Directo ya está visible, refresca completa
