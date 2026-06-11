@@ -176,6 +176,22 @@
     }
   }
 
+  // Hora de kickoff para UI (mini-row Y card expandida, misma etiqueta):
+  // hora Madrid desde el ts canónico de live_scores, con sufijo ' +1' si en
+  // Madrid cae en el día siguiente al día canónico de la sección (madrugadas).
+  // m.date (hora de sede, sin TZ) queda solo como fallback para no dejar la
+  // vista sin hora.
+  function _kickoffHoraLabel(ctx, m) {
+    const koMs = _kickoffMs(ctx.liveRow);
+    if (koMs == null) {
+      return new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+    let hora = _formatHoraMadrid(koMs);
+    const canonDate = m.date ? m.date.substring(0, 10) : '';
+    if (canonDate && _madridDateStr(koMs) > canonDate) hora += ' +1';
+    return hora;
+  }
+
   // ─────────────────────────────────────────────────────────────
   // F7.4-D-1: setVistaGruposExtended eliminado. El toggle entre pages
   // grupos/jornada/directo lo gobierna showPage desde el bottom-tab.
@@ -359,20 +375,7 @@
     } else if (ctx.isFinal) {
       rightHtml = '<span class="dv2-mini-status final">FINAL</span>';
     } else {
-      // Hora Madrid desde el ts canónico de live_scores. m.date (hora de sede,
-      // sin TZ) queda solo como fallback para no dejar la fila sin hora.
-      const koMs = _kickoffMs(ctx.liveRow);
-      let hora;
-      if (koMs != null) {
-        hora = _formatHoraMadrid(koMs);
-        // Kickoff de madrugada: en Madrid cae en el día siguiente al día
-        // canónico de la sección (la agrupación por jornada no cambia).
-        const canonDate = m.date ? m.date.substring(0, 10) : '';
-        if (canonDate && _madridDateStr(koMs) > canonDate) hora += ' +1';
-      } else {
-        hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      }
-      rightHtml = '<span class="dv2-mini-status">⏰ ' + hora + '</span>';
+      rightHtml = '<span class="dv2-mini-status">⏰ ' + _kickoffHoraLabel(ctx, m) + '</span>';
     }
 
     const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
@@ -496,7 +499,9 @@
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
     const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
-    const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    // Misma etiqueta de hora que la mini-row (Madrid + sufijo +1, fallback
+    // m.date). dayShort sigue siendo el día canónico de la sección (m.date).
+    const hora = _kickoffHoraLabel(ctx, m);
     const dayShort = new Date(m.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
     // ── Header: badge de estado (igual que v1) ──
