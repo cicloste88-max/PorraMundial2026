@@ -1,6 +1,11 @@
 // Supabase Edge Function: update-results
 // football-data.org → results (vía INDEPENDIENTE del puente P4 — no sustituir).
 //
+// v9 (11-jun-2026, review orquestador): el bucle de grupos filtra
+//   m.stage === "GROUP_STAGE". Sin el filtro, un rematch KO entre compañeros
+//   de grupo (posible de cuartos en adelante) casaba contra GROUP_MATCHES y
+//   machacaba el resultado de grupos con el marcador del KO (pre-existente en
+//   v7; el matching bidireccional doblaba la probabilidad del false-match).
 // v8 (11-jun-2026, prep activación pg_cron):
 //   - Gate X-Cron-Key: env IA_CRON_KEY (secret project-wide) con fallback a
 //     Vault vía RPC get_vault_secrets (ERR-27; mismo secreto que valida
@@ -129,6 +134,10 @@ Deno.serve(async (req: Request) => {
 
     for (const m of matches) {
       if (m.status !== "FINISHED") continue;
+      // Solo fase de grupos: un rematch KO entre compañeros de grupo (cuartos
+      // en adelante) casaría contra GROUP_MATCHES y machacaría el resultado
+      // real de grupos con el marcador del KO.
+      if (m.stage !== "GROUP_STAGE") continue;
       const homeTla: string = m.homeTeam?.tla ?? "";
       const awayTla: string = m.awayTeam?.tla ?? "";
       const homeApp = matchByTla(homeTla);
@@ -147,7 +156,7 @@ Deno.serve(async (req: Request) => {
         if (resolved.swapped) {
           log.push(`↔️ Orientación API invertida en ${resolved.key}: marcador girado a convención app`);
         }
-      } else if (m.stage === "GROUP_STAGE") {
+      } else {
         log.push(`⚠️ Sin fixture en GROUP_MATCHES: ${homeApp} vs ${awayApp}`);
       }
     }
