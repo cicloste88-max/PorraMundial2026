@@ -93,8 +93,14 @@
   }
 
   // Resultado real del fixture (finished/live) desde live_scores / PARTIDOS.
-  function _realFor(matchObj, matchKey) {
-    var live = _live()[matchKey];
+  // OJO (Item 6 post-J1): window._liveScoresByMatchKey está indexada por key
+  // de BD (wc2026_gX_id), NO por la key legacy de _mk (grupo_local_visitante).
+  // Resolver con window.matchKeyFor (live-sync.js, mismo mapper que
+  // getDirectoKey en ui-directo). La legacy sigue siendo la correcta para
+  // predByKey y boostSet — no tocar _mk en el resto.
+  function _realFor(matchObj) {
+    var liveKey = (typeof window.matchKeyFor === 'function') ? window.matchKeyFor(matchObj) : null;
+    var live = liveKey ? _live()[liveKey] : null;
     if (live && live.status === 'finished') {
       var h = (live.score_home != null) ? live.score_home : (matchObj.realHome != null ? matchObj.realHome : null);
       var a = (live.score_away != null) ? live.score_away : (matchObj.realAway != null ? matchObj.realAway : null);
@@ -120,7 +126,7 @@
     var matchKey = _mk(matchObj);
     var home = { n: matchObj.home, c: codeFor(matchObj.home) };
     var away = { n: matchObj.away, c: codeFor(matchObj.away) };
-    var rf = _realFor(matchObj, matchKey);
+    var rf = _realFor(matchObj);
     var phase = rf ? rf.phase : 'pre';
     if (!pred) {
       return { home: home, away: away, time: _timeLabel(matchObj), phase: 'pre', pred: null, real: null, scorer: '', boost: false, boosted: false, pts: 0, scoringTypes: [] };
