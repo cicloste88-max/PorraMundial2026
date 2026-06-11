@@ -854,7 +854,13 @@
      (.is-fallback apaga la animación del wrapper).
    · prefers-reduced-motion: reduce → balón estático.
    ============================================================ */
-.dv2-mini-score { font-size: 13px; gap: 8px; }
+/* QA San 11-jun (2º ajuste mini): a 13px los '—' placeholder rozaban las
+   iniciales (KOR/CZE) y el ⏰ quedaba pegado al equipo — el contenido
+   desbordaba las columnas 1fr del grid. Marcador más pequeño + hora más
+   compacta para devolver el aire del gap (10px) entre columnas. */
+.dv2-mini-score { font-size: 11px; gap: 6px; }
+.dv2-mini-right { font-size: 8px; }
+.dv2-mini-right .dv2-mini-status { letter-spacing: .05em; }
 .dv2-exp--kits .dv2-exp-score { font-size: 54px; gap: 16px; }
 
 .dv2-score-ball {
@@ -887,6 +893,6 @@
 }
 
 @media (max-width: 380px) {
-  .dv2-mini-score { font-size: 11px; }
+  .dv2-mini-score { font-size: 10px; }
   .dv2-score-ball img { width: 28px; height: 28px; }
 }
