@@ -103,13 +103,13 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..86: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86).
+ERR-01..87: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86), forma cache normalizada (87).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..85 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..87 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol

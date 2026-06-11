@@ -101,6 +101,12 @@
       status:         row.status,
       score_home:     scoreHome,
       score_away:     scoreAway,
+      // Kickoff canónico UTC (BIGINT seg/ms). Consumido por _kickoffHoraLabel
+      // (ui-directo.js) para la hora Madrid de mini-rows y card expandida.
+      // OJO: todo campo de la row de BD que el front consuma debe copiarse
+      // aquí a primer nivel — la cache normalizada NO expone la row cruda
+      // salvo via `raw` (ERR-87).
+      match_start_ts: row.match_start_ts,
       events:         Array.isArray(row.events) ? row.events : [],
       minute:         null, // pendiente: SofaScore pone minuto en status.time.played (no está en la tabla actual)
       _teams_swapped: !!meta.teams_swapped,

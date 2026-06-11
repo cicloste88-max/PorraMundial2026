@@ -140,8 +140,12 @@
   // Epoch ms del kickoff canónico desde live_scores.match_start_ts.
   // m.date (PARTIDOS, data.js legacy) lleva hora de sede SIN timezone y NO
   // sirve para formatear horas reales. Misma detección seg/ms que formatStartCEST.
+  // liveRow puede ser la row normalizada de live-sync (match_start_ts a primer
+  // nivel desde ERR-87, con la row de BD en .raw) o una row cruda (simulacros).
   function _kickoffMs(liveRow) {
-    const ts = liveRow ? liveRow.match_start_ts : null;
+    if (!liveRow) return null;
+    let ts = liveRow.match_start_ts;
+    if (ts == null && liveRow.raw) ts = liveRow.raw.match_start_ts;
     if (ts == null) return null;
     const num = Number(ts);
     if (!Number.isFinite(num) || num <= 0) return null;
