@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**11-jun**: `update-results` v8 DESPLEGADA (gate X-Cron-Key, matching bidireccional BRA-ESC, verify_jwt OFF); falta job pg_cron→orquestador. PR tender-fermat.
+**11-jun**: `update-results` v9 DESPLEGADA (gate X-Cron-Key, bidi BRA-ESC, filtro GROUP_STAGE anti-rematch KO, verify_jwt OFF); falta job pg_cron→orquestador. PR #157.
 
 **10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.2 (5 insights service_role + verja cierre F4 + insights 1-2 time-aware J1→J3, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR #148 gate San.
 
