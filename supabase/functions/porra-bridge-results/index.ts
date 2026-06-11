@@ -2,6 +2,12 @@
 // Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
 // supabase/functions/porra-bridge-results/index.ts
 // P4/D — Puente live_scores(finished) → results. BLOQUE CRITICO del torneo.
+//   v8 (Item 2 post-J1, hardening OBLIGATORIO tras el incidente update-results
+//     v9 del 11-jun): (a) reader defensivo asObj en match_results/ko_results —
+//     un writer que regrese a jsonb double-encoded (string) ya no crashea el
+//     bridge con 500 mudo (el spread de un string producía basura {0:'{',...});
+//     (b) try/catch GLOBAL con console.error del stack — el 500 de aquella
+//     noche no dejó traza alguna en logs.
 //   v7 (B11, Item 7 post-J1): tras un bridge con éxito, refresca
 //     user_points_cache invocando get-league-standings v1.4.0 (bearer
 //     service_role privilegiado) para TODAS las ligas — el tile del Predictor
@@ -37,6 +43,17 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
+}
+
+// Reader defensivo jsonb (patrón asObj de get-league-standings): si el campo
+// llega como string (double-encoded por un writer con JSON.stringify, vivido
+// con update-results v9 el 11-jun), parsear en vez de crashear.
+function asObj(v: unknown): Record<string, unknown> | null {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    try { return JSON.parse(v); } catch { return null; }
+  }
+  return typeof v === "object" ? (v as Record<string, unknown>) : null;
 }
 
 type EquiposPlayer = { key: string; name: string };
@@ -123,7 +140,7 @@ function koWinner(
   return null;
 }
 
-Deno.serve(async (req: Request) => {
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "missing_env" }, 500);
@@ -176,8 +193,10 @@ Deno.serve(async (req: Request) => {
   const { data: resultRow, error: rErr } = await supa
     .from("results").select("match_results, ko_results, log").eq("id", 1).maybeSingle();
   if (rErr) return json({ error: "results_query_failed", detail: rErr.message }, 500);
-  const matchResults: Record<string, unknown> = (resultRow?.match_results as Record<string, unknown>) ?? {};
-  const koResults: Record<string, unknown> = (resultRow?.ko_results as Record<string, unknown>) ?? {};
+  // v8: asObj — un match_results/ko_results double-encoded (string) ya no
+  // revienta el merge (spread de string = basura) ni pierde lo acumulado.
+  const matchResults: Record<string, unknown> = asObj(resultRow?.match_results) ?? {};
+  const koResults: Record<string, unknown> = asObj(resultRow?.ko_results) ?? {};
   const log: unknown[] = Array.isArray(resultRow?.log) ? (resultRow!.log as unknown[]) : [];
 
   const bridgedG: string[] = [];
@@ -270,4 +289,16 @@ Deno.serve(async (req: Request) => {
   }
 
   return json({ ok: true, bridged: totalBridged, groups: bridgedG, ko: bridgedK, skipped, cache_refresh: cacheRefreshed });
+}
+
+// v8: try/catch GLOBAL — un throw inesperado (shape imprevisto, lector roto)
+// devolvía 500 SIN traza en logs (vivido 11-jun con el jsonb double-encoded
+// de update-results v9). Ahora: stack completo a console.error + detail.
+Deno.serve(async (req: Request) => {
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error("[bridge] UNCAUGHT:", e instanceof Error ? (e.stack ?? e.message) : String(e));
+    return json({ error: "internal_uncaught", detail: e instanceof Error ? e.message : String(e) }, 500);
+  }
 });

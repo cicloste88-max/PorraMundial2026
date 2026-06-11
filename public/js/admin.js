@@ -22,6 +22,18 @@ let _admResultsData  = null;  // { match_results, overrides }
 let _admGroupFilter  = 'todos';
 let _admInited       = false;
 
+// Lector defensivo jsonb (Item 2 post-J1, patrón asObj del bridge): tras la
+// normalización de results del 11-jun los campos llegan como OBJETO y el
+// JSON.parse directo crasheaba ("[object Object]"); si un writer regresara a
+// double-encoded (string), también se tolera.
+function admAsObj(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') {
+    try { return JSON.parse(v); } catch (_) { return null; }
+  }
+  return typeof v === 'object' ? v : null;
+}
+
 // ── Helper: llamada autenticada a admin-actions ──────────────────
 async function admCall(action, extra = {}) {
   let token = window._porraToken || sessionStorage.getItem("porra_token") || "";
@@ -104,8 +116,8 @@ async function admInit() {
   }
   // Renderizar resultados con los datos ya recibidos (sin segunda llamada)
   if (resultsRes.ok) {
-    const matchResults = resultsRes.data?.match_results ? JSON.parse(resultsRes.data.match_results) : {};
-    const overrides    = resultsRes.data?.overrides     ? JSON.parse(resultsRes.data.overrides)     : {};
+    const matchResults = admAsObj(resultsRes.data?.match_results) || {};
+    const overrides    = admAsObj(resultsRes.data?.overrides)     || {};
     _admResultsData    = { matchResults, overrides };
     admRenderResultsTable();
   }
@@ -148,8 +160,8 @@ async function admLoadResults() {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#ef4444;padding:16px">Error: ${escapeHtml(r.error)}</td></tr>`;
     return;
   }
-  const matchResults = r.data?.match_results ? JSON.parse(r.data.match_results) : {};
-  const overrides    = r.data?.overrides     ? JSON.parse(r.data.overrides)     : {};
+  const matchResults = admAsObj(r.data?.match_results) || {};
+  const overrides    = admAsObj(r.data?.overrides)     || {};
   _admResultsData    = { matchResults, overrides };
   admRenderResultsTable();
   if(typeof window.refreshBracketResults==='function') window.refreshBracketResults();
@@ -438,7 +450,7 @@ async function admReopenDirect(uid, type, matchId) {
 async function admLoadAwards() {
   const r = await admCall('get_results');
   if (!r.ok || !r.data?.award_winners) return;
-  const aw = JSON.parse(r.data.award_winners);
+  const aw = admAsObj(r.data.award_winners) || {};
   ['golden_ball','golden_boot','golden_glove','young_player'].forEach(k => {
     const el = document.getElementById('adm-aw-' + k);
     if (el && aw[k]) el.value = aw[k];

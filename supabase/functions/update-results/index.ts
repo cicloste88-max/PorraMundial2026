@@ -1,6 +1,17 @@
 // Supabase Edge Function: update-results
 // football-data.org → results (vía INDEPENDIENTE del puente P4 — no sustituir).
 //
+// ⛔ RETIRADA (12-jun-2026, Item 2 post-J1, decisión San). El cron
+//    update-results-mundial-2026 fue UNSCHEDULED la noche del 11-jun tras dos
+//    bugs en producción: (a) JSON.stringify en los upserts → jsonb
+//    double-encoded tipo string que crasheaba el bridge con 500 mudo;
+//    (b) sobrescritura destructiva de match_results/ko_results/classification
+//    cada 20 min pisando lo escrito por porra-bridge-results. El pipeline
+//    canónico es espn-poll → live_scores → porra-bridge-results (validado
+//    end-to-end con MEX-RSA). Esta EF queda desplegada pero SIN cron, gate
+//    X-Cron-Key intacto, como vía de emergencia manual; NO recrear el cron
+//    sin reescribirla (quitar stringify + escritura no destructiva).
+//
 // v9 (11-jun-2026, review orquestador): el bucle de grupos filtra
 //   m.stage === "GROUP_STAGE". Sin el filtro, un rematch KO entre compañeros
 //   de grupo (posible de cuartos en adelante) casaba contra GROUP_MATCHES y
