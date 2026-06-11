@@ -74,24 +74,45 @@
   margin-bottom: 6px;
 }
 
+/* Item 9 post-J1 — el trofeo abre Clasificación (la pantalla más buscada
+   cada jornada) y pasaba desapercibido: 32px gris translúcido sin label.
+   Ahora pill dorada (paleta trofeo de los chips: --fifa-gold #C9A961) con
+   label corto y target táctil ≥44px. Destaca sin gritar: fondo tenue +
+   borde, nunca sólido. */
 .fc-pred-trophy-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 0;
+  gap: 7px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: rgba(201, 169, 97, 0.12);
+  border: 1px solid rgba(201, 169, 97, 0.45);
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--fifa-gold, #C9A961);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 .fc-pred-trophy-btn:hover,
 .fc-pred-trophy-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(201, 169, 97, 0.2);
   outline: none;
+}
+.fc-pred-trophy-btn:active {
+  transform: scale(0.97);
+}
+.fc-pred-trophy-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@media (max-width: 350px) {
+  /* Pantallas mínimas: icono solo — el target 44px se mantiene. */
+  .fc-pred-trophy-label { display: none; }
 }
 
 .fc-pred-title {

@@ -363,8 +363,9 @@
     mount.innerHTML =
       '<div class="fc-pred-eyebrow-row">' +
         '<span class="fc-eyebrow">PREDICTOR</span>' +
-        '<button class="fc-pred-trophy-btn" type="button" aria-label="Mis premios individuales">' +
+        '<button class="fc-pred-trophy-btn" type="button" aria-label="Clasificación de liga">' +
           trophySvg +
+          '<span class="fc-pred-trophy-label">Clasificación</span>' +
         '</button>' +
       '</div>' +
       '<h1 class="fc-pred-title">Tus predicciones</h1>' +
