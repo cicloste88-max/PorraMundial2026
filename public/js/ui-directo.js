@@ -137,10 +137,88 @@
     }
   }
 
+  // Epoch ms del kickoff canónico desde live_scores.match_start_ts.
+  // m.date (PARTIDOS, data.js legacy) lleva hora de sede SIN timezone y NO
+  // sirve para formatear horas reales. Misma detección seg/ms que formatStartCEST.
+  // liveRow puede ser la row normalizada de live-sync (match_start_ts a primer
+  // nivel desde ERR-87, con la row de BD en .raw) o una row cruda (simulacros).
+  function _kickoffMs(liveRow) {
+    if (!liveRow) return null;
+    let ts = liveRow.match_start_ts;
+    if (ts == null && liveRow.raw) ts = liveRow.raw.match_start_ts;
+    if (ts == null) return null;
+    const num = Number(ts);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    return num > 1e12 ? num : num * 1000;
+  }
+
+  // Solo-hora en Europe/Madrid, 24h (para fecha+hora usar formatStartCEST).
+  function _formatHoraMadrid(ms) {
+    const d = new Date(ms);
+    try {
+      return new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).format(d);
+    } catch {
+      return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  // Fecha YYYY-MM-DD en Europe/Madrid (en-CA emite formato ISO). Usada para
+  // el sufijo +1 de kickoffs de madrugada y para elegir la jornada en curso.
+  // NO se usa para agrupar: la jornada canónica sigue siendo m.date (sede).
+  function _madridDateStr(ms) {
+    const d = new Date(ms);
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(d);
+    } catch {
+      return d.toISOString().substring(0, 10);
+    }
+  }
+
+  // Hora de kickoff para UI (mini-row Y card expandida, misma etiqueta):
+  // hora Madrid desde el ts canónico de live_scores, con sufijo ' +1' si en
+  // Madrid cae en el día siguiente al día canónico de la sección (madrugadas).
+  // m.date (hora de sede, sin TZ) queda solo como fallback para no dejar la
+  // vista sin hora.
+  function _kickoffHoraLabel(ctx, m) {
+    const koMs = _kickoffMs(ctx.liveRow);
+    if (koMs == null) {
+      return new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+    let hora = _formatHoraMadrid(koMs);
+    const canonDate = m.date ? m.date.substring(0, 10) : '';
+    if (canonDate && _madridDateStr(koMs) > canonDate) hora += ' +1';
+    return hora;
+  }
+
   // ─────────────────────────────────────────────────────────────
   // F7.4-D-1: setVistaGruposExtended eliminado. El toggle entre pages
   // grupos/jornada/directo lo gobierna showPage desde el bottom-tab.
   // ─────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
+  // Separador del marcador = balón Trionda (ITEM C, PR #156).
+  // SOLO en la card expandida: en mini-rows el balón se solapaba con
+  // los '—' placeholder (QA San 11-jun) y la mini conserva el ':'.
+  // Mismo asset que la timeline del Predictor (TRIONDA_URL en
+  // ui-pred-shell.js; CSS legacy ballSpin en base.css/.vs-ball).
+  // Estructura: wrapper .dv2-score-ball (oscilación translateY) + img
+  // interna (rotación) — estilos y reduced-motion en directo-v3.css.
+  // El wrapper CONSERVA la clase -sep legacy: si la img falla, onerror
+  // degrada a ':' con el estilo del separador de siempre.
+  // ─────────────────────────────────────────────────────────────
+  var TRIONDA_URL = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Ball/Trionda-official-ball.png';
+  function _buildScoreBall(sepClass) {
+    return '<span class="' + sepClass + ' dv2-score-ball" aria-hidden="true">' +
+      '<img src="' + TRIONDA_URL + '" alt="" loading="lazy" ' +
+      'onerror="this.parentNode.classList.add(\'is-fallback\');this.parentNode.textContent=\':\'">' +
+    '</span>';
+  }
 
   // ─────────────────────────────────────────────────────────────
   // Traducción status → etiqueta y clase
@@ -320,8 +398,7 @@
     } else if (ctx.isFinal) {
       rightHtml = '<span class="dv2-mini-status final">FINAL</span>';
     } else {
-      const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      rightHtml = '<span class="dv2-mini-status">⏰ ' + hora + '</span>';
+      rightHtml = '<span class="dv2-mini-status">⏰ ' + _kickoffHoraLabel(ctx, m) + '</span>';
     }
 
     const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
@@ -445,7 +522,9 @@
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
     const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
-    const hora = new Date(m.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    // Misma etiqueta de hora que la mini-row (Madrid + sufijo +1, fallback
+    // m.date). dayShort sigue siendo el día canónico de la sección (m.date).
+    const hora = _kickoffHoraLabel(ctx, m);
     const dayShort = new Date(m.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
     // ── Header: badge de estado (igual que v1) ──
@@ -568,7 +647,7 @@
             headerHtml +
             '<div class="dv2-exp-score">' +
               '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
-              '<span class="dv2-exp-score-sep">:</span>' +
+              _buildScoreBall('dv2-exp-score-sep') +
               '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
             '</div>' +
             periodHtml +
@@ -689,6 +768,11 @@
   // ─────────────────────────────────────────────────────────────
   let _expandedKey = null;
 
+  // Fechas (YYYY-MM-DD) de secciones colapsables expandidas por el usuario.
+  // Mismo patrón que _expandedKey: variable de módulo, sobrevive los
+  // re-render disparados por live-sync.
+  const _expandedDays = new Set();
+
   // ─────────────────────────────────────────────────────────────
   // Render completo de la vista Directo
   // ─────────────────────────────────────────────────────────────
@@ -743,7 +827,12 @@
         otherLive.push({ m, idx });
       }
     });
-    const otherLiveKeys = new Set(otherLive.map(x => getDirectoKey(x.m)));
+    // Solo se extraen de su sección cuando el bloque "Otros partidos en vivo"
+    // existe (hay card expandida); sin expandida, el live se queda en su
+    // jornada — si no, desaparecería de la vista (badge "EN VIVO" sin fila).
+    const otherLiveKeys = expandedEntry
+      ? new Set(otherLive.map(x => getDirectoKey(x.m)))
+      : new Set();
 
     // Reusa la función de ranking de jornada si existe
     const sidebarHtml = (typeof window._buildJornadaRanking === 'function')
@@ -764,8 +853,35 @@
 
     // ── Listado por día con mini-rows ──
     // Excluir: el expandido y los inprogress que ya están en "Otros en vivo".
+    //
+    // Colapso de jornadas: solo se renderizan DOS secciones — la jornada EN
+    // CURSO (expandida, como siempre) y la siguiente (contraída, header
+    // toggleable). Si la en curso es la última, la contraída es la ANTERIOR.
+    // El resto de jornadas no se pinta. La agrupación canónica por m.date
+    // (17 jornadas) NO cambia: solo cambia qué secciones se materializan.
+    const _liveCountOf = (date) => {
+      let n = 0;
+      jornadasMap[date].forEach(({ m }) => {
+        const dk = getDirectoKey(m);
+        const row = dk ? window._liveScoresByMatchKey[dk] : null;
+        if (row && (row.status === 'inprogress' || row.status === 'halftime' ||
+                    row.status === 'overtime'   || row.status === 'penalties')) n++;
+      });
+      return n;
+    };
+
+    // Jornada en curso, por prioridad: (a) primera con partido live →
+    // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+    const todayMadrid = _madridDateStr(Date.now());
+    let currentIdx = dias.findIndex(d => _liveCountOf(d) > 0);
+    if (currentIdx === -1) currentIdx = dias.indexOf(todayMadrid);
+    if (currentIdx === -1) currentIdx = dias.findIndex(d => d > todayMadrid);
+    if (currentIdx === -1) currentIdx = dias.length - 1;
+    const secondaryIdx = (currentIdx + 1 < dias.length) ? currentIdx + 1 : currentIdx - 1;
+
     let sectionsHtml = '';
     dias.forEach((date, dIdx) => {
+      if (dIdx !== currentIdx && dIdx !== secondaryIdx) return;
       const jNum = dIdx + 1;
       const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-ES', {
         weekday: 'long', day: 'numeric', month: 'long'
@@ -779,22 +895,23 @@
       });
       if (matchesOfDay.length === 0) return;
 
-      let liveCount = 0;
-      jornadasMap[date].forEach(({ m }) => {
-        const dk = getDirectoKey(m);
-        const row = dk ? window._liveScoresByMatchKey[dk] : null;
-        if (row && (row.status === 'inprogress' || row.status === 'halftime' ||
-                    row.status === 'overtime'   || row.status === 'penalties')) liveCount++;
-      });
+      const liveCount = _liveCountOf(date);
       const liveBadge = liveCount > 0
         ? '<span class="directo-live-count">🔴 ' + liveCount + ' EN VIVO</span>'
         : '';
 
-      sectionsHtml += '<div class="directo-section" id="directo-' + date + '">';
-      sectionsHtml += '<div class="directo-header">';
+      const isCollapsible = dIdx === secondaryIdx;
+      const isCollapsed = isCollapsible && !_expandedDays.has(date);
+
+      sectionsHtml += '<div class="directo-section' + (isCollapsed ? ' is-collapsed' : '') +
+                      '" id="directo-' + date + '" data-date="' + date + '">';
+      sectionsHtml += isCollapsible
+        ? '<div class="directo-header is-collapsible" role="button" tabindex="0" aria-expanded="' + String(!isCollapsed) + '">'
+        : '<div class="directo-header">';
       sectionsHtml += '<span class="directo-label">J' + jNum + '</span>';
       sectionsHtml += '<span class="directo-date">' + dayLabel + '</span>';
       sectionsHtml += liveBadge;
+      if (isCollapsible) sectionsHtml += '<span class="directo-chevron" aria-hidden="true">▾</span>';
       sectionsHtml += '</div>';
       sectionsHtml += '<div class="dv2-mini-list">';
       matchesOfDay.forEach(({ m, idx }) => { sectionsHtml += _buildDMini(m, idx); });
@@ -846,6 +963,19 @@
     if (collapseBtn) {
       _expandedKey = null;
       renderVistaDirecto();
+      return;
+    }
+    // Toggle de la sección colapsable (header de la jornada secundaria).
+    // In-place (sin re-render): solo cambia visibilidad de la lista; el Set
+    // _expandedDays conserva la elección a través de los re-render de live-sync.
+    const collHeader = e.target.closest('.directo-header.is-collapsible');
+    if (collHeader) {
+      const section = collHeader.closest('.directo-section');
+      const date = section ? section.getAttribute('data-date') : '';
+      if (!section || !date) return;
+      const collapsed = section.classList.toggle('is-collapsed');
+      if (collapsed) _expandedDays.delete(date); else _expandedDays.add(date);
+      collHeader.setAttribute('aria-expanded', String(!collapsed));
       return;
     }
     const mini = e.target.closest('.dv2-mini');

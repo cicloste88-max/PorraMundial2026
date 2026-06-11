@@ -2420,3 +2420,74 @@ confirmadas en SELECT: `league_members`, `predictions`, `ko_predictions`, `boost
 (`get-league-standings` / `get-league-predictions` / `get-league-highlights`).
 
 **Fecha detección**: 09-jun-2026 (great-wozniak). **Resuelto**: 10-jun-2026 vía EF.
+
+## ERR-87 — Cache normalizada pierde campos de la row de BD (smoke sintético no valida la forma real)
+
+**Síntoma**: las mini-rows de Directo (y la card expandida) siguen mostrando la hora
+de sede (MEX-RSA 15:00, KOR-CZE 22:00, CAN-BIH 15:00) tras desplegar el fix de hora
+Madrid del PR #156, en TODOS los partidos. Sin errores en consola: el código nuevo
+ejecuta, pero siempre por la rama de fallback `m.date`.
+
+**Causa**: `_kickoffMs(ctx.liveRow)` leía `liveRow.match_start_ts`, pero `liveRow` no
+es la row de `live_scores`: es el objeto NORMALIZADO que construye `normalizeRow`
+(`live-sync.js`) para `window._liveScoresByMatchKey`, que solo copiaba `match_key`,
+`status`, scores, `events`, `minute` y `_teams_swapped` — `match_start_ts` quedaba
+únicamente dentro de `.raw`. `undefined` → fallback en silencio. El smoke de Node del
+PR pasó porque la row sintética del test llevaba `match_start_ts` a primer nivel: un
+smoke con datos sintéticos valida la LÓGICA pero no la FORMA del dato real.
+
+**Fix** (11-jun-2026, PR #156): (1) `normalizeRow` copia `match_start_ts: row.match_start_ts`
+a primer nivel (comentario in-situ: todo campo de BD que el front consuma debe copiarse
+a la row normalizada); (2) `_kickoffMs` robustecido — lee `liveRow.match_start_ts` y cae
+a `liveRow.raw.match_start_ts` antes del fallback `m.date` (cubre cache vieja en
+mixed-deploy y rows crudas de simulacros); (3) regresión permanente
+`tests/directo-hora-madrid.test.mjs`: pasa rows REALES de `live_scores` (forma exacta
+del SELECT, BIGINT segundos) por el `normalizeRow` real extraído de live-sync.js y el
+resultado por el `_kickoffHoraLabel` real de ui-directo.js — MEX-RSA `21:00`,
+KOR-CZE `04:00 +1`.
+
+**Patrón detectable**: consumir un campo "nuevo" de una row cacheada sin verificar la
+forma del objeto EN RUNTIME (`console.log(Object.keys(row))` en el punto de consumo, o
+test que reproduzca el pipeline productor→consumidor con la row real de BD). Toda cache
+intermedia que normaliza (`normalizeRow` y equivalentes) es una allowlist de campos:
+si el campo no está en el objeto retornado, el consumidor ve `undefined` aunque la BD
+y el SELECT lo traigan. Ante un fallback que se activa "siempre", sospechar de la forma
+del dato antes que de la lógica.
+
+**Fecha detección**: 11-jun-2026 (QA San preview PR #156). **Resuelto**: 11-jun-2026.
+
+## ERR-88 — `liveSyncInit` latcheaba `initialized` antes de tener `_porraDb` (cache live vacía para siempre, intermitente)
+
+**Síntoma**: las horas de Directo vuelven a ser las de sede (fallback `m.date`) en TODOS
+los partidos, en una carga concreta, con el código del fix de hora (ERR-87) íntegro en
+el deploy — y en la carga anterior funcionaba. Sin marcadores live ni updates realtime
+en esa sesión. Re-cargar a veces lo arregla, a veces no.
+
+**Causa**: `liveSyncInit` (live-sync.js) hacía `initialized = true` como primera
+instrucción. Su ÚNICO caller es `main-entry.js` al final de la chain de `loadScript`,
+UNA sola vez; el comentario del caller decía "si `_porraDb` aún no existe, saltará
+silenciosamente el snapshot... auth.js puede llamar manualmente" — pero nadie re-llama
+(grep: cero callers más), y aunque lo hicieran, `if (initialized) return` lo convertía
+en no-op. Si el bootstrap de auth iba lento en esa carga (frío, red), snapshot y
+subscribe se saltaban con un warn y `_liveScoresByMatchKey` quedaba `{}` para siempre:
+`_kickoffMs` → fallback, sin live scores, sin realtime. Race dependiente del timing →
+intermitente. El mismo problema de arranque que ya documentaba `checkIsAdmin`
+(ui-directo.js) para el flag admin. El path `loadMatchesJson` fallido también moría
+latcheado (`return` con `initialized=true`).
+
+**Fix** (11-jun-2026, PR #156): `liveSyncInit` solo latchea cuando `window._porraDb`
+existe; sin db programa reintento (`setTimeout` 500 ms, máx 20 ≈ 10 s, patrón
+`checkIsAdmin`); si `loadMatchesJson` falla, des-latchea (`initialized=false`) y
+reintenta. Regresión `tests/live-sync-init-retry.test.mjs`: ejecuta el live-sync.js
+REAL completo en sandbox VM (window/fetch/setTimeout stub) y reproduce la race (db
+aparece tras 2 reintentos → cache poblada con `match_start_ts` a primer nivel), el
+fetch transitorio del JSON y el abandono tras tope con warn.
+
+**Patrón detectable**: módulo con init one-shot (`if (initialized) return; initialized = true`)
+cuyo arranque depende de un global creado por OTRO script de la chain (`_porraDb`,
+sesión auth, JSON remoto). Todo "skip silencioso" en un init de una sola oportunidad es
+un estado terminal encubierto: o reintenta con backoff, o des-latchea antes de salir.
+Síntoma gemelo de capa distinta que ERR-87 (allí el dato llegaba pero la cache lo
+perdía; aquí la cache entera no llega a poblarse).
+
+**Fecha detección**: 11-jun-2026 (QA San preview PR #156, 2ª regresión de hora). **Resuelto**: 11-jun-2026.

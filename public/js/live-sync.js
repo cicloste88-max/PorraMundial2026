@@ -101,6 +101,12 @@
       status:         row.status,
       score_home:     scoreHome,
       score_away:     scoreAway,
+      // Kickoff canónico UTC (BIGINT seg/ms). Consumido por _kickoffHoraLabel
+      // (ui-directo.js) para la hora Madrid de mini-rows y card expandida.
+      // OJO: todo campo de la row de BD que el front consuma debe copiarse
+      // aquí a primer nivel — la cache normalizada NO expone la row cruda
+      // salvo via `raw` (ERR-87).
+      match_start_ts: row.match_start_ts,
       events:         Array.isArray(row.events) ? row.events : [],
       minute:         null, // pendiente: SofaScore pone minuto en status.time.played (no está en la tabla actual)
       _teams_swapped: !!meta.teams_swapped,
@@ -212,13 +218,45 @@
 
   // ─────────────────────────────────────────────────────────────
   // API pública
+  //
+  // Retry de init (ERR-88): el ÚNICO caller es main-entry.js al final de la
+  // chain de loadScript, UNA vez. Antes, liveSyncInit latcheaba
+  // `initialized=true` de entrada; si en ese instante auth.js aún no había
+  // creado `_porraDb` (bootstrap lento, carga fría), snapshot+subscribe se
+  // saltaban con un warn y NINGUNA llamada posterior podía reactivarlo
+  // (`if (initialized) return`). Resultado: cache vacía para siempre →
+  // ui-directo cae al fallback m.date (horas de sede) en todos los partidos,
+  // de forma intermitente según el timing de cada carga. Mismo patrón de
+  // race y mismo remedio que checkIsAdmin (ui-directo.js): reintentar con
+  // backoff y solo latchear cuando hay db.
   // ─────────────────────────────────────────────────────────────
+  let _initAttempts = 0;
+  const _MAX_INIT_ATTEMPTS = 20; // 20 × 500 ms = 10 s máx
+
+  function _scheduleInitRetry() {
+    _initAttempts++;
+    if (_initAttempts > _MAX_INIT_ATTEMPTS) {
+      console.warn('[live-sync] init abandonado tras ' + _MAX_INIT_ATTEMPTS +
+                    ' reintentos (sin _porraDb o sin JSON de partidos)');
+      return;
+    }
+    setTimeout(liveSyncInit, 500);
+  }
+
   async function liveSyncInit() {
     if (initialized) return;
+    if (!window._porraDb) {
+      _scheduleInitRetry();
+      return;
+    }
     initialized = true;
 
     const loaded = await loadMatchesJson();
-    if (!loaded) return;
+    if (!loaded) {
+      initialized = false; // fetch transitorio: permitir reintento
+      _scheduleInitRetry();
+      return;
+    }
 
     await loadInitialSnapshot();
     subscribe();

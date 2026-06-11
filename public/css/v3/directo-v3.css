@@ -838,3 +838,61 @@
   .dv2-mini-flag { width: 38px; height: 26px; }
   .dv2-mini-code { font-size: 10px; }
 }
+
+/* ============================================================
+   ITEM C (PR #156) — Marcador: dígitos menores + balón Trionda
+   ────────────────────────────────────────────────────────────
+   · Dígitos ~15% menores y más gap entre ambos números (mini y
+     expandida).
+   · Balón Trionda como separador SOLO en la card expandida
+     (.dv2-score-ball, emitido por _buildScoreBall, ui-directo.js):
+     wrapper = oscilación vertical, img interna = rotación 6s.
+     En mini-rows el balón se solapaba con los '—' placeholder
+     (QA San 11-jun) → la mini conserva el ':' legacy.
+   · El wrapper conserva la clase -sep legacy → el fallback
+     onerror (':') hereda el estilo del separador de siempre
+     (.is-fallback apaga la animación del wrapper).
+   · prefers-reduced-motion: reduce → balón estático.
+   ============================================================ */
+/* QA San 11-jun (2º ajuste mini): a 13px los '—' placeholder rozaban las
+   iniciales (KOR/CZE) y el ⏰ quedaba pegado al equipo — el contenido
+   desbordaba las columnas 1fr del grid. Marcador más pequeño + hora más
+   compacta para devolver el aire del gap (10px) entre columnas. */
+.dv2-mini-score { font-size: 11px; gap: 6px; }
+.dv2-mini-right { font-size: 8px; }
+.dv2-mini-right .dv2-mini-status { letter-spacing: .05em; }
+.dv2-exp--kits .dv2-exp-score { font-size: 54px; gap: 16px; }
+
+.dv2-score-ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  animation: dv2BallBob 1.8s ease-in-out infinite alternate;
+}
+.dv2-score-ball img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  animation: dv2BallSpin 6s linear infinite;
+}
+.dv2-score-ball.is-fallback { animation: none; }
+
+@keyframes dv2BallSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes dv2BallBob {
+  from { transform: translateY(-1.5px); }
+  to   { transform: translateY(1.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv2-score-ball,
+  .dv2-score-ball img { animation: none; }
+}
+
+@media (max-width: 380px) {
+  .dv2-mini-score { font-size: 10px; }
+  .dv2-score-ball img { width: 28px; height: 28px; }
+}
