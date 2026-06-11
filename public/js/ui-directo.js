@@ -202,6 +202,23 @@
   // ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
+  // Separador del marcador = balón Trionda (ITEM C, PR #156).
+  // Mismo asset que la timeline del Predictor (TRIONDA_URL en
+  // ui-pred-shell.js; CSS legacy ballSpin en base.css/.vs-ball).
+  // Estructura: wrapper .dv2-score-ball (oscilación translateY) + img
+  // interna (rotación) — estilos y reduced-motion en directo-v3.css.
+  // El wrapper CONSERVA la clase -sep legacy: si la img falla, onerror
+  // degrada a ':' con el estilo del separador de siempre.
+  // ─────────────────────────────────────────────────────────────
+  var TRIONDA_URL = 'https://cmyfyswystjgzdwbqyyb.supabase.co/storage/v1/object/public/miniatures/Ball/Trionda-official-ball.png';
+  function _buildScoreBall(sepClass) {
+    return '<span class="' + sepClass + ' dv2-score-ball" aria-hidden="true">' +
+      '<img src="' + TRIONDA_URL + '" alt="" loading="lazy" ' +
+      'onerror="this.parentNode.classList.add(\'is-fallback\');this.parentNode.textContent=\':\'">' +
+    '</span>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Traducción status → etiqueta y clase
   // ─────────────────────────────────────────────────────────────
   function statusLabel(status) {
@@ -393,7 +410,7 @@
         '</span>' +
         '<span class="dv2-mini-score">' +
           '<span class="dv2-mini-score-num">' + lTxt + '</span>' +
-          '<span class="dv2-mini-score-sep">:</span>' +
+          _buildScoreBall('dv2-mini-score-sep') +
           '<span class="dv2-mini-score-num">' + vTxt + '</span>' +
         '</span>' +
         '<span class="dv2-mini-team right">' +
@@ -628,7 +645,7 @@
             headerHtml +
             '<div class="dv2-exp-score">' +
               '<span class="dv2-exp-score-num">' + lTxt + '</span>' +
-              '<span class="dv2-exp-score-sep">:</span>' +
+              _buildScoreBall('dv2-exp-score-sep') +
               '<span class="dv2-exp-score-num">' + vTxt + '</span>' +
             '</div>' +
             periodHtml +

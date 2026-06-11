@@ -838,3 +838,55 @@
   .dv2-mini-flag { width: 38px; height: 26px; }
   .dv2-mini-code { font-size: 10px; }
 }
+
+/* ============================================================
+   ITEM C (PR #156) — Marcador: dígitos menores + balón Trionda
+   ────────────────────────────────────────────────────────────
+   · Dígitos ~15% menores y más gap entre ambos números.
+   · El ':' (.dv2-*-score-sep) se sustituye en el markup por
+     .dv2-score-ball (emitido por _buildScoreBall, ui-directo.js):
+     wrapper = oscilación vertical, img interna = rotación 6s.
+   · El wrapper conserva la clase -sep legacy → el fallback
+     onerror (':') hereda el estilo del separador de siempre
+     (.is-fallback apaga la animación del wrapper).
+   · prefers-reduced-motion: reduce → balón estático.
+   ============================================================ */
+.dv2-mini-score { font-size: 13px; gap: 8px; }
+.dv2-exp--kits .dv2-exp-score { font-size: 54px; gap: 16px; }
+
+.dv2-score-ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  animation: dv2BallBob 1.8s ease-in-out infinite alternate;
+}
+.dv2-score-ball img {
+  display: block;
+  width: 15px;
+  height: 15px;
+  animation: dv2BallSpin 6s linear infinite;
+}
+/* Proporcional al contexto: mayor en la card expandida (hero kits) */
+.dv2-exp-score .dv2-score-ball img { width: 32px; height: 32px; }
+.dv2-score-ball.is-fallback { animation: none; }
+
+@keyframes dv2BallSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes dv2BallBob {
+  from { transform: translateY(-1.5px); }
+  to   { transform: translateY(1.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv2-score-ball,
+  .dv2-score-ball img { animation: none; }
+}
+
+@media (max-width: 380px) {
+  .dv2-mini-score { font-size: 11px; }
+  .dv2-score-ball img { width: 13px; height: 13px; }
+  .dv2-exp-score .dv2-score-ball img { width: 28px; height: 28px; }
+}
