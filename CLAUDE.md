@@ -5,13 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
+**11-jun**: `update-results` v8 DESPLEGADA (gate X-Cron-Key, matching bidireccional BRA-ESC, verify_jwt OFF); falta job pg_cron→orquestador. PR tender-fermat.
+
 **10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.2 (5 insights service_role + verja cierre F4 + insights 1-2 time-aware J1→J3, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR #148 gate San.
 
-Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun**: XIs 48 + `squads.xi` rebuild + 18 formaciones; `ia_last5` N=10. Deploy CLI EF: SIEMPRE `--no-verify-jwt`. **08-jun**: ko-card-polish #140 + boost #137/#138/#139 (ERR-83/84). **02-jun — P4 puente CERRADO** (ERR-82). `update-results` indep. 11-jun.
+Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun**: XIs 48 + `squads.xi` rebuild + 18 formaciones; `ia_last5` N=10. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Activar pg_cron `update-results` (11-jun)** — football-data.org→`results`, vía INDEPENDIENTE.
+1. **Activar pg_cron `update-results` (11-jun)** — EF v8 lista; smoke positivo + job 20min vía orquestador.
 2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
 3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
 
