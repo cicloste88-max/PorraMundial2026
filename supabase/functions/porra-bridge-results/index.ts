@@ -2,6 +2,12 @@
 // Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
 // supabase/functions/porra-bridge-results/index.ts
 // P4/D — Puente live_scores(finished) → results. BLOQUE CRITICO del torneo.
+//   v7 (B11, Item 7 post-J1): tras un bridge con éxito, refresca
+//     user_points_cache invocando get-league-standings v1.4.0 (bearer
+//     service_role privilegiado) para TODAS las ligas — el tile del Predictor
+//     y las vistas v_user_global_rank/v_league_rank leen de esa cache, que
+//     así se actualiza al finalizar cada partido. Fallos del refresh NO
+//     tumban el bridge (console.error + cache_refresh en la respuesta).
 //   v4: GUARDAS (no escribe con dato incompleto) + soporte FASE FINAL (KO).
 //     - Grupos: results.match_results["{grupo}_{home_es}_{away_es}"] = {l,v,scorers,status}
 //     - KO:     results.ko_results["{ko_match_id}"] = {l,v,scorers,winner,status}
@@ -235,5 +241,33 @@ Deno.serve(async (req: Request) => {
     await supa.from("results").update({ log, updated_at: nowIso }).eq("id", 1);
   }
 
-  return json({ ok: true, bridged: totalBridged, groups: bridgedG, ko: bridgedK, skipped });
+  // v7 (B11): refrescar user_points_cache vía get-league-standings (bearer
+  // service_role privilegiado) para todas las ligas. Solo si hubo bridge real.
+  let cacheRefreshed = 0;
+  if (totalBridged > 0) {
+    try {
+      const { data: allLeagues } = await supa.from("leagues").select("id");
+      const refreshes = await Promise.allSettled((allLeagues ?? []).map((lg: { id: string }) =>
+        fetch(`${SUPABASE_URL}/functions/v1/get-league-standings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SERVICE_KEY}`,
+          },
+          body: JSON.stringify({ league_id: lg.id }),
+        }).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        })
+      ));
+      cacheRefreshed = refreshes.filter((r) => r.status === "fulfilled").length;
+      const failedRefreshes = refreshes.length - cacheRefreshed;
+      if (failedRefreshes > 0) {
+        console.error(`[bridge] user_points_cache refresh: ${failedRefreshes} liga(s) fallida(s)`);
+      }
+    } catch (e) {
+      console.error("[bridge] user_points_cache refresh error:", e);
+    }
+  }
+
+  return json({ ok: true, bridged: totalBridged, groups: bridgedG, ko: bridgedK, skipped, cache_refresh: cacheRefreshed });
 });

@@ -377,26 +377,77 @@
   }
 
   // ─────────────────────────────────────────────────────────────
-  // [B3] Helpers puros — % aciertos + racha (§1.3 del bundle)
+  // [B3 → B11 Item 7] Helpers puros — % aciertos + racha
   // ─────────────────────────────────────────────────────────────
-  function _computeAciertos(predictionsResolved, iaByMatch) {
+  // % aciertos ESPEJO del motor (scoring.js / _shared/scoring.mjs): +1 signo,
+  // +3 exacto (apila), +2 goleador, +1 vsIA, cap 7 por partido. El máximo por
+  // partido es 6, o 7 si el bono IA era ALCANZABLE (IA con sign válido y
+  // distinto del usuario). El boost ×2 queda FUERA del % (multiplicador del
+  // pick del día, no de acierto). La versión B3 anterior no sumaba el +1 de
+  // signo simple y usaba max 5/6 — no era espejo del motor.
+  function _computeAciertos(predictionsResolved) {
     if (!predictionsResolved || !predictionsResolved.length) {
       return { pts: 0, max: 0, pct: null };
     }
     var pts = 0, max = 0;
     for (var i = 0; i < predictionsResolved.length; i++) {
       var p = predictionsResolved[i];
-      var iaSign = (iaByMatch && iaByMatch[p.matchKey]) ? iaByMatch[p.matchKey] : null;
-      var userSign = (p.pred.home > p.pred.away) ? '1'
-                   : (p.pred.home < p.pred.away) ? '2' : 'X';
-      var vsIA = !!(iaSign && userSign !== iaSign);
-      max += vsIA ? 6 : 5;
-      if (p.exactCorrect) pts += 3;
-      if (p.scorerCorrect) pts += 2;
-      if (vsIA && p.signCorrect) pts += 1;
+      var earned = 0;
+      if (p.signCorrect) earned += 1;
+      if (p.exactCorrect) earned += 3;
+      if (p.scorerCorrect) earned += 2;
+      if (p.iaBonus) earned += 1;
+      pts += Math.min(earned, 7);
+      max += p.iaDistinct ? 7 : 6;
     }
     var pct = max > 0 ? Math.round((pts / max) * 100) : null;
     return { pts: pts, max: max, pct: pct };
+  }
+
+  // [B11 Item 7] Partidos jugados RESUELTOS del viewer: sus predictions ×
+  // resultados canónicos del bridge (results.match_results vía
+  // window._matchResultsByKey, live-sync). Orden cronológico ASC — requisito
+  // de la racha. Solo partidos CON pronóstico guardado entran en el % (sin
+  // pronóstico no hay acierto que medir).
+  function _resolvePlayedPredictions() {
+    var mr = window._matchResultsByKey || null;
+    if (!mr || typeof PARTIDOS === 'undefined' || typeof predictions === 'undefined') return [];
+    var ms = PARTIDOS.slice().sort(function (a, b) {
+      return String(a.date || '').localeCompare(String(b.date || ''));
+    });
+    var out = [];
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i];
+      var key = (typeof getMatchKey === 'function') ? getMatchKey(m) : null;
+      if (!key) continue;
+      var real = mr[key];
+      if (!real || real.l == null || real.v == null) continue;
+      var pred = predictions[key];
+      if (!pred || pred.l == null || pred.v == null) continue;
+      var signCorrect = Math.sign(pred.l - pred.v) === Math.sign(real.l - real.v);
+      var exactCorrect = pred.l === real.l && pred.v === real.v;
+      var scorers = Array.isArray(real.scorers) ? real.scorers : [];
+      // Regla 0-0 canónica (San 10-jun): sin goleador apostado, el +2 paga
+      // solo con 0-0 clavado.
+      var scorerCorrect = pred.gol
+        ? scorers.indexOf(pred.gol) !== -1
+        : (pred.l === 0 && pred.v === 0 && real.l === 0 && real.v === 0);
+      var mySign = pred.l > pred.v ? '1' : (pred.l < pred.v ? '2' : 'X');
+      var ia = (typeof iaPredictions !== 'undefined' && iaPredictions) ? iaPredictions[key] : null;
+      var iaDistinct = !!(ia && (ia.sign === '1' || ia.sign === 'X' || ia.sign === '2') && ia.sign !== mySign);
+      var iaBonus = (typeof iaBonusWillApply === 'function')
+        ? !!iaBonusWillApply(key, pred, real.l, real.v)
+        : (iaDistinct && signCorrect);
+      out.push({
+        matchKey: key,
+        signCorrect: signCorrect,
+        exactCorrect: exactCorrect,
+        scorerCorrect: scorerCorrect,
+        iaDistinct: iaDistinct,
+        iaBonus: iaBonus
+      });
+    }
+    return out;
   }
 
   function _computeStreak(predictionsResolved) {
@@ -444,7 +495,7 @@
     var subPre = isPre ? '<span class="fc-pred-stats__sub">Disponible 11 jun</span>' : '';
 
     mount.innerHTML =
-      '<div class="fc-pred-stats__col">' +
+      '<div class="fc-pred-stats__col" title="Puntos conseguidos sobre el máximo posible en tus partidos jugados con pronóstico (sin boost ×2)">' +
         '<span class="fc-eyebrow">% Aciertos</span>' +
         '<strong class="fc-pred-stats__val' + pctColorClass + '">' + pctVal + '</strong>' +
         subPre +
@@ -921,11 +972,24 @@
     // (memberCount inferido de _activeLeague + globalRank=0).
     var ranking = window._predictorRanking || null;
     var leagueMembersFinal = ranking ? Number(ranking.leagueMembers || 0) : memberCount;
-    var leagueRankFinal = ranking ? Number(ranking.leagueRank || 0)
-                                  : (memberCount > 0 ? 1 : 0);
+    // B11 (Item 7): rank y puntos REALES de user_points_cache (vistas
+    // v_league_rank / v_user_global_rank v2). Sin ranking cargado aún →
+    // 0 y el tile pinta su fallback; NUNCA el "1º" pre-Mundial hardcodeado.
+    var leagueRankFinal = ranking ? Number(ranking.leagueRank || 0) : 0;
     var globalRankFinal = ranking ? Number(ranking.globalRank || 0) : 0;
     var globalTotalFinal = ranking ? Number(ranking.globalTotal || 0) : 0;
-    var totalPts = (typeof totalPoints === 'number') ? totalPoints : 0;
+    // Puntos del torneo: motor servidor (bridge + get-league-standings) vía
+    // cache — el global legacy `totalPoints` (scoring.js) ya no alimenta el tile.
+    var totalPts = ranking ? Number(ranking.totalPts || 0) : 0;
+
+    // [B11] Stats reales desde partidos jugados (resultados canónicos bridge).
+    var resolved = _resolvePlayedPredictions();
+    var aciertos = _computeAciertos(resolved);
+    var rachaVal = _computeStreak(resolved);
+    var bonusIaCount = 0;
+    for (var ri = 0; ri < resolved.length; ri++) {
+      if (resolved[ri].iaBonus) bonusIaCount++;
+    }
 
     var st = {
       mode: mode,
@@ -955,10 +1019,10 @@
       // B11-trionda: progress del Mundial (poblado por mountPredShell tras
       // getMundialProgress() async). Si null → render usa fallback.
       mundialProgress: window._mundialProgress || null,
-      // Stats
-      aciertosPct: null,
-      racha: null,
-      bonusIa: 0,
+      // Stats [B11]: null/— solo cuando aún no hay partidos jugados resueltos.
+      aciertosPct: aciertos.pct,
+      racha: resolved.length ? rachaVal : null,
+      bonusIa: bonusIaCount,
       // Filters
       todayCount: 0,
       activeFilter: _state.activeFilter,

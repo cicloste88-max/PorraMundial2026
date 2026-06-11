@@ -142,6 +142,12 @@
       if (mr && typeof mr === 'object') {
         window._matchResultsByKey = mr;
         console.log('[live-sync] match_results:', Object.keys(mr).length, 'partidos bridgeados');
+        // Recalcular el total legacy canónico (elim-shell / #total-points).
+        try {
+          if (typeof window.updateGlobalPoints === 'function') window.updateGlobalPoints();
+        } catch (e) {
+          console.warn('[live-sync] updateGlobalPoints tras match_results:', e);
+        }
       }
     } catch (err) {
       console.error('[live-sync] match_results exception:', err);

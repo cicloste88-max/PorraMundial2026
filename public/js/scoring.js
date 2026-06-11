@@ -1309,15 +1309,29 @@ function updateCardUI(idx, match) {
   }
 }
 
+// Item 7 colateral (audit 0-0 pre-pitido): antes puntuaba contra
+// PARTIDOS.realHome/realAway — estáticos 0-0 en data.js — SIN gate de jugado:
+// un pronóstico 0-0 guardado regalaba puntos en el total legacy ANTES del
+// partido (lo mostraban elim-shell y #total-points). Ahora suma SOLO partidos
+// con resultado canónico del bridge (results.match_results vía
+// window._matchResultsByKey, live-sync) y con sus scorers reales. El tile del
+// Predictor ya NO lee este total (usa user_points_cache); consumidores
+// restantes: ui-elim-shell._totalPoints y el #total-points legacy.
 function updateGlobalPoints(){
   let pts=0;
+  const mr = window._matchResultsByKey || {};
   PARTIDOS.forEach(m=>{
     const key=getMatchKey(m);
     const pred=predictions[key];
-    if(pred && pred.saved) pts += calcMatchPoints(pred, m.realHome, m.realAway, key);
+    const real=mr[key];
+    if(pred && pred.saved && real && real.l != null && real.v != null) {
+      pts += calcMatchPoints(pred, real.l, real.v, key,
+                             Array.isArray(real.scorers) ? real.scorers : []);
+    }
   });
   totalPoints=pts;
-  document.getElementById('total-points').textContent=totalPoints;
+  const totalEl=document.getElementById('total-points');
+  if(totalEl) totalEl.textContent=totalPoints;
 }
 
 

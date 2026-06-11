@@ -389,28 +389,33 @@ window.PHRASES_GRUPO = {
   ]
 };
 
-// === [B10-traceability] Predictor ranking helpers ===
+// === [B10-traceability → B11 Item 7 post-J1] Predictor ranking helpers ===
 //
-// Vistas backend (migración 20260430200000_predictor_ranking_views.sql):
+// Vistas backend (migración 20260612001000_b11_user_points_cache.sql):
 //   v_league_member_count(league_id, human_count, total_count)
-//   v_user_global_rank(user_id, total_pts, rank_global, total_users)
+//   v_league_rank(user_id, league_id, total_pts, rank_league, ranked_members)
+//   v_user_global_rank v2(user_id, league_id, total_pts, rank_global, total_users)
 //
-// loadPredictorRankingData() lo invoca mountPredShell() en ui-pred-shell.js
-// y popla window._predictorRanking. Pre-Mundial: total_pts=0 para todos →
-// todos empatados, leagueRank=1 si liga tiene miembros. Mid-Mundial
-// requerirá sprint B11 (user_points_cache real) para diferenciar.
+// Fuente canónica: user_points_cache, rellenada por get-league-standings
+// v1.4.0 (write-through) e invocada por porra-bridge-results tras cada
+// partido bridgeado. FUERA los hardcodes pre-Mundial (leagueRank=1, stub
+// global por created_at).
+//
+// Decisiones San (12-jun): rank global = mis pts EN ESTA LIGA vs el mejor
+// total de cada usuario de la app (2 ligas con mismos pts → misma posición);
+// IA Zayu COMPITE → denominador de liga = total_count (con bot), no
+// human_count.
 //
 // Defensiva: si window._porraDb no está disponible o falta league/user,
 // devuelve null y mantiene compat con render fallback de #fc-pred-tile
-// ("Líder · Liga" / "— · Global").
+// ("Líder · Liga" / "— · Global"). Cache TTL 60s: el tile se refresca al
+// remontar tras un partido bridgeado sin esperar reload completo.
 
-var _leagueMemberCountCache = {};
-var _globalRankCache = {};
+var _predictorRankingCache = {};
+var _PREDICTOR_RANKING_TTL_MS = 60000;
 
 async function loadLeagueMemberCount(leagueId) {
-  if (!leagueId) return null;
-  if (_leagueMemberCountCache[leagueId]) return _leagueMemberCountCache[leagueId];
-  if (!window._porraDb) return null;
+  if (!leagueId || !window._porraDb) return null;
   var res = await window._porraDb
     .from('v_league_member_count')
     .select('human_count,total_count')
@@ -420,24 +425,36 @@ async function loadLeagueMemberCount(leagueId) {
     console.warn('[predictor] loadLeagueMemberCount error', res.error);
     return null;
   }
-  _leagueMemberCountCache[leagueId] = res.data;
   return res.data;
 }
 
-async function loadGlobalRank(userId) {
-  if (!userId) return null;
-  if (_globalRankCache[userId]) return _globalRankCache[userId];
-  if (!window._porraDb) return null;
+async function loadLeagueRankRow(userId, leagueId) {
+  if (!userId || !leagueId || !window._porraDb) return null;
+  var res = await window._porraDb
+    .from('v_league_rank')
+    .select('total_pts,rank_league,ranked_members')
+    .eq('user_id', userId)
+    .eq('league_id', leagueId)
+    .maybeSingle();
+  if (res.error) {
+    console.warn('[predictor] loadLeagueRankRow error', res.error);
+    return null;
+  }
+  return res.data;
+}
+
+async function loadGlobalRank(userId, leagueId) {
+  if (!userId || !leagueId || !window._porraDb) return null;
   var res = await window._porraDb
     .from('v_user_global_rank')
     .select('rank_global,total_users')
     .eq('user_id', userId)
+    .eq('league_id', leagueId)
     .maybeSingle();
   if (res.error) {
     console.warn('[predictor] loadGlobalRank error', res.error);
     return null;
   }
-  _globalRankCache[userId] = res.data;
   return res.data;
 }
 
@@ -446,25 +463,36 @@ async function loadPredictorRankingData() {
   var userId = window.currentUser && window.currentUser.id;
   if (!leagueId || !userId) return null;
 
+  var cacheKey = userId + '|' + leagueId;
+  var cached = _predictorRankingCache[cacheKey];
+  if (cached && (Date.now() - cached.ts) < _PREDICTOR_RANKING_TTL_MS) {
+    window._predictorRanking = cached.data;
+    return cached.data;
+  }
+
   var results = await Promise.all([
     loadLeagueMemberCount(leagueId),
-    loadGlobalRank(userId)
+    loadLeagueRankRow(userId, leagueId),
+    loadGlobalRank(userId, leagueId)
   ]);
   var leagueData = results[0];
-  var globalData = results[1];
+  var rankRow = results[1];
+  var globalData = results[2];
 
+  // Zayu cuenta: denominador = total_count (miembros con bot). Fallback al
+  // nº de filas rankeadas en cache si la vista de members no responde.
   var memberCount = leagueData
-    ? Number(leagueData.human_count || leagueData.total_count || 0)
-    : 0;
-  // Pre-Mundial: todos empatados a 0 pts → user es 1º si liga tiene miembros.
-  var leagueRank = memberCount > 0 ? 1 : 0;
+    ? Number(leagueData.total_count || leagueData.human_count || 0)
+    : (rankRow ? Number(rankRow.ranked_members || 0) : 0);
 
   window._predictorRanking = {
     leagueMembers: memberCount,
-    leagueRank: leagueRank,
+    leagueRank: rankRow ? Number(rankRow.rank_league || 0) : 0,
+    totalPts: rankRow ? Number(rankRow.total_pts || 0) : 0,
     globalRank: globalData ? Number(globalData.rank_global || 0) : 0,
     globalTotal: globalData ? Number(globalData.total_users || 0) : 0
   };
+  _predictorRankingCache[cacheKey] = { ts: Date.now(), data: window._predictorRanking };
   return window._predictorRanking;
 }
 
