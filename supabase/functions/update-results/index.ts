@@ -1,5 +1,27 @@
 // Supabase Edge Function: update-results
+// football-data.org → results (vía INDEPENDIENTE del puente P4 — no sustituir).
+//
+// v9 (11-jun-2026, review orquestador): el bucle de grupos filtra
+//   m.stage === "GROUP_STAGE". Sin el filtro, un rematch KO entre compañeros
+//   de grupo (posible de cuartos en adelante) casaba contra GROUP_MATCHES y
+//   machacaba el resultado de grupos con el marcador del KO (pre-existente en
+//   v7; el matching bidireccional doblaba la probabilidad del false-match).
+// v8 (11-jun-2026, prep activación pg_cron):
+//   - Gate X-Cron-Key: env IA_CRON_KEY (secret project-wide) con fallback a
+//     Vault vía RPC get_vault_secrets (ERR-27; mismo secreto que valida
+//     porra-ia-compute, así el caller pg_net del cron funciona aunque el env
+//     secret falte). Sin key válida → 401. Necesario porque verify_jwt pasa a
+//     false (ERR-16, JWT ES256) y la EF no puede quedar pública: el free tier
+//     de football-data son 10 req/min.
+//   - Matching bidireccional de grupos en ./matcher.mjs: el fixture oficial
+//     puede venir invertido vs la convención app (caso real wc2026_gC_15186861
+//     Brasil-Escocia, teams_swapped=true). Antes ese partido se saltaba EN
+//     SILENCIO; ahora se guarda el marcador girado bajo la key canónica app.
+//   - Path KO: sigue registrando la orientación de la API con winner explícito
+//     por nombre — la canonicalización KO vive aguas abajo (wc_matches_ko /
+//     JO-1a). Revisar cuando haya fixture KO real (~28-jun).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveGroupResult } from "./matcher.mjs";
 
 const FOOTBALL_API_KEY = Deno.env.get("FOOTBALL_DATA_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -29,92 +51,64 @@ const TLA_TO_APP: Record<string, string> = Object.fromEntries(
   Object.entries(TEAM_TLA).map(([app, tla]) => [tla, app])
 );
 
-const GROUP_MATCHES = [
-  { group: "A", home: "México", away: "Sudáfrica" },
-  { group: "A", home: "República de Corea", away: "República Checa" },
-  { group: "A", home: "República Checa", away: "Sudáfrica" },
-  { group: "A", home: "México", away: "República de Corea" },
-  { group: "A", home: "República Checa", away: "México" },
-  { group: "A", home: "Sudáfrica", away: "República de Corea" },
-  { group: "B", home: "Canadá", away: "Bosnia y Herzegovina" },
-  { group: "B", home: "Catar", away: "Suiza" },
-  { group: "B", home: "Suiza", away: "Bosnia y Herzegovina" },
-  { group: "B", home: "Canadá", away: "Catar" },
-  { group: "B", home: "Suiza", away: "Canadá" },
-  { group: "B", home: "Bosnia y Herzegovina", away: "Catar" },
-  { group: "C", home: "Brasil", away: "Marruecos" },
-  { group: "C", home: "Haití", away: "Escocia" },
-  { group: "C", home: "Escocia", away: "Marruecos" },
-  { group: "C", home: "Brasil", away: "Haití" },
-  { group: "C", home: "Brasil", away: "Escocia" },
-  { group: "C", home: "Marruecos", away: "Haití" },
-  { group: "D", home: "Estados Unidos", away: "Paraguay" },
-  { group: "D", home: "Australia", away: "Turquía" },
-  { group: "D", home: "Estados Unidos", away: "Australia" },
-  { group: "D", home: "Turquía", away: "Paraguay" },
-  { group: "D", home: "Turquía", away: "Estados Unidos" },
-  { group: "D", home: "Paraguay", away: "Australia" },
-  { group: "E", home: "Alemania", away: "Curazao" },
-  { group: "E", home: "Costa de Marfil", away: "Ecuador" },
-  { group: "E", home: "Alemania", away: "Costa de Marfil" },
-  { group: "E", home: "Ecuador", away: "Curazao" },
-  { group: "E", home: "Curazao", away: "Costa de Marfil" },
-  { group: "E", home: "Ecuador", away: "Alemania" },
-  { group: "F", home: "Países Bajos", away: "Japón" },
-  { group: "F", home: "Suecia", away: "Túnez" },
-  { group: "F", home: "Países Bajos", away: "Suecia" },
-  { group: "F", home: "Túnez", away: "Japón" },
-  { group: "F", home: "Japón", away: "Suecia" },
-  { group: "F", home: "Túnez", away: "Países Bajos" },
-  { group: "G", home: "Bélgica", away: "Egipto" },
-  { group: "G", home: "RI de Irán", away: "Nueva Zelanda" },
-  { group: "G", home: "Bélgica", away: "RI de Irán" },
-  { group: "G", home: "Nueva Zelanda", away: "Egipto" },
-  { group: "G", home: "Egipto", away: "RI de Irán" },
-  { group: "G", home: "Nueva Zelanda", away: "Bélgica" },
-  { group: "H", home: "España", away: "Cabo Verde" },
-  { group: "H", home: "Arabia Saudí", away: "Uruguay" },
-  { group: "H", home: "España", away: "Arabia Saudí" },
-  { group: "H", home: "Uruguay", away: "Cabo Verde" },
-  { group: "H", home: "Cabo Verde", away: "Arabia Saudí" },
-  { group: "H", home: "Uruguay", away: "España" },
-  { group: "I", home: "Francia", away: "Senegal" },
-  { group: "I", home: "Colombia", away: "Jordania" },
-  { group: "I", home: "Francia", away: "Colombia" },
-  { group: "I", home: "Senegal", away: "Jordania" },
-  { group: "I", home: "Colombia", away: "Senegal" },
-  { group: "I", home: "Jordania", away: "Francia" },
-  { group: "J", home: "Inglaterra", away: "Panamá" },
-  { group: "J", home: "Argentina", away: "Irak" },
-  { group: "J", home: "Argentina", away: "Panamá" },
-  { group: "J", home: "Inglaterra", away: "Irak" },
-  { group: "J", home: "Panamá", away: "Irak" },
-  { group: "J", home: "Argentina", away: "Inglaterra" },
-  { group: "K", home: "Portugal", away: "Uzbekistán" },
-  { group: "K", home: "Austria", away: "RD Congo" },
-  { group: "K", home: "Portugal", away: "Austria" },
-  { group: "K", home: "Uzbekistán", away: "RD Congo" },
-  { group: "K", home: "Austria", away: "Uzbekistán" },
-  { group: "K", home: "RD Congo", away: "Portugal" },
-  { group: "L", home: "Croacia", away: "Argelia" },
-  { group: "L", home: "Noruega", away: "Ghana" },
-  { group: "L", home: "Noruega", away: "Argelia" },
-  { group: "L", home: "Croacia", away: "Ghana" },
-  { group: "L", home: "Ghana", away: "Argelia" },
-  { group: "L", home: "Noruega", away: "Croacia" },
-];
-
-function getMatchKey(group: string, home: string, away: string): string {
-  return `${group}_${home}_${away}`;
-}
-
 function matchByTla(tla: string): string | null {
   return TLA_TO_APP[tla] ?? null;
+}
+
+// ─── Gate X-Cron-Key (verify_jwt=false → auth manual) ──────────────────────
+
+function constantTimeEq(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+// Fallback Vault vía RPC get_vault_secrets (patrón porra-ia-compute/lib/auth.ts;
+// el schema vault no está expuesto en api.schemas — ERR-27). trim() obligatorio
+// (ERR-04, whitespace en secrets).
+async function readVaultCronKey(): Promise<string> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_vault_secrets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+      },
+      body: JSON.stringify({ secret_names: ["IA_CRON_KEY"] }),
+    });
+    if (!res.ok) return "";
+    const data = await res.json();
+    // deno-lint-ignore no-explicit-any
+    const row = Array.isArray(data) ? data.find((r: any) => r.name === "IA_CRON_KEY") : null;
+    return row ? String(row.secret).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+// Fail closed: sin header, o sin secreto configurado en ningún lado, nadie pasa.
+async function isCronAuthorized(req: Request): Promise<boolean> {
+  const provided = (req.headers.get("x-cron-key") ?? "").trim();
+  if (!provided) return false;
+  const expected = (Deno.env.get("IA_CRON_KEY") ?? "").trim() || (await readVaultCronKey());
+  if (!expected) return false;
+  return constantTimeEq(provided, expected);
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": "*" } });
+  }
+
+  if (!(await isCronAuthorized(req))) {
+    return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -140,6 +134,10 @@ Deno.serve(async (req: Request) => {
 
     for (const m of matches) {
       if (m.status !== "FINISHED") continue;
+      // Solo fase de grupos: un rematch KO entre compañeros de grupo (cuartos
+      // en adelante) casaría contra GROUP_MATCHES y machacaría el resultado
+      // real de grupos con el marcador del KO.
+      if (m.stage !== "GROUP_STAGE") continue;
       const homeTla: string = m.homeTeam?.tla ?? "";
       const awayTla: string = m.awayTeam?.tla ?? "";
       const homeApp = matchByTla(homeTla);
@@ -151,10 +149,15 @@ Deno.serve(async (req: Request) => {
       const scoreHome = m.score?.fullTime?.home ?? m.score?.regularTime?.home ?? null;
       const scoreAway = m.score?.fullTime?.away ?? m.score?.regularTime?.away ?? null;
       if (scoreHome === null || scoreAway === null) continue;
-      const groupMatch = GROUP_MATCHES.find(gm => gm.home === homeApp && gm.away === awayApp);
-      if (groupMatch) {
-        matchResults[getMatchKey(groupMatch.group, groupMatch.home, groupMatch.away)] = { l: scoreHome, v: scoreAway };
+      const resolved = resolveGroupResult(homeApp, awayApp, scoreHome, scoreAway);
+      if (resolved) {
+        matchResults[resolved.key] = { l: resolved.l, v: resolved.v };
         groupMatchesUpdated++;
+        if (resolved.swapped) {
+          log.push(`↔️ Orientación API invertida en ${resolved.key}: marcador girado a convención app`);
+        }
+      } else {
+        log.push(`⚠️ Sin fixture en GROUP_MATCHES: ${homeApp} vs ${awayApp}`);
       }
     }
     log.push(`Partidos de grupos actualizados: ${groupMatchesUpdated}`);
