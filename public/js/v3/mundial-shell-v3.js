@@ -175,9 +175,23 @@
     });
   }
 
+  // Item 8 post-J1: códigos ISO3 — los nombres completos (República de Corea
+  // vs República Checa) truncaban ilegibles junto al countdown a 360px.
+  // codeFor compartido de window.PCShared (comunidad-shared-v3, el mismo que
+  // usa porra-jugador-v3); ese módulo carga DESPUÉS de este en main-entry, de
+  // ahí el fallback inline a EQUIPOS por nombre (y 3 letras en último término).
+  function teamCode(name) {
+    if (window.PCShared && typeof window.PCShared.codeFor === 'function') {
+      return window.PCShared.codeFor(name);
+    }
+    var eqs = (typeof EQUIPOS !== 'undefined') ? EQUIPOS : (window.EQUIPOS || []);
+    var e = (eqs && eqs.find) ? eqs.find(function (t) { return t && t.name === name; }) : null;
+    return ((e && e.flag) || String(name || '').slice(0, 3)).toUpperCase();
+  }
+
   function carouselSlideHTML(match) {
-    var home = match.home_es || match.home_en || '—';
-    var away = match.away_es || match.away_en || '—';
+    var home = teamCode(match.home_es || match.home_en || '—');
+    var away = teamCode(match.away_es || match.away_en || '—');
     var mid;
     if (match.isLive) {
       mid = '<span class="v3-carousel-live is-live">EN VIVO</span>';
