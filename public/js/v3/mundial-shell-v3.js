@@ -63,6 +63,17 @@
     return { h: pad2(parts[0]), m: pad2(parts[1]) };
   }
 
+  // N2 post-J1: cuenta atrás REAL contra date_utc (kickoff con sufijo +1,
+  // ms epoch — timezone-agnóstico). El slide pintaba la HORA del kickoff
+  // (madridHM) en bloques con labels h/min: a 25' del KOR-CZE de madrugada
+  // el banner decía "04 h 00 min" — su hora (04:00 Madrid), no lo que falta.
+  // totalMin alimenta también la key del slide (re-render 1/min).
+  function remainingHM(ts, now) {
+    var diff = Math.max(0, Number(ts) - Number(now));
+    var totalMin = Math.floor(diff / 60000);
+    return { h: pad2(Math.floor(totalMin / 60)), m: pad2(totalMin % 60), totalMin: totalMin };
+  }
+
   function flagPath(slug) {
     // encodeURIComponent solo en filename (D3) — el bucket lleva espacio %20.
     if (!slug) return '';
@@ -189,14 +200,15 @@
     return ((e && e.flag) || String(name || '').slice(0, 3)).toUpperCase();
   }
 
-  function carouselSlideHTML(match) {
+  function carouselSlideHTML(match, now) {
     var home = teamCode(match.home_es || match.home_en || '—');
     var away = teamCode(match.away_es || match.away_en || '—');
     var mid;
     if (match.isLive) {
       mid = '<span class="v3-carousel-live is-live">EN VIVO</span>';
     } else {
-      var t = madridHM(match.date_utc_ms);
+      // N2: tiempo RESTANTE hasta el kickoff real (no la hora del kickoff).
+      var t = remainingHM(match.date_utc_ms, now != null ? now : nowMs());
       mid = '<div class="v3-carousel-time">'
         + '<div class="v3-cd-block"><span class="v3-cd-num">' + t.h + '</span><span class="v3-cd-lbl">h</span></div>'
         + '<div class="v3-cd-block"><span class="v3-cd-num">' + t.m + '</span><span class="v3-cd-lbl">min</span></div>'
@@ -256,8 +268,10 @@
         var eyebrowText = isLive
           ? ('EN VIVO · ' + counter)
           : ((day.state === 'upcoming' ? 'PRÓXIMOS' : 'HOY') + ' · ' + counter);
-        var key = match.key + (isLive ? ':live' : ':time');
-        var html = carouselSlideHTML(match);
+        // N2: la key incluye los minutos restantes — setSlideContent dedupa
+        // por key y el countdown debe re-renderizar al cambiar de minuto.
+        var key = match.key + (isLive ? ':live' : ':t' + remainingHM(match.date_utc_ms, n).totalMin);
+        var html = carouselSlideHTML(match, n);
 
         eyebrows.forEach(function (el) {
           el.textContent = eyebrowText;
