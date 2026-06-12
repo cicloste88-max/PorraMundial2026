@@ -227,3 +227,63 @@ test('repaint: con #jornada-container presente, re-renderiza Jornada tras cargar
   await api.load();
   assert.strictEqual(repainted, true);
 });
+
+// ─── R2a-bis: v3CalcMatchPointsGrupos (grupos-v3, consumido por porra-jugador) ───
+// El MISMO placeholder primer-jugador-del-ganador vivía aquí: con dogino
+// (gol=Jimenez=players[0]) coincidía de casualidad; con Parrandas (Quinones)
+// el chip Gol de porra-jugador y de grupos marcaba ✗.
+
+const GRUPOS_SRC = readFileSync(new URL('../public/js/v3/grupos-v3.js', import.meta.url), 'utf8');
+
+function makeV3Calc(matchResults, calcRecorder) {
+  const factory = new Function(
+    'window', 'getMatchKey', 'EQUIPOS', 'iaBonusWillApply', 'calcMatchPoints',
+    `${extractFn(GRUPOS_SRC, 'v3CalcMatchPointsGrupos')}
+     return v3CalcMatchPointsGrupos;`,
+  );
+  return factory(
+    { _matchResultsByKey: matchResults },
+    (m) => m.group + '_' + m.home + '_' + m.away,
+    EQUIPOS_FIXTURE,
+    () => false,
+    calcRecorder,
+  );
+}
+
+test('R2a-bis: gole por scorers canónicos (Quinones ✓ aunque players[0] sea Jimenez) y calc con 5º arg', () => {
+  const calls = [];
+  const calc = makeV3Calc(
+    { 'A_México_Sudáfrica': { l: 2, v: 0, scorers: ['Quinones', 'Jimenez'], status: 'finished' } },
+    (p, l, r, k, sc) => { calls.push(sc); return 3; },
+  );
+  const out = calc(
+    { saved: true, l: 2, v: 1, gol: 'Quinones', home: 'México', away: 'Sudáfrica' },
+    { group: 'A', home: 'México', away: 'Sudáfrica', realHome: 2, realAway: 0, played: true },
+  );
+  assert.ok(out.types.indexOf('gole') !== -1);
+  assert.ok(out.types.indexOf('win') !== -1);
+  assert.deepStrictEqual(calls[0], ['Quinones', 'Jimenez']);
+});
+
+test('R2a-bis: goleador en EMPATE también cuenta (el placeholder viejo lo excluía)', () => {
+  const calc = makeV3Calc(
+    { 'A_México_Sudáfrica': { l: 1, v: 1, scorers: ['Quinones', 'Zwane'], status: 'finished' } },
+    () => 3,
+  );
+  const out = calc(
+    { saved: true, l: 1, v: 1, gol: 'Zwane', home: 'México', away: 'Sudáfrica' },
+    { group: 'A', home: 'México', away: 'Sudáfrica', realHome: 1, realAway: 1, played: true },
+  );
+  assert.ok(out.types.indexOf('gole') !== -1);
+});
+
+test('R2a-bis: sin entrada canónica aún (lag del bridge) → sin gole y calc recibe []', () => {
+  const calls = [];
+  const calc = makeV3Calc({}, (p, l, r, k, sc) => { calls.push(sc); return 1; });
+  const out = calc(
+    { saved: true, l: 2, v: 1, gol: 'Quinones', home: 'México', away: 'Sudáfrica' },
+    { group: 'A', home: 'México', away: 'Sudáfrica', realHome: 2, realAway: 0, played: true },
+  );
+  assert.ok(out.types.indexOf('gole') === -1);
+  assert.deepStrictEqual(calls[0], []);
+});
