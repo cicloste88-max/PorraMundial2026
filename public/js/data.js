@@ -498,35 +498,52 @@ async function loadPredictorRankingData() {
 
 window.loadPredictorRankingData = loadPredictorRankingData;
 
-// === [Sprint A · Group 3] loadLeagueRanking — lista completa de miembros
-//     de la liga con nombre + is_bot + posición. Pre-Mundial todos a 0 pts
-//     (Sprint B: leer puntos reales de user_points_cache cuando exista). ===
+// === [Sprint A · Group 3 → R1 post-J1] loadLeagueRanking — ranking REAL de
+//     la liga desde user_points_cache (v_league_rank, MISMA fuente que el
+//     panel TU POSICIÓN del tile) + nombres/is_bot de profiles (RLS lectura
+//     pública "Profiles públicos para scoreboard"). NUNCA vía league_members:
+//     su SELECT es self-only (auth.uid() = user_id) y el widget colapsaba a
+//     "Vas Nº1 de 1 · líder <yo> con 0 pts" — cada usuario veía SOLO su
+//     fila, con points:0 hardcodeado del stub pre-Mundial. ===
 async function loadLeagueRanking(leagueId) {
   if (!leagueId || !window._porraDb) return [];
   var db = window._porraDb;
   var res = await db
-    .from('league_members')
-    .select('user_id, profiles(nombre, is_bot)')
-    .eq('league_id', leagueId);
+    .from('v_league_rank')
+    .select('user_id, total_pts, rank_league')
+    .eq('league_id', leagueId)
+    .order('rank_league', { ascending: true });
   if (res.error) {
     console.warn('[loadLeagueRanking] error', res.error.message);
     return [];
   }
-  var members = res.data || [];
-  // Orden natural por nombre alfabético — Pre-Mundial todos empatados a 0 pts.
-  // Sprint B: ORDER BY points DESC.
-  var rows = members.map(function (m) {
+  var ranks = res.data || [];
+  if (!ranks.length) return [];
+
+  var ids = ranks.map(function (r) { return r.user_id; });
+  var profRes = await db
+    .from('profiles')
+    .select('id, nombre, is_bot')
+    .in('id', ids);
+  if (profRes.error) console.warn('[loadLeagueRanking] profiles error', profRes.error.message);
+  var profById = {};
+  (profRes.data || []).forEach(function (p) { profById[p.id] = p; });
+
+  var rows = ranks.map(function (r) {
+    var p = profById[r.user_id] || {};
     return {
-      user_id: m.user_id,
-      nombre: (m.profiles && m.profiles.nombre) ? m.profiles.nombre : 'Usuario',
-      is_bot: !!(m.profiles && m.profiles.is_bot),
-      points: 0
+      user_id: r.user_id,
+      nombre: p.nombre || 'Usuario',
+      is_bot: !!p.is_bot,
+      points: Number(r.total_pts || 0),
+      position: Number(r.rank_league || 0)
     };
   });
+  // Empates comparten position (rank clásico de la vista); orden estable por
+  // nombre dentro del empate para que la lista no baile entre renders.
   rows.sort(function (a, b) {
-    return a.nombre.localeCompare(b.nombre, 'es');
+    return (a.position - b.position) || a.nombre.localeCompare(b.nombre, 'es');
   });
-  rows.forEach(function (r, i) { r.position = i + 1; });
   return rows;
 }
 window.loadLeagueRanking = loadLeagueRanking;
