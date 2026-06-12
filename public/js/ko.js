@@ -584,6 +584,27 @@ let currentView   = 'cinematic';
 
 
 async function saveKO() {
+  // Inferir classifier desde el marcador antes de persistir: la UI solo pide
+  // "quién avanza" en empates, así que en victorias claras quedaba null y ni
+  // el scoring KO ni el comprobante PDF podían resolver avances (backfill BD
+  // de ligas ya cerradas: EF backfill-ko-classifiers). El path de edición
+  // (v3AdjustScoreKO) resetea classifier al dejar de ser empate, por lo que
+  // la inferencia se re-aplica sola si el usuario cambia el marcador.
+  try {
+    if (typeof resolveAllSlots === 'function' && typeof EQUIPOS !== 'undefined') {
+      resolveAllSlots();
+      const allRounds = [...BRACKET.r32,...BRACKET.r16,...BRACKET.qf,...BRACKET.sf,...BRACKET.third,...BRACKET.final];
+      allRounds.forEach(m => {
+        const p = koPredictions[m.id] || koPredictions[String(m.id)];
+        if (!p || !p.saved || p.classifier) return;
+        if (!Number.isInteger(p.l) || !Number.isInteger(p.v) || p.l === p.v) return;
+        const winner = p.l > p.v ? resolvedSlots[m.home] : resolvedSlots[m.away];
+        // Solo nombres reales de equipo: resolvedSlots puede propagar etiquetas
+        // ('1A', 'W74') como fallback si el bracket aguas arriba está incompleto.
+        if (winner && EQUIPOS.some(e => e.name === winner)) p.classifier = winner;
+      });
+    }
+  } catch(e) { console.warn('saveKO: inferencia de classifier falló', e); }
   try {
     localStorage.setItem('porra_ko_predictions', JSON.stringify(koPredictions));
     localStorage.setItem('porra_predictions', JSON.stringify(predictions));

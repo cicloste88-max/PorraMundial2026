@@ -15,13 +15,17 @@
 //
 //   FASE FINAL (KO) — ko_predictions.match_id INTEGER 73..104 = SLOT fijo del
 //   cuadro (no id de partido real). La fila NO trae los dos equipos del cruce
-//   (local/visitante son el marcador). Solo: slot + marcador + classifier
-//   (NOMBRE en español de quién avanza) + scorer. Por tanto renderizamos solo
-//   lo que la fila trae: ronda + marcador + "Avanza: <classifier>" + goleador.
+//   (local/visitante son el marcador): slot + marcador + classifier (NOMBRE en
+//   español de quién avanza) + scorer. El cruce HOME vs AWAY de cada slot se
+//   reconstruye con el bracket dinámico del usuario vía resolveBracket()
+//   (_shared/ko-bracket.mjs, réplica del frontend compartida con la EF
+//   backfill-ko-classifiers); si un lado no es resoluble queda null y el
+//   render degrada a solo-marcador (comportamiento pre-v11).
 //   classifier (ES) -> iso3 se resuelve contra wc_matches. El goleador KO se
-//   busca en TODO el roster (no conocemos los dos equipos del cruce). Campeón =
-//   classifier del slot 104; ganador del 3.er puesto = classifier del slot 103.
-//   NO derivamos subcampeón ni 4.º (necesitan el cruce).
+//   busca en TODO el roster. Campeón = classifier del slot 104; ganador del
+//   3.er puesto = classifier del slot 103.
+
+import { resolveBracket } from "../_shared/ko-bracket.mjs";
 
 // deno-lint-ignore no-explicit-any
 type SupabaseClient = any;
@@ -81,6 +85,10 @@ export interface KoPred {
   slot: number;
   round: KoRound;
   roundLabel: string;
+  homeName: string | null; // cruce del slot según el bracket dinámico del
+  homeIso3: string | null; // usuario (resolveBracket); null si irresoluble
+  awayName: string | null;
+  awayIso3: string | null;
   l: number | null;
   v: number | null;
   classifierName: string | null; // nombre ES tal cual guardado (o null)
@@ -358,16 +366,32 @@ export async function buildReceiptData(
   );
 
   // ── FASE FINAL (KO) ────────────────────────────────────────────────────────
+  // Cruce HOME vs AWAY por slot — bracket dinámico del usuario (módulo
+  // compartido con backfill-ko-classifiers). Defensivo: si la resolución
+  // fallara, el comprobante sale igual con cruces a null (render pre-v11).
+  let bracketSlots: Record<number, { home: string | null; away: string | null }> = {};
+  try {
+    bracketSlots = resolveBracket(rawPreds, rawKo).slots;
+  } catch (e) {
+    console.warn("resolveBracket falló — comprobante sin cruces:", e instanceof Error ? e.message : e);
+  }
+
   const ko: KoPred[] = [];
   for (const k of rawKo) {
     const slot = Number(k.match_id);
     const round = koRoundForSlot(slot);
     if (!round) continue;
     const classifierName: string | null = k.classifier ?? null;
+    const homeName = bracketSlots[slot]?.home ?? null;
+    const awayName = bracketSlots[slot]?.away ?? null;
     ko.push({
       slot,
       round,
       roundLabel: KO_ROUND_LABEL[round],
+      homeName,
+      homeIso3: homeName ? (esNameToIso3.get(homeName) ?? null) : null,
+      awayName,
+      awayIso3: awayName ? (esNameToIso3.get(awayName) ?? null) : null,
       l: k.local ?? null,
       v: k.visitante ?? null,
       classifierName,

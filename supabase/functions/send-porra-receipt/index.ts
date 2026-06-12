@@ -21,6 +21,8 @@
 //                                             remitente verificado en Brevo.
 //
 // Idempotencia: UNIQUE(user_id, league_id) en sent_receipts. 2ª llamada → skipped.
+// Los envíos con to_override son QA: NI consultan NI registran sent_receipts
+// (no bloquean ni quedan bloqueados por el envío real al usuario).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
@@ -146,15 +148,19 @@ async function processReceipt(
   toOverride: string | null,
   cfg: SendConfig,
 ): Promise<ProcessResult> {
-  // 1. Idempotencia: ¿ya enviado para (user, league)?
-  const { data: existing, error: exErr } = await supa
-    .from("sent_receipts")
-    .select("email")
-    .eq("user_id", userId)
-    .eq("league_id", leagueId)
-    .maybeSingle();
-  if (exErr) return { user_id: userId, status: "failed", error: `lookup:${exErr.message}` };
-  if (existing) return { user_id: userId, status: "skipped", email: existing.email };
+  // 1. Idempotencia: ¿ya enviado para (user, league)? Los envíos con
+  //    to_override son QA: ni consultan ni registran sent_receipts — una
+  //    prueba no debe quedar bloqueada por (ni bloquear) el envío real.
+  if (!toOverride) {
+    const { data: existing, error: exErr } = await supa
+      .from("sent_receipts")
+      .select("email")
+      .eq("user_id", userId)
+      .eq("league_id", leagueId)
+      .maybeSingle();
+    if (exErr) return { user_id: userId, status: "failed", error: `lookup:${exErr.message}` };
+    if (existing) return { user_id: userId, status: "skipped", email: existing.email };
+  }
 
   // 2. Construir el comprobante con los datos REALES del user.
   let data;
@@ -200,21 +206,23 @@ async function processReceipt(
     return { user_id: userId, status: "failed", error: String((e as Error)?.message || e) };
   }
 
-  // 5. Registrar el envío (idempotencia + auditoría).
-  const { error: insErr } = await supa.from("sent_receipts").insert({
-    user_id: userId,
-    league_id: leagueId,
-    email: recipient,
-    resend_id: resendId || null,
-    meta: {
-      code: data.verificationCode,
-      counts: data.counts,
-      override: !!toOverride,
-    },
-  });
-  if (insErr) {
-    // El email ya salió; un conflicto aquí (carrera) es benigno.
-    console.warn(`sent_receipts insert warn user=${userId}: ${insErr.message}`);
+  // 5. Registrar el envío (idempotencia + auditoría). Los envíos QA con
+  //    to_override NO se registran (no son el comprobante del usuario).
+  if (!toOverride) {
+    const { error: insErr } = await supa.from("sent_receipts").insert({
+      user_id: userId,
+      league_id: leagueId,
+      email: recipient,
+      resend_id: resendId || null,
+      meta: {
+        code: data.verificationCode,
+        counts: data.counts,
+      },
+    });
+    if (insErr) {
+      // El email ya salió; un conflicto aquí (carrera) es benigno.
+      console.warn(`sent_receipts insert warn user=${userId}: ${insErr.message}`);
+    }
   }
 
   return {
