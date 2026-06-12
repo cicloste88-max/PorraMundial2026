@@ -192,7 +192,15 @@
       var sb = window._sbData;
       if (Array.isArray(sb) && sb.length) {
         if (totalPlayers == null) totalPlayers = sb.length;
-        if (rank == null) { var idx = sb.findIndex(function (r) { return String(r.uid) === String(userId); }); if (idx >= 0) rank = idx + 1; }
+        if (rank == null) {
+          var idx = sb.findIndex(function (r) { return String(r.uid) === String(userId); });
+          // F2: rank() con empates compartidos (helper data.js), no row_number.
+          if (idx >= 0) {
+            rank = (typeof window.rankConEmpates === 'function')
+              ? window.rankConEmpates(sb, idx, function (r) { return r.total; })
+              : idx + 1;
+          }
+        }
       }
     }
     var meId = window.currentUser && window.currentUser.id;

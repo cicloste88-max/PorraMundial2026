@@ -371,6 +371,24 @@ async function loadBoostPicks() {
 
 // ========== FUNCIONES AUXILIARES ==========
 function getMatchKey(m) { return `${m.group}_${m.home}_${m.away}`; }
+
+// F2 post-J1 (re-QA San): posición con semántica rank() — los empates
+// COMPARTEN posición y dejan hueco después — la MISMA que v_league_rank (BD)
+// y el widget Ranking del Predictor. El índice del array ordenado es
+// row_number y mostraba #15 a un empatado a 3 pts que es #13 (alexnovesh,
+// jesusruedagar y Parrandas comparten el 13). Único helper para TODAS las
+// vistas de posición sobre arrays ordenados por puntos desc.
+// rows: array ordenado; idx: fila objetivo; getTotal: (row) => puntos.
+function rankConEmpates(rows, idx, getTotal) {
+  if (!Array.isArray(rows) || idx < 0 || idx >= rows.length) return idx + 1;
+  const mine = Number(getTotal(rows[idx]) || 0);
+  let r = 1;
+  for (let i = 0; i < rows.length; i++) {
+    if (Number(getTotal(rows[i]) || 0) > mine) r++;
+  }
+  return r;
+}
+window.rankConEmpates = rankConEmpates;
 function getMySign(pred) { if(pred.l===null||pred.v===null) return null; return pred.l>pred.v?'1':pred.l<pred.v?'2':'X'; }
 // F.4 — Bonus +1pt cuando el user predice en contra de la IA y acierta.
 // Condiciones (todas obligatorias):

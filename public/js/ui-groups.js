@@ -824,14 +824,19 @@ function _buildJornadaRanking() {
   }
   const myId = window.currentUser?.id;
   const rows = window._sbData.slice(0, 10);
+  // F2: posición rank() con empates compartidos (helper data.js) — misma
+  // semántica que v_league_rank y el widget del Predictor.
+  const _rk = (i) => (typeof rankConEmpates === 'function')
+    ? rankConEmpates(rows, i, (u) => u.total) : (i + 1);
   return '<div class="jornada-ranking">' +
     '<div class="jornada-ranking-title">🏆 Clasificación liga</div>' +
     rows.map((u, i) => {
       const isMe = u.uid === myId;
       const ini  = (u.nombre || '?').charAt(0).toUpperCase();
-      const posCls = i < 3 ? 'jrank-pos top' : 'jrank-pos';
+      const rank = _rk(i);
+      const posCls = rank <= 3 ? 'jrank-pos top' : 'jrank-pos';
       const medals = ['🥇','🥈','🥉'];
-      const posStr = i < 3 ? medals[i] : (i + 1);
+      const posStr = rank <= 3 ? medals[rank - 1] : rank;
       return '<div class="jrank-row' + (isMe ? ' jrank-me' : '') + '">' +
         '<span class="' + posCls + '">' + posStr + '</span>' +
         '<div class="jrank-avatar">' + ini + '</div>' +
@@ -850,8 +855,12 @@ function _renderUserStrip() {
   const idx = window._sbData.findIndex(u => u.uid === myId);
   if (idx === -1) return;
   const u = window._sbData[idx];
+  // F2: rank() con empates compartidos — el índice (row_number) mostraba
+  // #15 a Parrandas cuando su posición real con empates a 3 pts es #13.
+  const rank = (typeof rankConEmpates === 'function')
+    ? rankConEmpates(window._sbData, idx, (r) => r.total) : (idx + 1);
   const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
-  const pos = idx < 3 ? medals[idx] : '#' + (idx + 1);
+  const pos = rank <= 3 ? medals[rank - 1] : '#' + rank;
   el.innerHTML =
     '<span class="jus-pos">' + pos + '</span>' +
     '<span class="jus-name">' + escapeHtml(u.nombre) + '</span>' +
