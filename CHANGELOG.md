@@ -2,6 +2,32 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [12-jun-2026] `ko_predictions.classifier` NULL en KO con ganador claro — backfill BD + fix `saveKO()` (rama `fix/ko-classifier-backfill`)
+
+- **Síntoma**: comprobante PDF (send-porra-receipt v10) con "Avanza: —" en 29/32
+  partidos KO de Parrandas (Porra Gallos) y podio vacío; 20/20 humanos afectados.
+  Impacto mayor: el scoring KO usa `classifier` para puntuar avances
+  (+5/+10/+15/+20/+25) — habría fallado desde el 28-jun.
+- **Causa**: `saveKO()` (ko.js) persiste `p.classifier || null` y la UI solo pide
+  "quién avanza" en empates → en victorias claras quedaba null en BD.
+- **Fix A (BD)**: EF `backfill-ko-classifiers` v1.0.0 — réplica del bracket
+  dinámico del frontend (`logic.mjs`; `ko-data.mjs` GENERADO de los literales
+  BRACKET/ANNEX_C/GRUPOS por `scripts/gen-backfill-ko-data.mjs`, no copiado a
+  mano), inferencia en cascada 73→104, `dry_run` default true, idempotente,
+  preserva todo classifier no-null (empates elegidos + literales HF-09).
+  Ejecutada sobre Porra Gallos: 22 usuarios, 545 filas, 0 errores; SQL 20/20
+  humanos `sin_classifier=0`; 2ª pasada `rows_updated=0`. 2 contradicciones
+  (ambas cicloste88) preservadas con warning.
+- **Fix C (UI)**: `saveKO()` infiere classifier desde el marcador antes de
+  persistir (`resolveAllSlots()` + guard EQUIPOS contra etiquetas '1A'/'W74');
+  `v3AdjustScoreKO` ya resetea classifier al dejar de ser empate, así que un
+  cambio de marcador re-infiere solo.
+- **Regresión**: `tests/backfill-ko-classifiers.test.mjs` (14 tests: ANNEX_C 495,
+  slots 73-104, cascada, empates con/sin pick, literales home/away, contradicción
+  no sobrescrita, idempotencia, gate 72 marcadores). Suite 198/198.
+- **Pendiente**: backfill resto de ligas (Biwenger team, Mundial 2026 TILÍN,
+  Mundialito, Porrazo, Porrazo 2) — misma invocación cambiando `league_id`.
+
 ## [12-jun-2026] Post-J1: ESPN fuente primaria del directo + 9 fixes — rama `fix/j1-incidencias` (gate San)
 
 Contexto: SofaScore 403 challenge al actor Apify desde 11-jun ~18:54Z (ERR-89);
