@@ -2,6 +2,45 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [12-jun-2026] Post-J1: ESPN fuente primaria del directo + 9 fixes — rama `fix/j1-incidencias` (gate San)
+
+Contexto: SofaScore 403 challenge al actor Apify desde 11-jun ~18:54Z (ERR-89);
+stopgap SQL `espn_live_poll()` aplicado esa noche por Claude.ai vía MCP.
+
+- **Item 1 — EF `espn-poll` v1.0.0**: productiza el poller ESPN (fetch síncrono,
+  parser puro testeable, WhatsApp con textos/destinatarios de porra-apify-webhook
+  y dedup por ids md5 BIT-idénticos al scheme SQL — verificado contra BD),
+  monitoring a results.log, gate X-Cron-Key. Cron `espn-poll-mundial-2026`
+  (1min, gate EXISTS ventana kickoff−30m..+3h). Cutover: job 29 unscheduled +
+  DROP espn_live_poll(); espn_event_map y espn_poll_state SE MANTIENEN.
+- **Items 3+5 — badge pts Directo**: `_getLivePts` no pasaba realScorers y el +2
+  de goleador no se concedía nunca (ERR-91). Finished → scorers canónicos del
+  bridge (live-sync carga match_results, lector asObj + refetch al finalizar);
+  en vivo → `deriveScorersFromEvents` (espejo bridge, reusa playerToShortKey).
+  Copy: `+12 pts (boost ×2)`. Colateral: normalizeRow copia `minute` (ERR-87).
+- **Item 6 — porra-jugador-v3**: `_realFor` consultaba la cache live con la key
+  legacy (siempre miss → todo "Aún por jugar"); ahora `window.matchKeyFor`.
+- **Item 7 — B11 user_points_cache**: tabla + v_user_global_rank v2 (decisión
+  San: pts de la liga vista vs mejor total de cada usuario) + v_league_rank;
+  standings v1.4.0 (write-through + bearer service_role privilegiado); bridge
+  v7 refresca cache al finalizar partido. Tile/stats reales: fuera leagueRank=1
+  y stub global; Zayu cuenta (de 22); _computeAciertos espejo motor; audit 0-0:
+  updateGlobalPoints ya no puntúa contra los 0-0 estáticos pre-pitido.
+- **Item 2 — update-results RETIRADA** (decisión San) + hardening: bridge v8
+  (asObj + try/catch global con stack — el 500 del 11-jun fue mudo) y admin.js
+  (5 JSON.parse → admAsObj; el panel crasheaba con results normalizado). ERR-90.
+- **Item 4 — pastilla EN VIVO**: `.dv2-exp-header.live` pisaba el #fff del pill
+  kits con --fifa-red a especificidad igual → rojo sobre rojo. Override 0,3,0
+  patrón FINAL (texto claro, fondo sólido .92, z-index 2).
+- **Item 8 — banner FIFA**: códigos ISO3 (KOR-CZE) vía PCShared.codeFor en el
+  carrusel (nombres largos truncaban a 360px); aplica también al slide EN VIVO.
+- **Item 9 — trofeo Predictor**: pill dorada 44px + label "Clasificación"
+  (paleta --fifa-gold de los chips); aria-label corregido.
+
+Tests nuevos: espn-poll-parser (14), directo-live-scorers (13), jugador-v3-livekey
+(5), predictor-stats-b11 (11), bridge-hardening (5), fifa-bar-codes (4) — suite
+236/0. ERR-89/90/91 documentados. Detalle por acción: migration-log sesión 12-jun.
+
 ## [10-jun-2026] Fix barra IA PREDICE invertida en el único fixture teams_swapped (BRA-ESC J3) — rama `fix/ia-bar-orientation`
 
 - **Síntoma**: en `wc2026_gC_15186861` (Brasil-Escocia, J3, grupo C) la barra

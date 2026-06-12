@@ -93,8 +93,14 @@
   }
 
   // Resultado real del fixture (finished/live) desde live_scores / PARTIDOS.
-  function _realFor(matchObj, matchKey) {
-    var live = _live()[matchKey];
+  // OJO (Item 6 post-J1): window._liveScoresByMatchKey está indexada por key
+  // de BD (wc2026_gX_id), NO por la key legacy de _mk (grupo_local_visitante).
+  // Resolver con window.matchKeyFor (live-sync.js, mismo mapper que
+  // getDirectoKey en ui-directo). La legacy sigue siendo la correcta para
+  // predByKey y boostSet — no tocar _mk en el resto.
+  function _realFor(matchObj) {
+    var liveKey = (typeof window.matchKeyFor === 'function') ? window.matchKeyFor(matchObj) : null;
+    var live = liveKey ? _live()[liveKey] : null;
     if (live && live.status === 'finished') {
       var h = (live.score_home != null) ? live.score_home : (matchObj.realHome != null ? matchObj.realHome : null);
       var a = (live.score_away != null) ? live.score_away : (matchObj.realAway != null ? matchObj.realAway : null);
@@ -120,7 +126,7 @@
     var matchKey = _mk(matchObj);
     var home = { n: matchObj.home, c: codeFor(matchObj.home) };
     var away = { n: matchObj.away, c: codeFor(matchObj.away) };
-    var rf = _realFor(matchObj, matchKey);
+    var rf = _realFor(matchObj);
     var phase = rf ? rf.phase : 'pre';
     if (!pred) {
       return { home: home, away: away, time: _timeLabel(matchObj), phase: 'pre', pred: null, real: null, scorer: '', boost: false, boosted: false, pts: 0, scoringTypes: [] };
@@ -145,8 +151,12 @@
       var types = calc.types || [];
       var base = _baseFromTypes(types);
       var exact = types.indexOf('exact') !== -1;
+      var gole = types.indexOf('gole') !== -1;
       out.scoringTypes = types;
-      out.boosted = out.boost && exact;     // boost ×2 del TARGET
+      // R3 (12-jun, regla canónica San): el ×2 del boost SOLO con exacto Y
+      // goleador a la vez. N3 (decisión San, madrugada 12-jun): el +1 anti-IA
+      // va DENTRO del multiplicador — base (cap 7, bonus incluido) ×2, máx 14.
+      out.boosted = out.boost && exact && gole;
       out.pts = out.boosted ? base * 2 : base;
     }
     return out;
@@ -177,7 +187,15 @@
       var sb = window._sbData;
       if (Array.isArray(sb) && sb.length) {
         if (totalPlayers == null) totalPlayers = sb.length;
-        if (rank == null) { var idx = sb.findIndex(function (r) { return String(r.uid) === String(userId); }); if (idx >= 0) rank = idx + 1; }
+        if (rank == null) {
+          var idx = sb.findIndex(function (r) { return String(r.uid) === String(userId); });
+          // F2: rank() con empates compartidos (helper data.js), no row_number.
+          if (idx >= 0) {
+            rank = (typeof window.rankConEmpates === 'function')
+              ? window.rankConEmpates(sb, idx, function (r) { return r.total; })
+              : idx + 1;
+          }
+        }
       }
     }
     var meId = window.currentUser && window.currentUser.id;

@@ -472,6 +472,20 @@
   color: #fff;
   box-shadow: 0 4px 14px rgba(40,81,225,.5);
 }
+/* Item 4 post-J1 — pastilla EN VIVO ilegible sobre la foto (captura iPhone):
+   `.dv2-exp-header.live` (skin base, más abajo en este fichero) pisa el
+   color #fff del pill kits con var(--fifa-red) a especificidad IGUAL (0,2,0
+   y posterior) → "EN VIVO" rojo sobre fondo rojo; solo se veían el dot y el
+   minuto y la pastilla parecía recortada/solapada con el marcador. La FINAL
+   gris no sufre el choque (ink-400 sobre gris es legible) — este override
+   replica su patrón: texto claro sobre fondo sólido. 0,3,0 gana a ambas. */
+.dv2-exp--kits .dv2-exp-header.live {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.55);
+  background: rgba(200,5,16,.92);  /* más sólido que el .85 base: zonas claras de foto */
+  border-color: rgba(255,120,120,.8);
+  z-index: 2;                      /* nunca por debajo del marcador 64px */
+}
 .dv2-exp--kits .dv2-exp-score {
   font-size: 64px;
   letter-spacing: -.04em;

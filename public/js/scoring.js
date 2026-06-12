@@ -66,31 +66,46 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   // F2.9 HF-09 — Goleador: +2 si pred.gol acierta a CUALQUIER goleador real
   // del partido, del equipo que sea (ganador, perdedor, empatado).
   // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
-  // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si pred
-  // 0-0 Y real 0-0 Y sin goleador, paga el +2 (0-0 clavado = 1+3+2 = 6 base,
-  // paridad con cualquier otro exacto). Si registró goleador y el real es
-  // 0-0, su apuesta falla (scorers vacío). Paridad con _shared/scoring.mjs.
+  // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador"; con 0-0
+  // clavado paga el +2 y a efectos del boost ese slot CUENTA (golOk=true).
   // Excepción KO: los goles en tanda de penaltis NO cuentan — responsabilidad
   // del pipeline alimentar realScorers solo con goles de 90' + prórroga.
+  // Paridad con _shared/scoring.mjs.
+  let golOk = false;
   if(pred.gol) {
     const scorers = realScorers ?? _hf09FallbackScorers(pred, realL, realR);
-    if(scorers.includes(pred.gol)) pts += 2;
+    golOk = scorers.includes(pred.gol);
   } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
-    pts += 2;
+    golOk = true;
   }
+  if(golOk) pts += 2;
 
   // Bonus vs IA (F.4). iaBonusWillApply valida que ia.sign !== null,
   // user_sign !== ia_sign, y user_sign === real_sign.
-  if(iaBonusWillApply(matchKey, pred, realL, realR)) pts += 1;
+  const iaB = iaBonusWillApply(matchKey, pred, realL, realR);
 
-  pts = Math.min(pts, 7); // cap 7pt por partido (pre-boost)
-
-  // Boost x2: si este partido es el boost del día Y se acertó el exacto
-  if(isExact && matchKey) {
+  // Boost ×2 — REGLA CANÓNICA (San product owner, 12-jun-2026, R3 post-J1):
+  // SOLO dobla cuando se aciertan RESULTADO EXACTO y GOLEADOR a la vez. El
+  // bug previo (doblar con solo exacto) infló puntos publicados en J1.
+  let doubled = false;
+  if(isExact && golOk && matchKey) {
     const matchDate = PARTIDOS.find(m => getMatchKey(m) === matchKey)?.date?.substring(0,10);
-    if(matchDate && boostPicks[matchDate] === matchKey) {
-      pts *= 2; // máximo 14 pts
-    }
+    doubled = !!(matchDate && boostPicks[matchDate] === matchKey);
+  }
+
+  // Interacción anti-IA × boost — DECIDIDO por San (12-jun-2026): el +1
+  // anti-IA va DENTRO del multiplicador (máx 14 = cap7 ×2). Espejo de
+  // BOOST_INCLUYE_IA=true en _shared/scoring.mjs. Para volver al alternativo
+  // (IA fuera, máx 13) en runtime: window.BOOST_INCLUYE_IA = false.
+  const iaDentro = !(typeof window !== 'undefined' && window.BOOST_INCLUYE_IA === false);
+  if (iaDentro) {
+    if(iaB) pts += 1;
+    pts = Math.min(pts, 7);
+    if(doubled) pts *= 2; // máx 14
+  } else {
+    pts = Math.min(pts, 7);
+    if(doubled) pts *= 2;
+    if(iaB) pts += 1; // máx 13
   }
 
   return pts;
@@ -107,6 +122,33 @@ function _hf09FallbackScorers(pred, realL, realR) {
   return teams
     .map(name => EQUIPOS.find(e => e.name === name)?.players?.[0]?.key)
     .filter(Boolean);
+}
+
+// ── Goleadores reales desde el pipeline live (Item 3+5 post-J1) ──────────
+// events crudos de live_scores → scorer keys. Espejo de extractScorers del
+// bridge porra-bridge-results: cuentan goal + inGamePenalty; ownGoal y
+// penaltyShootout NO (los penaltis de tanda no son gol de jugador a efectos
+// de la porra). El mapeo nombre→key REUSA playerToShortKey (este fichero,
+// §Sprint Combos & Awards): lookup en EQUIPOS[iso3].players con fallback NFD
+// sin diacríticos + último token ('Raúl Jiménez' → 'Jimenez') — mismo patrón
+// que el bridge. homeIso3/awayIso3 en orientación PROYECTO; el flag
+// teamsSwapped reorienta el isHome de SofaScore/ESPN igual que el bridge.
+function deriveScorersFromEvents(rawEvents, teamsSwapped, homeIso3, awayIso3) {
+  if (!Array.isArray(rawEvents)) return [];
+  const out = [];
+  for (const e of rawEvents) {
+    if (!e || typeof e !== 'object') continue;
+    const itype = String(e.incidentType || '');
+    if (itype !== 'goal' && itype !== 'inGamePenalty') continue;
+    if (String(e.incidentClass || '') === 'ownGoal') continue;
+    const pname = e.player && typeof e.player.name === 'string' ? e.player.name : '';
+    if (!pname) continue;
+    const sofaIsHome = e.isHome === true;
+    const projIsHome = teamsSwapped ? !sofaIsHome : sofaIsHome;
+    const key = playerToShortKey(pname, projIsHome ? homeIso3 : awayIso3);
+    if (key) out.push(key);
+  }
+  return out;
 }
 
 // ── Puntos KO por ronda ───────────────────────────────────
@@ -1282,15 +1324,29 @@ function updateCardUI(idx, match) {
   }
 }
 
+// Item 7 colateral (audit 0-0 pre-pitido): antes puntuaba contra
+// PARTIDOS.realHome/realAway — estáticos 0-0 en data.js — SIN gate de jugado:
+// un pronóstico 0-0 guardado regalaba puntos en el total legacy ANTES del
+// partido (lo mostraban elim-shell y #total-points). Ahora suma SOLO partidos
+// con resultado canónico del bridge (results.match_results vía
+// window._matchResultsByKey, live-sync) y con sus scorers reales. El tile del
+// Predictor ya NO lee este total (usa user_points_cache); consumidores
+// restantes: ui-elim-shell._totalPoints y el #total-points legacy.
 function updateGlobalPoints(){
   let pts=0;
+  const mr = window._matchResultsByKey || {};
   PARTIDOS.forEach(m=>{
     const key=getMatchKey(m);
     const pred=predictions[key];
-    if(pred && pred.saved) pts += calcMatchPoints(pred, m.realHome, m.realAway, key);
+    const real=mr[key];
+    if(pred && pred.saved && real && real.l != null && real.v != null) {
+      pts += calcMatchPoints(pred, real.l, real.v, key,
+                             Array.isArray(real.scorers) ? real.scorers : []);
+    }
   });
   totalPoints=pts;
-  document.getElementById('total-points').textContent=totalPoints;
+  const totalEl=document.getElementById('total-points');
+  if(totalEl) totalEl.textContent=totalPoints;
 }
 
 
@@ -1480,7 +1536,7 @@ function playerToShortKey(nombre, iso3) {
   }
   // 2. Fallback: último token sin diacríticos. ̀-ͯ = bloque
   //    Unicode "Combining Diacritical Marks" producido por NFD.
-  const norm = String(nombre).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = String(nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const parts = norm.trim().split(/\s+/);
   return parts[parts.length - 1] || '';
 }

@@ -1,5 +1,13 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.3.0
+// PR-1 · Leaderboard de liga · v1.4.0
+//   v1.4.0 (B11, Item 7 post-J1): (a) bearer service_role PRIVILEGIADO —
+//     porra-bridge-results invoca esta EF tras cada partido bridgeado sin JWT
+//     de usuario (salta getUser + membership check; mismo compare directo que
+//     el gate del bridge); (b) write-through a user_points_cache: tras montar
+//     rows (TODOS los miembros, también hasPreds=false con 0 pts) upserta
+//     (user_id, league_id, total_pts, breakdown {grp,ko,aw}) — la leen el tile
+//     del Predictor y las vistas v_user_global_rank v2 / v_league_rank. Un
+//     fallo del upsert NO tumba la respuesta (console.error y sigue).
 //   v1.3.0 (Fase 2 pre-kickoff): puente del bono anti-IA. ia_predictions usa
 //     claves wc2026_g{X}_{sofascore_id} y predictions usa el formato legacy
 //     {grupo}_{home_es}_{away_es}: el lookup directo daba overlap 0 y el +1
@@ -123,21 +131,27 @@ serve(async (req: Request) => {
     });
   }
   const token = authHeader.slice(7).trim();
-  let callerUid: string;
-  try {
-    const { data, error } = await supa.auth.getUser(token);
-    if (error || !data?.user?.id) {
+  // v1.4.0: bearer service_role privilegiado (caller interno: porra-bridge-
+  // results refrescando user_points_cache). Mismo compare directo que usa el
+  // gate del propio bridge. Sin membership check: opera sobre cualquier liga.
+  const privileged = token.length > 0 && token === SERVICE_KEY;
+  let callerUid: string | null = null;
+  if (!privileged) {
+    try {
+      const { data, error } = await supa.auth.getUser(token);
+      if (error || !data?.user?.id) {
+        return new Response(JSON.stringify({ error: "invalid_token" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      callerUid = data.user.id;
+    } catch {
       return new Response(JSON.stringify({ error: "invalid_token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    callerUid = data.user.id;
-  } catch {
-    return new Response(JSON.stringify({ error: "invalid_token" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
 
   let body: { league_id?: string };
@@ -157,7 +171,7 @@ serve(async (req: Request) => {
     });
   }
 
-  {
+  if (!privileged) {
     const { data: member, error: mErr } = await supa
       .from("league_members")
       .select("user_id")
@@ -361,12 +375,35 @@ serve(async (req: Request) => {
     };
   });
 
+  // B11 (Item 7): write-through a user_points_cache con TODOS los miembros
+  // (también hasPreds=false, a 0 pts — completan el denominador de las vistas
+  // de rank). El bridge invoca esta EF tras cada partido bridgeado, así la
+  // cache se actualiza al finalizar partido sin que nadie abra la app.
+  try {
+    const nowIso = new Date().toISOString();
+    const cacheRows = rows.map((r) => ({
+      user_id: r.uid,
+      league_id: leagueId,
+      total_pts: r.total,
+      breakdown: { grp: r.grpPts, ko: r.koPts, aw: r.awPts },
+      updated_at: nowIso,
+    }));
+    if (cacheRows.length) {
+      const { error: cacheErr } = await supa
+        .from("user_points_cache")
+        .upsert(cacheRows, { onConflict: "user_id,league_id" });
+      if (cacheErr) console.error("[standings] user_points_cache upsert failed:", cacheErr.message);
+    }
+  } catch (e) {
+    console.error("[standings] user_points_cache write-through error:", e);
+  }
+
   const filtered = rows
     .filter(r => r.hasPreds)
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.3.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.4.0" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

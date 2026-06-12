@@ -707,14 +707,27 @@ function _buildJCard(m, idx, date, boostKey, live) {
 
     const isExact = pred.l === realL && pred.v === realR;
     const signMatch = Math.sign(pred.l - pred.v) === Math.sign(realL - realR);
-    // Goleador: replicamos la lógica de calcMatchPoints.
-    let golMatch = false;
-    if (pred.gol && realL !== realR) {
-      const winnerTeamName = realL > realR ? m.home : m.away;
-      const winnerTeam = EQUIPOS.find(e => e.name === winnerTeamName);
-      const realScorer = winnerTeam?.players?.[0]?.key || null;
-      golMatch = !!(realScorer && pred.gol === realScorer);
+    // Goleador (R2a post-J1): scorers CANÓNICOS del bridge — la key legacy
+    // matchKey ES la de results.match_results (window._matchResultsByKey,
+    // live-sync). Fallback: derivar de los events crudos con el helper
+    // compartido de scoring.js (espejo del extractScorers del bridge). El
+    // placeholder anterior (primer jugador de plantilla del ganador) marcaba
+    // ✗ goleadores acertados (Parrandas: 2-1 Quinones sobre MEX-RSA 2-0) y
+    // el calc sin 5º argumento caía al mismo placeholder (ERR-91) → +1 pts
+    // en vez de +3.
+    let realScorers;
+    const mrEntry = (window._matchResultsByKey || {})[matchKey];
+    if (mrEntry && Array.isArray(mrEntry.scorers)) {
+      realScorers = mrEntry.scorers;
+    } else if (typeof deriveScorersFromEvents === 'function' && live) {
+      realScorers = deriveScorersFromEvents(
+        live.events, !!live._teams_swapped,
+        hTeam ? hTeam.flag : null, aTeam ? aTeam.flag : null);
     }
+    // golOk espejo del motor: pick acertado, o regla 0-0 (slot "sin goleador").
+    const golMatch = pred.gol
+      ? (Array.isArray(realScorers) && realScorers.indexOf(pred.gol) !== -1)
+      : (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0);
     const iaBonus = (typeof iaBonusWillApply === 'function') ? iaBonusWillApply(matchKey, predWithSaved, realL, realR) : false;
 
     const chip = (label, ok) => {
@@ -729,9 +742,11 @@ function _buildJCard(m, idx, date, boostKey, live) {
     const mySign = (typeof getMySign === 'function') ? getMySign(pred) : null;
     if (ia && ia.sign && mySign && mySign !== ia.sign) chipsHtml += chip('vs IA', iaBonus);
 
-    const pts = (typeof calcMatchPoints === 'function') ? calcMatchPoints(predWithSaved, realL, realR, matchKey) : 0;
-    const isBoostX2 = isBoost && isExact;
-    goldChipHtml = '<span class="jv2-chip jv2-chip--gold">+' + pts + ' pts' + (isBoostX2 ? ' ×2' : '') + '</span>';
+    const pts = (typeof calcMatchPoints === 'function') ? calcMatchPoints(predWithSaved, realL, realR, matchKey, realScorers) : 0;
+    // R3: el ×2 SOLO con exacto Y goleador a la vez (regla canónica San) —
+    // misma condición que el motor; copy alineado con Directo (Item 5).
+    const isBoostX2 = isBoost && isExact && golMatch;
+    goldChipHtml = '<span class="jv2-chip jv2-chip--gold">+' + pts + ' pts' + (isBoostX2 ? ' (boost ×2)' : '') + '</span>';
   }
 
   const boostRowCls = isBoost ? 'jv2-boost active' : 'jv2-boost';
@@ -809,14 +824,19 @@ function _buildJornadaRanking() {
   }
   const myId = window.currentUser?.id;
   const rows = window._sbData.slice(0, 10);
+  // F2: posición rank() con empates compartidos (helper data.js) — misma
+  // semántica que v_league_rank y el widget del Predictor.
+  const _rk = (i) => (typeof rankConEmpates === 'function')
+    ? rankConEmpates(rows, i, (u) => u.total) : (i + 1);
   return '<div class="jornada-ranking">' +
     '<div class="jornada-ranking-title">🏆 Clasificación liga</div>' +
     rows.map((u, i) => {
       const isMe = u.uid === myId;
       const ini  = (u.nombre || '?').charAt(0).toUpperCase();
-      const posCls = i < 3 ? 'jrank-pos top' : 'jrank-pos';
+      const rank = _rk(i);
+      const posCls = rank <= 3 ? 'jrank-pos top' : 'jrank-pos';
       const medals = ['🥇','🥈','🥉'];
-      const posStr = i < 3 ? medals[i] : (i + 1);
+      const posStr = rank <= 3 ? medals[rank - 1] : rank;
       return '<div class="jrank-row' + (isMe ? ' jrank-me' : '') + '">' +
         '<span class="' + posCls + '">' + posStr + '</span>' +
         '<div class="jrank-avatar">' + ini + '</div>' +
@@ -835,8 +855,12 @@ function _renderUserStrip() {
   const idx = window._sbData.findIndex(u => u.uid === myId);
   if (idx === -1) return;
   const u = window._sbData[idx];
+  // F2: rank() con empates compartidos — el índice (row_number) mostraba
+  // #15 a Parrandas cuando su posición real con empates a 3 pts es #13.
+  const rank = (typeof rankConEmpates === 'function')
+    ? rankConEmpates(window._sbData, idx, (r) => r.total) : (idx + 1);
   const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
-  const pos = idx < 3 ? medals[idx] : '#' + (idx + 1);
+  const pos = rank <= 3 ? medals[rank - 1] : '#' + rank;
   el.innerHTML =
     '<span class="jus-pos">' + pos + '</span>' +
     '<span class="jus-name">' + escapeHtml(u.nombre) + '</span>' +

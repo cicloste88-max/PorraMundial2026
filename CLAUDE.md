@@ -5,17 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**11-jun**: `update-results` v9 DESPLEGADA (gate X-Cron-Key, bidi BRA-ESC, filtro GROUP_STAGE anti-rematch KO, verify_jwt OFF); falta job pg_cron→orquestador. PR #157.
+**12-jun (post-J1)**: SofaScore 403 al actor (ERR-89) → **ESPN fuente primaria**: EF `espn-poll` v1 + cron `espn-poll-mundial-2026` (job 30, 1min, gate ventana); stopgap SQL retirado. `update-results` RETIRADA (decisión San). B11: `user_points_cache` + vistas rank reales (standings v1.4.0 write-through, bridge v7/v8 asObj+try/catch). Fixes J1: +2 goleador en Directo, jugador-v3 key BD, pastilla EN VIVO, banner ISO3, trofeo dorado. Rama `fix/j1-incidencias` (9 commits) **gate San**. Suite 236/0.
 
-**10-jun PM**: Highlights liga REALES — EF `get-league-highlights` v1.0.2 (5 insights service_role + verja cierre F4 + insights 1-2 time-aware J1→J3, ERR-86; great-wozniak OBSOLETA) + `loadLeagueHighlights` invoke + panel 5 cards. PR #148 gate San.
-
-Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun**: XIs 48 + `squads.xi` rebuild + 18 formaciones; `ia_last5` N=10. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
+Main `33af098`. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Activar pg_cron `update-results` (11-jun)** — EF v8 lista; smoke positivo + job 20min vía orquestador.
-2. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
-3. **QA picker premios** (simulacro 10-jun: display-only tras cierre) + **PR-3 ver pronósticos otros** (read-only, post-cierre).
+1. **Aceptación espn-poll (12-13 jun)**: CAN-BIH 19:00Z y USA-PAR 01:00Z — marcador, goles, descanso, FT, bridge y WhatsApp sin intervención. Si OK → unschedule `dispatch-live-slots` (evitar doble escritor si SofaScore desbloquea).
+2. **QA + merge `fix/j1-incidencias`** (gate humano San, preview Vercel).
+3. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
 
 ## Pendientes — Bugs UI
 
@@ -25,13 +23,13 @@ Main `ad96a52` (10-jun: backfill runtime→repo 17 EFs + tests CI 137). **10-jun
 
 1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
 2. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
-3. Validar JSON `_results.ko_results` con `update-results` real (11 jun).
+3. Validar `ko_results` con KO real vía bridge + espn-poll (~28 jun).
 4. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
 
 ## Backlog post-launch / Deuda técnica
 
 1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
-2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador, path goleador respeta `saved=(l!==null && v!==null)`. Defensa actual queda como red. F1 picker goleador KO (PR #69) YA EVITA replicar este patrón en `v3SaveGoleadorKO`. Post-launch — aplica solo al path grupos.
+2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador; goleador respeta `saved=(l!==null && v!==null)`. F1 (PR #69) ya evita el patrón en KO. Post-launch, solo grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
 5. **ERR-79 cerrado**. Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
@@ -105,13 +103,13 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..88: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86), forma cache normalizada (87), init latch live-sync (88).
+ERR-01..91: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86), forma cache normalizada (87), init latch live-sync (88), anti-bot per-IP (89), jsonb double-encoded (90), fallback param opcional (91).
 
 ### Otros ficheros de contexto
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..88 (síntoma/causa/fix/patrón).
+- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..91 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol

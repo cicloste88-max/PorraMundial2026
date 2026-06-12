@@ -106,6 +106,12 @@ function leagueSelect(league) {
     awPicks.golden_glove = null; awPicks.young_player = null;
     window._awPicksSaved = false;
     loadUserData(currentUser.id);
+    // R2-F1 post-J1: recargar boosts de ESTA liga desde BD. El load del
+    // bootstrap de auth corre SIN liga activa (deja boostPicks={}) y nadie
+    // volvía a cargarlos: pill y checkbox se quedaban con el residuo de
+    // localStorage toda la sesión. Debe ir DESPUÉS de fijar _porraCerrada
+    // (con porra cerrada loadBoostPicks ignora localStorage por completo).
+    if (typeof loadBoostPicks === 'function') loadBoostPicks();
   }
 
   // Actualizar pill en la barra de navegación

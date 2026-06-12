@@ -243,11 +243,25 @@ let boostPicks = {};  // { "2026-06-12": "México_Sudáfrica", ... }
 let iaPredictions = {};
 let totalPoints = 0;
 
+// R2b post-J1 → endurecido en F1 (re-QA San): SOLO key de liga concreta.
+// Sin liga activa NO hay key de cache — el residuo 'boostPicks_default'
+// (era pre-ligas / pruebas) sobrevive a los hard-reload (NO limpian
+// localStorage) y pintaba pill+checkbox en el partido equivocado durante
+// toda la sesión: el load del bootstrap de auth corre ANTES de que exista
+// liga activa y nadie volvía a cargar boosts al seleccionarla (ahora
+// leagueSelect re-llama a loadBoostPicks).
+function _boostLsKey() {
+  const leagueId = (window.getActiveLeagueId && window.getActiveLeagueId()) ||
+    window._currentLeagueId || null;
+  return leagueId ? ('boostPicks_' + leagueId) : null;
+}
+
 async function saveBoostPicks() {
-  // 1. Siempre guardar en localStorage como caché rápida
+  // 1. Caché rápida en localStorage — solo con liga activa (sin liga no se
+  //    escribe NADA: recrearía el residuo 'default').
   try {
-    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-    localStorage.setItem(key, JSON.stringify(boostPicks));
+    const lsKey = _boostLsKey();
+    if (lsKey) localStorage.setItem(lsKey, JSON.stringify(boostPicks));
   } catch(e) {}
 
   // 2. Sincronizar con Supabase (upsert por usuario/liga/día)
@@ -272,12 +286,31 @@ async function saveBoostPicks() {
 }
 
 async function loadBoostPicks() {
-  // 1. Cargar desde localStorage primero (respuesta inmediata)
-  try {
-    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-    const raw = localStorage.getItem(key);
-    boostPicks = raw ? JSON.parse(raw) : {};
-  } catch(e) { boostPicks = {}; }
+  // R2-F1: higiene one-shot — purgar el residuo legacy pre-ligas. Los
+  // hard-reload NO limpian localStorage; este residuo era el que seguía
+  // pintando la pill en MEX-RSA con la BD correcta.
+  try { localStorage.removeItem('boostPicks_default'); } catch(e) {}
+
+  const lsKey = _boostLsKey();
+  if (!lsKey) {
+    // Sin liga activa no hay contexto de boosts que pintar. NO leer locals.
+    boostPicks = {};
+    return;
+  }
+
+  // R2-F1: con la porra CERRADA la ÚNICA verdad es boost_picks en BD —
+  // ignorar localStorage por completo en lectura (un residuo bajo la key de
+  // liga ganaría el primer paint de pill/checkbox antes de resolver la BD).
+  const cerrada = window._porraCerrada === true;
+  if (cerrada) {
+    boostPicks = {};
+  } else {
+    // Pre-cierre: localStorage como caché rápida (la BD manda en el paso 2).
+    try {
+      const raw = localStorage.getItem(lsKey);
+      boostPicks = raw ? JSON.parse(raw) : {};
+    } catch(e) { boostPicks = {}; }
+  }
 
   // 2. Sobreescribir/migrar contra Supabase (fuente de verdad)
   try {
@@ -302,16 +335,35 @@ async function loadBoostPicks() {
       boostPicks = {};
       data.forEach(row => { boostPicks[row.match_date] = row.match_id; });
       try {
-        const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-        localStorage.setItem(key, JSON.stringify(boostPicks));
+        localStorage.setItem(lsKey, JSON.stringify(boostPicks));
       } catch(e) {}
-    } else if (Object.keys(boostPicks).length > 0) {
-      // Recuperación one-shot: DB vacía + localStorage con boosts
-      // (resaca del bug del cliente AUTH). Subir y dejar que el próximo
-      // load entre por la rama normal. Idempotente.
-      console.log('[loadBoostPicks] DB vacía + local con', Object.keys(boostPicks).length, 'boosts → migrando');
+    } else if (!cerrada && Object.keys(boostPicks).length > 0) {
+      // Recuperación one-shot: DB vacía + localStorage DE ESTA MISMA LIGA
+      // (lsKey es league-scoped por construcción; resaca del bug del cliente
+      // AUTH). Solo PRE-cierre: tras el cierre no existen boosts legítimos
+      // solo-locales. Idempotente.
+      console.log('[loadBoostPicks] DB vacía + local de la liga con', Object.keys(boostPicks).length, 'boosts → migrando');
       await saveBoostPicks();
+    } else {
+      // DB vacía y sin locals fiables de esta liga → sin boosts.
+      boostPicks = {};
     }
+
+    // R2-F1: las vistas pintadas antes de resolver la BD deben repintarse
+    // con el estado bueno (pill + checkbox leen el global boostPicks).
+    try {
+      if (document.getElementById('jornada-container') &&
+          typeof window.renderVistaJornada === 'function') {
+        window.renderVistaJornada();
+      }
+      if (document.getElementById('groups-container') &&
+          typeof window.renderAll === 'function') {
+        window.renderAll();
+      }
+      if (typeof window.v3RenderBoardGrupos === 'function') {
+        window.v3RenderBoardGrupos();
+      }
+    } catch(e) { /* vista no activa */ }
   } catch(e) {
     console.warn('[loadBoostPicks] Supabase error:', e.message);
   }
@@ -319,6 +371,24 @@ async function loadBoostPicks() {
 
 // ========== FUNCIONES AUXILIARES ==========
 function getMatchKey(m) { return `${m.group}_${m.home}_${m.away}`; }
+
+// F2 post-J1 (re-QA San): posición con semántica rank() — los empates
+// COMPARTEN posición y dejan hueco después — la MISMA que v_league_rank (BD)
+// y el widget Ranking del Predictor. El índice del array ordenado es
+// row_number y mostraba #15 a un empatado a 3 pts que es #13 (alexnovesh,
+// jesusruedagar y Parrandas comparten el 13). Único helper para TODAS las
+// vistas de posición sobre arrays ordenados por puntos desc.
+// rows: array ordenado; idx: fila objetivo; getTotal: (row) => puntos.
+function rankConEmpates(rows, idx, getTotal) {
+  if (!Array.isArray(rows) || idx < 0 || idx >= rows.length) return idx + 1;
+  const mine = Number(getTotal(rows[idx]) || 0);
+  let r = 1;
+  for (let i = 0; i < rows.length; i++) {
+    if (Number(getTotal(rows[i]) || 0) > mine) r++;
+  }
+  return r;
+}
+window.rankConEmpates = rankConEmpates;
 function getMySign(pred) { if(pred.l===null||pred.v===null) return null; return pred.l>pred.v?'1':pred.l<pred.v?'2':'X'; }
 // F.4 — Bonus +1pt cuando el user predice en contra de la IA y acierta.
 // Condiciones (todas obligatorias):
@@ -389,28 +459,33 @@ window.PHRASES_GRUPO = {
   ]
 };
 
-// === [B10-traceability] Predictor ranking helpers ===
+// === [B10-traceability → B11 Item 7 post-J1] Predictor ranking helpers ===
 //
-// Vistas backend (migración 20260430200000_predictor_ranking_views.sql):
+// Vistas backend (migración 20260612001000_b11_user_points_cache.sql):
 //   v_league_member_count(league_id, human_count, total_count)
-//   v_user_global_rank(user_id, total_pts, rank_global, total_users)
+//   v_league_rank(user_id, league_id, total_pts, rank_league, ranked_members)
+//   v_user_global_rank v2(user_id, league_id, total_pts, rank_global, total_users)
 //
-// loadPredictorRankingData() lo invoca mountPredShell() en ui-pred-shell.js
-// y popla window._predictorRanking. Pre-Mundial: total_pts=0 para todos →
-// todos empatados, leagueRank=1 si liga tiene miembros. Mid-Mundial
-// requerirá sprint B11 (user_points_cache real) para diferenciar.
+// Fuente canónica: user_points_cache, rellenada por get-league-standings
+// v1.4.0 (write-through) e invocada por porra-bridge-results tras cada
+// partido bridgeado. FUERA los hardcodes pre-Mundial (leagueRank=1, stub
+// global por created_at).
+//
+// Decisiones San (12-jun): rank global = mis pts EN ESTA LIGA vs el mejor
+// total de cada usuario de la app (2 ligas con mismos pts → misma posición);
+// IA Zayu COMPITE → denominador de liga = total_count (con bot), no
+// human_count.
 //
 // Defensiva: si window._porraDb no está disponible o falta league/user,
 // devuelve null y mantiene compat con render fallback de #fc-pred-tile
-// ("Líder · Liga" / "— · Global").
+// ("Líder · Liga" / "— · Global"). Cache TTL 60s: el tile se refresca al
+// remontar tras un partido bridgeado sin esperar reload completo.
 
-var _leagueMemberCountCache = {};
-var _globalRankCache = {};
+var _predictorRankingCache = {};
+var _PREDICTOR_RANKING_TTL_MS = 60000;
 
 async function loadLeagueMemberCount(leagueId) {
-  if (!leagueId) return null;
-  if (_leagueMemberCountCache[leagueId]) return _leagueMemberCountCache[leagueId];
-  if (!window._porraDb) return null;
+  if (!leagueId || !window._porraDb) return null;
   var res = await window._porraDb
     .from('v_league_member_count')
     .select('human_count,total_count')
@@ -420,24 +495,36 @@ async function loadLeagueMemberCount(leagueId) {
     console.warn('[predictor] loadLeagueMemberCount error', res.error);
     return null;
   }
-  _leagueMemberCountCache[leagueId] = res.data;
   return res.data;
 }
 
-async function loadGlobalRank(userId) {
-  if (!userId) return null;
-  if (_globalRankCache[userId]) return _globalRankCache[userId];
-  if (!window._porraDb) return null;
+async function loadLeagueRankRow(userId, leagueId) {
+  if (!userId || !leagueId || !window._porraDb) return null;
+  var res = await window._porraDb
+    .from('v_league_rank')
+    .select('total_pts,rank_league,ranked_members')
+    .eq('user_id', userId)
+    .eq('league_id', leagueId)
+    .maybeSingle();
+  if (res.error) {
+    console.warn('[predictor] loadLeagueRankRow error', res.error);
+    return null;
+  }
+  return res.data;
+}
+
+async function loadGlobalRank(userId, leagueId) {
+  if (!userId || !leagueId || !window._porraDb) return null;
   var res = await window._porraDb
     .from('v_user_global_rank')
     .select('rank_global,total_users')
     .eq('user_id', userId)
+    .eq('league_id', leagueId)
     .maybeSingle();
   if (res.error) {
     console.warn('[predictor] loadGlobalRank error', res.error);
     return null;
   }
-  _globalRankCache[userId] = res.data;
   return res.data;
 }
 
@@ -446,59 +533,87 @@ async function loadPredictorRankingData() {
   var userId = window.currentUser && window.currentUser.id;
   if (!leagueId || !userId) return null;
 
+  var cacheKey = userId + '|' + leagueId;
+  var cached = _predictorRankingCache[cacheKey];
+  if (cached && (Date.now() - cached.ts) < _PREDICTOR_RANKING_TTL_MS) {
+    window._predictorRanking = cached.data;
+    return cached.data;
+  }
+
   var results = await Promise.all([
     loadLeagueMemberCount(leagueId),
-    loadGlobalRank(userId)
+    loadLeagueRankRow(userId, leagueId),
+    loadGlobalRank(userId, leagueId)
   ]);
   var leagueData = results[0];
-  var globalData = results[1];
+  var rankRow = results[1];
+  var globalData = results[2];
 
+  // Zayu cuenta: denominador = total_count (miembros con bot). Fallback al
+  // nº de filas rankeadas en cache si la vista de members no responde.
   var memberCount = leagueData
-    ? Number(leagueData.human_count || leagueData.total_count || 0)
-    : 0;
-  // Pre-Mundial: todos empatados a 0 pts → user es 1º si liga tiene miembros.
-  var leagueRank = memberCount > 0 ? 1 : 0;
+    ? Number(leagueData.total_count || leagueData.human_count || 0)
+    : (rankRow ? Number(rankRow.ranked_members || 0) : 0);
 
   window._predictorRanking = {
     leagueMembers: memberCount,
-    leagueRank: leagueRank,
+    leagueRank: rankRow ? Number(rankRow.rank_league || 0) : 0,
+    totalPts: rankRow ? Number(rankRow.total_pts || 0) : 0,
     globalRank: globalData ? Number(globalData.rank_global || 0) : 0,
     globalTotal: globalData ? Number(globalData.total_users || 0) : 0
   };
+  _predictorRankingCache[cacheKey] = { ts: Date.now(), data: window._predictorRanking };
   return window._predictorRanking;
 }
 
 window.loadPredictorRankingData = loadPredictorRankingData;
 
-// === [Sprint A · Group 3] loadLeagueRanking — lista completa de miembros
-//     de la liga con nombre + is_bot + posición. Pre-Mundial todos a 0 pts
-//     (Sprint B: leer puntos reales de user_points_cache cuando exista). ===
+// === [Sprint A · Group 3 → R1 post-J1] loadLeagueRanking — ranking REAL de
+//     la liga desde user_points_cache (v_league_rank, MISMA fuente que el
+//     panel TU POSICIÓN del tile) + nombres/is_bot de profiles (RLS lectura
+//     pública "Profiles públicos para scoreboard"). NUNCA vía league_members:
+//     su SELECT es self-only (auth.uid() = user_id) y el widget colapsaba a
+//     "Vas Nº1 de 1 · líder <yo> con 0 pts" — cada usuario veía SOLO su
+//     fila, con points:0 hardcodeado del stub pre-Mundial. ===
 async function loadLeagueRanking(leagueId) {
   if (!leagueId || !window._porraDb) return [];
   var db = window._porraDb;
   var res = await db
-    .from('league_members')
-    .select('user_id, profiles(nombre, is_bot)')
-    .eq('league_id', leagueId);
+    .from('v_league_rank')
+    .select('user_id, total_pts, rank_league')
+    .eq('league_id', leagueId)
+    .order('rank_league', { ascending: true });
   if (res.error) {
     console.warn('[loadLeagueRanking] error', res.error.message);
     return [];
   }
-  var members = res.data || [];
-  // Orden natural por nombre alfabético — Pre-Mundial todos empatados a 0 pts.
-  // Sprint B: ORDER BY points DESC.
-  var rows = members.map(function (m) {
+  var ranks = res.data || [];
+  if (!ranks.length) return [];
+
+  var ids = ranks.map(function (r) { return r.user_id; });
+  var profRes = await db
+    .from('profiles')
+    .select('id, nombre, is_bot')
+    .in('id', ids);
+  if (profRes.error) console.warn('[loadLeagueRanking] profiles error', profRes.error.message);
+  var profById = {};
+  (profRes.data || []).forEach(function (p) { profById[p.id] = p; });
+
+  var rows = ranks.map(function (r) {
+    var p = profById[r.user_id] || {};
     return {
-      user_id: m.user_id,
-      nombre: (m.profiles && m.profiles.nombre) ? m.profiles.nombre : 'Usuario',
-      is_bot: !!(m.profiles && m.profiles.is_bot),
-      points: 0
+      user_id: r.user_id,
+      nombre: p.nombre || 'Usuario',
+      is_bot: !!p.is_bot,
+      points: Number(r.total_pts || 0),
+      position: Number(r.rank_league || 0)
     };
   });
+  // Empates comparten position (rank clásico de la vista); orden estable por
+  // nombre dentro del empate para que la lista no baile entre renders.
   rows.sort(function (a, b) {
-    return a.nombre.localeCompare(b.nombre, 'es');
+    return (a.position - b.position) || a.nombre.localeCompare(b.nombre, 'es');
   });
-  rows.forEach(function (r, i) { r.position = i + 1; });
   return rows;
 }
 window.loadLeagueRanking = loadLeagueRanking;

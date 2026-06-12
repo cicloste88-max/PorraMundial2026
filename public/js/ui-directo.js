@@ -152,6 +152,24 @@
     return num > 1e12 ? num : num * 1000;
   }
 
+  // N1 post-J1 — umbral "inminente" para la prioridad (a-bis) de la jornada
+  // en curso: kickoff REAL vencido o a ≤6h. Cubre el hueco medianoche→último
+  // slot de madrugada (04:00 Madrid) sin adelantar jornadas de tarde.
+  const _KICKOFF_INMINENTE_MS = 6 * 60 * 60 * 1000;
+
+  // Jornada en curso, por prioridad: (a) primera con partido live →
+  // (a-bis) primera con pendiente de kickoff real vencido/inminente →
+  // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+  // Pura (accessors inyectados) para testearla con escenarios de madrugada.
+  function _pickJornadaEnCurso(dias, opts) {
+    let idx = dias.findIndex(d => opts.liveCountOf(d) > 0);
+    if (idx === -1) idx = dias.findIndex(d => opts.hasPendingImminent(d));
+    if (idx === -1) idx = dias.indexOf(opts.todayMadrid);
+    if (idx === -1) idx = dias.findIndex(d => d > opts.todayMadrid);
+    if (idx === -1) idx = dias.length - 1;
+    return idx;
+  }
+
   // Solo-hora en Europe/Madrid, 24h (para fecha+hora usar formatStartCEST).
   function _formatHoraMadrid(ms) {
     const d = new Date(ms);
@@ -348,7 +366,7 @@
                     pred.v !== null && pred.v !== undefined;
 
     return { directoKey, liveRow, status, isLive, isFinal, scoreH, scoreA,
-             events, hasScore, minuteStr, matchKey, pred, hasPred };
+             events, hasScore, minuteStr, matchKey, pred, hasPred, teamsSwapped };
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -359,13 +377,41 @@
     if (!ctx.hasPred || !ctx.hasScore || !(ctx.isLive || ctx.isFinal)) return null;
     if (typeof calcMatchPoints !== 'function') return null;
     const predWithFlag = Object.assign({}, ctx.pred, { saved: ctx.pred.saved !== false });
-    const pts = calcMatchPoints(predWithFlag, ctx.scoreH, ctx.scoreA, ctx.matchKey);
+    const realScorers = _realScorersFor(ctx, m);
+    const pts = calcMatchPoints(predWithFlag, ctx.scoreH, ctx.scoreA, ctx.matchKey, realScorers);
     const bpSource = (typeof boostPicks !== 'undefined') ? boostPicks : {};
     const boostKey = bpSource[m.date?.substring(0, 10)];
     const isBoost  = boostKey === ctx.matchKey;
     const isExact  = ctx.pred.l === ctx.scoreH && ctx.pred.v === ctx.scoreA;
-    // calcMatchPoints ya aplica el x2 internamente cuando boost+exact.
-    return { pts, isExact, isBoost, finalPts: pts };
+    // R3 (regla canónica San 12-jun): el ×2 SOLO con exacto Y goleador a la
+    // vez — calcMatchPoints ya lo aplica internamente; aquí se replica la
+    // condición SOLO para el sufijo "(boost ×2)" del copy.
+    const golOk = ctx.pred.gol
+      ? (Array.isArray(realScorers) && realScorers.indexOf(ctx.pred.gol) !== -1)
+      : (ctx.pred.l === 0 && ctx.pred.v === 0 && ctx.scoreH === 0 && ctx.scoreA === 0);
+    return { pts, isExact, isBoost, isDoubled: isBoost && isExact && golOk, finalPts: pts };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Goleadores reales para el +2 (Item 3+5 post-J1). Sin 5º argumento,
+  // calcMatchPoints caía a _hf09FallbackScorers (primer jugador de plantilla
+  // del ganador) y el +2 de goleador no se concedía nunca en Directo.
+  //   - finished: scorers canónicos del bridge (results.match_results, key
+  //     legacy == ctx.matchKey), cargados por live-sync en
+  //     window._matchResultsByKey.
+  //   - en vivo (o finished aún sin bridge): derivados de los events crudos
+  //     de live_scores vía deriveScorersFromEvents (scoring.js, espejo del
+  //     extractScorers del bridge). [] = aún sin goles (NO usar fallback).
+  // ─────────────────────────────────────────────────────────────
+  function _realScorersFor(ctx, m) {
+    if (ctx.isFinal && ctx.matchKey && window._matchResultsByKey) {
+      const entry = window._matchResultsByKey[ctx.matchKey];
+      if (entry && Array.isArray(entry.scorers)) return entry.scorers;
+    }
+    if (typeof deriveScorersFromEvents !== 'function' || !ctx.liveRow) return undefined;
+    const hIso3 = (EQUIPOS.find(e => e.name === m.home) || {}).flag || null;
+    const aIso3 = (EQUIPOS.find(e => e.name === m.away) || {}).flag || null;
+    return deriveScorersFromEvents(ctx.liveRow.events, ctx.teamsSwapped, hIso3, aIso3);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -589,7 +635,10 @@
         const cls = live.finalPts > 0 ? 'win' : 'zero';
         const verb = ctx.isFinal ? (live.finalPts > 0 ? 'GANASTE' : 'SIN PUNTOS')
                                  : (live.finalPts > 0 ? 'VAS GANANDO' : '0 PTS POR AHORA');
-        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isBoost && live.isExact ? ' ×2' : '') : '';
+        // Copy boost: la cifra YA lleva el ×2 aplicado — "(boost ×2)" como
+        // aclaración, nunca "pts ×2" (sugería multiplicación pendiente).
+        // R3: el sufijo solo cuando el ×2 realmente aplicó (exacto Y goleador).
+        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isDoubled ? ' (boost ×2)' : '') : '';
         predStatusHtml = '<div class="dv2-exp-pred-status ' + cls + '">' + verb + (ptsTxt ? ' ' + ptsTxt : '') + '</div>';
       }
 
@@ -870,13 +919,31 @@
       return n;
     };
 
-    // Jornada en curso, por prioridad: (a) primera con partido live →
-    // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+    // (a-bis) — N1 post-J1 (captura San 03:35 Madrid): jornada con algún
+    // partido NO finished cuyo kickoff REAL (match_start_ts, con sufijo +1 —
+    // NO el día canónico de sede) esté vencido o a ≤6h. De madrugada sin
+    // live, (b) saltaba al día nuevo y la J1 desaparecía ENTERA con KOR-CZE
+    // aún por jugar (kickoff 04:00 del viernes, día canónico jueves 11); se
+    // autocuraba al pitido vía (a) pero el hueco medianoche→kickoff confundía.
+    // 6h cubre el peor hueco (medianoche → slot 04:00) sin adelantar de más
+    // las jornadas de tarde.
+    const _hasPendingImminent = (date) => {
+      const now = Date.now();
+      return jornadasMap[date].some(({ m }) => {
+        const dk = getDirectoKey(m);
+        const row = dk ? window._liveScoresByMatchKey[dk] : null;
+        if (row && row.status === 'finished') return false;
+        const ko = _kickoffMs(row);
+        return ko != null && (ko - now) <= _KICKOFF_INMINENTE_MS;
+      });
+    };
+
     const todayMadrid = _madridDateStr(Date.now());
-    let currentIdx = dias.findIndex(d => _liveCountOf(d) > 0);
-    if (currentIdx === -1) currentIdx = dias.indexOf(todayMadrid);
-    if (currentIdx === -1) currentIdx = dias.findIndex(d => d > todayMadrid);
-    if (currentIdx === -1) currentIdx = dias.length - 1;
+    const currentIdx = _pickJornadaEnCurso(dias, {
+      liveCountOf: _liveCountOf,
+      hasPendingImminent: _hasPendingImminent,
+      todayMadrid: todayMadrid
+    });
     const secondaryIdx = (currentIdx + 1 < dias.length) ? currentIdx + 1 : currentIdx - 1;
 
     let sectionsHtml = '';

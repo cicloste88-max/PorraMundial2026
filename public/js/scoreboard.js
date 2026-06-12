@@ -145,16 +145,21 @@ function sbRender(rows) {
             || null;
 
   // ── HERO PODIO (top-3 con orden visual 2 · 1 · 3) ────────
+  // F2 post-J1: las medallas/posiciones usan rank() con empates compartidos
+  // (rankConEmpates, data.js) — misma semántica que v_league_rank y el
+  // widget del Predictor. Con colíderes, varios pods muestran "1".
+  const _rk = (i) => (typeof rankConEmpates === 'function')
+    ? rankConEmpates(rows, i, (u) => u.total) : (i + 1);
   const podiumEl = document.getElementById('sb-podium');
   const top3 = rows.slice(0, 3);
   let order, meta, rowCls;
   if (top3.length >= 3) {
     order = [top3[1], top3[0], top3[2]];
-    meta = [{ cls: 'tf-pod--2', medal: '2' }, { cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--3', medal: '3' }];
+    meta = [{ cls: 'tf-pod--2', medal: String(_rk(1)) }, { cls: 'tf-pod--1', medal: String(_rk(0)) }, { cls: 'tf-pod--3', medal: String(_rk(2)) }];
     rowCls = '';
   } else if (top3.length === 2) {
     order = [top3[0], top3[1]];
-    meta = [{ cls: 'tf-pod--1', medal: '1' }, { cls: 'tf-pod--2', medal: '2' }];
+    meta = [{ cls: 'tf-pod--1', medal: String(_rk(0)) }, { cls: 'tf-pod--2', medal: String(_rk(1)) }];
     rowCls = ' duo';
   } else {
     order = [top3[0]];
@@ -188,7 +193,7 @@ function sbRender(rows) {
   // ── LISTA completa ────────────────────────────────────────
   const rowsEl = document.getElementById('sb-rows');
   rowsEl.innerHTML = rows.map((u, i) => {
-    const rank = i + 1;
+    const rank = _rk(i); // F2: empates comparten posición (rank(), no row_number)
     const isMe = u.uid === myId;
     const topCls = rank === 1 ? ' top1' : rank === 2 ? ' top2' : rank === 3 ? ' top3' : '';
     const tr = _sbTrendInfo(u.trend);

@@ -656,6 +656,7 @@ function v3CalcMatchPointsGrupos(prediction, match) {
   var realL = match.realHome;
   var realR = match.realAway;
   var types = [];
+  var matchKey = (typeof getMatchKey === 'function') ? getMatchKey(match) : null;
 
   // Replicamos la lógica de scoring.js calcMatchPoints SIN llamarla directamente
   // (queremos breakdown por tipo, no solo total). El total final debe coincidir
@@ -670,28 +671,38 @@ function v3CalcMatchPointsGrupos(prediction, match) {
     types.push('win');
   }
 
-  // Goleador (+2): coincide con el goleador real del equipo ganador.
-  if (prediction.gol && realL !== realR && typeof EQUIPOS !== 'undefined') {
-    var winnerTeam = realL > realR ? prediction.home : prediction.away;
-    var team = EQUIPOS.find(function(e) { return e.name === winnerTeam; });
-    var realScorer = team && team.players && team.players[0] ? team.players[0].key : null;
-    if (realScorer && prediction.gol === realScorer) types.push('gole');
-  } else if (!prediction.gol && prediction.l === 0 && prediction.v === 0 && realL === 0 && realR === 0) {
+  // Goleador (+2) — R2a post-J1: scorers CANÓNICOS del bridge
+  // (results.match_results vía window._matchResultsByKey, live-sync; la key
+  // legacy ES la del bridge). El placeholder anterior (primer jugador de
+  // plantilla del GANADOR, y solo sin empate) marcaba ✗ picks acertados
+  // (Parrandas: Quinones ≠ players[0] Jimenez) tanto aquí como en
+  // porra-jugador-v3, que consume estos types; con dogino (gol=Jimenez)
+  // coincidía de casualidad. Regla canónica F2.9: CUALQUIER goleador real
+  // del partido, también en empates. Sin entrada canónica aún (lag bridge):
+  // scorers=[] — sin +2, coherente con el chip apagado.
+  var realScorers = [];
+  var mrEntry = (typeof window !== 'undefined' && window._matchResultsByKey && matchKey)
+    ? window._matchResultsByKey[matchKey] : null;
+  if (mrEntry && Array.isArray(mrEntry.scorers)) realScorers = mrEntry.scorers;
+  if (prediction.gol) {
+    if (realScorers.indexOf(prediction.gol) !== -1) types.push('gole');
+  } else if (prediction.l === 0 && prediction.v === 0 && realL === 0 && realR === 0) {
     // Regla 0-0 (canónica, San 10-jun): sin goleador + 0-0 clavado → +2.
     // Paridad con calcMatchPoints (scoring.js) y _shared/scoring.mjs.
     types.push('gole');
   }
 
   // Bonus IA contrario (+1). Sólo si iaBonusWillApply existe globalmente.
-  var matchKey = (typeof getMatchKey === 'function') ? getMatchKey(match) : null;
   if (typeof iaBonusWillApply === 'function' && matchKey && iaBonusWillApply(matchKey, prediction, realL, realR)) {
     types.push('bonus');
   }
 
-  // Llamamos a calcMatchPoints si disponible para el total canónico (incluye cap 7 + boost).
+  // Llamamos a calcMatchPoints si disponible para el total canónico (incluye
+  // cap 7 + boost R3) — con los MISMOS scorers que el breakdown (ERR-91:
+  // sin 5º argumento caía al fallback placeholder y total ≠ chips).
   var total;
   if (typeof calcMatchPoints === 'function') {
-    total = calcMatchPoints(prediction, realL, realR, matchKey);
+    total = calcMatchPoints(prediction, realL, realR, matchKey, realScorers);
   } else {
     // Fallback computacional si scoring.js no cargado (sandbox sin scoring).
     total = 0;

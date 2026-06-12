@@ -14,7 +14,10 @@
 //   4. EF assembly: guard del mapeo `scorer` (BD) → `gol` (motor).
 //
 // Reglas (ERR-67, San 21-may-2026):
-//   +1 signo · +3 exacto APILA · +2 goleador · +1 bonus IA · cap 7 · boost ×2.
+//   +1 signo · +3 exacto APILA · +2 goleador · +1 bonus IA · cap 7.
+// Boost ×2 — REGLA CANÓNICA R3 (San, 12-jun-2026): SOLO dobla con EXACTO y
+// GOLEADOR a la vez. N3 (decisión San, madrugada 12-jun): el +1 anti-IA va
+// DENTRO del multiplicador (BOOST_INCLUYE_IA=true) → máx 14 = (cap 7) ×2.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
@@ -46,7 +49,7 @@ import {
   assert.strictEqual(t4, 7, 'shared #4: exacto + goleador + IA bonus → max 7');
 
   const t5 = sharedCalcMatchPoints({ saved: true, l: 3, v: 1, gol: null }, 3, 1, { boost: true });
-  assert.strictEqual(t5, 8, 'shared #5: exacto con boost ×2 → 4×2 = 8');
+  assert.strictEqual(t5, 4, 'shared #5 (R3): exacto SIN goleador + boost → NO dobla = 4');
 
   const t6 = sharedCalcMatchPoints({ saved: true, l: 2, v: 0, gol: null }, 3, 1, { boost: true });
   assert.strictEqual(t6, 1, 'shared #6: boost NO aplica sin exacto');
@@ -61,17 +64,33 @@ import {
   const t8 = sharedCalcMatchPoints({ saved: false, l: 3, v: 0, gol: null }, 3, 0);
   assert.strictEqual(t8, 0, 'shared #8: saved=false → 0');
 
-  // NUEVO (B2/T3): cap 7 ANTES del boost; exacto+gol+IA = 7, ×2 = 14 (máx).
+  // N3 (decisión San 12-jun): el +1 anti-IA DENTRO del multiplicador
+  // (BOOST_INCLUYE_IA=true): (1+3+2+1, cap 7) ×2 = 14 (máximo por partido).
   const t9 = sharedCalcMatchPoints(
     { saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, { scorers: ['lozano'], iaBonus: true, boost: true }
   );
-  assert.strictEqual(t9, 14, 'shared #9: (cap 7) × boost = 14 (máximo por partido)');
+  assert.strictEqual(t9, 14, 'shared #9 (N3): (cap 7) × boost = 14 (máximo por partido)');
 
   // NUEVO (B2/T3): boost NO dobla sin exacto aunque haya gol acertado.
   const t10 = sharedCalcMatchPoints(
     { saved: true, l: 2, v: 1, gol: 'lozano' }, 3, 1, { scorers: ['lozano'], boost: true }
   );
   assert.strictEqual(t10, 3, 'shared #10: signo+gol=3, boost no aplica (no exacto)');
+
+  // R3 — los 4 casos canónicos del boost (regla San 12-jun-2026):
+  const b1 = sharedCalcMatchPoints({ saved: true, l: 2, v: 0, gol: 'wrong' }, 2, 0, { scorers: ['lozano'], boost: true });
+  assert.strictEqual(b1, 4, 'R3 b1: solo exacto (goleador fallado) → NO dobla = 4');
+  const b2 = sharedCalcMatchPoints({ saved: true, l: 1, v: 2, gol: 'lozano' }, 2, 1, { scorers: ['lozano'], boost: true });
+  assert.strictEqual(b2, 2, 'R3 b2: solo goleador (signo fallado) → NO dobla = 2');
+  const b3 = sharedCalcMatchPoints({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, { scorers: ['lozano'], boost: true });
+  assert.strictEqual(b3, 12, 'R3 b3: exacto + goleador → dobla = (1+3+2)×2 = 12');
+  const b4 = sharedCalcMatchPoints({ saved: true, l: 0, v: 2, gol: 'wrong' }, 2, 0, { scorers: ['lozano'], boost: true });
+  assert.strictEqual(b4, 0, 'R3 b4: ninguno → 0 (boost irrelevante)');
+  // Caso real J1 (javion_89/daniel.castan20/josempurullena): exacto+boost con
+  // goleador fallado estaba inflado a 8; canónico = 4 (cubierto por b1/t5).
+  // Regla 0-0: el slot de goleador "sin goleador" acertado CUENTA para el ×2.
+  const b5 = sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, { boost: true });
+  assert.strictEqual(b5, 12, 'R3 b5: 0-0 clavado sin goleador + boost → (1+3+2)×2 = 12');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -187,6 +206,23 @@ const {
   globalThis.iaBonusWillApply = () => true;
   assert.strictEqual(legacyCMP({ saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, 'mock-key', ['lozano']), 7, 'legacy CMP #4');
   globalThis.iaBonusWillApply = () => false;
+}
+
+// R3 — paridad legacy↔shared de la regla canónica del boost (el legacy
+// resuelve el boost vía PARTIDOS/boostPicks por fecha, no por opts).
+{
+  globalThis.PARTIDOS = [{ group: 'A', home: 'H', away: 'V', date: '2026-06-11T19:00' }];
+  globalThis.boostPicks = { '2026-06-11': 'A_H_V' };
+  const K = 'A_H_V';
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'wrong' }, 2, 0, K, ['lozano']), 4, 'legacy R3: solo exacto NO dobla');
+  assert.strictEqual(legacyCMP({ saved: true, l: 1, v: 2, gol: 'lozano' }, 2, 1, K, ['lozano']), 2, 'legacy R3: solo goleador NO dobla');
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, K, ['lozano']), 12, 'legacy R3: exacto+goleador dobla = 12');
+  assert.strictEqual(legacyCMP({ saved: true, l: 0, v: 2, gol: 'wrong' }, 2, 0, K, ['lozano']), 0, 'legacy R3: ninguno → 0');
+  globalThis.iaBonusWillApply = () => true;
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, K, ['lozano']), 14, 'legacy N3: IA dentro del ×2 → 14 (parity shared #9)');
+  globalThis.iaBonusWillApply = () => false;
+  globalThis.PARTIDOS = [];
+  globalThis.boostPicks = {};
 }
 
 // Canónicos legacy calcKOMatchPoints (NUEVO — antes no se ejercía aislado).
@@ -349,11 +385,17 @@ const {
   const boostByUser = { u1: new Set(['A_Mex_Cro', 'B_Esp_Por']) };
   const has = (uid, mid) => boostByUser[uid]?.has(mid) ?? false;
 
-  // u1 con boost en A_Mex_Cro y exacto → 4 × 2 = 8.
+  // R3: el ×2 exige exacto Y goleador — exacto+gol acertado → 6 × 2 = 12.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: 'lozano' }, 2, 1, { scorers: ['lozano'], boost: has('u1', 'A_Mex_Cro') }),
+    12,
+    'EF assembly boost: match boosteado + exacto + goleador → ×2',
+  );
+  // R3: exacto solo (sin goleador) en match boosteado → NO dobla = 4.
   assert.strictEqual(
     sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: null }, 2, 1, { boost: has('u1', 'A_Mex_Cro') }),
-    8,
-    'EF assembly boost: match boosteado + exacto → ×2',
+    4,
+    'EF assembly boost (R3): exacto sin goleador NO dobla',
   );
   // u1 sin boost en match no boosteado → 4 (sin doblar).
   assert.strictEqual(
