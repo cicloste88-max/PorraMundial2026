@@ -243,11 +243,21 @@ let boostPicks = {};  // { "2026-06-12": "México_Sudáfrica", ... }
 let iaPredictions = {};
 let totalPoints = 0;
 
+// R2b post-J1: una ÚNICA fuente para la key de liga del cache local. Antes
+// localStorage usaba window._currentLeagueId y la BD getActiveLeagueId() —
+// dos globals que podían divergir: se leía 'boostPicks_default' (rancio, de
+// otra liga o de pruebas) y la pill de boost aparecía en el partido
+// equivocado aunque boost_picks en BD estuviera correcto.
+function _boostLsKey() {
+  const leagueId = (window.getActiveLeagueId && window.getActiveLeagueId()) ||
+    window._currentLeagueId || null;
+  return 'boostPicks_' + (leagueId || 'default');
+}
+
 async function saveBoostPicks() {
   // 1. Siempre guardar en localStorage como caché rápida
   try {
-    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-    localStorage.setItem(key, JSON.stringify(boostPicks));
+    localStorage.setItem(_boostLsKey(), JSON.stringify(boostPicks));
   } catch(e) {}
 
   // 2. Sincronizar con Supabase (upsert por usuario/liga/día)
@@ -272,10 +282,11 @@ async function saveBoostPicks() {
 }
 
 async function loadBoostPicks() {
-  // 1. Cargar desde localStorage primero (respuesta inmediata)
+  // 1. Cargar desde localStorage primero (respuesta inmediata; puede ser
+  //    rancio — la BD manda en el paso 2 y repinta).
+  const lsKey = _boostLsKey();
   try {
-    const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(lsKey);
     boostPicks = raw ? JSON.parse(raw) : {};
   } catch(e) { boostPicks = {}; }
 
@@ -302,15 +313,26 @@ async function loadBoostPicks() {
       boostPicks = {};
       data.forEach(row => { boostPicks[row.match_date] = row.match_id; });
       try {
-        const key = 'boostPicks_' + (window._currentLeagueId || 'default');
-        localStorage.setItem(key, JSON.stringify(boostPicks));
+        localStorage.setItem(lsKey, JSON.stringify(boostPicks));
       } catch(e) {}
-    } else if (Object.keys(boostPicks).length > 0) {
-      // Recuperación one-shot: DB vacía + localStorage con boosts
+    } else if (lsKey === 'boostPicks_' + leagueId && Object.keys(boostPicks).length > 0) {
+      // Recuperación one-shot: DB vacía + localStorage DE ESTA MISMA LIGA
       // (resaca del bug del cliente AUTH). Subir y dejar que el próximo
-      // load entre por la rama normal. Idempotente.
-      console.log('[loadBoostPicks] DB vacía + local con', Object.keys(boostPicks).length, 'boosts → migrando');
+      // load entre por la rama normal. Idempotente. R2b: el guard de key
+      // evita migrar locals de OTRA liga o del 'default' (contaminaría
+      // boost_picks cruzando ligas).
+      console.log('[loadBoostPicks] DB vacía + local de la liga con', Object.keys(boostPicks).length, 'boosts → migrando');
       await saveBoostPicks();
+    } else {
+      // DB vacía y sin locals fiables de esta liga → sin boosts.
+      boostPicks = {};
+    }
+
+    // R2b: si la vista Jornada ya se pintó con el cache local rancio, el
+    // estado correcto de BD debe repintar la pill (no esperar a navegar).
+    if (document.getElementById('jornada-container') &&
+        typeof window.renderVistaJornada === 'function') {
+      try { window.renderVistaJornada(); } catch(e) { /* vista no activa */ }
     }
   } catch(e) {
     console.warn('[loadBoostPicks] Supabase error:', e.message);
