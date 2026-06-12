@@ -152,6 +152,24 @@
     return num > 1e12 ? num : num * 1000;
   }
 
+  // N1 post-J1 — umbral "inminente" para la prioridad (a-bis) de la jornada
+  // en curso: kickoff REAL vencido o a ≤6h. Cubre el hueco medianoche→último
+  // slot de madrugada (04:00 Madrid) sin adelantar jornadas de tarde.
+  const _KICKOFF_INMINENTE_MS = 6 * 60 * 60 * 1000;
+
+  // Jornada en curso, por prioridad: (a) primera con partido live →
+  // (a-bis) primera con pendiente de kickoff real vencido/inminente →
+  // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+  // Pura (accessors inyectados) para testearla con escenarios de madrugada.
+  function _pickJornadaEnCurso(dias, opts) {
+    let idx = dias.findIndex(d => opts.liveCountOf(d) > 0);
+    if (idx === -1) idx = dias.findIndex(d => opts.hasPendingImminent(d));
+    if (idx === -1) idx = dias.indexOf(opts.todayMadrid);
+    if (idx === -1) idx = dias.findIndex(d => d > opts.todayMadrid);
+    if (idx === -1) idx = dias.length - 1;
+    return idx;
+  }
+
   // Solo-hora en Europe/Madrid, 24h (para fecha+hora usar formatStartCEST).
   function _formatHoraMadrid(ms) {
     const d = new Date(ms);
@@ -901,13 +919,31 @@
       return n;
     };
 
-    // Jornada en curso, por prioridad: (a) primera con partido live →
-    // (b) hoy en Europe/Madrid → (c) primera futura → (d) última si todo pasado.
+    // (a-bis) — N1 post-J1 (captura San 03:35 Madrid): jornada con algún
+    // partido NO finished cuyo kickoff REAL (match_start_ts, con sufijo +1 —
+    // NO el día canónico de sede) esté vencido o a ≤6h. De madrugada sin
+    // live, (b) saltaba al día nuevo y la J1 desaparecía ENTERA con KOR-CZE
+    // aún por jugar (kickoff 04:00 del viernes, día canónico jueves 11); se
+    // autocuraba al pitido vía (a) pero el hueco medianoche→kickoff confundía.
+    // 6h cubre el peor hueco (medianoche → slot 04:00) sin adelantar de más
+    // las jornadas de tarde.
+    const _hasPendingImminent = (date) => {
+      const now = Date.now();
+      return jornadasMap[date].some(({ m }) => {
+        const dk = getDirectoKey(m);
+        const row = dk ? window._liveScoresByMatchKey[dk] : null;
+        if (row && row.status === 'finished') return false;
+        const ko = _kickoffMs(row);
+        return ko != null && (ko - now) <= _KICKOFF_INMINENTE_MS;
+      });
+    };
+
     const todayMadrid = _madridDateStr(Date.now());
-    let currentIdx = dias.findIndex(d => _liveCountOf(d) > 0);
-    if (currentIdx === -1) currentIdx = dias.indexOf(todayMadrid);
-    if (currentIdx === -1) currentIdx = dias.findIndex(d => d > todayMadrid);
-    if (currentIdx === -1) currentIdx = dias.length - 1;
+    const currentIdx = _pickJornadaEnCurso(dias, {
+      liveCountOf: _liveCountOf,
+      hasPendingImminent: _hasPendingImminent,
+      todayMadrid: todayMadrid
+    });
     const secondaryIdx = (currentIdx + 1 < dias.length) ? currentIdx + 1 : currentIdx - 1;
 
     let sectionsHtml = '';
