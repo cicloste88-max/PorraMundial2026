@@ -14,7 +14,7 @@
 // comprobante con "Avanza: —").
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { BRACKET, ANNEX_C, GRUPOS } from '../supabase/functions/backfill-ko-classifiers/ko-data.mjs';
+import { BRACKET, ANNEX_C, GRUPOS } from '../supabase/functions/_shared/ko-data.mjs';
 import {
   ALL_KO_SLOTS,
   calcGroupTable,

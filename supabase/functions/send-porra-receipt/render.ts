@@ -228,6 +228,12 @@ function renderKo(d: ReceiptData): string {
       currentRound = k.roundLabel;
       rows += `<tr><td colspan="3" style="${SUBHEAD}">${esc(k.roundLabel)}</td></tr>`;
     }
+    // Cruce compacto "<home> <l · v> <away>" (bracket dinámico del usuario).
+    // Si un lado no es resoluble, flagName degrada a "—" y queda el marcador.
+    const cross =
+      `${flagName(d.flagsBase, k.homeIso3, k.homeName)} ` +
+      `<b style="white-space:nowrap">${score(k.l, k.v)}</b> ` +
+      `${flagName(d.flagsBase, k.awayIso3, k.awayName)}`;
     const advances = k.classifierName
       ? flagName(d.flagsBase, k.classifierIso3, k.classifierName, { bold: true })
       : `<span style="color:#cbd5e1">—</span>`;
@@ -235,15 +241,15 @@ function renderKo(d: ReceiptData): string {
       ? `<span style="color:#374151">⚽ ${esc(k.scorer)}</span>`
       : `<span style="color:#cbd5e1">—</span>`;
     rows +=
-      `<tr><td style="${CELL_C}font-weight:700">${score(k.l, k.v)}</td>` +
-      `<td style="${CELL}"><span style="color:#6b7280;font-size:12px">Avanza:</span> ${advances}</td>` +
+      `<tr><td style="${CELL}">${cross}</td>` +
+      `<td style="${CELL}white-space:nowrap"><span style="color:#6b7280;font-size:12px">Avanza:</span> ${advances}</td>` +
       `<td style="${CELL}">${scorer}</td></tr>`;
   }
   return (
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ` +
     `style="border-collapse:collapse;border:1px solid #eef0f3;border-radius:8px;overflow:hidden">` +
     `<thead><tr>` +
-    `<th style="${CELL_C}background:#f3f4f6;font-size:12px;color:#6b7280">Marcador</th>` +
+    `<th align="left" style="${CELL}background:#f3f4f6;font-size:12px;color:#6b7280">Partido</th>` +
     `<th align="left" style="${CELL}background:#f3f4f6;font-size:12px;color:#6b7280">Quién avanza</th>` +
     `<th align="left" style="${CELL}background:#f3f4f6;font-size:12px;color:#6b7280">Goleador</th>` +
     `</tr></thead><tbody>${rows}</tbody></table>`

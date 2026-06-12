@@ -1,4 +1,4 @@
-// ko-data.mjs — GENERADO por scripts/gen-backfill-ko-data.mjs. NO editar a mano.
+// ko-data.mjs — GENERADO por scripts/gen-ko-data.mjs. NO editar a mano.
 // Copia 1:1 de BRACKET + ANNEX_C (public/js/ko.js) y GRUPOS (public/js/data.js).
 // Regenerar tras cambios en los literales fuente.
 
