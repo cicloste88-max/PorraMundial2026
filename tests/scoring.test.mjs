@@ -16,8 +16,8 @@
 // Reglas (ERR-67, San 21-may-2026):
 //   +1 signo · +3 exacto APILA · +2 goleador · +1 bonus IA · cap 7.
 // Boost ×2 — REGLA CANÓNICA R3 (San, 12-jun-2026): SOLO dobla con EXACTO y
-// GOLEADOR a la vez; el +1 anti-IA queda FUERA del multiplicador (default
-// BOOST_INCLUYE_IA=false → máx 13). Antes doblaba con solo exacto (máx 14).
+// GOLEADOR a la vez. N3 (decisión San, madrugada 12-jun): el +1 anti-IA va
+// DENTRO del multiplicador (BOOST_INCLUYE_IA=true) → máx 14 = (cap 7) ×2.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
@@ -64,12 +64,12 @@ import {
   const t8 = sharedCalcMatchPoints({ saved: false, l: 3, v: 0, gol: null }, 3, 0);
   assert.strictEqual(t8, 0, 'shared #8: saved=false → 0');
 
-  // R3 (12-jun): el +1 anti-IA queda FUERA del multiplicador (default
-  // BOOST_INCLUYE_IA=false): (1+3+2)×2 + 1 = 13 (máximo por partido).
+  // N3 (decisión San 12-jun): el +1 anti-IA DENTRO del multiplicador
+  // (BOOST_INCLUYE_IA=true): (1+3+2+1, cap 7) ×2 = 14 (máximo por partido).
   const t9 = sharedCalcMatchPoints(
     { saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, { scorers: ['lozano'], iaBonus: true, boost: true }
   );
-  assert.strictEqual(t9, 13, 'shared #9 (R3): (1+3+2)×2 + 1 IA fuera = 13 (máximo)');
+  assert.strictEqual(t9, 14, 'shared #9 (N3): (cap 7) × boost = 14 (máximo por partido)');
 
   // NUEVO (B2/T3): boost NO dobla sin exacto aunque haya gol acertado.
   const t10 = sharedCalcMatchPoints(
@@ -219,7 +219,7 @@ const {
   assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, K, ['lozano']), 12, 'legacy R3: exacto+goleador dobla = 12');
   assert.strictEqual(legacyCMP({ saved: true, l: 0, v: 2, gol: 'wrong' }, 2, 0, K, ['lozano']), 0, 'legacy R3: ninguno → 0');
   globalThis.iaBonusWillApply = () => true;
-  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, K, ['lozano']), 13, 'legacy R3: IA fuera del ×2 → 13 (parity shared #9)');
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, K, ['lozano']), 14, 'legacy N3: IA dentro del ×2 → 14 (parity shared #9)');
   globalThis.iaBonusWillApply = () => false;
   globalThis.PARTIDOS = [];
   globalThis.boostPicks = {};

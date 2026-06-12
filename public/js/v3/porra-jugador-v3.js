@@ -154,15 +154,10 @@
       var gole = types.indexOf('gole') !== -1;
       out.scoringTypes = types;
       // R3 (12-jun, regla canónica San): el ×2 del boost SOLO con exacto Y
-      // goleador a la vez; el +1 anti-IA queda FUERA del multiplicador
-      // (default BOOST_INCLUYE_IA=false, espejo scoring.js/_shared) — máx 13.
+      // goleador a la vez. N3 (decisión San, madrugada 12-jun): el +1 anti-IA
+      // va DENTRO del multiplicador — base (cap 7, bonus incluido) ×2, máx 14.
       out.boosted = out.boost && exact && gole;
-      if (out.boosted) {
-        var bonus = types.indexOf('bonus') !== -1 ? 1 : 0;
-        out.pts = (base - bonus) * 2 + bonus;
-      } else {
-        out.pts = base;
-      }
+      out.pts = out.boosted ? base * 2 : base;
     }
     return out;
   }

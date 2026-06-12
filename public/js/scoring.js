@@ -93,19 +93,19 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
     doubled = !!(matchDate && boostPicks[matchDate] === matchKey);
   }
 
-  // Interacción anti-IA × boost — default ajustable (espejo de
-  // BOOST_INCLUYE_IA en _shared/scoring.mjs; pendiente confirmación San):
-  // por defecto el +1 anti-IA queda FUERA del multiplicador (máx 13).
-  // Cambiar en runtime: window.BOOST_INCLUYE_IA = true (máx 14).
-  const iaDentro = (typeof window !== 'undefined' && window.BOOST_INCLUYE_IA === true);
+  // Interacción anti-IA × boost — DECIDIDO por San (12-jun-2026): el +1
+  // anti-IA va DENTRO del multiplicador (máx 14 = cap7 ×2). Espejo de
+  // BOOST_INCLUYE_IA=true en _shared/scoring.mjs. Para volver al alternativo
+  // (IA fuera, máx 13) en runtime: window.BOOST_INCLUYE_IA = false.
+  const iaDentro = !(typeof window !== 'undefined' && window.BOOST_INCLUYE_IA === false);
   if (iaDentro) {
     if(iaB) pts += 1;
     pts = Math.min(pts, 7);
-    if(doubled) pts *= 2;
+    if(doubled) pts *= 2; // máx 14
   } else {
-    pts = Math.min(pts, 7); // defensa; sin IA dentro, el máximo base es 6
+    pts = Math.min(pts, 7);
     if(doubled) pts *= 2;
-    if(iaB) pts += 1;
+    if(iaB) pts += 1; // máx 13
   }
 
   return pts;

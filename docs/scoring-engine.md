@@ -13,7 +13,7 @@ El motor de puntuación calcula automáticamente la puntuación de cada particip
 | Goleador correcto | +2 |
 | Bonus vs IA (opuesto a IA y aciertas) | +1 |
 | **Máximo por partido** | **7** |
-| **Con boost ×2 activado** | **13** |
+| **Con boost ×2 activado** | **14** |
 
 ### Regla del +2 goleador (F2.9 HF-09)
 
@@ -49,7 +49,7 @@ El **×2 del boost SOLO aplica cuando se aciertan RESULTADO EXACTO y GOLEADOR a 
 | Ninguno | NO | 0-1 |
 | 0-0 clavado sin goleador | **SÍ** (slot goleador acertado) | (1+3+2)×2 = **12** |
 
-**Interacción con el +1 anti-IA** (default ajustable, pendiente confirmación de San): el +1 queda **FUERA del multiplicador** y se suma después → máximo por partido **13** = (1+3+2)×2 + 1. Flag `BOOST_INCLUYE_IA` en `_shared/scoring.mjs` (espejo `window.BOOST_INCLUYE_IA` en `scoring.js`); con `true` el +1 entra en el ×2 (máx 14, comportamiento pre-R3).
+**Interacción con el +1 anti-IA** (DECIDIDA por San, 12-jun-2026): el +1 va **DENTRO del multiplicador** → máximo por partido **14** = (1 signo + 3 exacto + 2 goleador + 1 vs IA, cap 7) ×2. Flag `BOOST_INCLUYE_IA=true` en `_shared/scoring.mjs` (espejo `window.BOOST_INCLUYE_IA` en `scoring.js`); con `false` el +1 quedaría fuera del ×2 (máx 13).
 
 > Historia (R3 post-J1, 12-jun-2026): el motor doblaba con solo exacto e infló 8↔4 los puntos J1 de 3 usuarios (javion_89, daniel.castan20, josempurullena); corregido y re-sembrada `user_points_cache`. Los 12 de exacto+goleador+boost eran correctos.
 
@@ -97,7 +97,7 @@ El bonus se aplica cuando el pronóstico del usuario diverge del signo de la IA 
 1. **Guard `iaBonusWillApply`**: la IA debe tener un signo válido (`ia.sign ∈ {'1','X','2'}`).
 2. Comparación: si el signo del usuario coincide con el de la IA, no hay bonus.
 3. Si divergen Y el signo del usuario es el correcto del partido, suma +1.
-4. **Orden de aplicación** (default `BOOST_INCLUYE_IA=false`, R3): el bonus se suma DESPUÉS del cap y del ×2 del boost — queda fuera del multiplicador (máx 13). Con el flag a `true`, se aplica antes del cap y del ×2 (máx 14).
+4. **Orden de aplicación** (`BOOST_INCLUYE_IA=true`, decisión San 12-jun): el bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap `Math.min(pts, 7)` y del ×2 del boost — entra en el multiplicador (máx 14). Con el flag a `false`, se sumaría tras el ×2 (máx 13).
 
 Detalle del motor IA y fórmula del pronóstico en `docs/ia-predictor.md`.
 

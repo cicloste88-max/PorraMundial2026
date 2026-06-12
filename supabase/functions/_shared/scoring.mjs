@@ -24,11 +24,12 @@ export const FINAL_CLASSIFICATION_PTS = {
   fourth:    10,
 };
 
-// Interacción anti-IA × boost — DEFAULT AJUSTABLE (pendiente confirmación de
-// San, 12-jun-2026): false = el +1 anti-IA queda FUERA del multiplicador y se
-// suma después (máx teórico 13 = (1+3+2)×2 + 1); true = IA dentro del ×2
-// (máx 14). Espejo frontend: window.BOOST_INCLUYE_IA (scoring.js).
-export const BOOST_INCLUYE_IA = false;
+// Interacción anti-IA × boost — DECIDIDO por San (12-jun-2026, madrugada):
+// el +1 anti-IA va DENTRO del multiplicador — (1 signo + 3 exacto + 2 goleador
+// + 1 vs IA, cap 7) ×2 = MÁXIMO 14 por partido. Con false, el +1 quedaría
+// fuera y se sumaría después (máx 13). Espejo frontend:
+// window.BOOST_INCLUYE_IA (scoring.js; false para volver al alternativo).
+export const BOOST_INCLUYE_IA = true;
 
 export function calcMatchPoints(pred, realL, realR, opts = {}) {
   if (!pred || !pred.saved) return 0;
