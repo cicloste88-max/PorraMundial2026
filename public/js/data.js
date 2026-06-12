@@ -243,21 +243,25 @@ let boostPicks = {};  // { "2026-06-12": "México_Sudáfrica", ... }
 let iaPredictions = {};
 let totalPoints = 0;
 
-// R2b post-J1: una ÚNICA fuente para la key de liga del cache local. Antes
-// localStorage usaba window._currentLeagueId y la BD getActiveLeagueId() —
-// dos globals que podían divergir: se leía 'boostPicks_default' (rancio, de
-// otra liga o de pruebas) y la pill de boost aparecía en el partido
-// equivocado aunque boost_picks en BD estuviera correcto.
+// R2b post-J1 → endurecido en F1 (re-QA San): SOLO key de liga concreta.
+// Sin liga activa NO hay key de cache — el residuo 'boostPicks_default'
+// (era pre-ligas / pruebas) sobrevive a los hard-reload (NO limpian
+// localStorage) y pintaba pill+checkbox en el partido equivocado durante
+// toda la sesión: el load del bootstrap de auth corre ANTES de que exista
+// liga activa y nadie volvía a cargar boosts al seleccionarla (ahora
+// leagueSelect re-llama a loadBoostPicks).
 function _boostLsKey() {
   const leagueId = (window.getActiveLeagueId && window.getActiveLeagueId()) ||
     window._currentLeagueId || null;
-  return 'boostPicks_' + (leagueId || 'default');
+  return leagueId ? ('boostPicks_' + leagueId) : null;
 }
 
 async function saveBoostPicks() {
-  // 1. Siempre guardar en localStorage como caché rápida
+  // 1. Caché rápida en localStorage — solo con liga activa (sin liga no se
+  //    escribe NADA: recrearía el residuo 'default').
   try {
-    localStorage.setItem(_boostLsKey(), JSON.stringify(boostPicks));
+    const lsKey = _boostLsKey();
+    if (lsKey) localStorage.setItem(lsKey, JSON.stringify(boostPicks));
   } catch(e) {}
 
   // 2. Sincronizar con Supabase (upsert por usuario/liga/día)
@@ -282,13 +286,31 @@ async function saveBoostPicks() {
 }
 
 async function loadBoostPicks() {
-  // 1. Cargar desde localStorage primero (respuesta inmediata; puede ser
-  //    rancio — la BD manda en el paso 2 y repinta).
+  // R2-F1: higiene one-shot — purgar el residuo legacy pre-ligas. Los
+  // hard-reload NO limpian localStorage; este residuo era el que seguía
+  // pintando la pill en MEX-RSA con la BD correcta.
+  try { localStorage.removeItem('boostPicks_default'); } catch(e) {}
+
   const lsKey = _boostLsKey();
-  try {
-    const raw = localStorage.getItem(lsKey);
-    boostPicks = raw ? JSON.parse(raw) : {};
-  } catch(e) { boostPicks = {}; }
+  if (!lsKey) {
+    // Sin liga activa no hay contexto de boosts que pintar. NO leer locals.
+    boostPicks = {};
+    return;
+  }
+
+  // R2-F1: con la porra CERRADA la ÚNICA verdad es boost_picks en BD —
+  // ignorar localStorage por completo en lectura (un residuo bajo la key de
+  // liga ganaría el primer paint de pill/checkbox antes de resolver la BD).
+  const cerrada = window._porraCerrada === true;
+  if (cerrada) {
+    boostPicks = {};
+  } else {
+    // Pre-cierre: localStorage como caché rápida (la BD manda en el paso 2).
+    try {
+      const raw = localStorage.getItem(lsKey);
+      boostPicks = raw ? JSON.parse(raw) : {};
+    } catch(e) { boostPicks = {}; }
+  }
 
   // 2. Sobreescribir/migrar contra Supabase (fuente de verdad)
   try {
@@ -315,12 +337,11 @@ async function loadBoostPicks() {
       try {
         localStorage.setItem(lsKey, JSON.stringify(boostPicks));
       } catch(e) {}
-    } else if (lsKey === 'boostPicks_' + leagueId && Object.keys(boostPicks).length > 0) {
+    } else if (!cerrada && Object.keys(boostPicks).length > 0) {
       // Recuperación one-shot: DB vacía + localStorage DE ESTA MISMA LIGA
-      // (resaca del bug del cliente AUTH). Subir y dejar que el próximo
-      // load entre por la rama normal. Idempotente. R2b: el guard de key
-      // evita migrar locals de OTRA liga o del 'default' (contaminaría
-      // boost_picks cruzando ligas).
+      // (lsKey es league-scoped por construcción; resaca del bug del cliente
+      // AUTH). Solo PRE-cierre: tras el cierre no existen boosts legítimos
+      // solo-locales. Idempotente.
       console.log('[loadBoostPicks] DB vacía + local de la liga con', Object.keys(boostPicks).length, 'boosts → migrando');
       await saveBoostPicks();
     } else {
@@ -328,12 +349,21 @@ async function loadBoostPicks() {
       boostPicks = {};
     }
 
-    // R2b: si la vista Jornada ya se pintó con el cache local rancio, el
-    // estado correcto de BD debe repintar la pill (no esperar a navegar).
-    if (document.getElementById('jornada-container') &&
-        typeof window.renderVistaJornada === 'function') {
-      try { window.renderVistaJornada(); } catch(e) { /* vista no activa */ }
-    }
+    // R2-F1: las vistas pintadas antes de resolver la BD deben repintarse
+    // con el estado bueno (pill + checkbox leen el global boostPicks).
+    try {
+      if (document.getElementById('jornada-container') &&
+          typeof window.renderVistaJornada === 'function') {
+        window.renderVistaJornada();
+      }
+      if (document.getElementById('groups-container') &&
+          typeof window.renderAll === 'function') {
+        window.renderAll();
+      }
+      if (typeof window.v3RenderBoardGrupos === 'function') {
+        window.v3RenderBoardGrupos();
+      }
+    } catch(e) { /* vista no activa */ }
   } catch(e) {
     console.warn('[loadBoostPicks] Supabase error:', e.message);
   }

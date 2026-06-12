@@ -159,8 +159,10 @@ function fakeLs(store) {
   return {
     store,
     reads: [],
+    removed: [],
     getItem(k) { this.reads.push(k); return this.store[k] ?? null; },
     setItem(k, v) { this.store[k] = v; },
+    removeItem(k) { this.removed.push(k); delete this.store[k]; },
   };
 }
 
@@ -213,6 +215,54 @@ test('BD vacía + local DE ESTA liga → migración one-shot (recovery bug AUTH 
   });
   await api.load();
   assert.strictEqual(migrated, true);
+});
+
+// ─── F1 (re-QA San): el residuo sobrevive a hard-reload y al bootstrap sin liga ───
+
+test('F1: SIN liga activa → boostPicks {} y localStorage NI SE LEE (el bootstrap de auth corre así)', async () => {
+  const ls = fakeLs({
+    'boostPicks_default': JSON.stringify({ '2026-06-11': 'A_México_Sudáfrica' }),
+    'boostPicks_liga-gallos': JSON.stringify({ '2026-06-11': 'A_México_Sudáfrica' }),
+  });
+  const win = WIN([]);
+  win.getActiveLeagueId = () => null;
+  const api = makeLoadBoost({ window: win, localStorage: ls });
+  await api.load();
+  assert.deepStrictEqual(api.getBoost(), {});
+  assert.deepStrictEqual(ls.reads, []); // ni default ni nada
+  assert.ok(ls.removed.includes('boostPicks_default')); // higiene del residuo
+});
+
+test('F1: porra CERRADA → localStorage ignorado por completo; BD es la única verdad', async () => {
+  // Residuo bajo la PROPIA key de liga (escenario que pedía reproducir San).
+  const ls = fakeLs({ 'boostPicks_liga-gallos': JSON.stringify({ '2026-06-11': 'A_México_Sudáfrica' }) });
+  const win = WIN([{ match_date: '2026-06-11', match_id: 'A_República de Corea_República Checa' }]);
+  win._porraCerrada = true;
+  const api = makeLoadBoost({ window: win, localStorage: ls });
+  await api.load();
+  assert.deepStrictEqual(ls.reads, []); // cerrada: NUNCA se lee el local
+  assert.deepStrictEqual(api.getBoost(), { '2026-06-11': 'A_República de Corea_República Checa' });
+  // y el cache queda sobrescrito con la verdad de BD
+  assert.ok(ls.store['boostPicks_liga-gallos'].includes('Corea'));
+});
+
+test('F1: porra CERRADA + BD vacía → {} y NUNCA migración (post-cierre no hay boosts solo-locales legítimos)', async () => {
+  let migrated = false;
+  const ls = fakeLs({ 'boostPicks_liga-gallos': JSON.stringify({ '2026-06-11': 'X' }) });
+  const win = WIN([]);
+  win._porraCerrada = true;
+  const api = makeLoadBoost({ window: win, localStorage: ls, saveBoostPicks: () => { migrated = true; } });
+  await api.load();
+  assert.strictEqual(migrated, false);
+  assert.deepStrictEqual(api.getBoost(), {});
+});
+
+test('F1 wiring: leagueSelect re-llama a loadBoostPicks tras fijar _porraCerrada', () => {
+  const leaguesSrc = readFileSync(new URL('../public/js/leagues.js', import.meta.url), 'utf8');
+  const fn = leaguesSrc.slice(leaguesSrc.indexOf('function leagueSelect('), leaguesSrc.indexOf('function leagueUpdateNavPill('));
+  const cerradaPos = fn.indexOf('window._porraCerrada = !!league.porra_cerrada');
+  const loadPos = fn.indexOf('loadBoostPicks()');
+  assert.ok(cerradaPos > -1 && loadPos > -1 && cerradaPos < loadPos);
 });
 
 test('repaint: con #jornada-container presente, re-renderiza Jornada tras cargar BD', async () => {
