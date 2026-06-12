@@ -24,6 +24,12 @@ export const FINAL_CLASSIFICATION_PTS = {
   fourth:    10,
 };
 
+// Interacción anti-IA × boost — DEFAULT AJUSTABLE (pendiente confirmación de
+// San, 12-jun-2026): false = el +1 anti-IA queda FUERA del multiplicador y se
+// suma después (máx teórico 13 = (1+3+2)×2 + 1); true = IA dentro del ×2
+// (máx 14). Espejo frontend: window.BOOST_INCLUYE_IA (scoring.js).
+export const BOOST_INCLUYE_IA = false;
+
 export function calcMatchPoints(pred, realL, realR, opts = {}) {
   if (!pred || !pred.saved) return 0;
   let pts = 0;
@@ -38,24 +44,37 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
 
   if (isExact) pts += 3;
 
+  // Goleador (+2). golOk alimenta también la condición del boost (R3).
+  let golOk = false;
   if (pred.gol) {
     const scorers = opts.scorers;
-    if (Array.isArray(scorers) && scorers.includes(pred.gol)) pts += 2;
+    golOk = Array.isArray(scorers) && scorers.includes(pred.gol);
   } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
     // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
     // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si el
     // real también es 0-0, paga el +2 de goleador (un 0-0 clavado vale
     // 1+3+2=6 base, paridad con cualquier otro exacto). Si el usuario SÍ
     // registró goleador y el real es 0-0, su apuesta falla (rama de arriba:
-    // scorers vacío → no suma). Cap 7 y boost ×2 sobre exacto, como siempre.
-    pts += 2;
+    // scorers vacío → no suma). A efectos del boost, ese slot de goleador
+    // acertado CUENTA (golOk=true).
+    golOk = true;
   }
+  if (golOk) pts += 2;
 
-  if (opts.iaBonus) pts += 1;
+  // Boost ×2 — REGLA CANÓNICA (San product owner, 12-jun-2026, R3 post-J1):
+  // SOLO dobla cuando se aciertan RESULTADO EXACTO y GOLEADOR a la vez.
+  // El bug previo (doblar con solo exacto) infló 8↔4 a 3 usuarios en J1.
+  const doubled = isExact && golOk && opts.boost === true;
 
-  pts = Math.min(pts, 7);
-
-  if (isExact && opts.boost) pts *= 2;
+  if (BOOST_INCLUYE_IA) {
+    if (opts.iaBonus) pts += 1;
+    pts = Math.min(pts, 7);
+    if (doubled) pts *= 2; // máx 14
+  } else {
+    pts = Math.min(pts, 7); // defensa; sin IA dentro, el máximo base es 6
+    if (doubled) pts *= 2;
+    if (opts.iaBonus) pts += 1; // máx 13
+  }
 
   return pts;
 }

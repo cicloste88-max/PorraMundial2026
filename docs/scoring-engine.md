@@ -13,7 +13,7 @@ El motor de puntuación calcula automáticamente la puntuación de cada particip
 | Goleador correcto | +2 |
 | Bonus vs IA (opuesto a IA y aciertas) | +1 |
 | **Máximo por partido** | **7** |
-| **Con boost x2 activado** | **14** |
+| **Con boost ×2 activado** | **13** |
 
 ### Regla del +2 goleador (F2.9 HF-09)
 
@@ -35,7 +35,23 @@ Al pronosticar **0-0**, el goleador es **opcional**: dejarlo vacío es la apuest
 | 0-0 sin goleador, **con boost** | 0-0 | (1+3+2) × 2 = **12** |
 | 1-1 sin goleador | 0-0 | **1** (solo signo X; la regla exige pred 0-0 exacto) |
 
-El **cap 7** (pre-boost) y el **×2 del boost sobre exacto** se aplican igual que siempre. Las rondas KO heredan la regla vía `calcKOMatchPoints` (que delega los puntos de marcador en `calcMatchPoints`).
+El **cap 7** se aplica igual que siempre. El ×2 del boost requiere exacto **y** goleador (ver regla canónica abajo); en el caso 0-0 clavado sin goleador, el slot de goleador acertado CUENTA para el ×2. Las rondas KO heredan la regla vía `calcKOMatchPoints` (que delega los puntos de marcador en `calcMatchPoints`).
+
+### Regla del boost ×2 (CANÓNICA — confirmada por San, product owner, 12-jun-2026)
+
+El **×2 del boost SOLO aplica cuando se aciertan RESULTADO EXACTO y GOLEADOR a la vez**.
+
+| Con boost activado | ¿Dobla? | Puntos |
+|---|---|---|
+| Solo exacto (goleador fallado/ausente) | NO | 1+3 = **4** |
+| Solo goleador (exacto fallado) | NO | (1)+2 = **2-3** |
+| Exacto + goleador | **SÍ** | (1+3+2)×2 = **12** |
+| Ninguno | NO | 0-1 |
+| 0-0 clavado sin goleador | **SÍ** (slot goleador acertado) | (1+3+2)×2 = **12** |
+
+**Interacción con el +1 anti-IA** (default ajustable, pendiente confirmación de San): el +1 queda **FUERA del multiplicador** y se suma después → máximo por partido **13** = (1+3+2)×2 + 1. Flag `BOOST_INCLUYE_IA` en `_shared/scoring.mjs` (espejo `window.BOOST_INCLUYE_IA` en `scoring.js`); con `true` el +1 entra en el ×2 (máx 14, comportamiento pre-R3).
+
+> Historia (R3 post-J1, 12-jun-2026): el motor doblaba con solo exacto e infló 8↔4 los puntos J1 de 3 usuarios (javion_89, daniel.castan20, josempurullena); corregido y re-sembrada `user_points_cache`. Los 12 de exacto+goleador+boost eran correctos.
 
 **Implementación con paridad obligatoria**: `supabase/functions/_shared/scoring.mjs` (motor compartido, lo consume la EF `get-league-standings`) y `public/js/scoring.js` (frontend). Casos canónicos en `tests/scoring.test.mjs`.
 
@@ -81,7 +97,7 @@ El bonus se aplica cuando el pronóstico del usuario diverge del signo de la IA 
 1. **Guard `iaBonusWillApply`**: la IA debe tener un signo válido (`ia.sign ∈ {'1','X','2'}`).
 2. Comparación: si el signo del usuario coincide con el de la IA, no hay bonus.
 3. Si divergen Y el signo del usuario es el correcto del partido, suma +1.
-4. **Orden de aplicación**: el bonus se aplica DESPUÉS de signo/exacto/goleador y ANTES del cap `Math.min(pts, 7)` y del boost ×2.
+4. **Orden de aplicación** (default `BOOST_INCLUYE_IA=false`, R3): el bonus se suma DESPUÉS del cap y del ×2 del boost — queda fuera del multiplicador (máx 13). Con el flag a `true`, se aplica antes del cap y del ×2 (máx 14).
 
 Detalle del motor IA y fórmula del pronóstico en `docs/ia-predictor.md`.
 

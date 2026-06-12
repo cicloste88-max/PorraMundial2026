@@ -151,9 +151,18 @@
       var types = calc.types || [];
       var base = _baseFromTypes(types);
       var exact = types.indexOf('exact') !== -1;
+      var gole = types.indexOf('gole') !== -1;
       out.scoringTypes = types;
-      out.boosted = out.boost && exact;     // boost ×2 del TARGET
-      out.pts = out.boosted ? base * 2 : base;
+      // R3 (12-jun, regla canónica San): el ×2 del boost SOLO con exacto Y
+      // goleador a la vez; el +1 anti-IA queda FUERA del multiplicador
+      // (default BOOST_INCLUYE_IA=false, espejo scoring.js/_shared) — máx 13.
+      out.boosted = out.boost && exact && gole;
+      if (out.boosted) {
+        var bonus = types.indexOf('bonus') !== -1 ? 1 : 0;
+        out.pts = (base - bonus) * 2 + bonus;
+      } else {
+        out.pts = base;
+      }
     }
     return out;
   }

@@ -66,31 +66,46 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   // F2.9 HF-09 — Goleador: +2 si pred.gol acierta a CUALQUIER goleador real
   // del partido, del equipo que sea (ganador, perdedor, empatado).
   // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
-  // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si pred
-  // 0-0 Y real 0-0 Y sin goleador, paga el +2 (0-0 clavado = 1+3+2 = 6 base,
-  // paridad con cualquier otro exacto). Si registró goleador y el real es
-  // 0-0, su apuesta falla (scorers vacío). Paridad con _shared/scoring.mjs.
+  // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador"; con 0-0
+  // clavado paga el +2 y a efectos del boost ese slot CUENTA (golOk=true).
   // Excepción KO: los goles en tanda de penaltis NO cuentan — responsabilidad
   // del pipeline alimentar realScorers solo con goles de 90' + prórroga.
+  // Paridad con _shared/scoring.mjs.
+  let golOk = false;
   if(pred.gol) {
     const scorers = realScorers ?? _hf09FallbackScorers(pred, realL, realR);
-    if(scorers.includes(pred.gol)) pts += 2;
+    golOk = scorers.includes(pred.gol);
   } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
-    pts += 2;
+    golOk = true;
   }
+  if(golOk) pts += 2;
 
   // Bonus vs IA (F.4). iaBonusWillApply valida que ia.sign !== null,
   // user_sign !== ia_sign, y user_sign === real_sign.
-  if(iaBonusWillApply(matchKey, pred, realL, realR)) pts += 1;
+  const iaB = iaBonusWillApply(matchKey, pred, realL, realR);
 
-  pts = Math.min(pts, 7); // cap 7pt por partido (pre-boost)
-
-  // Boost x2: si este partido es el boost del día Y se acertó el exacto
-  if(isExact && matchKey) {
+  // Boost ×2 — REGLA CANÓNICA (San product owner, 12-jun-2026, R3 post-J1):
+  // SOLO dobla cuando se aciertan RESULTADO EXACTO y GOLEADOR a la vez. El
+  // bug previo (doblar con solo exacto) infló puntos publicados en J1.
+  let doubled = false;
+  if(isExact && golOk && matchKey) {
     const matchDate = PARTIDOS.find(m => getMatchKey(m) === matchKey)?.date?.substring(0,10);
-    if(matchDate && boostPicks[matchDate] === matchKey) {
-      pts *= 2; // máximo 14 pts
-    }
+    doubled = !!(matchDate && boostPicks[matchDate] === matchKey);
+  }
+
+  // Interacción anti-IA × boost — default ajustable (espejo de
+  // BOOST_INCLUYE_IA en _shared/scoring.mjs; pendiente confirmación San):
+  // por defecto el +1 anti-IA queda FUERA del multiplicador (máx 13).
+  // Cambiar en runtime: window.BOOST_INCLUYE_IA = true (máx 14).
+  const iaDentro = (typeof window !== 'undefined' && window.BOOST_INCLUYE_IA === true);
+  if (iaDentro) {
+    if(iaB) pts += 1;
+    pts = Math.min(pts, 7);
+    if(doubled) pts *= 2;
+  } else {
+    pts = Math.min(pts, 7); // defensa; sin IA dentro, el máximo base es 6
+    if(doubled) pts *= 2;
+    if(iaB) pts += 1;
   }
 
   return pts;

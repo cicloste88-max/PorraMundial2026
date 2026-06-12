@@ -365,8 +365,13 @@
     const boostKey = bpSource[m.date?.substring(0, 10)];
     const isBoost  = boostKey === ctx.matchKey;
     const isExact  = ctx.pred.l === ctx.scoreH && ctx.pred.v === ctx.scoreA;
-    // calcMatchPoints ya aplica el x2 internamente cuando boost+exact.
-    return { pts, isExact, isBoost, finalPts: pts };
+    // R3 (regla canónica San 12-jun): el ×2 SOLO con exacto Y goleador a la
+    // vez — calcMatchPoints ya lo aplica internamente; aquí se replica la
+    // condición SOLO para el sufijo "(boost ×2)" del copy.
+    const golOk = ctx.pred.gol
+      ? (Array.isArray(realScorers) && realScorers.indexOf(ctx.pred.gol) !== -1)
+      : (ctx.pred.l === 0 && ctx.pred.v === 0 && ctx.scoreH === 0 && ctx.scoreA === 0);
+    return { pts, isExact, isBoost, isDoubled: isBoost && isExact && golOk, finalPts: pts };
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -614,7 +619,8 @@
                                  : (live.finalPts > 0 ? 'VAS GANANDO' : '0 PTS POR AHORA');
         // Copy boost: la cifra YA lleva el ×2 aplicado — "(boost ×2)" como
         // aclaración, nunca "pts ×2" (sugería multiplicación pendiente).
-        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isBoost && live.isExact ? ' (boost ×2)' : '') : '';
+        // R3: el sufijo solo cuando el ×2 realmente aplicó (exacto Y goleador).
+        const ptsTxt = live.finalPts > 0 ? '+' + live.finalPts + ' pts' + (live.isDoubled ? ' (boost ×2)' : '') : '';
         predStatusHtml = '<div class="dv2-exp-pred-status ' + cls + '">' + verb + (ptsTxt ? ' ' + ptsTxt : '') + '</div>';
       }
 
