@@ -2491,3 +2491,82 @@ Síntoma gemelo de capa distinta que ERR-87 (allí el dato llegaba pero la cache
 perdía; aquí la cache entera no llega a poblarse).
 
 **Fecha detección**: 11-jun-2026 (QA San preview PR #156, 2ª regresión de hora). **Resuelto**: 11-jun-2026.
+
+## ERR-89 — Challenge anti-bot per-IP + fingerprint: el 403 global de un scraper con proxy DC no es un bug de parser
+
+**Síntoma**: el actor `sofascore-webshare-proxy` (pipeline live principal) empieza a
+recibir 403 challenge de SofaScore en TODOS los runs desde 11-jun-2026 ~18:54Z, sin
+cambio de código. El recapture self-healing de cookies (modo `auto`) no lo resuelve:
+el reto reaparece request a request.
+
+**Causa**: endurecimiento del anti-bot (Cloudflare Bot Management): scoring por IP
+(pool datacenter/proxy identificado) + fingerprint TLS/navegador. El desbloqueo por
+cookies deja de ser suficiente porque el challenge se re-evalúa por petición — no hay
+estado "bueno" que capturar.
+
+**Fix/mitigación** (12-jun-2026, Item 1 post-J1): cambiar de fuente, no pelear el
+anti-bot en caliente: EF `espn-poll` contra `site.api.espn.com` (scoreboard público
+sin challenge) como fuente primaria del directo + cron `espn-poll-mundial-2026` con
+gate de ventana. `dispatch-live-slots` (Apify) queda activo como vía de recuperación
+si SofaScore desbloquea (runs fallidos baratos). Plan futuro BACKLOG: fetches desde
+contexto browser con `page.evaluate`; plan B proxy RESIDENTIAL de Apify.
+
+**Patrón detectable**: scraper estable que pasa a fallar 403 EN TODOS los runs a la
+vez y el replay manual desde otra IP residencial funciona → challenge per-IP/
+fingerprint. La señal clave es "global y simultáneo": un bug de parser rompe campos,
+no el transporte entero. Tener SIEMPRE identificada una fuente alternativa del dato.
+
+**Fecha detección**: 11-jun-2026 (~18:54Z, J1 en curso). **Mitigado**: 11-jun (stopgap SQL) / 12-jun (EF productizada).
+
+## ERR-90 — JSON.stringify hacia columnas jsonb vía supabase-js → double-encoded que crashea lectores no defensivos
+
+**Síntoma**: `porra-bridge-results` devolvía 500 MUDO (sin traza en logs) tras correr
+update-results v9; el panel Admin (tab Resultados) quedaba vacío con SyntaxError en
+consola DESPUÉS de normalizar el dato. Dos caras del mismo error.
+
+**Causa**: pasar `JSON.stringify(obj)` a una columna jsonb con supabase-js guarda un
+jsonb de tipo STRING (doble codificación). Los lectores que asumen objeto revientan
+de formas distintas: spread/`Object.entries` sobre string → basura `{"0":"{"...}` o
+throw; y tras NORMALIZAR la columna a objeto, el lector inverso (`JSON.parse(campo)`,
+admin.js) crashea con "[object Object]". update-results v9 stringificaba
+match_results/ko_results/classification.
+
+**Fix** (12-jun-2026, Item 2 post-J1): (1) writers: NUNCA stringify hacia jsonb —
+objetos JS planos (espn-poll y bridge lo documentan en cabecera); (2) lectores
+DEFENSIVOS `asObj` (typeof string → JSON.parse con try/catch) en bridge v8,
+live-sync (`loadMatchResults`) y admin.js (`admAsObj` ×5 sites; standings ya lo
+tenía desde ERR-79); (3) bridge v8 añade try/catch GLOBAL con stack a console.error
+— el 500 nunca más será mudo.
+
+**Patrón detectable**: columna jsonb con MÁS de un writer o con writers históricos →
+todo lector debe ser asObj-defensivo. Smoke obligatorio tras tocar un writer:
+`select jsonb_typeof(campo)` debe devolver 'object', no 'string'.
+
+**Fecha detección**: 11-jun-2026 (noche, post-J1). **Resuelto**: 12-jun-2026.
+
+## ERR-91 — Parámetro opcional con fallback de semántica distinta: el olvido del caller es invisible
+
+**Síntoma**: el +2 de goleador no se concedía NUNCA en el badge de puntos de Directo
+("GANASTE +8 PTS" cuando el motor servidor paga 12; "VAS GANANDO +1" cuando es 3),
+sin error ni warning en consola. Dos usuarios lo reportaron con capturas (J1).
+
+**Causa**: `calcMatchPoints(pred, l, v, matchKey, realScorers)` tiene el 5º parámetro
+opcional con fallback `realScorers ?? _hf09FallbackScorers(...)` — un placeholder de
+pre-producción (primer jugador de plantilla del ganador) pensado para cuando no había
+pipeline de scorers. `_getLivePts` (ui-directo) llamaba con 4 argumentos: el motor no
+puede distinguir "no me pasaron el dato" de "no hay goles", y el fallback produce un
+resultado PLAUSIBLE pero incorrecto — el bug no se ve hasta comparar con el servidor.
+
+**Fix** (12-jun-2026, Items 3+5 post-J1): pasar SIEMPRE la fuente real — finished:
+scorers canónicos del bridge (results.match_results vía `window._matchResultsByKey`);
+en vivo: `deriveScorersFromEvents` (scoring.js, espejo del extractScorers del bridge
+reutilizando `playerToShortKey`). Convención: `[]` significa "aún sin goles" y NO
+activa el fallback (solo `undefined` lo hace, y ya ningún caller de producción lo usa).
+
+**Patrón detectable**: parámetro opcional cuyo default NO es neutro (placeholder,
+mock, primera-opción) sino semánticamente distinto del dato real. Al añadir un
+parámetro así: grep de TODOS los callers en el mismo commit, o hacerlo obligatorio,
+o loguear cuando el fallback se active. Pariente del ERR-86 (agregado parcial
+silencioso): el sistema "funciona" con datos incorrectos.
+
+**Fecha detección**: 11/12-jun-2026 (capturas usuarios J1). **Resuelto**: 12-jun-2026.
