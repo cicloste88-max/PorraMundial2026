@@ -2598,6 +2598,17 @@ bloque Directo). Las etiquetas de fecha ancladas a mediodía (`date + 'T12:00:00
 incluida la cabecera de cada jornada) NO se tocan: el mediodía no cruza de día y
 siguen correctas.
 
+**Ampliación (brief 2, 13-jun-2026)**: el MISMO bug vivía en dos vistas de
+predicciones que formateaban con `new Date(match.date)` + `getHours()/getMinutes()/
+getDate()` (hora de SEDE interpretada como LOCAL del navegador → un usuario fuera de
+España veía su propia hora, no la de Madrid): `_timeLabel` en
+`public/js/v3/porra-jugador-v3.js` y en `public/js/v3/predicciones-liga-v3.js`. Ambas
+migradas al instante real (`window.kickoffUtcMsFor`, fallback `new Date(match.date)`)
+formateado SIEMPRE con `timeZone:'Europe/Madrid'` (toLocaleDateString/Time, nunca
+getHours/getDate), preservando el formato de salida de cada fichero. NO se tocan
+`scoreboard.js` ("Actualizado a las HH:MM" = hora actual local, correcto) ni
+`next-match-resolver-v3.js` (ya usaba UTC real + Madrid).
+
 **Patrón detectable**: misma fuente de verdad para el mismo dato en dos vistas.
 Directo ya tenía el instante UTC canónico; Jornada lo reinventaba desde un campo de
 SEDE sin TZ. Cuando dos pantallas pintan "lo mismo", deben compartir helper y fuente,

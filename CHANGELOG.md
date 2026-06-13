@@ -19,11 +19,20 @@ Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
   weekday del MISMO instante (no baila en partidos de madrugada). Anti-flash:
   `liveSyncInit` repinta Jornada al cargar el JSON. Las etiquetas de fecha ancladas
   a mediodía (cabecera de jornada incluida) NO cambian.
+- **Vistas de predicciones (mismo bug, brief 2)**: `_timeLabel` en
+  `public/js/v3/porra-jugador-v3.js` y `public/js/v3/predicciones-liga-v3.js`
+  formateaban con `new Date(match.date)` + `getHours/getMinutes/getDate` (hora de
+  sede como LOCAL del navegador → fuera de España se veía la hora del usuario).
+  Migradas al instante real (`window.kickoffUtcMsFor`, fallback `new Date(match.date)`)
+  formateado SIEMPRE en Europe/Madrid, preservando el formato de salida de cada
+  fichero. NO tocados `scoreboard.js` (hora actual local, correcto) ni
+  `next-match-resolver-v3.js` (ya UTC + Madrid).
 - **Tests**: `tests/jornada-hora-madrid.test.mjs` (6, instante real vs JSON real:
-  MEX-RSA 21:00, KOR-CZE 04:00, USA-PAR huso US 03:00, fallback, idempotencia 'Z').
-  `tests/jcard-r2.test.mjs` inyecta el `_joKickoffMs` real (nueva dependencia de
-  `_buildJCard`). Suite 264/268 (4 fallos pre-existentes por `cheerio` ausente en
-  el container, no relacionados).
+  MEX-RSA 21:00, KOR-CZE 04:00, USA-PAR huso US 03:00, fallback, idempotencia 'Z')
+  + `tests/predicciones-hora-madrid.test.mjs` (6, ambas `_timeLabel`: MEX-RSA 21:00,
+  USA-PAR 03:00). `tests/jcard-r2.test.mjs` inyecta el `_joKickoffMs` real (nueva
+  dependencia de `_buildJCard`). Suite 270/274 (4 fallos pre-existentes por `cheerio`
+  ausente en el container, no relacionados).
 - Gate San: QA en preview Vercel. **NO merge.**
 
 ## [12-jun-2026] Comprobante: cruce HOME vs AWAY en cada slot KO + bracket dinámico a `_shared/` (rama `fix/ko-classifier-backfill`, PR #158)
