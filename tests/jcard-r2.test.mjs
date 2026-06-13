@@ -67,7 +67,11 @@ function makeBuildJCard(opts) {
     'window', 'getMatchKey', 'predictions', 'EQUIPOS', 'SB', 'ISO3_TO_ISO2',
     '_joParseMatchDate', 'deriveScorersFromEvents', 'iaBonusWillApply',
     'iaPredictions', 'getMySign', 'calcMatchPoints',
-    `${extractFn(GROUPS_SRC, '_buildJCard')}
+    // ERR-92: _buildJCard ahora deriva la hora del kickoff vía _joKickoffMs.
+    // Inyectamos el helper REAL; como este `window` no trae kickoffUtcMsFor,
+    // cae al fallback _joParseMatchDate (la hora no se asserta en este test).
+    `${extractFn(GROUPS_SRC, '_joKickoffMs')}
+     ${extractFn(GROUPS_SRC, '_buildJCard')}
      return _buildJCard;`,
   );
   const build = factory(

@@ -2,6 +2,39 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [13-jun-2026] Jornada: hora de kickoff en Europe/Madrid vía `date_utc` real (rama `fix/jornada-hora-madrid`)
+
+- **Síntoma**: la pantalla Jornada mostraba la hora de la SEDE, no la de Madrid —
+  MEX-RSA pintaba 15:00 en vez de 21:00. Afectaba a todos los partidos de grupos.
+  Directo ya era correcto.
+- **Causa** (ERR-92): `renderVistaJornada` (`_buildJCard` / `_buildMatchButtons` /
+  modal "Ver tarjeta") formateaba con `_joParseMatchDate(m.date)`, que asume
+  `+02:00` (CEST) sobre la hora de sede sin TZ. Las sedes 2026 están en husos
+  US/Canadá/México → offset de 6-9h. Directo no sufría el bug porque usa el UTC
+  real (`live_scores.match_start_ts`).
+- **Fix**: helper compartido `window.kickoffUtcMsFor` (live-sync.js) lee `date_utc`
+  del JSON wc_matches (mismo instante que Directo; sin designador de zona → fuerza
+  'Z'). `_joKickoffMs` (ui-groups.js) lo consume con fallback al parse legacy en
+  carga fría. Las 3 lecturas de hora real usan el instante real y derivan el
+  weekday del MISMO instante (no baila en partidos de madrugada). Anti-flash:
+  `liveSyncInit` repinta Jornada al cargar el JSON. Las etiquetas de fecha ancladas
+  a mediodía (cabecera de jornada incluida) NO cambian.
+- **Vistas de predicciones (mismo bug, brief 2)**: `_timeLabel` en
+  `public/js/v3/porra-jugador-v3.js` y `public/js/v3/predicciones-liga-v3.js`
+  formateaban con `new Date(match.date)` + `getHours/getMinutes/getDate` (hora de
+  sede como LOCAL del navegador → fuera de España se veía la hora del usuario).
+  Migradas al instante real (`window.kickoffUtcMsFor`, fallback `new Date(match.date)`)
+  formateado SIEMPRE en Europe/Madrid, preservando el formato de salida de cada
+  fichero. NO tocados `scoreboard.js` (hora actual local, correcto) ni
+  `next-match-resolver-v3.js` (ya UTC + Madrid).
+- **Tests**: `tests/jornada-hora-madrid.test.mjs` (6, instante real vs JSON real:
+  MEX-RSA 21:00, KOR-CZE 04:00, USA-PAR huso US 03:00, fallback, idempotencia 'Z')
+  + `tests/predicciones-hora-madrid.test.mjs` (6, ambas `_timeLabel`: MEX-RSA 21:00,
+  USA-PAR 03:00). `tests/jcard-r2.test.mjs` inyecta el `_joKickoffMs` real (nueva
+  dependencia de `_buildJCard`). Suite 270/274 (4 fallos pre-existentes por `cheerio`
+  ausente en el container, no relacionados).
+- Gate San: QA en preview Vercel. **NO merge.**
+
 ## [12-jun-2026] Comprobante: cruce HOME vs AWAY en cada slot KO + bracket dinámico a `_shared/` (rama `fix/ko-classifier-backfill`, PR #158)
 
 - **Síntoma**: el PDF del comprobante mostraba cada slot KO como "1-3 → Avanza:

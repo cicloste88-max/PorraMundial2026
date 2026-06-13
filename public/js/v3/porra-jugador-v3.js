@@ -61,12 +61,16 @@
   }
   function _timeLabel(match) {
     if (!match || !match.date) return (match && match.time) || '';
-    var d = new Date(match.date);
+    // ERR-92: instante real del kickoff (date_utc, igual que Directo) vía
+    // window.kickoffUtcMsFor; m.date es hora de SEDE (no CEST) → formatear
+    // SIEMPRE en Europe/Madrid, nunca con getHours/getDate (hora del navegador).
+    var ms = (typeof window.kickoffUtcMsFor === 'function') ? window.kickoffUtcMsFor(match) : null;
+    var d = ms != null ? new Date(ms) : new Date(match.date);
     if (isNaN(d.getTime())) return match.time || '';
-    var dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
-    var hh = String(d.getHours()).padStart(2, '0');
-    var mm = String(d.getMinutes()).padStart(2, '0');
-    return dow + ' ' + d.getDate() + ' · ' + hh + ':' + mm;
+    var dow = d.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).toUpperCase().replace('.', '');
+    var dd = d.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
+    var hhmm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Madrid' });
+    return dow + ' ' + dd + ' · ' + hhmm;
   }
 
   // Jornadas de grupos = matchday J1/J2/J3 (V3_MATCH_DAY).

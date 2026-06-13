@@ -71,13 +71,18 @@
   }
   function _timeLabel(match) {
     if (!match.date) return '';
-    const d = new Date(match.date);
+    // ERR-92: instante real del kickoff (date_utc, igual que Directo) vía
+    // window.kickoffUtcMsFor; m.date es hora de SEDE (no CEST) → formatear
+    // SIEMPRE en Europe/Madrid, nunca con getHours/getDate (hora del navegador).
+    const ms = (typeof window.kickoffUtcMsFor === 'function') ? window.kickoffUtcMsFor(match) : null;
+    const d = ms != null ? new Date(ms) : new Date(match.date);
     if (isNaN(d.getTime())) return '';
-    const dow = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase().replace('.', '');
-    const mon = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${dow} · ${d.getDate()} ${mon} · ${hh}:${mm}`;
+    const TZ = { timeZone: 'Europe/Madrid' };
+    const dow = d.toLocaleDateString('es-ES', { weekday: 'short', ...TZ }).toUpperCase().replace('.', '');
+    const mon = d.toLocaleDateString('es-ES', { month: 'short', ...TZ }).toUpperCase().replace('.', '');
+    const dd = d.toLocaleDateString('es-ES', { day: 'numeric', ...TZ });
+    const hhmm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false, ...TZ });
+    return `${dow} · ${dd} ${mon} · ${hhmm}`;
   }
   function _realResult(match, matchKey) {
     const live = _live()[matchKey];
