@@ -85,6 +85,26 @@
   window.matchKeyFor = matchKeyFor;
 
   // ─────────────────────────────────────────────────────────────
+  // KICKOFF UTC del partido (mismo instante que Directo) — fuente:
+  // date_utc del JSON wc_matches (= live_scores.match_start_ts). La
+  // pantalla Jornada lo consume vía window.kickoffUtcMsFor para pintar
+  // la hora en Europe/Madrid sin asumir CEST en la sede (husos
+  // US/Canadá/México → el +02:00 legacy desplazaba hasta 6-9h). ERR-92.
+  // date_utc viene SIN designador de zona ("2026-06-11T19:00") → forzamos
+  // 'Z' para que Date.parse lo interprete como UTC y no como hora local.
+  // ─────────────────────────────────────────────────────────────
+  function kickoffUtcMsFor(match) {
+    const key = matchKeyFor(match);
+    if (!key || !matchesByKey || !matchesByKey[key]) return null;
+    const du = matchesByKey[key].date_utc;
+    if (!du) return null;
+    const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(du) ? du : du + 'Z';
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  window.kickoffUtcMsFor = kickoffUtcMsFor;
+
+  // ─────────────────────────────────────────────────────────────
   // NORMALIZAR row de live_scores → cache desde perspectiva de data.js
   // (aplica teams_swapped a score. events se traducirá en ui-directo.js
   //  usando la flag _teams_swapped)
@@ -322,6 +342,15 @@
     if (directoContainer && directoContainer.style.display !== 'none' &&
         typeof window.renderVistaDirecto === 'function') {
       window.renderVistaDirecto();
+    }
+
+    // Mismo anti-flash para Jornada (ERR-92): en carga fría la pantalla pinta
+    // con el fallback de sede; al cargar el JSON repintamos para que las horas
+    // pasen a Europe/Madrid real (date_utc). Mirror del bloque Directo de arriba.
+    const jornadaContainer = document.getElementById('jornada-container');
+    if (jornadaContainer && jornadaContainer.style.display !== 'none' &&
+        typeof window.renderVistaJornada === 'function') {
+      window.renderVistaJornada();
     }
   }
 

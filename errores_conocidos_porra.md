@@ -2570,3 +2570,38 @@ o loguear cuando el fallback se active. Pariente del ERR-86 (agregado parcial
 silencioso): el sistema "funciona" con datos incorrectos.
 
 **Fecha detección**: 11/12-jun-2026 (capturas usuarios J1). **Resuelto**: 12-jun-2026.
+
+## ERR-92 — Pantalla Jornada asumía CEST en la sede → hora de kickoff 6-9h desplazada
+
+**Síntoma**: la pantalla JORNADA mostraba la hora de la SEDE, no la de Madrid
+(MEX-RSA aparecía a las 15:00 en vez de 21:00). Afectaba a TODOS los partidos de
+grupos. Directo, en cambio, acertaba.
+
+**Causa**: `renderVistaJornada` (vía `_buildJCard`, `_buildMatchButtons` y el modal
+"Ver tarjeta" `_showJcardModal`) formateaba la hora con `_joParseMatchDate(m.date)`,
+que añade `+02:00` cuando el string no trae timezone — ASUMIENDO que todo el Mundial
+es CEST. Falso: las sedes 2026 están en husos US/Canadá/México y `m.date` (PARTIDOS,
+data.js) es hora de SEDE sin TZ. El `+02:00` interpretaba mal el instante (offset
+sede↔Madrid de 6-9h). Directo no sufría el bug porque usa el UTC real
+(`live_scores.match_start_ts`), no `m.date`.
+
+**Fix** (13-jun-2026, rama `fix/jornada-hora-madrid`): helper compartido
+`window.kickoffUtcMsFor(match)` en live-sync.js lee `date_utc` del JSON wc_matches
+(= `match_start_ts`, mismo instante que Directo; `date_utc` viene SIN designador de
+zona → se fuerza 'Z' para leerlo como UTC). `_joKickoffMs(m)` (ui-groups.js) lo
+consume y cae al `_joParseMatchDate` legacy solo si live-sync aún no cargó el JSON
+(carga fría — nunca devuelve null si `m.date` existe). Las 3 lecturas de hora real
+usan el instante real, y el weekday/día corto se deriva del MISMO instante para no
+bailar en partidos de madrugada (02:00Z → 04:00 Madrid del día SIGUIENTE a la fecha
+de sede). Anti-flash: `liveSyncInit` repinta Jornada al cargar el JSON (mirror del
+bloque Directo). Las etiquetas de fecha ancladas a mediodía (`date + 'T12:00:00'`,
+incluida la cabecera de cada jornada) NO se tocan: el mediodía no cruza de día y
+siguen correctas.
+
+**Patrón detectable**: misma fuente de verdad para el mismo dato en dos vistas.
+Directo ya tenía el instante UTC canónico; Jornada lo reinventaba desde un campo de
+SEDE sin TZ. Cuando dos pantallas pintan "lo mismo", deben compartir helper y fuente,
+no derivar cada una por su cuenta. Pariente de ERR-87 (la cache de Directo no exponía
+`match_start_ts` a primer nivel y caía al mismo `m.date` de sede).
+
+**Fecha detección**: 13-jun-2026. **Resuelto**: 13-jun-2026.

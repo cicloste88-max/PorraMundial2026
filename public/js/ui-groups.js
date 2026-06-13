@@ -3,14 +3,32 @@
 // renderMatchCard, openModal, updateCardUI, renderGroupTableCard, refreshGroupTables.
 // Deps: data.js, scoring.js, auth.js, leagues.js
 
-// JO-4: las fechas de PARTIDOS llegan ISO local naive ("2026-06-11T15:00:00").
-// El calendario FIFA Mundial 2026 (11 jun → 19 jul) está íntegro en CEST
-// (UTC+2). Anclamos el parse a +02:00 cuando falta TZ explícita y forzamos
-// timeZone:'Europe/Madrid' en cada toLocaleXxx para que la hora oficial
-// española se vea igual en cualquier dispositivo (Madrid, Londres, NY…).
+// JO-4 / ERR-92: m.date (PARTIDOS, data.js) es la hora de la SEDE sin timezone
+// ("2026-06-11T15:00:00"). Las sedes del Mundial 2026 están en husos
+// US/Canadá/México, NO en CEST → asumir +02:00 sobre m.date desplazaba la hora
+// real hasta 6-9h (MEX-RSA pintaba 15:00 en vez de 21:00). Para la HORA real
+// del kickoff usamos _joKickoffMs (date_utc del JSON, igual que Directo).
+// _joParseMatchDate queda SOLO para:
+//   · etiquetas de fecha ancladas a mediodía (date + 'T12:00:00') — correctas,
+//     no dependen del huso porque el mediodía no cruza de día;
+//   · fallback de _joKickoffMs cuando live-sync aún no cargó el JSON.
 function _joParseMatchDate(s) {
   if (!s) return null;
   return new Date(/([Zz]|[+-]\d{2}:?\d{2})$/.test(s) ? s : s + '+02:00');
+}
+
+// Instante UTC real del kickoff (igual que Directo). Fuente: date_utc del JSON
+// wc_matches vía window.kickoffUtcMsFor (live-sync). m.date es hora de SEDE y NO
+// es CEST → el +02:00 de _joParseMatchDate estaba mal en sedes US. Cuando
+// live-sync aún no cargó el JSON (carga fría) cae al fallback legacy: nunca
+// devuelve null si m.date existe. Ref. ERR-92.
+function _joKickoffMs(m) {
+  if (typeof window.kickoffUtcMsFor === 'function') {
+    const ms = window.kickoffUtcMsFor(m);
+    if (ms != null) return ms;
+  }
+  const d = _joParseMatchDate(m && m.date);
+  return d && !isNaN(d.getTime()) ? d.getTime() : null;
 }
 
 // JO-3: estado de colapso por sección Jornada (acordeón multi-abierto).
@@ -321,7 +339,11 @@ window.scrollToMatchCard = scrollToMatchCard;
 function _buildMatchButtons(date, onClickFn) {
   const matchesOfDay = PARTIDOS.filter(m => m.date?.substring(0,10) === date);
   const boostedKey = boostPicks[date];
-  const hora = (m) => _joParseMatchDate(m.date).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Madrid'});
+  const hora = (m) => {
+    const ms = _joKickoffMs(m);
+    const d = ms != null ? new Date(ms) : _joParseMatchDate(m.date);
+    return d.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Madrid'});
+  };
   const jNum = [...new Set(PARTIDOS.map(m => m.date?.substring(0,10)).filter(Boolean))].sort().indexOf(date) + 1;
   const dayLabel = _joParseMatchDate(date + 'T12:00:00').toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short', timeZone:'Europe/Madrid'});
 
@@ -691,8 +713,12 @@ function _buildJCard(m, idx, date, boostKey, live) {
     scoreR = hasPred ? pred.v : '—';
   }
 
-  // Hora y estadio
-  const dt = _joParseMatchDate(m.date);
+  // Hora y estadio — instante real del kickoff (date_utc, igual que Directo).
+  // El día corto (weekday) se deriva del MISMO instante Madrid para que no
+  // baile en partidos de madrugada (02:00Z → 04:00 Madrid del día siguiente
+  // a la fecha de sede). ERR-92.
+  const _koMs = _joKickoffMs(m);
+  const dt = _koMs != null ? new Date(_koMs) : _joParseMatchDate(m.date);
   const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
   const dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
   const stadium = m.stadium ? m.stadium.replace(' Stadium', '').replace(' Estadio', '') : '';
@@ -947,7 +973,10 @@ function _showJcardModal(matchKey, opts) {
     const stadium = match.stadium || '';
     let whenLabel = '';
     if (match.date) {
-      const d = _joParseMatchDate(match.date);
+      // Instante real del kickoff (date_utc, igual que Directo) — dow/día se
+      // derivan del mismo ms para no bailar en partidos de madrugada. ERR-92.
+      const _koMs = _joKickoffMs(match);
+      const d = _koMs != null ? new Date(_koMs) : _joParseMatchDate(match.date);
       const TZ = 'Europe/Madrid';
       const dow = d.toLocaleDateString('es-ES', { weekday: 'short', timeZone: TZ }).toUpperCase().replace('.', '');
       // JO-4: getDate() devuelve hora local del dispositivo; usar Intl con TZ Madrid.
