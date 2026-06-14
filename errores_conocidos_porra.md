@@ -2638,22 +2638,43 @@ pero la predicción guarda la key canónica `"Vinicius"` → ni el matcher de st
 `supabase/functions/_shared/scorer-normalize.mjs` (fuente única):
 - `matchPlayerKey(nombre, players)` resuelve por SOLAPAMIENTO DE TOKENS normalizados
   (sin acentos, minúsculas, junior/júnior→jr, sin dorsales/puntuación). Tokens
-  distintivos pesan 3; el genérico `jr` pesa 1 (no gana una desambiguación por sí
-  solo). Devuelve la key del mejor candidato o `null`.
-- `fallbackKey(nombre)` (último token normalizado) solo si no hay solape; el bridge
-  loguea `scorer_unresolved iso3=… raw=…` para auditar nombres no resueltos.
+  distintivos pesan 3; el genérico `jr` pesa 1. Devuelve `{key}` con un único
+  ganador, `{ambiguous:true}` si el mejor score empata entre ≥2 jugadores
+  (apellido compartido: 2× Rodriguez, Hwang/Heechan) y la key exacta no
+  desambigua — **NO se adivina** (bridge loguea `scorer_ambiguous`), o `null` si
+  ningún token solapa.
+- `fallbackKey(nombre)` (último token, diacríticos/dorsal/puntuación fuera) **CONSERVA
+  LA CAJA** (como el bridge v8 y como la key que guarda el picker para jugadores
+  fuera del roster curado) → un re-bridge v9 produce la MISMA key fallback que v8,
+  así que casa con el matcher exacto viejo **sin lockstep de deploy**. Solo si no
+  hay solape; bridge loguea `scorer_unresolved`.
 - `scorerMatches(scorers, gol)` compara la key ENTERA normalizada (no por subcadena):
-  absorbe drift de caja/acentos/jr-junior entre lo persistido y lo predicho.
+  absorbe drift de caja/acentos/jr-junior entre lo persistido y lo predicho. Con el
+  fallback conservando caja, queda como **defensa en profundidad pura** (no es
+  imprescindible para evitar regresión al re-bridgear).
 Reusado en el bridge (resolución, v9) y en `_shared/scoring.mjs` (matcher);
 espejado INLINE en `public/js/scoring.js` (classic script, no ESM) con parity
 shared↔legacy en la suite. Tests: `tests/scorer-normalize.test.mjs` (casos raíz
-Vinicius + desambiguación por "jr" + Jiménez≠Giménez + source guards de las 3
-superficies) y sección 10 de `tests/scoring.test.mjs`.
+Vinicius + clase-Vinicius Son/DeBruyne/VanDijk/MacAllister + desambiguación por "jr"
++ empate de apellido Rodriguez/Hwang + Jiménez≠Giménez + fallback==v8 + source
+guards de las 3 superficies) y sección 10 de `tests/scoring.test.mjs`.
 
-**Remediación J1** (post-deploy, gate San): re-bridgear los 6 partidos `finished`
+**Dimensión**: la clase-Vinicius (in-roster con key ≠ apellido del feed: Son,
+DeBruyne, Bruno, Nico, James, VanDijk, MacAllister, casi toda Corea…) son ~34
+jugadores. En J1 quedaron a 0 impacto por suerte del fixture (+ parche manual de
+`C_Brasil_Marruecos`→`Vinicius`); en J2+ se denegarían todos bajo v8 → desplegar v9
+antes de J2.
+
+**Remediación J1** (post-deploy, gate San): re-bridgear los 8 partidos `finished`
 (re-ejecuta `extractScorers`→`playerToShortKey` con el fix) y reseed
-`user_points_cache`. Auditar los `scorer_unresolved` y tokens probablemente
-afectados por el mismo fallback: `Krejci`, `Lukic`, `Larin`, `Khoukhi`, `Mauricio`.
+`user_points_cache`. Verificado en prod (read-only, 14-jun): hoy 0 usuarios
+denegados (el único caso con impacto, Vinicius, ya estaba parcheado a mano).
+Las keys fallback de J1 (`Krejci`, `Lukic`, `Larin`, `Khoukhi`, `McGinn`,
+`Metcalfe`, `Mauricio`) son de jugadores **ausentes del roster curado** (8/equipo):
+el token-fix NO las cambia (caen igual al fallback) y casan porque picker y bridge
+coinciden en el último token; arreglarlas de raíz pide completar `equipos_players`
+(pendiente "convocatorias reales"). `Irankunda` (roster tiene `Irakunda`) sí es
+clase-Vinicius pero nadie lo apostó.
 
 **Sitio relacionado pendiente (gate San)**: `porra-ia-compute/lib/scorer-keys.ts`
 tiene una TERCERA copia del mismo `playerToShortKey` (substring + último token) que

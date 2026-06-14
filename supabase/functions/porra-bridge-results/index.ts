@@ -6,8 +6,10 @@
 //     por TOKENS normalizados (_shared/scorer-normalize.mjs), NO por substring
 //     estricto. "Vinicius Junior" (feed) vs "7 · Vinicius Jr" (roster) fallaba
 //     el includes y caia al ultimo token "Junior" ≠ key canonica "Vinicius" →
-//     el +2 de goleador no casaba nunca. Fallback sin solape → scorer_unresolved
-//     (console.warn) para auditoria. El matcher de scoring tambien normaliza.
+//     el +2 de goleador no casaba nunca. Empate por apellido compartido (2x
+//     Rodriguez, Hwang/Heechan) → scorer_ambiguous, no se adivina. El fallback
+//     CONSERVA LA CAJA (= v8 y picker) → re-bridge sin lockstep de deploy. El
+//     matcher de scoring normaliza como defensa. Sin solape → scorer_unresolved.
 //   v8 (Item 2 post-J1, hardening OBLIGATORIO tras el incidente update-results
 //     v9 del 11-jun): (a) reader defensivo asObj en match_results/ko_results —
 //     un writer que regrese a jsonb double-encoded (string) ya no crashea el
@@ -68,15 +70,19 @@ type EquiposPlayersByIso3 = Record<string, EquiposPlayer[]>;
 
 function playerToShortKey(nombre: string, iso3: string, eqMap: EquiposPlayersByIso3): string {
   if (!nombre) return "";
-  // Resolucion por tokens normalizados contra el roster (name + key). Cubre
-  // "Vinicius Junior" (y con acentos) -> "Vinicius" y separa Jimenez de
-  // Gimenez. Ver _shared/scorer-normalize.mjs (ERR-93).
-  const matched = matchPlayerKey(nombre, eqMap[iso3]);
-  if (matched) return matched;
-  // Ningun token del roster solapo: degradar al ultimo token y AUDITAR. El
-  // matcher normalizado de scoring aun puede casarlo, pero el warn deja rastro
-  // de los nombres de feed no resueltos para revisar el roster.
-  console.warn(`scorer_unresolved iso3=${iso3} raw=${JSON.stringify(nombre)}`);
+  // Resolucion por tokens normalizados contra el roster (name + key). Cubre la
+  // clase-Vinicius (key != apellido: "Vinicius Junior"->Vinicius, y Son,
+  // DeBruyne, VanDijk, MacAllister...) y separa Jimenez de Gimenez. Devuelve
+  // {key} | {ambiguous} | null. Ver _shared/scorer-normalize.mjs (ERR-93).
+  const m = matchPlayerKey(nombre, eqMap[iso3]);
+  if (m && m.key) return m.key;
+  // Sin ganador claro: degradar al fallback (ultimo token, CONSERVA CAJA = key
+  // que guarda el picker para jugadores fuera del roster) y AUDITAR.
+  //   scorer_ambiguous  = empate entre apellidos compartidos → no adivinamos.
+  //   scorer_unresolved = ningun token del roster solapo (jugador ausente).
+  console.warn(
+    `${m && m.ambiguous ? "scorer_ambiguous" : "scorer_unresolved"} iso3=${iso3} raw=${JSON.stringify(nombre)}`,
+  );
   return fallbackKey(nombre);
 }
 

@@ -38,26 +38,52 @@ export function toks(s) {
 // nombre del feed → key del roster por solapamiento de tokens. Los tokens
 // distintivos pesan 3; el genérico "jr" pesa 1 — así un apellido distintivo
 // gana SIEMPRE una desambiguación frente a dos jugadores que comparten "jr".
-// Devuelve la key del mejor candidato, o null si ningún token solapa (el
-// caller decide el fallback).
+// Devuelve:
+//   { key }             un único ganador claro,
+//   { ambiguous: true } empate de score entre ≥2 jugadores irresoluble — NO
+//                       adivinar (riesgo de acreditar al jugador equivocado
+//                       ante apellidos compartidos: 2× Rodriguez, Hwang/Heechan),
+//   null                ningún token solapó (el caller cae al fallback).
+// Desempate del empate: se prefiere el jugador cuya KEY normalizada == el feed
+// normalizado (feed "Hwang" → key "Hwang", no "Heechan"); si eso no deja un
+// único candidato, ambiguo.
 export function matchPlayerKey(nombre, players) {
   const feed = toks(nombre);
   if (!Array.isArray(players) || feed.length === 0) return null;
-  let best = null;
+  let best = 0;
+  let winners = [];
   for (const p of players) {
     const cand = toks(`${p?.name ?? ""} ${p?.key ?? ""}`);
     const score = feed.reduce(
       (a, t) => a + (cand.includes(t) ? (t === "jr" ? 1 : 3) : 0),
       0,
     );
-    if (score > 0 && (!best || score > best.score)) best = { key: p.key, score };
+    if (score <= 0) continue;
+    if (score > best) { best = score; winners = [p]; }
+    else if (score === best) winners.push(p);
   }
-  return best ? best.key : null;
+  if (winners.length === 0) return null;
+  if (winners.length === 1) return { key: winners[0].key };
+  // Empate de score → preferir key exacta; si sigue sin ser único, ambiguo.
+  const feedNorm = feed.join(" ");
+  const exact = winners.filter((p) => normName(p?.key) === feedNorm);
+  if (exact.length === 1) return { key: exact[0].key };
+  return { ambiguous: true };
 }
 
-// Fallback cuando ningún jugador del roster solapa: último token normalizado.
+// Fallback cuando ningún jugador del roster solapa: último token con
+// diacríticos/puntuación/dorsal quitados pero CONSERVANDO LA CAJA (igual que el
+// bridge v8 y que la key que el picker guarda para jugadores fuera del roster
+// curado). Así un re-bridge v9 produce la MISMA key fallback que v8 → casa con
+// el matcher exacto viejo sin re-deploy en lockstep. NO minusculiza:
+// scorerMatches ya normaliza por su cuenta como defensa en profundidad.
 export function fallbackKey(nombre) {
-  const parts = toks(nombre);
+  const cleaned = String(nombre ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // fuera diacríticos (conserva caja)
+    .replace(/[^A-Za-z0-9\s]/g, " ")          // fuera "·", ".", "'"…
+    .replace(/\b\d+\b/g, " ")                  // fuera dorsales sueltos
+    .replace(/\s+/g, " ").trim();
+  const parts = cleaned.split(" ").filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "";
 }
 

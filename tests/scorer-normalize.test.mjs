@@ -49,47 +49,65 @@ test('toks: divide en tokens no vacíos', () => {
   assert.deepStrictEqual(toks('  '), []);
 });
 
+// matchPlayerKey devuelve { key } | { ambiguous:true } | null. Helper: en match
+// claro devuelve la key (string); ambiguo/sin-match se asertan sobre el objeto.
+const mk = (n, p) => { const r = matchPlayerKey(n, p); return r && r.key ? r.key : r; };
+
 // ── matchPlayerKey — el caso raíz (obligatorio) ──────────────────────
 test('CASO RAÍZ: "Vinicius Junior" (feed) → key "Vinicius"', () => {
-  assert.strictEqual(matchPlayerKey('Vinicius Junior', BRA), 'Vinicius');
+  assert.strictEqual(mk('Vinicius Junior', BRA), 'Vinicius');
+  assert.deepStrictEqual(matchPlayerKey('Vinicius Junior', BRA), { key: 'Vinicius' }); // envoltorio
 });
 
 test('CASO RAÍZ: "Vinícius Júnior" (con acentos) → "Vinicius"', () => {
-  assert.strictEqual(matchPlayerKey('Vinícius Júnior', BRA), 'Vinicius');
+  assert.strictEqual(mk('Vinícius Júnior', BRA), 'Vinicius');
 });
 
 test('CASO RAÍZ: "Junior" suelto → "Vinicius" (único Jr del squad)', () => {
-  assert.strictEqual(matchPlayerKey('Junior', BRA), 'Vinicius');
+  assert.strictEqual(mk('Junior', BRA), 'Vinicius');
 });
 
-test('desambiguación: dos jugadores comparten "jr" — el token distintivo manda', () => {
+test('desambiguación por "jr": el token distintivo manda', () => {
   const TWO = [
     { key: 'Vinicius', name: '7 · Vinicius Jr' },
     { key: 'Lucas',    name: '8 · Lucas Junior' },
   ];
   // "jr" pesa 1; el apellido distintivo pesa 3 → gana el correcto.
-  assert.strictEqual(matchPlayerKey('Lucas Junior', TWO), 'Lucas');
-  assert.strictEqual(matchPlayerKey('Vinicius Junior', TWO), 'Vinicius');
-  // "Junior" a secas es ambiguo (ambos puntúan 1): resuelve determinista al
-  // primero del roster — documentado, no garantiza acierto sin token distintivo.
-  assert.strictEqual(matchPlayerKey('Junior', TWO), 'Vinicius');
+  assert.strictEqual(mk('Lucas Junior', TWO), 'Lucas');
+  assert.strictEqual(mk('Vinicius Junior', TWO), 'Vinicius');
+  // "Junior" a secas empata (ambos 1) y ninguna key == "jr" → AMBIGUO,
+  // no se adivina (ajuste supervisión).
+  assert.deepStrictEqual(matchPlayerKey('Junior', TWO), { ambiguous: true });
 });
 
 test('Jiménez ≠ Giménez: j/g distinguen la key correcta', () => {
-  assert.strictEqual(matchPlayerKey('Raúl Jiménez', MEX), 'Jimenez');
-  assert.strictEqual(matchPlayerKey('Santiago Giménez', MEX), 'Gimenez');
+  assert.strictEqual(mk('Raúl Jiménez', MEX), 'Jimenez');
+  assert.strictEqual(mk('Santiago Giménez', MEX), 'Gimenez');
 });
 
 test('key ≠ último apellido del feed: "Guillermo Martínez" → "Martin"', () => {
-  assert.strictEqual(matchPlayerKey('Guillermo Martínez', MEX), 'Martin');
-  assert.strictEqual(matchPlayerKey('Julián Quiñones', MEX), 'Quinones');
+  assert.strictEqual(mk('Guillermo Martínez', MEX), 'Martin');
+  assert.strictEqual(mk('Julián Quiñones', MEX), 'Quinones');
+});
+
+test('clase-Vinicius: key distinta del apellido (Son, DeBruyne, VanDijk, MacAllister)', () => {
+  const SQUAD = [
+    { key: 'Son',         name: '7 · Son Heung-Min' },
+    { key: 'DeBruyne',    name: '7 · Kevin De Bruyne' },
+    { key: 'VanDijk',     name: '4 · Virgil van Dijk' },
+    { key: 'MacAllister', name: '20 · Alexis Mac Allister' },
+  ];
+  assert.strictEqual(mk('Son Heung-Min', SQUAD), 'Son');
+  assert.strictEqual(mk('Kevin De Bruyne', SQUAD), 'DeBruyne');
+  assert.strictEqual(mk('Virgil van Dijk', SQUAD), 'VanDijk');
+  assert.strictEqual(mk('Alexis Mac Allister', SQUAD), 'MacAllister');
 });
 
 test('substring estricto que ANTES fallaba ahora resuelve (regresión ERR-93)', () => {
   // El roster guarda "7 · Vinicius Jr"; el viejo includes("Vinicius Junior")
   // daba false. Token-match lo resuelve.
-  assert.notStrictEqual(matchPlayerKey('Vinicius Junior', BRA), 'Junior');
-  assert.strictEqual(matchPlayerKey('Vinicius Junior', BRA), 'Vinicius');
+  assert.notStrictEqual(mk('Vinicius Junior', BRA), 'Junior');
+  assert.strictEqual(mk('Vinicius Junior', BRA), 'Vinicius');
 });
 
 test('matchPlayerKey: sin solape → null; roster ausente → null', () => {
@@ -98,11 +116,48 @@ test('matchPlayerKey: sin solape → null; roster ausente → null', () => {
   assert.strictEqual(matchPlayerKey('', MEX), null);
 });
 
-// ── fallbackKey ──────────────────────────────────────────────────────
-test('fallbackKey: último token normalizado (degradado, audita en el bridge)', () => {
-  assert.strictEqual(fallbackKey('Nombre Apellido'), 'apellido');
-  assert.strictEqual(fallbackKey('Algo Junior'), 'jr');
+// ── matchPlayerKey — desempate de apellidos compartidos (ajuste supervisión) ──
+const PAN = [
+  { key: 'JoseLuisRodriguez', name: '15 · José Luis Rodríguez' },
+  { key: 'TomasRodriguez',    name: '7 · Tomás Rodríguez' },
+];
+const KOR = [
+  { key: 'Hwang',   name: '6 · Hwang In-Beom' },
+  { key: 'Heechan', name: '11 · Hwang Hee-Chan' },
+];
+
+test('apellido compartido: nombre completo resuelve al jugador correcto', () => {
+  assert.strictEqual(mk('José Luis Rodríguez', PAN), 'JoseLuisRodriguez');
+  assert.strictEqual(mk('Tomás Rodríguez', PAN), 'TomasRodriguez');
+  assert.strictEqual(mk('Hwang In-Beom', KOR), 'Hwang');
+  assert.strictEqual(mk('Hwang Hee-Chan', KOR), 'Heechan');
+});
+
+test('apellido a secas SIN key exacta → AMBIGUO (no acreditar al equivocado)', () => {
+  assert.deepStrictEqual(matchPlayerKey('Rodriguez', PAN), { ambiguous: true });
+  assert.deepStrictEqual(matchPlayerKey('Rodríguez', PAN), { ambiguous: true });
+});
+
+test('apellido a secas CON key exacta → preferir esa key (feed "Hwang" → "Hwang")', () => {
+  assert.strictEqual(mk('Hwang', KOR), 'Hwang');
+});
+
+// ── fallbackKey — CONSERVA LA CAJA (ajuste supervisión: sin lockstep deploy) ──
+test('fallbackKey: último token, diacríticos/dorsal/puntuación fuera, CASO intacto', () => {
+  assert.strictEqual(fallbackKey('Nombre Apellido'), 'Apellido');
+  assert.strictEqual(fallbackKey('9 · Raúl Jiménez'), 'Jimenez');
+  assert.strictEqual(fallbackKey('Algo Junior'), 'Junior'); // sin junior→jr (espejo v8/picker)
   assert.strictEqual(fallbackKey(''), '');
+});
+
+test('fallbackKey == v8 para los scorers fallback de J1 (re-bridge sin regresión)', () => {
+  // Estas keys ya viven en results con esa caja; el picker guarda igual → casan.
+  for (const [feed, key] of [
+    ['Sasa Lukic', 'Lukic'], ['Cyle Larin', 'Larin'], ['Boualem Khoukhi', 'Khoukhi'],
+    ['John McGinn', 'McGinn'], ['Ladislav Krejčí', 'Krejci'],
+  ]) {
+    assert.strictEqual(fallbackKey(feed), key, `fallback "${feed}" → "${key}"`);
+  }
 });
 
 // ── scorerMatches — matcher normalizado (defensa en profundidad) ─────
@@ -132,6 +187,7 @@ test('guard bridge: importa scorer-normalize, usa matchPlayerKey/fallbackKey, au
   assert.match(BRIDGE_SRC, /matchPlayerKey\(nombre, eqMap\[iso3\]\)/);
   assert.ok(BRIDGE_SRC.includes('fallbackKey(nombre)'));
   assert.ok(BRIDGE_SRC.includes('scorer_unresolved'));
+  assert.ok(BRIDGE_SRC.includes('scorer_ambiguous'), 'el bridge debe loguear empates de apellido');
   // El patrón roto (substring estricto contra el roster) NO debe volver.
   assert.ok(!/p\.name\.includes\(nombre\)/.test(BRIDGE_SRC),
     'el bridge no debe resolver scorers por substring estricto (ERR-93)');
