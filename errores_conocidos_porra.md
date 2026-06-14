@@ -2616,3 +2616,56 @@ no derivar cada una por su cuenta. Pariente de ERR-87 (la cache de Directo no ex
 `match_start_ts` a primer nivel y caía al mismo `m.date` de sede).
 
 **Fecha detección**: 13-jun-2026. **Resuelto**: 13-jun-2026.
+
+## ERR-93 — Resolución de goleador por substring estricto + fallback al último token ≠ key canónica
+
+**Síntoma**: el +2 de goleador no puntuaba para ciertos jugadores en NINGUNA
+superficie (tabla de liga, tile Predictor, card por partido), aunque el usuario
+hubiera acertado el goleador. Caso testigo: Vinicius. Afecta a todo jugador cuyo
+último token del nombre del feed ≠ su key canónica.
+
+**Causa**: `playerToShortKey()` en `porra-bridge-results` resolvía el nombre del
+feed (SofaScore/ESPN) a key canónica con substring ESTRICTO contra el roster:
+`eq.find((p) => p.name.includes(nombre))`, y al fallar caía al ÚLTIMO token. El
+feed da `"Vinicius Junior"`; el roster es `name:"7 · Vinicius Jr"` →
+`"…Vinicius Jr".includes("Vinicius Junior")` → false (`Junior` ≠ `Jr`) → fallback
+→ último token `"Junior"`. Se persistía `"Junior"` en `results.match_results[].scorers`,
+pero la predicción guarda la key canónica `"Vinicius"` → ni el matcher de standings
+(`_shared/scoring.mjs`, `scorers.includes(pred.gol)`) ni el espejo del frontend
+(`public/js/scoring.js`) casaban → 0 puntos de goleador.
+
+**Fix** (14-jun-2026, rama `claude/dreamy-euler-xrpgh4`): módulo compartido
+`supabase/functions/_shared/scorer-normalize.mjs` (fuente única):
+- `matchPlayerKey(nombre, players)` resuelve por SOLAPAMIENTO DE TOKENS normalizados
+  (sin acentos, minúsculas, junior/júnior→jr, sin dorsales/puntuación). Tokens
+  distintivos pesan 3; el genérico `jr` pesa 1 (no gana una desambiguación por sí
+  solo). Devuelve la key del mejor candidato o `null`.
+- `fallbackKey(nombre)` (último token normalizado) solo si no hay solape; el bridge
+  loguea `scorer_unresolved iso3=… raw=…` para auditar nombres no resueltos.
+- `scorerMatches(scorers, gol)` compara la key ENTERA normalizada (no por subcadena):
+  absorbe drift de caja/acentos/jr-junior entre lo persistido y lo predicho.
+Reusado en el bridge (resolución, v9) y en `_shared/scoring.mjs` (matcher);
+espejado INLINE en `public/js/scoring.js` (classic script, no ESM) con parity
+shared↔legacy en la suite. Tests: `tests/scorer-normalize.test.mjs` (casos raíz
+Vinicius + desambiguación por "jr" + Jiménez≠Giménez + source guards de las 3
+superficies) y sección 10 de `tests/scoring.test.mjs`.
+
+**Remediación J1** (post-deploy, gate San): re-bridgear los 6 partidos `finished`
+(re-ejecuta `extractScorers`→`playerToShortKey` con el fix) y reseed
+`user_points_cache`. Auditar los `scorer_unresolved` y tokens probablemente
+afectados por el mismo fallback: `Krejci`, `Lukic`, `Larin`, `Khoukhi`, `Mauricio`.
+
+**Sitio relacionado pendiente (gate San)**: `porra-ia-compute/lib/scorer-keys.ts`
+tiene una TERCERA copia del mismo `playerToShortKey` (substring + último token) que
+genera la key `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (el OTRO
+lado de la comparación). NO tocado en este fix (scope bridge+scoring+frontend);
+plegar al módulo compartido + recomputar dentro del pendiente "update_ia_scorers".
+
+**Patrón detectable**: dos representaciones del mismo dato (nombre del feed vs key
+del roster) reconciliadas por substring/igualdad exacta sobre strings que ya
+divergen en formato. Match por tokens normalizados, no por `includes`/`===`. La
+misma lógica de matching duplicada en N superficies → extraer a módulo compartido
+(aquí 4 copias: bridge, scoring shared, frontend, ia-compute). Pariente de ERR-91
+(el +2 que tampoco casaba, por el 5º parámetro opcional).
+
+**Fecha detección**: 12/14-jun-2026. **Resuelto** (código): 14-jun-2026 (deploy + remediación: gate San).

@@ -34,6 +34,29 @@ const FINAL_CLASSIFICATION_PTS = {
   fourth:    10,
 };
 
+// ── Normalización de scorers — ESPEJO de _shared/scorer-normalize.mjs ──
+// scoring.js es classic script (no ESM import): la lógica se replica aquí.
+// Si tocas una, replica en la otra — la suite tiene parity shared↔legacy
+// (tests/scoring.test.mjs). ̀-ͯ = bloque Combining Diacritical Marks (NFD).
+// (ERR-93)
+function normName(s) {
+  return String(s ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\bjunior\b/g, 'jr')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+// Matcher de goleador normalizado (defensa en profundidad sobre el fix del
+// bridge): compara la key entera normalizada, absorbe caja/acentos/jr-junior.
+function scorerMatches(scorers, gol) {
+  if (!gol || !Array.isArray(scorers) || scorers.length === 0) return false;
+  const g = normName(gol);
+  if (!g) return false;
+  return scorers.some(function (s) { return normName(s) === g; });
+}
+
 // ── Puntos por partido (grupos y KO) ──────────────────────
 // +1 signo correcto (1·X·2)
 // +3 marcador exacto (APILA sobre el +1 del signo)
@@ -74,7 +97,7 @@ function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   let golOk = false;
   if(pred.gol) {
     const scorers = realScorers ?? _hf09FallbackScorers(pred, realL, realR);
-    golOk = scorers.includes(pred.gol);
+    golOk = scorerMatches(scorers, pred.gol);  // matcher normalizado (ERR-93)
   } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
     golOk = true;
   }

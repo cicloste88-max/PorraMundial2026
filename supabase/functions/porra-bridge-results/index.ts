@@ -2,6 +2,12 @@
 // Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
 // supabase/functions/porra-bridge-results/index.ts
 // P4/D — Puente live_scores(finished) → results. BLOQUE CRITICO del torneo.
+//   v9 (ERR-93): playerToShortKey resuelve el nombre del feed contra el roster
+//     por TOKENS normalizados (_shared/scorer-normalize.mjs), NO por substring
+//     estricto. "Vinicius Junior" (feed) vs "7 · Vinicius Jr" (roster) fallaba
+//     el includes y caia al ultimo token "Junior" ≠ key canonica "Vinicius" →
+//     el +2 de goleador no casaba nunca. Fallback sin solape → scorer_unresolved
+//     (console.warn) para auditoria. El matcher de scoring tambien normaliza.
 //   v8 (Item 2 post-J1, hardening OBLIGATORIO tras el incidente update-results
 //     v9 del 11-jun): (a) reader defensivo asObj en match_results/ko_results —
 //     un writer que regrese a jsonb double-encoded (string) ya no crashea el
@@ -28,6 +34,7 @@
 // no-volcados. verify_jwt=false (auth secret==service_role).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { matchPlayerKey, fallbackKey } from "../_shared/scorer-normalize.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -61,14 +68,16 @@ type EquiposPlayersByIso3 = Record<string, EquiposPlayer[]>;
 
 function playerToShortKey(nombre: string, iso3: string, eqMap: EquiposPlayersByIso3): string {
   if (!nombre) return "";
-  const eq = eqMap[iso3];
-  if (Array.isArray(eq)) {
-    const hit = eq.find((p) => p.name && p.name.includes(nombre));
-    if (hit) return hit.key;
-  }
-  const norm = String(nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const parts = norm.trim().split(/\s+/);
-  return parts[parts.length - 1] || "";
+  // Resolucion por tokens normalizados contra el roster (name + key). Cubre
+  // "Vinicius Junior" (y con acentos) -> "Vinicius" y separa Jimenez de
+  // Gimenez. Ver _shared/scorer-normalize.mjs (ERR-93).
+  const matched = matchPlayerKey(nombre, eqMap[iso3]);
+  if (matched) return matched;
+  // Ningun token del roster solapo: degradar al ultimo token y AUDITAR. El
+  // matcher normalizado de scoring aun puede casarlo, pero el warn deja rastro
+  // de los nombres de feed no resueltos para revisar el roster.
+  console.warn(`scorer_unresolved iso3=${iso3} raw=${JSON.stringify(nombre)}`);
+  return fallbackKey(nombre);
 }
 
 function extractScorers(
