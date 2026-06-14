@@ -2,6 +2,14 @@
 // Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
 // supabase/functions/porra-bridge-results/index.ts
 // P4/D — Puente live_scores(finished) → results. BLOQUE CRITICO del torneo.
+//   v9 (ERR-93): playerToShortKey resuelve el nombre del feed contra el roster
+//     por TOKENS normalizados (_shared/scorer-normalize.mjs), NO por substring
+//     estricto. "Vinicius Junior" (feed) vs "7 · Vinicius Jr" (roster) fallaba
+//     el includes y caia al ultimo token "Junior" ≠ key canonica "Vinicius" →
+//     el +2 de goleador no casaba nunca. Empate por apellido compartido (2x
+//     Rodriguez, Hwang/Heechan) → scorer_ambiguous, no se adivina. El fallback
+//     CONSERVA LA CAJA (= v8 y picker) → re-bridge sin lockstep de deploy. El
+//     matcher de scoring normaliza como defensa. Sin solape → scorer_unresolved.
 //   v8 (Item 2 post-J1, hardening OBLIGATORIO tras el incidente update-results
 //     v9 del 11-jun): (a) reader defensivo asObj en match_results/ko_results —
 //     un writer que regrese a jsonb double-encoded (string) ya no crashea el
@@ -28,6 +36,7 @@
 // no-volcados. verify_jwt=false (auth secret==service_role).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { matchPlayerKey, fallbackKey } from "../_shared/scorer-normalize.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -61,14 +70,20 @@ type EquiposPlayersByIso3 = Record<string, EquiposPlayer[]>;
 
 function playerToShortKey(nombre: string, iso3: string, eqMap: EquiposPlayersByIso3): string {
   if (!nombre) return "";
-  const eq = eqMap[iso3];
-  if (Array.isArray(eq)) {
-    const hit = eq.find((p) => p.name && p.name.includes(nombre));
-    if (hit) return hit.key;
-  }
-  const norm = String(nombre).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const parts = norm.trim().split(/\s+/);
-  return parts[parts.length - 1] || "";
+  // Resolucion por tokens normalizados contra el roster (name + key). Cubre la
+  // clase-Vinicius (key != apellido: "Vinicius Junior"->Vinicius, y Son,
+  // DeBruyne, VanDijk, MacAllister...) y separa Jimenez de Gimenez. Devuelve
+  // {key} | {ambiguous} | null. Ver _shared/scorer-normalize.mjs (ERR-93).
+  const m = matchPlayerKey(nombre, eqMap[iso3]);
+  if (m && m.key) return m.key;
+  // Sin ganador claro: degradar al fallback (ultimo token, CONSERVA CAJA = key
+  // que guarda el picker para jugadores fuera del roster) y AUDITAR.
+  //   scorer_ambiguous  = empate entre apellidos compartidos → no adivinamos.
+  //   scorer_unresolved = ningun token del roster solapo (jugador ausente).
+  console.warn(
+    `${m && m.ambiguous ? "scorer_ambiguous" : "scorer_unresolved"} iso3=${iso3} raw=${JSON.stringify(nombre)}`,
+  );
+  return fallbackKey(nombre);
 }
 
 function extractScorers(

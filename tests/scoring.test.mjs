@@ -491,4 +491,38 @@ const {
   assert.strictEqual(sharedKo, 11, 'regla00 KO shared: 0-0 sin gol + avance r32 (winner) = 6+5');
 }
 
-console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost + regla 0-0) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW+regla00) + EF assembly (scorer→gol + boost)');
+// ════════════════════════════════════════════════════════════════════
+// 10. MATCHER NORMALIZADO DE GOLEADOR (ERR-93)
+//
+// El +2 de goleador debe casar aunque la key persistida difiera en
+// caja/acentos/jr-junior de la predicha (scorer "vinicius" vs pred
+// "Vinicius"). Cubre el escenario raíz del bug (feed "Vinicius Junior" →
+// "Junior" persistido) en AMBOS motores, con paridad shared↔legacy.
+// ════════════════════════════════════════════════════════════════════
+{
+  // shared — caja distinta (p.ej. proveniente del fallback del bridge) casa.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 1, gol: 'Vinicius' }, 2, 1, { scorers: ['vinicius'] }),
+    6, 'norm shared #1: caja distinta casa (1+3+2)',
+  );
+  // shared — acentos casan.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 0, gol: 'Jimenez' }, 1, 0, { scorers: ['Jiménez'] }),
+    6, 'norm shared #2: acentos casan',
+  );
+  // shared — jugador distinto NO casa (sin falso positivo por subcadena).
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 0, gol: 'Jimenez' }, 1, 0, { scorers: ['Gimenez'] }),
+    4, 'norm shared #3: Giménez ≠ Jiménez (sin +2)',
+  );
+
+  // legacy — paridad exacta de los 3 casos (sin boost ni IA).
+  globalThis.iaBonusWillApply = () => false;
+  globalThis.PARTIDOS = [];
+  globalThis.boostPicks = {};
+  assert.strictEqual(legacyCMP({ saved: true, l: 2, v: 1, gol: 'Vinicius' }, 2, 1, null, ['vinicius']), 6, 'norm legacy #1: caja');
+  assert.strictEqual(legacyCMP({ saved: true, l: 1, v: 0, gol: 'Jimenez' }, 1, 0, null, ['Jiménez']), 6, 'norm legacy #2: acentos');
+  assert.strictEqual(legacyCMP({ saved: true, l: 1, v: 0, gol: 'Jimenez' }, 1, 0, null, ['Gimenez']), 4, 'norm legacy #3: Giménez≠Jiménez');
+}
+
+console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost + regla 0-0 + matcher normalizado) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW+regla00+norm) + EF assembly (scorer→gol + boost)');

@@ -1,6 +1,8 @@
 // supabase/functions/_shared/scoring.mjs
 // Motor de puntuación Porra Mundial 2026 — funciones puras (sin globals).
 
+import { scorerMatches } from "./scorer-normalize.mjs";
+
 export const KO_ROUND_PTS = {
   groups:         5,
   r32:            5,
@@ -46,10 +48,11 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
   if (isExact) pts += 3;
 
   // Goleador (+2). golOk alimenta también la condición del boost (R3).
+  // Matcher NORMALIZADO (ERR-93, _shared/scorer-normalize.mjs): absorbe drift
+  // de caja/acentos/jr-junior entre la key persistida y la predicha.
   let golOk = false;
   if (pred.gol) {
-    const scorers = opts.scorers;
-    golOk = Array.isArray(scorers) && scorers.includes(pred.gol);
+    golOk = scorerMatches(opts.scorers, pred.gol);
   } else if (pred.l === 0 && pred.v === 0 && realL === 0 && realR === 0) {
     // Regla 0-0 (canónica, confirmada San 10-jun-2026): el goleador es opcional
     // al pronosticar 0-0 — su ausencia es la apuesta "sin goleador". Si el

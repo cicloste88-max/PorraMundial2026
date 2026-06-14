@@ -2616,3 +2616,77 @@ no derivar cada una por su cuenta. Pariente de ERR-87 (la cache de Directo no ex
 `match_start_ts` a primer nivel y caía al mismo `m.date` de sede).
 
 **Fecha detección**: 13-jun-2026. **Resuelto**: 13-jun-2026.
+
+## ERR-93 — Resolución de goleador por substring estricto + fallback al último token ≠ key canónica
+
+**Síntoma**: el +2 de goleador no puntuaba para ciertos jugadores en NINGUNA
+superficie (tabla de liga, tile Predictor, card por partido), aunque el usuario
+hubiera acertado el goleador. Caso testigo: Vinicius. Afecta a todo jugador cuyo
+último token del nombre del feed ≠ su key canónica.
+
+**Causa**: `playerToShortKey()` en `porra-bridge-results` resolvía el nombre del
+feed (SofaScore/ESPN) a key canónica con substring ESTRICTO contra el roster:
+`eq.find((p) => p.name.includes(nombre))`, y al fallar caía al ÚLTIMO token. El
+feed da `"Vinicius Junior"`; el roster es `name:"7 · Vinicius Jr"` →
+`"…Vinicius Jr".includes("Vinicius Junior")` → false (`Junior` ≠ `Jr`) → fallback
+→ último token `"Junior"`. Se persistía `"Junior"` en `results.match_results[].scorers`,
+pero la predicción guarda la key canónica `"Vinicius"` → ni el matcher de standings
+(`_shared/scoring.mjs`, `scorers.includes(pred.gol)`) ni el espejo del frontend
+(`public/js/scoring.js`) casaban → 0 puntos de goleador.
+
+**Fix** (14-jun-2026, rama `claude/dreamy-euler-xrpgh4`): módulo compartido
+`supabase/functions/_shared/scorer-normalize.mjs` (fuente única):
+- `matchPlayerKey(nombre, players)` resuelve por SOLAPAMIENTO DE TOKENS normalizados
+  (sin acentos, minúsculas, junior/júnior→jr, sin dorsales/puntuación). Tokens
+  distintivos pesan 3; el genérico `jr` pesa 1. Devuelve `{key}` con un único
+  ganador, `{ambiguous:true}` si el mejor score empata entre ≥2 jugadores
+  (apellido compartido: 2× Rodriguez, Hwang/Heechan) y la key exacta no
+  desambigua — **NO se adivina** (bridge loguea `scorer_ambiguous`), o `null` si
+  ningún token solapa.
+- `fallbackKey(nombre)` (último token, diacríticos/dorsal/puntuación fuera) **CONSERVA
+  LA CAJA** (como el bridge v8 y como la key que guarda el picker para jugadores
+  fuera del roster curado) → un re-bridge v9 produce la MISMA key fallback que v8,
+  así que casa con el matcher exacto viejo **sin lockstep de deploy**. Solo si no
+  hay solape; bridge loguea `scorer_unresolved`.
+- `scorerMatches(scorers, gol)` compara la key ENTERA normalizada (no por subcadena):
+  absorbe drift de caja/acentos/jr-junior entre lo persistido y lo predicho. Con el
+  fallback conservando caja, queda como **defensa en profundidad pura** (no es
+  imprescindible para evitar regresión al re-bridgear).
+Reusado en el bridge (resolución, v9) y en `_shared/scoring.mjs` (matcher);
+espejado INLINE en `public/js/scoring.js` (classic script, no ESM) con parity
+shared↔legacy en la suite. Tests: `tests/scorer-normalize.test.mjs` (casos raíz
+Vinicius + clase-Vinicius Son/DeBruyne/VanDijk/MacAllister + desambiguación por "jr"
++ empate de apellido Rodriguez/Hwang + Jiménez≠Giménez + fallback==v8 + source
+guards de las 3 superficies) y sección 10 de `tests/scoring.test.mjs`.
+
+**Dimensión**: la clase-Vinicius (in-roster con key ≠ apellido del feed: Son,
+DeBruyne, Bruno, Nico, James, VanDijk, MacAllister, casi toda Corea…) son ~34
+jugadores. En J1 quedaron a 0 impacto por suerte del fixture (+ parche manual de
+`C_Brasil_Marruecos`→`Vinicius`); en J2+ se denegarían todos bajo v8 → desplegar v9
+antes de J2.
+
+**Remediación J1** (post-deploy, gate San): re-bridgear los 8 partidos `finished`
+(re-ejecuta `extractScorers`→`playerToShortKey` con el fix) y reseed
+`user_points_cache`. Verificado en prod (read-only, 14-jun): hoy 0 usuarios
+denegados (el único caso con impacto, Vinicius, ya estaba parcheado a mano).
+Las keys fallback de J1 (`Krejci`, `Lukic`, `Larin`, `Khoukhi`, `McGinn`,
+`Metcalfe`, `Mauricio`) son de jugadores **ausentes del roster curado** (8/equipo):
+el token-fix NO las cambia (caen igual al fallback) y casan porque picker y bridge
+coinciden en el último token; arreglarlas de raíz pide completar `equipos_players`
+(pendiente "convocatorias reales"). `Irankunda` (roster tiene `Irakunda`) sí es
+clase-Vinicius pero nadie lo apostó.
+
+**Sitio relacionado pendiente (gate San)**: `porra-ia-compute/lib/scorer-keys.ts`
+tiene una TERCERA copia del mismo `playerToShortKey` (substring + último token) que
+genera la key `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (el OTRO
+lado de la comparación). NO tocado en este fix (scope bridge+scoring+frontend);
+plegar al módulo compartido + recomputar dentro del pendiente "update_ia_scorers".
+
+**Patrón detectable**: dos representaciones del mismo dato (nombre del feed vs key
+del roster) reconciliadas por substring/igualdad exacta sobre strings que ya
+divergen en formato. Match por tokens normalizados, no por `includes`/`===`. La
+misma lógica de matching duplicada en N superficies → extraer a módulo compartido
+(aquí 4 copias: bridge, scoring shared, frontend, ia-compute). Pariente de ERR-91
+(el +2 que tampoco casaba, por el 5º parámetro opcional).
+
+**Fecha detección**: 12/14-jun-2026. **Resuelto** (código): 14-jun-2026 (deploy + remediación: gate San).
