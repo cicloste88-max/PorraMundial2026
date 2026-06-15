@@ -2690,3 +2690,55 @@ misma lógica de matching duplicada en N superficies → extraer a módulo compa
 (el +2 que tampoco casaba, por el 5º parámetro opcional).
 
 **Fecha detección**: 12/14-jun-2026. **Resuelto** (código): 14-jun-2026 (deploy + remediación: gate San).
+
+## ERR-94 — Mitad simétrica de ERR-93: la PREDICCIÓN guarda key no-canónica (lado picker)
+
+**Síntoma**: tras desplegar el fix ERR-93 (bridge v9 + standings v12) y re-bridgear,
+intermanuel8 (TILÍN) seguía sin cobrar los 12 pts de `C_Brasil_Marruecos` (exacto +
+Vinicius + boost). El barrido NO lo resolvió.
+
+**Causa**: ERR-93 corrigió el lado RESULTADO (el bridge escribe `results.scorers`
+canónicos, p.ej. `Vinicius`). Pero la **predicción** de intermanuel8 tenía
+`predictions.scorer = "Jr"` — el picker (frontend `resolveKeysForSquad`/
+`playerToShortKey`) guardó en su día una key no-canónica (último token "Jr" en vez
+de "Vinicius"). El bridge **nunca toca las predicciones**, así que ni el re-bridge ni
+el matcher normalizado (`normName("Jr")="jr" ≠ "vinicius"`, palabras distintas) podían
+casarlo → 0 de goleador. Afecta a predicciones con nombre completo / inicial /
+fragmento (`"Cody Gakpo"`, `"E. Valencia"`, `"Heung-Min"`, `"Jr"`…) cuya key ≠ la que
+el bridge produce para ese jugador.
+
+**Fix** (15-jun-2026):
+- **2 víctimas en partidos jugados** (cerrados) corregidas a mano por San vía MCP:
+  `predictions` id `277fe8a1` (intermanuel8·C_Brasil_Marruecos·`Jr`→`Vinicius`),
+  `488d9b18` (intermanuel8·C_Brasil_Escocia·`Jr`→`Vinicius`), `b5c4a96f`
+  (mavc_999·E_Alemania_Curazao·`Kai Havertz`→`Havertz`) + reseed TILÍN/Gallos.
+- **Sweep de canonicalización** (fase de grupos, SOLO partidos NO jugados) con el
+  módulo REAL `_shared/scorer-normalize.mjs` (`matchPlayerKey`→`{key}`, si no
+  `fallbackKey`; `{ambiguous}` o colisión-de-nombre → SKIP). **112 filas** reescritas
+  vía UPDATE (JOIN `match_id`+`btrim(scorer)`, `NOT IN finished`, idempotente). HOLD
+  (no escribir): colisiones de nombre de pila (`Isak Hien`→`Isak`, `Luka Vuskovic`→
+  `Modric`, `Jhon Córdoba/Lucumí`→`Arias`), ambiguo (`M. Ali`), particle/conflación
+  (`Paik Seung-Ho`→`Junho`, `Ibrahim`, `J. Caicedo`=Jordy≠Moisés). NOOP: `David`/
+  `Junior`/`Hwang` (ya canónicas, exact-key preference).
+
+**Caveat de raíz**: el roster curado de `equipos_players` (≈8/equipo) hace que
+`matchPlayerKey` mal-resuelva nombres FUERA de él que comparten token con un jugador
+in-roster (`Isak Hien`→`Isak` porque Hien no está; `Paik Seung-Ho`→`Junho` por la
+partícula "ho"). Esto afecta IGUAL al bridge y al sweep (son "bridge-consistentes")
+pero conflaciona jugadores. El fix de fondo es completar `equipos_players`. El
+surname-guard (la key resuelta debe contener el apellido del pick) caza las colisiones
+de nombre de pila para no escribirlas.
+
+**Drift detectado**: `equipos_players` (tabla) vs `public/data/equipos-players.json`
+(espejo repo) divergen en **GER** y **MAR** (46 equipos idénticos). El sweep usó la
+TABLA (fuente del bridge). Recargar el JSON espejo pendiente (regla espejo
+runtime↔JSON, ver `.claude/rules/edge-functions.md`).
+
+**Patrón detectable**: cuando un fix canoniza UN lado de una comparación (resultado),
+el OTRO lado (predicción del usuario, generado por otro código) puede seguir
+divergente. Barrer ambos lados al mismo espacio de keys. Pendiente future-proof:
+picker v3/`resolveKeysForSquad` debe guardar SIEMPRE la key canónica (origen del "Jr");
+`porra-ia-compute/lib/scorer-keys.ts` es la 4ª copia del resolvedor. Hermano de ERR-93.
+
+**Fecha detección**: 15-jun-2026. **Resuelto**: 15-jun-2026 (sweep aplicado; KO diferido
+hasta poblarse el bracket ~28-jun; picker/ia-compute future-proof pendientes).
