@@ -683,9 +683,28 @@ function v3CalcMatchPointsGrupos(prediction, match) {
   var realScorers = [];
   var mrEntry = (typeof window !== 'undefined' && window._matchResultsByKey && matchKey)
     ? window._matchResultsByKey[matchKey] : null;
-  if (mrEntry && Array.isArray(mrEntry.scorers)) realScorers = mrEntry.scorers;
+  if (mrEntry && Array.isArray(mrEntry.scorers)) {
+    realScorers = mrEntry.scorers;            // cierre: scorers canónicos del bridge
+  } else if (typeof window !== 'undefined' && typeof deriveScorersFromEvents === 'function'
+             && typeof window.matchKeyFor === 'function' && window._liveScoresByMatchKey) {
+    // EN VIVO (o lag pre-bridge): sin entrada del bridge, derivar de
+    // live_scores.events con el MISMO resolver que el bridge (_liveScorerKey →
+    // matchPlayerKey) → +2 PROVISIONAL en vivo, consistente con el cierre. ERR-94 (B).
+    var _liveKey = window.matchKeyFor(match);
+    var _live = _liveKey ? window._liveScoresByMatchKey[_liveKey] : null;
+    if (_live && Array.isArray(_live.events)) {
+      var _hIso3 = (typeof EQUIPOS !== 'undefined') ? (EQUIPOS.find(function (e) { return e.name === match.home; }) || {}).flag : null;
+      var _aIso3 = (typeof EQUIPOS !== 'undefined') ? (EQUIPOS.find(function (e) { return e.name === match.away; }) || {}).flag : null;
+      realScorers = deriveScorersFromEvents(_live.events, !!_live._teams_swapped, _hIso3, _aIso3);
+    }
+  }
   if (prediction.gol) {
-    if (realScorers.indexOf(prediction.gol) !== -1) types.push('gole');
+    // Matcher normalizado (ERR-93) — robusto a drift caja/acentos; en vivo y
+    // cierre comparan keys del mismo espacio (el resolver es espejo del bridge).
+    var _golMatch = (typeof scorerMatches === 'function')
+      ? scorerMatches(realScorers, prediction.gol)
+      : (realScorers.indexOf(prediction.gol) !== -1);
+    if (_golMatch) types.push('gole');
   } else if (prediction.l === 0 && prediction.v === 0 && realL === 0 && realR === 0) {
     // Regla 0-0 (canónica, San 10-jun): sin goleador + 0-0 clavado → +2.
     // Paridad con calcMatchPoints (scoring.js) y _shared/scoring.mjs.
