@@ -49,14 +49,26 @@ const EQUIPOS_FIXTURE = [
     name: 'Sudáfrica', flag: 'RSA',
     players: [{ key: 'Zwane', name: '11 · Themba Zwane' }],
   },
+  // clase-Vinicius (key ≠ último apellido del feed) + ambiguo (2× Rodriguez).
+  { name: 'Suecia', flag: 'SWE', players: [{ key: 'Isak', name: '9 · Alexander Isak' }, { key: 'Gyokeres', name: '17 · Viktor Gyökeres' }] },
+  { name: 'Brasil', flag: 'BRA', players: [{ key: 'Vinicius', name: '7 · Vinicius Jr' }, { key: 'Raphinha', name: '11 · Raphinha' }] },
+  { name: 'Panamá', flag: 'PAN', players: [{ key: 'JoseLuisRodriguez', name: '15 · José Luis Rodríguez' }, { key: 'TomasRodriguez', name: '7 · Tomás Rodríguez' }] },
 ];
 
+// ERR-94 (A): deriveScorersFromEvents resuelve vía matchPlayerKey/fallbackKey
+// (espejo del bridge), no por el playerToShortKey legacy (substring). Se inyectan
+// las deps del módulo espejado en scoring.js.
 const factory = new Function('EQUIPOS', `
-  ${extractFn(SCORING_SRC, 'playerToShortKey')}
+  ${extractFn(SCORING_SRC, 'normName')}
+  ${extractFn(SCORING_SRC, 'toks')}
+  ${extractFn(SCORING_SRC, 'matchPlayerKey')}
+  ${extractFn(SCORING_SRC, 'fallbackKey')}
+  ${extractFn(SCORING_SRC, '_liveScorerKey')}
   ${extractFn(SCORING_SRC, 'deriveScorersFromEvents')}
-  return { playerToShortKey, deriveScorersFromEvents };
+  return { deriveScorersFromEvents };
 `);
 const { deriveScorersFromEvents } = factory(EQUIPOS_FIXTURE);
+const _goal = (name, isHome) => ({ isHome, player: { name }, incidentType: 'goal', incidentClass: 'regular' });
 
 // Events REALES de live_scores wc2026_gA_15186710 (escritos por el poller ESPN).
 const MEX_RSA_EVENTS = [
@@ -91,6 +103,21 @@ test('exclusiones espejo del bridge: ownGoal y penaltyShootout fuera; inGamePena
     { isHome: true, player: {}, incidentType: 'goal', incidentClass: 'regular' }, // sin nombre → skip
   ];
   assert.deepStrictEqual(deriveScorersFromEvents(ev, false, 'MEX', 'RSA'), ['Quinones']);
+});
+
+// ── ERR-94 (A): clase-Vinicius EN VIVO — feed nombre completo → key canónica ──
+test('EN VIVO clase-Vinicius: feed completo → key canónica (espejo bridge)', () => {
+  // Isak ya casaba (substring); Vinicius/Son eran el bug (substring fallaba →
+  // último token "Junior"/"Min"). Ahora matchPlayerKey resuelve por tokens.
+  assert.deepStrictEqual(deriveScorersFromEvents([_goal('Alexander Isak', true)], false, 'SWE', 'TUN'), ['Isak']);
+  assert.deepStrictEqual(deriveScorersFromEvents([_goal('Vinicius Junior', true)], false, 'BRA', 'MAR'), ['Vinicius']);
+  assert.deepStrictEqual(deriveScorersFromEvents([_goal('Vinícius Júnior', true)], false, 'BRA', 'MAR'), ['Vinicius']);
+});
+
+test('EN VIVO ambiguo (2× Rodriguez PAN): apellido a secas → fallback, nombre completo → jugador', () => {
+  // {ambiguous} → fallbackKey (como el bridge): no acredita a un candidato concreto.
+  assert.deepStrictEqual(deriveScorersFromEvents([_goal('Rodriguez', true)], false, 'PAN', 'XXX'), ['Rodriguez']);
+  assert.deepStrictEqual(deriveScorersFromEvents([_goal('Tomás Rodríguez', true)], false, 'PAN', 'XXX'), ['TomasRodriguez']);
 });
 
 test('teamsSwapped reorienta el isHome igual que el bridge', () => {

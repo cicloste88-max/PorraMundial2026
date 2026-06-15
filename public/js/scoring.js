@@ -56,6 +56,55 @@ function scorerMatches(scorers, gol) {
   if (!g) return false;
   return scorers.some(function (s) { return normName(s) === g; });
 }
+// toks/matchPlayerKey/fallbackKey — ESPEJO de _shared/scorer-normalize.mjs
+// (ERR-93/94). Resuelven el nombre CRUDO del feed → key del roster IGUAL que el
+// puente, para que el +2 EN VIVO use el mismo espacio de keys que el cierre.
+// Si tocas la lógica, replica en _shared (parity en tests/scorer-normalize +
+// directo-live-scorers).
+function toks(s) {
+  return normName(s).split(' ').filter(Boolean);
+}
+function matchPlayerKey(nombre, players) {
+  const feed = toks(nombre);
+  if (!Array.isArray(players) || feed.length === 0) return null;
+  let best = 0, winners = [];
+  for (const p of players) {
+    const cand = toks((p && p.name ? p.name : '') + ' ' + (p && p.key ? p.key : ''));
+    let score = 0;
+    for (const t of feed) if (cand.indexOf(t) !== -1) score += (t === 'jr' ? 1 : 3);
+    if (score <= 0) continue;
+    if (score > best) { best = score; winners = [p]; }
+    else if (score === best) winners.push(p);
+  }
+  if (winners.length === 0) return null;
+  if (winners.length === 1) return { key: winners[0].key };
+  const feedNorm = feed.join(' ');
+  const exact = winners.filter(function (p) { return normName(p && p.key) === feedNorm; });
+  if (exact.length === 1) return { key: exact[0].key };
+  return { ambiguous: true };
+}
+function fallbackKey(nombre) {
+  const cleaned = String(nombre == null ? '' : nombre)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9\s]/g, ' ')
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const parts = cleaned.split(' ').filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+// Resolver de goleador EN VIVO — espejo EXACTO del playerToShortKey del puente:
+// matchPlayerKey contra el roster del equipo del goleador (EQUIPOS[iso3].players,
+// curado = mismo que equipos_players de la tabla); {ambiguous} o sin solape →
+// fallbackKey (último token), igual que el puente. NO usa el playerToShortKey
+// legacy (substring) que fallaba la clase-Vinicius (Vinicius Junior→Junior). ERR-94.
+function _liveScorerKey(name, iso3) {
+  const eq = (typeof EQUIPOS !== 'undefined' && Array.isArray(EQUIPOS))
+    ? EQUIPOS.find(function (e) { return e.flag === iso3; }) : null;
+  const roster = (eq && Array.isArray(eq.players)) ? eq.players : [];
+  const m = matchPlayerKey(name, roster);
+  if (m && m.key) return m.key;
+  return fallbackKey(name);
+}
 
 // ── Puntos por partido (grupos y KO) ──────────────────────
 // +1 signo correcto (1·X·2)
@@ -151,11 +200,12 @@ function _hf09FallbackScorers(pred, realL, realR) {
 // events crudos de live_scores → scorer keys. Espejo de extractScorers del
 // bridge porra-bridge-results: cuentan goal + inGamePenalty; ownGoal y
 // penaltyShootout NO (los penaltis de tanda no son gol de jugador a efectos
-// de la porra). El mapeo nombre→key REUSA playerToShortKey (este fichero,
-// §Sprint Combos & Awards): lookup en EQUIPOS[iso3].players con fallback NFD
-// sin diacríticos + último token ('Raúl Jiménez' → 'Jimenez') — mismo patrón
-// que el bridge. homeIso3/awayIso3 en orientación PROYECTO; el flag
-// teamsSwapped reorienta el isHome de SofaScore/ESPN igual que el bridge.
+// de la porra). El mapeo nombre→key usa `_liveScorerKey` = matchPlayerKey/
+// fallbackKey (espejo de _shared/scorer-normalize.mjs, ERR-94) contra el roster
+// del equipo del goleador → MISMO espacio de keys que el puente, así el +2 en
+// vivo casa con el cierre (antes usaba playerToShortKey legacy por substring que
+// fallaba la clase-Vinicius: 'Vinicius Junior'→'Junior'). homeIso3/awayIso3 en
+// orientación PROYECTO; teamsSwapped reorienta el isHome de SofaScore/ESPN.
 function deriveScorersFromEvents(rawEvents, teamsSwapped, homeIso3, awayIso3) {
   if (!Array.isArray(rawEvents)) return [];
   const out = [];
@@ -168,7 +218,7 @@ function deriveScorersFromEvents(rawEvents, teamsSwapped, homeIso3, awayIso3) {
     if (!pname) continue;
     const sofaIsHome = e.isHome === true;
     const projIsHome = teamsSwapped ? !sofaIsHome : sofaIsHome;
-    const key = playerToShortKey(pname, projIsHome ? homeIso3 : awayIso3);
+    const key = _liveScorerKey(pname, projIsHome ? homeIso3 : awayIso3);
     if (key) out.push(key);
   }
   return out;
