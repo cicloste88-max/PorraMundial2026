@@ -918,7 +918,7 @@
    Escala móvil (375): caja 62px, copa 64×80, banderas 28×19.
    Laterales agrupados al extremo (cluster), sin .dvm__dot.
    ════════════════════════════════════════════════════════════ */
-.dvm{ position:relative; width:100%; max-width:343px; margin-inline:auto; border-radius:24px; padding:0 4px 6px 4px;
+.dvm{ position:relative; width:100%; border-radius:24px; padding:0 4px 6px 4px;
   background:linear-gradient(100deg,
     #F6A878 0%, #EF8E70 13%, #EA3C25 29%,
     rgba(234,60,37,0) 35%, rgba(90,79,212,0) 65%,
