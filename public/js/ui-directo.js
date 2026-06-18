@@ -448,13 +448,13 @@
       : '';
 
     // Mismo markup en ambos lados; el espejado del lado derecho lo hace el CSS
-    // (.dvm__side.is-right { flex-direction: row-reverse }).
-    const side = (cls, code, src, teamName, dotCls) =>
+    // (.dvm__side.is-right { flex-direction: row-reverse }). Sin .dvm__dot:
+    // bandera + código se agrupan al extremo (cluster, justify flex-start).
+    const side = (cls, code, src, teamName) =>
       '<div class="dvm__side ' + cls + '">' +
         '<div class="dvm__id">' +
           '<button type="button" class="dvm__flag dv2-mini-flag-btn" data-iso3="' + code + '" ' +
             'aria-label="Ver plantilla ' + (teamName || '') + '">' + flagImg(src) + '</button>' +
-          '<span class="dvm__dot ' + dotCls + '"></span>' +
         '</div>' +
         '<span class="dvm__code">' + code + '</span>' +
       '</div>';
@@ -463,7 +463,7 @@
       '<div class="dvm" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
         '<div class="dvm__bar">' +
-          side('is-left', hCode, hSrc, m.home, 'is-home') +
+          side('is-left', hCode, hSrc, m.home) +
           '<div class="dvm__center">' +
             '<div class="dvm__score is-l">' + lTxt + '</div>' +
             '<div class="dvm__badge">' +
@@ -473,7 +473,7 @@
             '</div>' +
             '<div class="dvm__score is-r">' + vTxt + '</div>' +
           '</div>' +
-          side('is-right', aCode, aSrc, m.away, 'is-away') +
+          side('is-right', aCode, aSrc, m.away) +
         '</div>' +
       '</div>'
     );
