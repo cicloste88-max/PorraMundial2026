@@ -953,7 +953,7 @@ button.dvm__flag{ appearance:none; -webkit-appearance:none;
   font-size:18px; font-weight:800; letter-spacing:.01em; color:#f3f6fa;
   text-shadow:0 2px 4px rgba(0,0,0,.55); white-space:nowrap; }
 /* centro: resultado + copa */
-.dvm__center{ position:relative; display:flex; align-items:center; gap:46px; }
+.dvm__center{ position:relative; display:flex; align-items:center; gap:30px; }
 .dvm__score{ width:46px; height:62px; display:grid; place-items:center;
   background:linear-gradient(180deg,#7CD3AB,#54B98B);
   box-shadow:inset 0 2px 0 rgba(255,255,255,.45), 0 0 18px rgba(86,200,150,.30);
@@ -962,9 +962,9 @@ button.dvm__flag{ appearance:none; -webkit-appearance:none;
 .dvm__score.is-l{ border-radius:18px 6px 6px 18px; }
 .dvm__score.is-r{ border-radius:6px 18px 18px 6px; }
 .dvm__badge{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:5;
-  width:64px; height:80px; border-radius:15px;
+  width:56px; height:72px; border-radius:14px; overflow:hidden;
   background:linear-gradient(180deg,#1b2030,#05070d); border:2px solid #04060b;
   box-shadow:0 16px 28px rgba(0,0,0,.6), 0 5px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
   display:grid; place-items:center; }
-.dvm__badge img{ height:66px; width:auto; display:block; filter:drop-shadow(0 4px 7px rgba(0,0,0,.55)); }
-.dvm__badge .dvm__fallback{ display:none; font-size:28px; }
+.dvm__badge img{ height:58px; width:auto; max-width:48px; object-fit:contain; display:block; filter:drop-shadow(0 4px 7px rgba(0,0,0,.55)); }
+.dvm__badge .dvm__fallback{ display:none; font-size:26px; }
