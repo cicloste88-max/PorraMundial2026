@@ -224,6 +224,30 @@ results.match_results["{group_letter}_{home_es}_{away_es}"]
   (igual que `live-sync.js`/`ui-directo.js` tratan `_es` como canónico). En
   fase de grupos solo `wc2026_gC_15186861` (Brasil vs Escocia) está swapped.
 
+### Invariante de orientación (CRÍTICO — ERR-95/96)
+
+**`live_scores` guarda SIEMPRE el orden de la FUENTE; la corrección a
+orden-proyecto se aplica UNA sola vez aguas abajo.** El writer (webhook
+SofaScore o `espn-poll`) **NUNCA** pre-orienta:
+
+- **`espn_event_map.inverted` debe ser `false`** (también en BRA-ESC). Si está
+  `true`, `espn-poll` pre-orienta marcador + `events.isHome` a orden-proyecto y
+  entonces el puente y `live-sync.js`/`ui-directo.js` (que aplican
+  `teams_swapped`) RE-invierten → **doble corrección = marcador espejo**
+  (3-0 → 0-3). Fue ERR-95: la migración SofaScore→ESPN (12-jun) duplicó la
+  responsabilidad de orientar. `espn_event_map` es **runtime-only** (sin seed en
+  el repo): ante cualquier reseed/backfill, preservar `inverted=false`.
+- **El SIGNO de la IA** sigue la misma regla en el frontend: `loadIAPredictions`
+  (`auth.js`) lo orienta UNA vez con `iaSignForCard` (espejo de
+  `buildIaSignByLegacyKey` en `_shared/ia-bridge.mjs`); los consumidores
+  (`iaBonusWillApply`, chip vs-IA, `v3ComputeIAStandings`, `hydrateIABar`,
+  `renderIA`) NO re-voltean. Las **probabilidades** se orientan en presentación
+  (`v3IAOrientProbs`), no en el load. Omitir el flip del signo fue ERR-96
+  (+1 anti-IA fantasma en el card del fixture swapped).
+- **KO (~28-jun)**: al sembrar `wc_matches_ko` + filas `espn_event_map`,
+  `inverted=false` + `wc_matches_ko.teams_swapped` según la fuente; el puente
+  NO necesita rama distinta grupos/KO bajo este invariante.
+
 ### Normalización del goleador
 
 1. **`extractScorers(events)`**: recorre los incidents de SofaScore quedándose

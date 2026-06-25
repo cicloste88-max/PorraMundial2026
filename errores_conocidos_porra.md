@@ -2742,3 +2742,36 @@ picker v3/`resolveKeysForSquad` debe guardar SIEMPRE la key canónica (origen de
 
 **Fecha detección**: 15-jun-2026. **Resuelto**: 15-jun-2026 (sweep aplicado; KO diferido
 hasta poblarse el bracket ~28-jun; picker/ia-compute future-proof pendientes).
+
+---
+
+## ERR-95 — Doble corrección de orientación `live_scores`↔puente tras migrar SofaScore→ESPN (marcador espejo BRA-ESC)
+
+**Síntoma**: Brasil-Escocia (J3, 24-jun, `wc2026_gC_15186861`) acabó 3-0 real pero se imputó **0-3** en `results.match_results["C_Brasil_Escocia"]` → puntos mal a todos los que predijeron Brasil, goleadores de Brasil keyados contra Escocia (Vinícius → fallback "Junior"), y el SPA pintaba 0-3 (Directo, clasificación de grupo, cards de jugador, puntos-preview). ÚNICO partido afectado del torneo.
+
+**Causa**: `wc2026_gC_15186861` es el ÚNICO `wc_matches.teams_swapped=true` (la fuente lista Scotland-home; el proyecto Brasil-home). Al migrar el directo a ESPN (12-jun, ERR-89) se sembró `espn_event_map.inverted=true` para ese fixture → `espn-poll` PRE-orientaba marcador y `events.isHome` a orden-proyecto (`live_scores.score_home=Brasil=3`). Pero el puente (`porra-bridge-results`, rama grupos `teams_swapped`) **y** el frontend (`live-sync.js normalizeRow` + `ui-directo.js`) vuelven a invertir según `teams_swapped` → **doble corrección = espejo**. Bajo SofaScore el invariante era de inversión ÚNICA: el webhook (`porra-apify-webhook`) escribía `live_scores` en orden-fuente crudo y `teams_swapped` corregía 1 vez. ESPN rompió el invariante al pre-orientar (duplicó la responsabilidad de orientar). El backend de standings/IA era correcto; el split-brain era live_scores↔consumidores.
+
+**Fix** (25-jun-2026, dato+config vía MCP, CERO código — NO se tocó el puente):
+1. Reparada la fila congelada `live_scores` `wc2026_gC_15186861` a orden-fuente: `score_home=0, score_away=3` + `events.isHome` invertido (×3 `false`). [ROLLBACK: `score_home=3, score_away=0`, isHome=`true`×3.]
+2. Re-bridge `porra-bridge-results` **v9** (vía `net.http_post` con secret de Vault, sin tocar código) → `results.match_results["C_Brasil_Escocia"]={l:3,v:0,scorers:["Vinicius","Vinicius","Cunha"]}`, `cache_refresh:7` ligas. Verificado: antonioruem 73→76 (+1 signo +2 Vinicius), javion_89 85→86 (+1 signo).
+3. `espn_event_map.inverted=false` para alinear el writer ESPN con orden-fuente (igual que el webhook SofaScore). [ROLLBACK: `true`.]
+
+El partido está `finished` → `espn-poll` no reescribe la fila (guard `.neq('status','finished')` + skip in-memory), por eso la reparación fue manual. `espn_event_map` es **runtime-only** (sin seed en el repo): ante reseed, mantener `inverted=false` en BRA-ESC.
+
+**Patrón preventivo — INVARIANTE DE ORIENTACIÓN**: `live_scores` guarda SIEMPRE el orden de la FUENTE; el writer NUNCA pre-orienta (`espn_event_map.inverted=false`); la corrección a orden-proyecto se aplica UNA sola vez aguas abajo vía `teams_swapped` (puente + frontend). Vale para ambos writers (ESPN y el webhook SofaScore de recuperación) y para grupos+KO. Detalle en `docs/live-scoring.md` §Invariante de orientación. KO (~28-jun): `espn_event_map.inverted=false` + `wc_matches_ko.teams_swapped` según fuente; el puente NO necesita rama distinta. Hermano de ERR-96 (misma raíz, capa frontend/IA).
+
+**Fecha detección**: 25-jun-2026. **Resuelto**: 25-jun-2026.
+
+---
+
+## ERR-96 — Signo IA sin orientar en el load del frontend: +1 anti-IA fantasma en el fixture swapped
+
+**Síntoma**: tras corregir el marcador de BRA-ESC a 3-0 (ERR-95), el card pintaba **"VS IA +1"** a los 37 usuarios que predijeron Brasil (Gallos+Tilín) → total del card inflado +1 sobre la clasificación oficial (`user_points_cache`, correcta). Split-brain card (cliente) ↔ tabla (backend). Antes, con el 0-3 invertido, la condición anti-IA no se cumplía y el bug quedaba ENMASCARADO; el fix de datos lo destapó.
+
+**Causa**: la IA computa en orden SofaScore (`ia_predictions.home_code='SCO'`, sign `'2'`=gana visitante=Brasil). El **backend** voltea el signo en `_shared/ia-bridge.mjs` (`buildIaSignByLegacyKey`, `1↔2` si `home_code!==home_iso3`) → la tabla es correcta. Pero el **frontend** `loadIAPredictions` (`auth.js`) guardaba el `sign` CRUDO → para el front la IA "predijo Escocia" ('2') y, como el usuario predijo Brasil ('1'), "le ganaba" → +1 fantasma. 5 consumidores del signo (`iaBonusWillApply` en data.js, chip "vs IA" en `ui-groups.js`, `v3ComputeIAStandings`, label de `hydrateIABar`, `renderIA`) leían el crudo, aunque varios ya ASUMÍAN el orientado (`renderIA` lo comenta: *"sign ya en orientación de la porra → NO re-voltear"*). La barra "IA PREDICE" (%) NO se veía afectada porque orienta las probabilidades aparte vía `v3IAOrientProbs` (dos rutas con orientaciones distintas).
+
+**Fix** (25-jun-2026, PR #165, rama `claude/determined-curie-oygbbm`): helper puro `iaSignForCard(sign, ia_home_code, wc_home_iso3)` en `auth.js` con la MISMA condición y flip que `buildIaSignByLegacyKey`, aplicado al construir cada entry de `iaPredictions` (opción "orientar 1 vez al cargar"). Todos los consumidores del signo pasan a hablar orden-proyecto sin re-voltear. Las probabilidades siguen crudas y se orientan en presentación (`v3IAOrientProbs`) → la barra no cambia. Solo BRA-ESC afectado (los 71 con `home_code==home_iso3` → passthrough idéntico). +5 tests de paridad front↔backend en `tests/ia-bar-orientation.test.mjs` (`iaSignForCard==buildIaSignByLegacyKey`; X invariante; passthrough; `iaBonusPredicate` sin +1; wiring guard).
+
+**Patrón preventivo**: misma raíz que ERR-95 (orientación del fixture swapped) en la capa frontend/IA. El LOADER del front debe normalizar el signo IA a orden-proyecto UNA vez (espejo de la EF), y los consumidores no re-voltean. Las dos magnitudes que llegan en orden-fuente se orientan en sitios distintos pero coherentes: el **signo** en el load (`iaSignForCard`, dato), las **probabilidades** en presentación (`v3IAOrientProbs`). No convivir orientado/crudo en la misma entry sin marcarlo. Hermano de ERR-95.
+
+**Fecha detección**: 25-jun-2026. **Resuelto**: 25-jun-2026.

@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**12-jun (post-J1)**: SofaScore 403 al actor (ERR-89) → **ESPN fuente primaria**: EF `espn-poll` v1 + cron `espn-poll-mundial-2026` (job 30, 1min, gate ventana); stopgap SQL retirado. `update-results` RETIRADA (decisión San). B11: `user_points_cache` + vistas rank reales (standings v1.4.0 write-through, bridge v7/v8 asObj+try/catch). Fixes J1: +2 goleador en Directo, jugador-v3 key BD, pastilla EN VIVO, banner ISO3, trofeo dorado. Rama `fix/j1-incidencias` (9 commits) **gate San**. Suite 236/0.
+**25-jun**: **ESPN fuente primaria** (`espn-poll` v1, cron gate-ventana; `update-results` retirada; puente v9 ERR-93). **BRA-ESC fixture swapped** corregido: marcador 3-0 (ERR-95, MCP) + signo IA (ERR-96, PR #165) → invariante `live_scores`=orden-FUENTE. Suite 302/306.
 
-Main `33af098`. Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
+Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Aceptación espn-poll (12-13 jun)**: CAN-BIH 19:00Z y USA-PAR 01:00Z — marcador, goles, descanso, FT, bridge y WhatsApp sin intervención. Si OK → unschedule `dispatch-live-slots` (evitar doble escritor si SofaScore desbloquea).
-2. **QA + merge `fix/j1-incidencias`** (gate humano San, preview Vercel).
-3. **JO-6 ficha lenta** — debug rendimiento ficha jugador (query Supabase / render / stats).
+1. **Merge PR #165** (ERR-96 signo IA, rama `claude/determined-curie-oygbbm`) tras QA — gate San.
+2. **KO ~28-jun (Paso 6)**: al sembrar `wc_matches_ko`/`espn_event_map`, aplicar el invariante (`inverted=false` + `teams_swapped` según fuente).
+3. **`dispatch-live-slots`** (SofaScore activo): unschedule si ESPN estable. **JO-6 ficha lenta** pendiente.
 
 ## Pendientes — Bugs UI
 
@@ -48,6 +48,7 @@ Vault/EF + Turnstile DESACTIVADO 30abr2026: ver `docs/secrets.md`.
 - **Actualizar `migration-log.md`** tras cada acción importante.
 - **Consultar `errores_conocidos_porra.md`** antes de debuggear.
 - **`schedule_match_crons(match_key, start_ts)`** para crons de partidos.
+- **Orientación fixture swapped** (BRA-ESC `wc2026_gC_15186861`, único `teams_swapped`): `live_scores`=orden-FUENTE, el writer NUNCA pre-orienta (`espn_event_map.inverted=false`); corregir UNA vez aguas abajo (`teams_swapped` puente+front; signo IA `iaSignForCard`). ERR-95/96, `docs/live-scoring.md`.
 - **Verificación CSS/build obligatoria**: `npm run build && grep -l "<selector>" dist/css/*.css`. Si no aparece, abortar merge (ERR-22).
 - **E13** — Subagentes Task con Write NO heredan `.claude/rules/` (GH#23478). Pasar contexto inline.
 - **E14** — Verificación post-fix de overlays/sub-overlays: tras `classList.remove('is-open')`, hacer click programático en OTRO elemento de la página (modal padre, tab adyacente, botón close, backdrop) Y verificar que el handler responde. Single-event tests no capturan el bug de `pointer-events` no gateado (ERR-43). Alternativa: `document.elementFromPoint(window.innerWidth/2, window.innerHeight/2)` post-cierre — debe devolver elemento background, no descendiente del overlay.
