@@ -50,6 +50,20 @@ window._porraDb = window._porraDb || null;
 
 let currentUser = null; // { id, email, nombre }
 
+// Orienta el SIGNO de la IA a la card de la porra (home_es/away_es). La IA
+// computa en orden SofaScore (home_code); en el ÚNICO fixture teams_swapped
+// (wc2026_gC_15186861, BRA-ESC J3: home_code=SCO != home_iso3=BRA) el sign
+// crudo viene invertido respecto a la card → flip 1<->2 (X invariante). MISMA
+// condición y flip que _shared/ia-bridge.mjs (buildIaSignByLegacyKey) y
+// get-league-predictions en el backend → card, clasificación, chip "vs IA",
+// v3ComputeIAStandings y el label de la barra usan el MISMO signo orientado
+// (sin split-brain con user_points_cache). Las PROBABILIDADES (p_*) se dejan
+// crudas y se reorientan en presentación con v3IAOrientProbs (misma metadata).
+function iaSignForCard(sign, iaHomeCode, wcHomeIso3) {
+  var swapped = !!(iaHomeCode && wcHomeIso3 && iaHomeCode !== wcHomeIso3);
+  return !swapped ? sign : (sign === '1' ? '2' : sign === '2' ? '1' : sign);
+}
+
 /* ── Bootstrap IA Predictor (Fase F) ──
    Lee el snapshot activo + predicciones de fase de grupos ya computadas
    (cron 11 jun 00:10 o compute_match on-demand). Reindexa por legacyKey
@@ -86,7 +100,10 @@ async function loadIAPredictions() {
       const key = legacyByMatchId[p.match_id] || p.match_id;
       const b = p.breakdown || {};
       out[key] = {
-        sign: p.sign,
+        // SIGN ya orientado a la card (mismo flip que el backend; ver iaSignForCard).
+        // Los consumidores de signo del front (iaBonusWillApply, chip "vs IA",
+        // v3ComputeIAStandings, hydrateIABar, renderIA) lo asumen orientado.
+        sign: iaSignForCard(p.sign, p.home_code || null, homeIso3ByMatchId[p.match_id] || null),
         confidence: p.confidence,
         quip: b.quip || '',
         is_dudoso: !!b.is_dudoso,

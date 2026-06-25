@@ -21,6 +21,8 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { buildIaSignByLegacyKey } from '../supabase/functions/get-league-standings/ia-bridge.mjs';
+import { iaBonusPredicate } from '../supabase/functions/_shared/scoring.mjs';
 
 const ELIM_SRC = readFileSync(new URL('../public/js/v3/eliminatoria-v3.js', import.meta.url), 'utf8');
 const AUTH_SRC = readFileSync(new URL('../public/js/auth.js', import.meta.url), 'utf8');
@@ -137,4 +139,68 @@ test('wiring guard — v3RenderIABlock orienta vía v3IAOrientProbs antes de pin
   const body = ELIM_SRC.slice(start, end);
   assert.ok(body.includes('v3IAOrientProbs('), 'la barra debe pasar por v3IAOrientProbs (no consumir pred.p_home/p_away en crudo)');
   assert.ok(!/_v3DistributeTo100\(\[pred\.p_home/.test(body), 'no debe volver el patrón crudo _v3DistributeTo100([pred.p_home, ...])');
+});
+
+// ── Orientación del SIGNO (espejo de buildIaSignByLegacyKey) ──────────────────
+// Bug 25-jun (revelado al corregir el dato BRA-ESC a 3-0): loadIAPredictions
+// guardaba el sign CRUDO (orden SofaScore) mientras el backend lo flipea en
+// ia-bridge.mjs. En el fixture swapped el front creía que la IA predijo Escocia
+// ('2') → pintaba "VS IA +1" a los Brasil-predictors (split-brain con la tabla,
+// que sí flipea). iaSignForCard (auth.js) aplica el MISMO flip al cargar, de
+// modo que TODOS los consumidores de signo del front (iaBonusWillApply, chip
+// "vs IA", v3ComputeIAStandings, hydrateIABar, renderIA) hablan en orientación
+// porra. La barra (probabilidades) ya se orientaba aparte vía v3IAOrientProbs.
+const WC_ROWS_SIGN = [
+  { match_key: 'wc2026_gC_15186861', group_letter: 'C', home_es: 'Brasil', away_es: 'Escocia', home_iso3: 'BRA' },
+];
+
+function loadIaSignForCard() {
+  const startIdx = AUTH_SRC.indexOf('function iaSignForCard');
+  assert.ok(startIdx !== -1, 'iaSignForCard no encontrada en auth.js (¿se quitó el flip del sign?)');
+  const endIdx = AUTH_SRC.indexOf('\n}', startIdx);
+  assert.ok(endIdx !== -1 && endIdx > startIdx, 'cierre de iaSignForCard no encontrado');
+  return new Function(AUTH_SRC.slice(startIdx, endIdx + 2) + '\nreturn iaSignForCard;')();
+}
+
+test('iaSignForCard — BRA-ESC (swapped): 2(crudo)→1 y PARIDAD con buildIaSignByLegacyKey', () => {
+  const iaSignForCard = loadIaSignForCard();
+  assert.strictEqual(iaSignForCard('2', 'SCO', 'BRA'), '1',
+    'sign crudo 2 (gana visitante=Brasil en SofaScore) → 1 (gana local=Brasil en la card)');
+  const back = buildIaSignByLegacyKey(
+    [{ match_id: 'wc2026_gC_15186861', sign: '2', home_code: 'SCO' }],
+    WC_ROWS_SIGN,
+  );
+  assert.strictEqual(iaSignForCard('2', 'SCO', 'BRA'), back['C_Brasil_Escocia'].sign,
+    'front (iaSignForCard) y backend (buildIaSignByLegacyKey) producen el MISMO signo orientado');
+});
+
+test('iaSignForCard — X invariante aunque el fixture esté swapped', () => {
+  const iaSignForCard = loadIaSignForCard();
+  assert.strictEqual(iaSignForCard('X', 'SCO', 'BRA'), 'X');
+});
+
+test('iaSignForCard — alineado (home_code === home_iso3) y metadata parcial: passthrough (los 71 no cambian)', () => {
+  const iaSignForCard = loadIaSignForCard();
+  assert.strictEqual(iaSignForCard('1', 'MEX', 'MEX'), '1', 'alineado → sin flip');
+  assert.strictEqual(iaSignForCard('2', 'MEX', 'MEX'), '2', 'alineado → sin flip');
+  assert.strictEqual(iaSignForCard('2', 'SCO', null), '2', 'sin home_iso3 → sin flip (misma guarda que el backend)');
+  assert.strictEqual(iaSignForCard('2', null, 'BRA'), '2', 'sin home_code → sin flip');
+});
+
+test('parity scoring — con el sign YA orientado, el Brasil-predictor NO cobra +1 (= user_points_cache)', () => {
+  const iaSignForCard = loadIaSignForCard();
+  const orientedSign = iaSignForCard('2', 'SCO', 'BRA'); // '1'
+  // Brasil 2-0 (sign '1'), real 3-0 (sign '1'): el user coincide con la IA → SIN bono.
+  // Ese era exactamente el "+1 fantasma" del card antes del fix.
+  assert.strictEqual(iaBonusPredicate({ sign: orientedSign }, { l: 2, v: 0 }, 3, 0), false,
+    'coincide con la IA (ambos Brasil) → 0');
+  // Control contra-IA: predijo empate (≠ IA '1') y acierta el empate real → +1.
+  assert.strictEqual(iaBonusPredicate({ sign: orientedSign }, { l: 1, v: 1 }, 1, 1), true,
+    'contra-IA acertando → +1');
+});
+
+test('wiring guard — loadIAPredictions asigna el sign vía iaSignForCard (no el crudo p.sign)', () => {
+  assert.match(AUTH_SRC, /sign:\s*iaSignForCard\(/, 'el sign de la entry debe orientarse con iaSignForCard');
+  assert.ok(!AUTH_SRC.includes('sign: p.sign,'),
+    'el sign crudo (sign: p.sign) ya no debe asignarse en la entry IA');
 });
