@@ -416,56 +416,65 @@
 
   // ─────────────────────────────────────────────────────────────
   // _buildDMini — fila compacta clickable (estado base de Directo).
+  // REDISEÑO dvm (marcador contraído FIFA). Pixel-exact con la captura.
+  // D1=A: sin columna de estado. Sin resultado → "—" "—".
+  // Hooks conservados: outer .dvm (role/tabindex/id/data-match-key/
+  // data-match-idx) + banderas .dv2-mini-flag-btn[data-iso3].
   // ─────────────────────────────────────────────────────────────
   function _buildDMini(m, idx) {
     const ctx = _getMatchCtx(m);
     const hTeam = EQUIPOS.find(e => e.name === m.home);
     const aTeam = EQUIPOS.find(e => e.name === m.away);
-    const hFlag = hTeam ? SB + '/flags/' + hTeam.flag + '.png' : '';
-    const aFlag = aTeam ? SB + '/flags/' + aTeam.flag + '.png' : '';
+
     const hCode = hTeam ? hTeam.flag : (m.home || '').substring(0, 3).toUpperCase();
     const aCode = aTeam ? aTeam.flag : (m.away || '').substring(0, 3).toUpperCase();
 
-    // Rectangular flags (PR #93) — URL del bucket miniatures/flags-sm/<ISO2>.webp
-    // Se inyecta como CSS var --flag-rect-url leída por .dv2-mini-flag (CSS).
-    // El <img> legacy queda como fallback hidden por CSS (display:none).
+    // Bandera rectangular: bucket miniatures/flags-sm/<ISO2>.webp (sistema PR#93).
+    // Fallback a /flags/<ISO3>.png si falta ISO2; onerror oculta el <img>.
     const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
     const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
-    const hFlagRectStyle = hIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + hIso2 + '.webp\')"' : '';
-    const aFlagRectStyle = aIso2 ? ' style="--flag-rect-url:url(\'' + SB + '/miniatures/flags-sm/' + aIso2 + '.webp\')"' : '';
+    const hSrc = hIso2 ? (SB + '/miniatures/flags-sm/' + hIso2 + '.webp')
+                       : (hTeam ? (SB + '/flags/' + hTeam.flag + '.png') : '');
+    const aSrc = aIso2 ? (SB + '/miniatures/flags-sm/' + aIso2 + '.webp')
+                       : (aTeam ? (SB + '/flags/' + aTeam.flag + '.png') : '');
 
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
 
-    let rightHtml;
-    if (ctx.isLive) {
-      rightHtml = '<span class="dv2-mini-live"><span class="dv2-mini-live-dot"></span>' +
-                  (ctx.minuteStr || 'EN VIVO') + '</span>';
-    } else if (ctx.isFinal) {
-      rightHtml = '<span class="dv2-mini-status final">FINAL</span>';
-    } else {
-      rightHtml = '<span class="dv2-mini-status">⏰ ' + _kickoffHoraLabel(ctx, m) + '</span>';
-    }
+    const TROPHY = SB + '/miniatures/Logos/2026_FIFA_World_Cup.png';
 
-    const classes = 'dv2-mini' + (ctx.isLive ? ' is-live' : '') + (ctx.isFinal ? ' is-final' : '');
+    const flagImg = (src) => src
+      ? '<img src="' + src + '" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '';
+
+    // Mismo markup en ambos lados; el espejado del lado derecho lo hace el CSS
+    // (.dvm__side.is-right { flex-direction: row-reverse }). Sin .dvm__dot:
+    // bandera + código se agrupan al extremo (cluster, justify flex-start).
+    const side = (cls, code, src, teamName) =>
+      '<div class="dvm__side ' + cls + '">' +
+        '<div class="dvm__id">' +
+          '<button type="button" class="dvm__flag dv2-mini-flag-btn" data-iso3="' + code + '" ' +
+            'aria-label="Ver plantilla ' + (teamName || '') + '">' + flagImg(src) + '</button>' +
+        '</div>' +
+        '<span class="dvm__code">' + code + '</span>' +
+      '</div>';
 
     return (
-      '<div class="' + classes + '" role="button" tabindex="0" id="dcard-' + idx + '" ' +
+      '<div class="dvm" role="button" tabindex="0" id="dcard-' + idx + '" ' +
         'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
-        '<span class="dv2-mini-team">' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso3="' + hCode + '"' + hFlagRectStyle + ' aria-label="Ver plantilla ' + (m.home || '') + '">' + (hFlag ? '<img src="' + hFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-          '<span class="dv2-mini-code">' + hCode + '</span>' +
-        '</span>' +
-        '<span class="dv2-mini-score">' +
-          '<span class="dv2-mini-score-num">' + lTxt + '</span>' +
-          '<span class="dv2-mini-score-sep">:</span>' +
-          '<span class="dv2-mini-score-num">' + vTxt + '</span>' +
-        '</span>' +
-        '<span class="dv2-mini-team right">' +
-          '<span class="dv2-mini-code">' + aCode + '</span>' +
-          '<button type="button" class="dv2-mini-flag dv2-mini-flag-btn" data-iso3="' + aCode + '"' + aFlagRectStyle + ' aria-label="Ver plantilla ' + (m.away || '') + '">' + (aFlag ? '<img src="' + aFlag + '" loading="lazy" onerror="this.style.display=\'none\'">' : '') + '</button>' +
-        '</span>' +
-        '<span class="dv2-mini-right">' + rightHtml + '</span>' +
+        '<div class="dvm__bar">' +
+          side('is-left', hCode, hSrc, m.home) +
+          '<div class="dvm__center">' +
+            '<div class="dvm__score is-l">' + lTxt + '</div>' +
+            '<div class="dvm__badge">' +
+              '<img src="' + TROPHY + '" alt="" ' +
+                'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
+              '<span class="dvm__fallback">🏆</span>' +
+            '</div>' +
+            '<div class="dvm__score is-r">' + vTxt + '</div>' +
+          '</div>' +
+          side('is-right', aCode, aSrc, m.away) +
+        '</div>' +
       '</div>'
     );
   }
@@ -1045,7 +1054,7 @@
       collHeader.setAttribute('aria-expanded', String(!collapsed));
       return;
     }
-    const mini = e.target.closest('.dv2-mini');
+    const mini = e.target.closest('.dvm');
     if (!mini) return;
     const key = mini.getAttribute('data-match-key');
     if (!key) return;
