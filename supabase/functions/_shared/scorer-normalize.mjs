@@ -56,13 +56,31 @@ export function matchPlayerKey(nombre, players) {
   if (!Array.isArray(players) || feed.length === 0) return null;
 
   const distinctiveFeed = feed.filter((t) => !GENERIC_TOKENS.has(t));
-  if (distinctiveFeed.length === 0) return null; // feed degenerado (solo genericos)
-  const feedSurname = distinctiveFeed[distinctiveFeed.length - 1];
+  const feedSurname = distinctiveFeed.length
+    ? distinctiveFeed[distinctiveFeed.length - 1]
+    : null;
+  // KSA y co.: el feed escribe "Al-Shehri" (tokens al+shehri) pero el roster
+  // guarda el apellido concatenado con el articulo ("Alshehri"). Aceptamos
+  // tambien articulo+apellido cuando una particula precede al apellido.
+  const surIdx = feedSurname != null ? feed.lastIndexOf(feedSurname) : -1;
+  const prevTok = surIdx > 0 ? feed[surIdx - 1] : null;
+  const surnameWithArticle =
+    prevTok && GENERIC_TOKENS.has(prevTok) ? prevTok + feedSurname : null;
 
   let best = 0;
   let winners = [];
   for (const p of players) {
     const cand = toks(`${p?.name ?? ""} ${p?.key ?? ""}`);
+    if (feedSurname == null) {
+      // Feed degenerado (solo tokens genericos, p.ej. "Junior" suelto):
+      // solape generico unico -> resuelve; empate -> ambiguo (no se adivina).
+      // Nunca aplica con apellido distintivo, donde vivia el falso positivo.
+      const gscore = feed.reduce((a, t) => a + (cand.includes(t) ? 1 : 0), 0);
+      if (gscore <= 0) continue;
+      if (gscore > best) { best = gscore; winners = [p]; }
+      else if (gscore === best) winners.push(p);
+      continue;
+    }
     let score = 0;
     let distinctiveHit = false;
     for (const t of feed) {
@@ -70,7 +88,10 @@ export function matchPlayerKey(nombre, players) {
       score += 3;
       distinctiveHit = true;
     }
-    if (!distinctiveHit || !cand.includes(feedSurname)) continue; // exige apellido
+    const surnameHit =
+      cand.includes(feedSurname) ||
+      (surnameWithArticle != null && cand.includes(surnameWithArticle));
+    if (!distinctiveHit || !surnameHit) continue; // exige apellido distintivo
     if (score > best) { best = score; winners = [p]; }
     else if (score === best) winners.push(p);
   }
