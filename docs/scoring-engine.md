@@ -59,27 +59,99 @@ El **×2 del boost SOLO aplica cuando se aciertan RESULTADO EXACTO y GOLEADOR a 
 
 **Estado actual del pipeline**: `realScorers` aún no se hidrata desde producción. El motor usa un **fallback placeholder** (`_hf09FallbackScorers` en `scoring.js`: `players[0]` de los equipos relevantes del partido) hasta que la hidratación real se implemente. Esto mantiene backwards compat: si `realScorers` no se pasa, el motor sigue funcionando con la heurística placeholder pero ya **no bloquea empates** (regresión pre-HF-09 corregida). Trabajo aguas arriba pendiente fuera de F2.9.
 
-## Puntos por avance KO
+## Modelo KO (eliminatorias R32 → Final) — `calcKOMatchPoints`
 
-Por cada equipo del que el usuario pronostica avance correctamente:
+> Reescrito el 26-jun-2026 (PR motor KO, Paso 6). El modelo anterior puntuaba el
+> marcador KO **sin saber qué equipos había en el slot** y decidía el avance por
+> LADO (`'home'/'away'`), no por equipo. Resultado: un slot pronosticado "Corea
+> 2-1, avanza Corea" cobraba el marcador y el avance contra un cruce real
+> "Alemania 2-1, avanza Alemania" (equipos distintos) → hasta +8 indebidos. Y el
+> `final_advance` (+25 del campeón) se sumaba en **ambas** semis. Ver ERR-98.
 
-| Transición | Puntos |
-|-----------|--------|
-| Grupos → R32 | +5 |
-| R32 → R16 | +5 |
-| R16 → Cuartos | +10 |
-| Cuartos → Semifinales | +15 |
-| Semifinales → Final | +20 |
-| Campeón | +25 |
+Para cada slot KO `s` (`ko_match_id` 73–104) el motor puntúa **dos componentes
+INDEPENDIENTES** que se suman, usando la **malla reconstruida** del usuario
+(qué dos equipos predice en cada slot y quién avanza, vía
+`_shared/ko-bracket.mjs` → `resolveBracket`) y la **malla real**
+(`wc_matches_ko` da los equipos por slot en iso3; `ko_results[s].winner` da el
+avanzador real):
 
-## Clasificación final
+### (a) Marcador — estilo grupo, SOLO si el cruce coincide
 
-| Posición | Puntos |
-|----------|--------|
-| Campeón | +30 |
-| Subcampeón | +20 |
-| Tercero | +15 |
-| Cuarto | +10 |
+`matchupCoincide` = el **conjunto** `{predHome, predAway}` (iso3) es igual al
+`{realHome, realAway}` (iso3). Si coincide:
+
+- Se **orienta** el marcador del usuario al marco real (swap home↔away si el
+  usuario puso a un equipo en local que el real tiene en visitante — invariante
+  ERR-95/96), y se puntúa con `calcMatchPoints`: **+1 signo / +3 exacto / +2
+  goleador / +1 anti-IA, cap 7, SIN boost** (§1.6).
+- Si **no** coincide el cruce: **0 de marcador** (ni signo, ni exacto, ni
+  goleador, ni IA). Este es el *gate de equipos*.
+
+### (b) Avance — por EQUIPO, independiente del cruce
+
+Si `predAdvancer === realAdvancer` (iso3) se suma `KO_ROUND_PTS[round]`. Se paga
+**aunque el cruce no coincida** (si solo aciertas quién avanza, cobras el avance
+y nada del marcador):
+
+| Ronda (slots) | Avance |
+|---------------|--------|
+| Grupos → R32 (clasificados) | +5 |
+| R32 → R16 (73–88) | +5 |
+| R16 → Cuartos (89–96) | +10 |
+| Cuartos → Semifinales (97–100) | +15 |
+| Semifinales → Final (101–102) | +20 |
+| Final → Campeón (**slot 104**) | +25 |
+| 3.er puesto (**slot 103**) | **sin avance** |
+
+El `+25` del campeón se aplica en la **Final (slot 104)**, no en las semis. El
+slot 103 (3.er puesto) puntúa marcador pero **no** da avance (`round` `'third'`
+∉ `KO_ROUND_PTS`).
+
+**Clasificados de grupos (+5)** — §1.7: `get-league-standings` v1.5.0 lo computa
+como intersección de conjuntos (antes no se otorgaba). Reales = los 32
+participantes de R32 (`wc_matches_ko` slots 73-88, `home_iso3`+`away_iso3`).
+Predichos = los 32 de la malla del usuario en esos mismos slots (su simulación
+de tablas + mejores terceros). `+5` por equipo en la intersección. Es una
+transición **independiente** del avance r32 (73→R16): aquí se premia *pasar de
+grupos*, no *ganar el partido de R32*.
+
+### Clasificación final (podio) — `calcKoPodiumPoints`, una vez por usuario
+
+Tras la Final, comparando el podio PREDICHO (de la malla del usuario) contra el
+REAL, ambos en iso3:
+
+| Posición | Derivación | Puntos |
+|----------|-----------|--------|
+| Campeón | avanzador del slot 104 | +30 |
+| Subcampeón | perdedor del slot 104 | +20 |
+| Tercero | avanzador del slot 103 | +15 |
+| Cuarto | perdedor del slot 103 | +10 |
+
+El podio es **independiente** del avance: un campeón acertado suma **sf 20**
+(llegar a la final) + **final 25** (ganarla) + **champion 30** (podio) = **75**.
+
+### Aritmética del campeón — DECISIÓN §1.5 (toggle reversible)
+
+Esquema activo: `KO_ROUND_PTS.final = 25` aplicado en el slot 104 → campeón = 75.
+**Toggle de 1 línea** para el esquema alternativo "campeón = 50" (sin el +25 de
+la final): borrar la clave `final` de `KO_ROUND_PTS` en **ambos** motores
+(`_shared/scoring.mjs` y `public/js/scoring.js`) — el slot 104 deja de otorgar
+avance automáticamente (`KO_ROUND_PTS[round] || 0`). Pendiente de confirmación de
+San en review.
+
+### Degradación limpia
+
+Si `wc_matches_ko` no tiene el slot (tabla vacía hasta ~28-jun, o dato parcial),
+ese slot suma **0** sin romper el resto del scoreboard. La rama KO de
+`get-league-standings` (v1.5.0) trata `wc_matches_ko` como **soft-fail**.
+
+### Bonus anti-IA en KO (dependencia, no bloquea)
+
+El +1 anti-IA aplica en KO igual que en grupos (dentro del cap 7, solo si el
+cruce coincide), buscando la predicción IA del **cruce real**. **Hoy degrada a
+0**: el bot `porra-ia-compute` solo genera IA de fase de grupos. La extensión a
+cruces KO reales es follow-up separado (TODO documentado en
+`get-league-standings/index.ts`).
 
 ## Premios individuales (AWARDS_CFG)
 

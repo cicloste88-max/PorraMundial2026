@@ -1,5 +1,16 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.4.0
+// PR-1 · Leaderboard de liga · v1.5.0
+//   v1.5.0 (KO scoring engine, Paso 6): motor KO reescrito al modelo normativo
+//     §1.3. Antes el KO puntuaba marcador SIN gate de equipos y avance por LADO
+//     ('home'/'away'), inflando puntos en cruces con equipos distintos (un slot
+//     "Corea 2-1 avanza Corea" cobraba +8 contra "Alemania 2-1 avanza Alemania").
+//     Ahora: (a) marcador estilo grupo SOLO si el cruce coincide (igualdad de
+//     conjunto de iso3, con orientación ERR-95/96); (b) avance por EQUIPO
+//     (predAdvancer===realAdvancer) con KO_ROUND_PTS[round] (final +25 en slot
+//     104, no en semis); (c) podio 30/20/15/10. Reconstruye la malla predicha de
+//     cada usuario con resolveBracket (_shared/ko-bracket.mjs) y la real con
+//     wc_matches_ko + ko_results. IA KO computada (hoy degrada a 0: sin IA de KO).
+//     boost KO off (§1.6). Degradación limpia si wc_matches_ko no tiene el slot.
 //   v1.4.0 (B11, Item 7 post-J1): (a) bearer service_role PRIVILEGIADO —
 //     porra-bridge-results invoca esta EF tras cada partido bridgeado sin JWT
 //     de usuario (salta getUser + membership check; mismo compare directo que
@@ -35,9 +46,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   calcMatchPoints,
   calcKOMatchPoints,
+  calcKoPodiumPoints,
   calcAwardPoints,
   iaBonusPredicate,
+  KO_ROUND_PTS,
 } from "../_shared/scoring.mjs";
+import { resolveBracket } from "../_shared/ko-bracket.mjs";
 import { fetchAllRows } from "./fetch-all.mjs";
 import { buildIaSignByLegacyKey } from "./ia-bridge.mjs";
 
@@ -217,6 +231,7 @@ serve(async (req: Request) => {
     { data: iaPreds,   error: iaErr },
     { data: boosts,    error: bErr },
     { data: wcRows,    error: wcErr },
+    { data: wcKoRows,  error: wcKoErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
     fetchAllCompat((from, to) => supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId).order("id").range(from, to)),
@@ -231,6 +246,11 @@ serve(async (req: Request) => {
     // sin fetchAll). teams_swapped acompaña como dato; el flip del bridge usa
     // la condición canónica home_code !== home_iso3 (get-league-predictions).
     supa.from("wc_matches").select("match_key, group_letter, home_es, away_es, home_iso3, away_iso3, teams_swapped"),
+    // KO (Paso 6): diccionario slot→equipos reales (vacío hasta ~28-jun → KO
+    // degrada limpio a 0). ko_results ya viene orientado a (home_iso3, away_iso3)
+    // y winner relativo a ellos (el puente aplica teams_swapped al escribir),
+    // así que el scoring consume la orientación canónica sin re-flip.
+    supa.from("wc_matches_ko").select("ko_match_id, round, home_iso3, away_iso3"),
   ]);
 
   for (const [err, label] of [
@@ -250,6 +270,9 @@ serve(async (req: Request) => {
       });
     }
   }
+  // wc_matches_ko es SOFT-FAIL: un error (o tabla vacía pre-28-jun) NO debe
+  // tumbar el scoring de grupos/premios. La rama KO degrada limpio a 0.
+  if (wcKoErr) console.error("[standings] wc_matches_ko query failed (KO degrada a 0):", wcKoErr.message);
 
   const memberUids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   const { data: profiles, error: profErr } = await supa
@@ -321,6 +344,81 @@ serve(async (req: Request) => {
     };
   }
 
+  // ── Malla KO (Paso 6) ──────────────────────────────────────────────────
+  // El motor KO (§1.3) puntúa por equipos (gate de cruce + avance por equipo),
+  // no por lado. La malla PREDICHA de cada usuario se reconstruye con la cascada
+  // compartida resolveBracket (_shared/ko-bracket.mjs, en nombres ES); la REAL
+  // sale de wc_matches_ko (equipos por slot en iso3) + ko_results (winner). El
+  // puente de nombres ES→iso3 se deriva de wc_matches (home_es/away_es ≡ GRUPOS).
+  const esNameToIso3: Record<string, string> = {};
+  for (const w of (wcRows ?? []) as Array<{ home_es?: string; away_es?: string; home_iso3?: string; away_iso3?: string }>) {
+    if (w.home_es && w.home_iso3) esNameToIso3[w.home_es] = w.home_iso3;
+    if (w.away_es && w.away_iso3) esNameToIso3[w.away_es] = w.away_iso3;
+  }
+  const toIso3 = (esName: string | null | undefined): string | null =>
+    (esName != null && esNameToIso3[esName]) ? esNameToIso3[esName] : null;
+
+  // Slot → equipos reales (iso3). Vacío hasta ~28-jun → KO degrada a 0.
+  const realKoTeamsBySlot: Record<number, { home: string | null; away: string | null }> = {};
+  for (const k of (wcKoRows ?? []) as Array<{ ko_match_id?: number; home_iso3?: string; away_iso3?: string }>) {
+    if (k.ko_match_id == null) continue;
+    realKoTeamsBySlot[Number(k.ko_match_id)] = { home: k.home_iso3 ?? null, away: k.away_iso3 ?? null };
+  }
+  // §1.7 — clasificados de grupos (+5 por equipo que el usuario predice que pasa
+  // a R32 y realmente pasa). Reales = los 32 participantes de R32 (slots 73-88
+  // de wc_matches_ko). NO se computaba antes (decisión: incluirlo aquí). Vacío
+  // hasta sembrar wc_matches_ko → 0 limpio. Es transición INDEPENDIENTE del
+  // avance r32 (73→R16): aquí se premia pasar de grupos, no ganar el R32.
+  const R32_SLOTS = Array.from({ length: 16 }, (_, i) => 73 + i);
+  const realQualifiers = new Set<string>();
+  for (const s of R32_SLOTS) {
+    const t = realKoTeamsBySlot[s];
+    if (t?.home) realQualifiers.add(t.home);
+    if (t?.away) realQualifiers.add(t.away);
+  }
+
+  // Malla real de un slot: equipos + avanzador/perdedor (winner relativo a
+  // home_iso3/away_iso3; el puente ya aplicó teams_swapped al escribir).
+  function realSlotMesh(slot: number): { home: string | null; away: string | null; advancer: string | null; loser: string | null } | null {
+    const teams = realKoTeamsBySlot[slot];
+    if (!teams) return null;
+    const home = teams.home ?? null;
+    const away = teams.away ?? null;
+    const res = realKoResults?.[String(slot)];
+    let advancer: string | null = null;
+    let loser: string | null = null;
+    if (res && (res.winner === "home" || res.winner === "away")) {
+      advancer = res.winner === "home" ? home : away;
+      loser    = res.winner === "home" ? away : home;
+    }
+    return { home, away, advancer, loser };
+  }
+  const realFinalMesh = realSlotMesh(104);
+  const realThirdMesh = realSlotMesh(103);
+  const realPodium = (realFinalMesh || realThirdMesh)
+    ? {
+        champion: realFinalMesh?.advancer ?? null,
+        runnerUp: realFinalMesh?.loser ?? null,
+        third:    realThirdMesh?.advancer ?? null,
+        fourth:   realThirdMesh?.loser ?? null,
+      }
+    : null;
+
+  // TODO (follow-up, NO bloquea este PR): el bot porra-ia-compute solo genera IA
+  // de grupos. Cuando produzca IA de cruces KO reales, poblar slot→{sign} (cruce
+  // real = realSlotMesh(slot).home vs .away). Hasta entonces, IA KO = 0 (limpio).
+  const iaByKoSlot: Record<number, { sign: string }> = {};
+
+  // Rows crudas por usuario para resolveBracket (cascada de la malla predicha).
+  const predRowsByUser: Record<string, Array<{ match_id: string; local: number; visitante: number }>> = {};
+  for (const p of preds ?? []) {
+    (predRowsByUser[p.user_id] ??= []).push({ match_id: p.match_id, local: p.local, visitante: p.visitante });
+  }
+  const koRowsByUser: Record<string, Array<{ match_id: number; local: number; visitante: number; classifier: string | null }>> = {};
+  for (const k of koPreds ?? []) {
+    (koRowsByUser[k.user_id] ??= []).push({ match_id: k.match_id, local: k.local, visitante: k.visitante, classifier: k.classifier });
+  }
+
   const rows: LeagueStandingsRow[] = (profiles ?? []).map((profile: { id: string; nombre: string | null }) => {
     const uid = profile.id;
     const userPreds  = predsByUser[uid]  ?? {};
@@ -341,19 +439,57 @@ serve(async (req: Request) => {
       });
     }
 
+    // Malla PREDICHA del usuario (cascada compartida; nombres ES → iso3).
+    const userBracket = resolveBracket(predRowsByUser[uid] ?? [], koRowsByUser[uid] ?? []);
+    const predSlots: Record<number, { home?: string | null; away?: string | null; winner?: string | null }> = userBracket.slots ?? {};
+
     let koPts = 0;
+
+    // §1.7 — clasificados de grupos: +5 por equipo de R32 predicho que también
+    // es clasificado real. Predichos = los 32 de la malla del usuario en slots
+    // 73-88 (su simulación de tablas + terceros). Intersección × 5.
+    if (realQualifiers.size > 0) {
+      const predQualifiers = new Set<string>();
+      for (const s of R32_SLOTS) {
+        const ps = predSlots[s];
+        const h = toIso3(ps?.home); if (h) predQualifiers.add(h);
+        const a = toIso3(ps?.away); if (a) predQualifiers.add(a);
+      }
+      for (const q of predQualifiers) {
+        if (realQualifiers.has(q)) koPts += KO_ROUND_PTS.groups;
+      }
+    }
     for (const [matchIdStr, pred] of Object.entries(userKoPreds)) {
       const matchId = Number(matchIdStr);
       const round = KO_ROUND_BY_ID[matchId];
       if (!round) continue;
-      const real = realKoResults?.[matchId];
+      const real = realKoResults?.[String(matchId)];
       if (!real) continue;
+      const realMesh = realSlotMesh(matchId);
+      if (!realMesh) continue; // slot sin entrada en wc_matches_ko → 0 limpio
+      const ps = predSlots[matchId] ?? {};
       koPts += calcKOMatchPoints({ ...pred, saved: true as const }, real.l, real.v, round, {
         scorers: real.scorers ?? null,
-        iaBonus: false,
         boost: false,
-        winner: real.winner ?? null,
+        predHome:     toIso3(ps.home),
+        predAway:     toIso3(ps.away),
+        predAdvancer: toIso3(ps.winner),
+        realHome:     realMesh.home,
+        realAway:     realMesh.away,
+        realAdvancer: realMesh.advancer,
+        iaPred:       iaByKoSlot[matchId] ?? null,
       });
+    }
+
+    // Podio (§1.5) — una vez por usuario, plegado en koPts (dominio KO).
+    if (realPodium) {
+      const predPodium = {
+        champion: toIso3(userBracket.podium?.champion),
+        runnerUp: toIso3(userBracket.podium?.runnerUp),
+        third:    toIso3(userBracket.podium?.third),
+        fourth:   toIso3(userBracket.podium?.fourth),
+      };
+      koPts += calcKoPodiumPoints(predPodium, realPodium);
     }
 
     let awPts = 0;
@@ -403,7 +539,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.4.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.5.0" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

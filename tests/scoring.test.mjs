@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import {
   calcMatchPoints as sharedCalcMatchPoints,
   calcKOMatchPoints as sharedCalcKOMatchPoints,
+  calcKoPodiumPoints as sharedCalcKoPodiumPoints,
   calcAwardPoints as sharedCalcAwardPoints,
   iaBonusPredicate,
   KO_ROUND_PTS,
@@ -101,32 +102,128 @@ import {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 2. SHARED MODULE — calcKOMatchPoints (avance de ronda)
+// 2. SHARED MODULE — calcKOMatchPoints (modelo normativo §1.3)
+//    Dos componentes INDEPENDIENTES: (a) marcador estilo grupo SOLO si el
+//    cruce de equipos coincide (igualdad de conjunto iso3, con orientación);
+//    (b) avance por EQUIPO (predAdvancer===realAdvancer). boost OFF en KO.
 // ════════════════════════════════════════════════════════════════════
 {
-  // r16 exacto + ganador correcto → 4 + KO_ROUND_PTS.r16 (10) = 14
-  const ko1 = sharedCalcKOMatchPoints(
-    { saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16'
-  );
-  assert.strictEqual(ko1, 14, 'ko #1: r16 exacto + avance = 4 + 10');
+  const KO = sharedCalcKOMatchPoints;
 
-  // sf signo correcto + avance + bonus final_advance → 1 + 20 + 25 = 46
-  const ko2 = sharedCalcKOMatchPoints(
-    { saved: true, l: 2, v: 1, gol: null }, 3, 1, 'sf'
-  );
-  assert.strictEqual(ko2, 46, 'ko #2: sf signo + avance + final_advance = 1+20+25');
+  // #1 cruce coincide + exacto + goleador + IA → marcador cap 7 (SIN boost
+  // aunque haya boost pick) + avance r16 (10) = 17.
+  const m1 = KO({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, 'r16', {
+    scorers: ['lozano'], boost: true,
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+    iaPred: { sign: '2' }, // IA dice gana visitante; user gana local y acierta → +1
+  });
+  assert.strictEqual(m1, 17, 'KO #1: cruce coincide exacto+gol+IA (cap7, sin boost) + avance r16 = 7+10');
 
-  // r32 empate predicho + classifier:'home' coincide ganador real → 0 signo + 5 avance
-  const ko3 = sharedCalcKOMatchPoints(
-    { saved: true, l: 1, v: 1, classifier: 'home', gol: null }, 2, 1, 'r32'
-  );
-  assert.strictEqual(ko3, 5, 'ko #3: r32 empate-classifier-correcto = 0+5');
+  // #2 cruce coincide + solo signo, avanzador FALLA → 1 (sin avance).
+  const m2 = KO({ saved: true, l: 2, v: 0, gol: null }, 1, 0, 'r32', {
+    predHome: 'BRA', predAway: 'ARG', predAdvancer: 'BRA',
+    realHome: 'BRA', realAway: 'ARG', realAdvancer: 'ARG',
+  });
+  assert.strictEqual(m2, 1, 'KO #2: cruce coincide, solo signo, avanzador falla = 1');
 
-  // 'third' / 'final' NO suman roundPts extra (KO_ROUND_PTS los omite)
-  const ko4 = sharedCalcKOMatchPoints(
-    { saved: true, l: 2, v: 0, gol: null }, 2, 0, 'final'
-  );
-  assert.strictEqual(ko4, 4, 'ko #4: final exacto sin avance extra = 4');
+  // #3 CASO COREA/ALEMANIA (el bug): user KOR 2-1 avanza KOR; real GER 2-1
+  // avanza GER. Mismo marcador y lado, equipos DISTINTOS → 0 (antes daba +8).
+  const m3 = KO({ saved: true, l: 2, v: 1, gol: null }, 2, 1, 'r32', {
+    predHome: 'KOR', predAway: 'JPN', predAdvancer: 'KOR',
+    realHome: 'GER', realAway: 'BRA', realAdvancer: 'GER',
+  });
+  assert.strictEqual(m3, 0, 'KO #3 (Corea/Alemania): cruce distinto, mismo 2-1/lado → 0, NO +8');
+
+  // #4 cruce NO coincide pero avanzador SÍ (user FRA-BRA avanza FRA; real
+  // FRA-ITA avanza FRA) → 0 marcador + avance qf (15).
+  const m4 = KO({ saved: true, l: 3, v: 0, gol: 'mbappe' }, 1, 0, 'qf', {
+    scorers: ['otro'],
+    predHome: 'FRA', predAway: 'BRA', predAdvancer: 'FRA',
+    realHome: 'FRA', realAway: 'ITA', realAdvancer: 'FRA',
+  });
+  assert.strictEqual(m4, 15, 'KO #4: cruce distinto, avanzador coincide → 0 marcador + avance qf (15)');
+
+  // #5 ORIENTACIÓN (ERR-95/96): user MEX(local) 0-2 KOR(visit); real KOR(local)
+  // 2-0 MEX(visit). Mismo cruce; el 0-2 del user se orienta a 2-0 → exacto.
+  const m5 = KO({ saved: true, l: 0, v: 2, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'KOR',
+    realHome: 'KOR', realAway: 'MEX', realAdvancer: 'KOR',
+  });
+  assert.strictEqual(m5, 14, 'KO #5: swap de lados, cruce coincide → marcador orientado exacto (4) + avance r16 (10)');
+
+  // #6 EMPATE por penaltis: el avanzador lo decide el EQUIPO (no el lado).
+  // user 2-2, real 1-1, ESP gana en penaltis → signo X (1) + avance sf (20).
+  const m6 = KO({ saved: true, l: 2, v: 2, gol: null, classifier: 'ESP' }, 1, 1, 'sf', {
+    predHome: 'ESP', predAway: 'GER', predAdvancer: 'ESP',
+    realHome: 'ESP', realAway: 'GER', realAdvancer: 'ESP',
+  });
+  assert.strictEqual(m6, 21, 'KO #6: empate (2-2 vs 1-1, penaltis) avanzador por equipo ESP → 1 + avance sf (20)');
+
+  // #7 slot 104 (final): marcador exacto (4) + avance FINAL (25) = 29 (campeón).
+  const finalSlot = KO({ saved: true, l: 1, v: 0, gol: null }, 1, 0, 'final', {
+    predHome: 'ARG', predAway: 'FRA', predAdvancer: 'ARG',
+    realHome: 'ARG', realAway: 'FRA', realAdvancer: 'ARG',
+  });
+  assert.strictEqual(finalSlot, 29, 'KO #7: final exacto (4) + avance final (25) = 29');
+
+  // #8 REGRESIÓN final_advance@sf: una semi acertada da SOLO sf 20 (no +45).
+  const semiSlot = KO({ saved: true, l: 1, v: 0, gol: null }, 1, 0, 'sf', {
+    predHome: 'ARG', predAway: 'CRO', predAdvancer: 'ARG',
+    realHome: 'ARG', realAway: 'CRO', realAdvancer: 'ARG',
+  });
+  assert.strictEqual(semiSlot, 24, 'KO #8: semi exacta (4) + avance sf (20) = 24, NO 49 (bug final_advance@sf)');
+
+  // #9 slot 103 (round 'third'): marcador sí, avance NO ('third' ∉ KO_ROUND_PTS).
+  const thirdSlot = KO({ saved: true, l: 2, v: 1, gol: null }, 2, 1, 'third', {
+    predHome: 'POR', predAway: 'NED', predAdvancer: 'POR',
+    realHome: 'POR', realAway: 'NED', realAdvancer: 'POR',
+  });
+  assert.strictEqual(thirdSlot, 4, 'KO #9: 3er puesto exacto (4) SIN avance');
+
+  // #10 degradación limpia: sin malla (mesh vacía) → 0 (marcador y avance off).
+  const noMesh = KO({ saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, 'r16', { scorers: ['lozano'] });
+  assert.strictEqual(noMesh, 0, 'KO #10: sin malla (wc_matches_ko vacío) → 0 limpio');
+
+  // KO_ROUND_PTS: final renombrado (no final_advance), third ausente.
+  assert.strictEqual(KO_ROUND_PTS.final, 25, 'KO_ROUND_PTS.final = 25 (renombrado de final_advance)');
+  assert.strictEqual(KO_ROUND_PTS.final_advance, undefined, 'KO_ROUND_PTS.final_advance eliminado');
+  assert.strictEqual(KO_ROUND_PTS.third, undefined, 'KO_ROUND_PTS.third ausente (3er puesto sin avance)');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 2b. SHARED MODULE — calcKoPodiumPoints (§1.5: 30/20/15/10)
+// ════════════════════════════════════════════════════════════════════
+{
+  const realPod = { champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' };
+  assert.strictEqual(
+    sharedCalcKoPodiumPoints({ champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' }, realPod),
+    75, 'podio 4/4 = 30+20+15+10');
+  assert.strictEqual(
+    sharedCalcKoPodiumPoints({ champion: 'ARG', runnerUp: 'BRA', third: 'X', fourth: 'Y' }, realPod),
+    30, 'podio solo campeón = 30');
+  assert.strictEqual(
+    sharedCalcKoPodiumPoints({ champion: 'BRA', runnerUp: 'FRA', third: 'CRO', fourth: 'X' }, realPod),
+    35, 'podio sub (20) + 3.º (15) = 35');
+  assert.strictEqual(sharedCalcKoPodiumPoints(null, realPod), 0, 'podio sin pred = 0');
+  assert.strictEqual(sharedCalcKoPodiumPoints({ champion: 'ARG' }, null), 0, 'podio sin real = 0');
+
+  // §1.5 — el campeón acertado suma en su recta final: sf 20 (slot 101/102) +
+  // final 25 (slot 104) + champion 30 (podio) = 75. Aislamos el AVANCE con
+  // marcador fallido (0-0 vs 1-0 → 0 de marcador).
+  const sfAdv = sharedCalcKOMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 1, 0, 'sf', {
+    predHome: 'ARG', predAway: 'GER', predAdvancer: 'ARG',
+    realHome: 'ARG', realAway: 'GER', realAdvancer: 'ARG',
+  });
+  const finalAdv = sharedCalcKOMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 1, 0, 'final', {
+    predHome: 'ARG', predAway: 'FRA', predAdvancer: 'ARG',
+    realHome: 'ARG', realAway: 'FRA', realAdvancer: 'ARG',
+  });
+  const champPod = sharedCalcKoPodiumPoints({ champion: 'ARG' }, { champion: 'ARG' });
+  assert.strictEqual(sfAdv, 20, '§1.5 a: avance sf aislado = 20');
+  assert.strictEqual(finalAdv, 25, '§1.5 b: avance final aislado = 25');
+  assert.strictEqual(champPod, 30, '§1.5 c: podio campeón = 30');
+  assert.strictEqual(sfAdv + finalAdv + champPod, 75, '§1.5: campeón = sf 20 + final 25 + champion 30 = 75');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -194,15 +291,16 @@ function loadLegacyEngine() {
   assert.ok(end !== -1 && end > start, 'legacy: marcador END (function calcTotalUserPoints) no encontrado en scoring.js');
   const slice = src.slice(start, end);
   const fn = new Function(
-    slice + '\nreturn { calcMatchPoints, calcKOMatchPoints, calcAwardPoints };'
+    slice + '\nreturn { calcMatchPoints, calcKOMatchPoints, calcAwardPoints, calcKoPodiumPoints };'
   );
   return fn();
 }
 
 const {
-  calcMatchPoints:   legacyCMP,
-  calcKOMatchPoints: legacyCKO,
-  calcAwardPoints:   legacyCAW,
+  calcMatchPoints:    legacyCMP,
+  calcKOMatchPoints:  legacyCKO,
+  calcAwardPoints:    legacyCAW,
+  calcKoPodiumPoints: legacyCPOD,
 } = loadLegacyEngine();
 
 // Canónicos legacy calcMatchPoints (los 4 originales).
@@ -232,12 +330,30 @@ const {
   globalThis.boostPicks = {};
 }
 
-// Canónicos legacy calcKOMatchPoints (NUEVO — antes no se ejercía aislado).
+// Canónicos legacy calcKOMatchPoints (modelo §1.3, nueva firma con malla).
 {
-  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', null), 14, 'legacy CKO r16 exacto+avance');
-  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 1, gol: null }, 3, 1, 'sf', null), 46, 'legacy CKO sf signo+avance+final');
-  assert.strictEqual(legacyCKO({ saved: true, l: 1, v: 1, classifier: 'home', gol: null }, 2, 1, 'r32', null), 5, 'legacy CKO r32 empate-classifier');
-  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'final', null), 4, 'legacy CKO final sin avance extra');
+  const mesh = (extra) => Object.assign({
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+  }, extra || {});
+  // cruce coincide + exacto + avance r16 = 4 + 10 = 14
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', mesh()), 14, 'legacy CKO r16 exacto+avance');
+  // final exacto + avance final (25) = 29
+  assert.strictEqual(legacyCKO({ saved: true, l: 1, v: 0, gol: null }, 1, 0, 'final', mesh()), 29, 'legacy CKO final exacto+avance 25');
+  // cruce distinto → 0 marcador; avanzador distinto → 0 avance
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 1, gol: null }, 2, 1, 'r32', {
+    predHome: 'KOR', predAway: 'JPN', predAdvancer: 'KOR', realHome: 'GER', realAway: 'BRA', realAdvancer: 'GER',
+  }), 0, 'legacy CKO Corea/Alemania = 0');
+  // sin malla → 0 (degradación limpia)
+  assert.strictEqual(legacyCKO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16'), 0, 'legacy CKO sin malla = 0');
+}
+
+// Canónicos legacy calcKoPodiumPoints.
+{
+  const realPod = { champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' };
+  assert.strictEqual(legacyCPOD({ champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' }, realPod), 75, 'legacy CPOD 4/4 = 75');
+  assert.strictEqual(legacyCPOD({ champion: 'ARG' }, realPod), 30, 'legacy CPOD solo campeón = 30');
+  assert.strictEqual(legacyCPOD(null, realPod), 0, 'legacy CPOD sin pred = 0');
 }
 
 // Canónicos legacy calcAwardPoints (NUEVO).
@@ -284,27 +400,53 @@ const {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 6b. PARITY shared↔legacy — calcKOMatchPoints
-//     Legacy invoca calcMatchPoints con matchKey=null → sin IA ni boost;
-//     shared recibe { iaBonus:false, boost:false } para igualar.
+// 6b. PARITY shared↔legacy — calcKOMatchPoints (modelo §1.3, firma con malla)
+//     Ambos motores reciben el MISMO opts (malla + scorers + iaPred). Si uno
+//     diverge del otro en gate de cruce, orientación, avance o IA, pita aquí.
 // ════════════════════════════════════════════════════════════════════
 {
+  globalThis.iaBonusWillApply = () => false; // legacy calcMatchPoints con matchKey=null
+  const M = { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX', realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX' };
   const koCases = [
-    { name: 'r16 exacto+avance', pred: { saved: true, l: 2, v: 0, gol: null },                     rl: 2, rv: 0, round: 'r16',   scorers: null        },
-    { name: 'sf signo+final',    pred: { saved: true, l: 2, v: 1, gol: null },                     rl: 3, rv: 1, round: 'sf',    scorers: null        },
-    { name: 'r32 empate-class',  pred: { saved: true, l: 1, v: 1, classifier: 'home', gol: null }, rl: 2, rv: 1, round: 'r32',   scorers: null        },
-    { name: 'qf exacto+avance',  pred: { saved: true, l: 1, v: 0, gol: null },                     rl: 1, rv: 0, round: 'qf',    scorers: null        },
-    { name: 'final exacto',      pred: { saved: true, l: 2, v: 0, gol: null },                     rl: 2, rv: 0, round: 'final', scorers: null        },
-    { name: 'third exacto',      pred: { saved: true, l: 1, v: 0, gol: null },                     rl: 1, rv: 0, round: 'third', scorers: null        },
-    { name: 'gol-fail r16',      pred: { saved: true, l: 2, v: 0, gol: 'wrong' },                  rl: 2, rv: 1, round: 'r16',   scorers: ['lozano']  },
+    { name: 'r16 exacto+avance',  pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: { ...M } },
+    { name: 'sf signo+avance',    pred: { saved: true, l: 2, v: 1, gol: null }, rl: 3, rv: 1, round: 'sf',    opts: { ...M } },
+    { name: 'qf exacto+avance',   pred: { saved: true, l: 1, v: 0, gol: null }, rl: 1, rv: 0, round: 'qf',    opts: { ...M } },
+    { name: 'final exacto+25',    pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'final', opts: { ...M } },
+    { name: 'third exacto sinAv', pred: { saved: true, l: 1, v: 0, gol: null }, rl: 1, rv: 0, round: 'third', opts: { ...M } },
+    { name: 'cruce distinto',     pred: { saved: true, l: 2, v: 1, gol: null }, rl: 2, rv: 1, round: 'r32',   opts: { predHome: 'KOR', predAway: 'JPN', predAdvancer: 'KOR', realHome: 'GER', realAway: 'BRA', realAdvancer: 'GER' } },
+    { name: 'avanzador-solo',     pred: { saved: true, l: 3, v: 0, gol: null }, rl: 1, rv: 0, round: 'qf',    opts: { predHome: 'FRA', predAway: 'BRA', predAdvancer: 'FRA', realHome: 'FRA', realAway: 'ITA', realAdvancer: 'FRA' } },
+    { name: 'orientación swap',   pred: { saved: true, l: 0, v: 2, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'KOR', realHome: 'KOR', realAway: 'MEX', realAdvancer: 'KOR' } },
+    { name: 'gol r16',            pred: { saved: true, l: 2, v: 0, gol: 'lozano' }, rl: 2, rv: 0, round: 'r16', opts: { ...M, scorers: ['lozano'] } },
+    { name: 'gol-fail r16',       pred: { saved: true, l: 2, v: 0, gol: 'wrong' }, rl: 2, rv: 1, round: 'r16', opts: { ...M, scorers: ['lozano'] } },
+    { name: 'IA KO bonus',        pred: { saved: true, l: 0, v: 1, gol: null }, rl: 0, rv: 1, round: 'r16',   opts: { ...M, iaPred: { sign: '1' } } },
+    { name: 'sin malla',          pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: {} },
   ];
   for (const c of koCases) {
-    const sharedPts = sharedCalcKOMatchPoints(c.pred, c.rl, c.rv, c.round, { scorers: c.scorers, iaBonus: false, boost: false });
-    const legacyPts = legacyCKO(c.pred, c.rl, c.rv, c.round, c.scorers);
+    const sharedPts = sharedCalcKOMatchPoints(c.pred, c.rl, c.rv, c.round, c.opts);
+    const legacyPts = legacyCKO(c.pred, c.rl, c.rv, c.round, c.opts);
     assert.strictEqual(
       sharedPts, legacyPts,
       `PARITY CKO [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
     );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 6d. PARITY shared↔legacy — calcKoPodiumPoints
+// ════════════════════════════════════════════════════════════════════
+{
+  const realPod = { champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' };
+  const podCases = [
+    { name: '4/4',   pred: { champion: 'ARG', runnerUp: 'FRA', third: 'CRO', fourth: 'MAR' } },
+    { name: 'champ', pred: { champion: 'ARG', runnerUp: 'X', third: 'Y', fourth: 'Z' } },
+    { name: '2y4',   pred: { champion: 'X', runnerUp: 'FRA', third: 'Y', fourth: 'MAR' } },
+    { name: '0/4',   pred: { champion: 'A', runnerUp: 'B', third: 'C', fourth: 'D' } },
+    { name: 'null',  pred: null },
+  ];
+  for (const c of podCases) {
+    const sharedPts = sharedCalcKoPodiumPoints(c.pred, realPod);
+    const legacyPts = legacyCPOD(c.pred, realPod);
+    assert.strictEqual(sharedPts, legacyPts, `PARITY CPOD [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`);
   }
 }
 
@@ -370,12 +512,16 @@ const {
   function mapKoFromDbRow(k) {
     return { l: k.local, v: k.visitante, gol: k.scorer, classifier: k.classifier, saved: true };
   }
-  // pred 2-0 vs real 2-1: signo OK, NO exacto, goleador acertado.
+  // pred 2-0 vs real 2-1: signo OK, NO exacto, goleador acertado. Cruce coincide
+  // (MEX/KOR), avanzador coincide (MEX). r16: signo +1 + goleador +2 + avance +10 = 13.
   const dbRow = { local: 2, visitante: 0, scorer: 'lozano', classifier: null };
   const pred = mapKoFromDbRow(dbRow);
-  // r16: signo +1 + goleador +2 + avance r16 +10 = 13
   assert.strictEqual(
-    sharedCalcKOMatchPoints(pred, 2, 1, 'r16', { scorers: ['lozano'] }),
+    sharedCalcKOMatchPoints(pred, 2, 1, 'r16', {
+      scorers: ['lozano'],
+      predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+      realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+    }),
     13,
     'EF assembly KO: row scorer→gol + avance r16',
   );
@@ -489,13 +635,14 @@ const {
       `PARITY regla00 [${c.name}]: shared=${sharedPts} ≠ legacy=${legacyPts}`,
     );
   }
-  // KO hereda la regla vía calcKOMatchPoints: 0-0 sin gol + classifier 'home'
-  // acertado en r32 → 6 (marcador con regla) + 5 (avance) = 11, en ambos motores.
-  const sharedKo = sharedCalcKOMatchPoints(
-    { saved: true, l: 0, v: 0, classifier: 'home', gol: null }, 0, 0, 'r32',
-    { scorers: [], iaBonus: false, boost: false, winner: 'home' },
-  );
-  assert.strictEqual(sharedKo, 11, 'regla00 KO shared: 0-0 sin gol + avance r32 (winner) = 6+5');
+  // KO hereda la regla 0-0 vía calcKOMatchPoints: cruce coincide, 0-0 sin gol
+  // vs real 0-0 → marcador 6 (1+3+2) + avance r32 por equipo (5) = 11, en
+  // ambos motores. Paridad shared↔legacy con la misma malla.
+  const koMesh00 = { scorers: [], predHome: 'A', predAway: 'B', predAdvancer: 'A', realHome: 'A', realAway: 'B', realAdvancer: 'A' };
+  const sharedKo = sharedCalcKOMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, 'r32', koMesh00);
+  const legacyKo = legacyCKO({ saved: true, l: 0, v: 0, gol: null }, 0, 0, 'r32', koMesh00);
+  assert.strictEqual(sharedKo, 11, 'regla00 KO shared: 0-0 sin gol (6) + avance r32 (5) = 11');
+  assert.strictEqual(legacyKo, 11, 'regla00 KO legacy: 0-0 sin gol (6) + avance r32 (5) = 11');
 }
 
 // ════════════════════════════════════════════════════════════════════
