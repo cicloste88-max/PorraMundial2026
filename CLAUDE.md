@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**25-jun**: **ESPN fuente primaria** (`espn-poll` v1, cron gate-ventana; `update-results` retirada; puente v9 ERR-93). **BRA-ESC fixture swapped** corregido: marcador 3-0 (ERR-95, MCP) + signo IA (ERR-96, PR #165) → invariante `live_scores`=orden-FUENTE. Suite 302/306.
+**26-jun**: **Motor KO reescrito** (ERR-98, rama `claude/ko-scoring-engine-2026-y0yonc`): `calcKOMatchPoints` gate de equipos + avance por EQUIPO + podio; `final_advance`→`final` slot 104. `get-league-standings` v1.5.0 reconstruye malla (`resolveBracket` + `wc_matches_ko`). Espejo `scoring.js`. **NO desplegado** — gate San.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Merge PR #165** (ERR-96 signo IA, rama `claude/determined-curie-oygbbm`) tras QA — gate San.
-2. **KO ~28-jun (Paso 6)**: al sembrar `wc_matches_ko`/`espn_event_map`, aplicar el invariante (`inverted=false` + `teams_swapped` según fuente).
-3. **`dispatch-live-slots`** (SofaScore activo): unschedule si ESPN estable. **JO-6 ficha lenta** pendiente.
+1. **Merge PR motor KO** (ERR-98) tras QA preview — gate San. **Confirmar §1.5** (campeón=75 vs 50, toggle `KO_ROUND_PTS.final`).
+2. **Sembrar `wc_matches_ko`** (~28-jun, slots 73–104 con iso3 + `teams_swapped` coherente con `ko_results`): sin esto KO=0 limpio.
+3. **`dispatch-live-slots`** (SofaScore activo): unschedule si ESPN estable. **JO-6 ficha lenta**.
 
 ## Pendientes — Bugs UI
 
@@ -32,7 +32,7 @@ Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador; goleador respeta `saved=(l!==null && v!==null)`. F1 (PR #69) ya evita el patrón en KO. Post-launch, solo grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
-5. **ERR-79 cerrado**. Residual: **boost ×2 KO backend** + tabla canónica a `docs/scoring-engine.md`.
+5. **ERR-79 cerrado** (residual KO resuelto en ERR-98).
 6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
 7. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
 

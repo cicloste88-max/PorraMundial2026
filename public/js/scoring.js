@@ -17,13 +17,18 @@
      Notas           : Logica pura de calculo. Sin efectos de UI.
 ================================================================ */
 // ── Puntos por ronda KO (equipos que avanzan) ─────────────
+// ESPEJO de _shared/scoring.mjs. Avance por EQUIPO (predAdvancer===realAdvancer),
+// aplicado uniforme KO_ROUND_PTS[round(slot)]: r32 +5 · r16 +10 · qf +15 ·
+// sf +20 · final (slot 104) +25. slot 103 (third) SIN avance. Campeón = sf 20 +
+// final 25 + champion 30 = 75. TOGGLE §1.5 (campeón = 50): borrar la clave
+// `final` aquí Y en _shared/scoring.mjs (slot 104 deja de dar avance).
 const KO_ROUND_PTS = {
-  groups:         5,   // equipo que pasa fase de grupos → 1/16
-  r32:            5,   // avanza en dieciseisavos → octavos
-  r16:           10,   // avanza en octavos → cuartos
-  qf:            15,   // avanza en cuartos → semifinales
-  sf:            20,   // avanza en semis → final
-  final_advance: 25,   // avanza a la gran final (campeón)
+  groups:  5,   // equipo que pasa fase de grupos → 1/16
+  r32:     5,   // avanza en dieciseisavos → octavos
+  r16:    10,   // avanza en octavos → cuartos
+  qf:     15,   // avanza en cuartos → semifinales
+  sf:     20,   // avanza en semis → final
+  final:  25,   // gana la final (campeón) — slot 104
 };
 
 // ── Puntos por clasificación final ────────────────────────
@@ -225,28 +230,85 @@ function deriveScorersFromEvents(rawEvents, teamsSwapped, homeIso3, awayIso3) {
 }
 
 // ── Puntos KO por ronda ───────────────────────────────────
-// Calcula los pts de un pronóstico KO dado un resultado real
-// round: 'r32'|'r16'|'qf'|'sf'|'final'
-function calcKOMatchPoints(pred, realL, realR, round, realScorers) {
+// ESPEJO de _shared/scoring.mjs calcKOMatchPoints — modelo normativo §1.3.
+// Dos componentes INDEPENDIENTES:
+//   (a) MARCADOR (máx 7, sin boost) SOLO si el cruce coincide (igualdad de
+//       conjunto {predHome,predAway} == {realHome,realAway}, en iso3). Se
+//       orienta el marcador del usuario al marco real (swap ERR-95/96) y se
+//       puntúa signo/exacto/goleador/IA. Cruce distinto → 0 de marcador.
+//   (b) AVANCE por EQUIPO: predAdvancer === realAdvancer → +KO_ROUND_PTS[round]
+//       (independiente del cruce; slot 103 'third' no da avance).
+// opts (malla iso3, degradan limpio si faltan): { predHome, predAway,
+//   predAdvancer, realHome, realAway, realAdvancer, scorers, iaPred:{sign} }.
+function _koSign(l, v) {
+  if (l == null || v == null) return null;
+  if (l > v) return '1';
+  if (l < v) return '2';
+  return 'X';
+}
+// Espejo de iaBonusPredicate (_shared/scoring.mjs) — bonus anti-IA del cruce
+// real: tu signo difiere del de la IA y aciertas el signo real → +1.
+function _koIaBonus(iaPred, pred, realL, realR) {
+  if (!iaPred || !iaPred.sign) return false;
+  if (iaPred.sign !== '1' && iaPred.sign !== 'X' && iaPred.sign !== '2') return false;
+  const mySign = _koSign(pred.l, pred.v);
+  if (!mySign) return false;
+  if (mySign === iaPred.sign) return false;
+  return mySign === _koSign(realL, realR);
+}
+function calcKOMatchPoints(pred, realL, realR, round, opts) {
   if(!pred || !pred.saved) return 0;
-  let pts = calcMatchPoints(pred, realL, realR, null, realScorers);
+  opts = opts || {};
+  const predHome = opts.predHome != null ? opts.predHome : null;
+  const predAway = opts.predAway != null ? opts.predAway : null;
+  const realHome = opts.realHome != null ? opts.realHome : null;
+  const realAway = opts.realAway != null ? opts.realAway : null;
+  const predAdvancer = opts.predAdvancer != null ? opts.predAdvancer : null;
+  const realAdvancer = opts.realAdvancer != null ? opts.realAdvancer : null;
+  let pts = 0;
 
-  const realWinner = realL > realR ? 'home' : realR > realL ? 'away' : null;
-  const predWinner = pred.l > pred.v ? 'home'
-                   : pred.v > pred.l ? 'away'
-                   : pred.classifier;
+  // (a) Marcador — gate de cruce.
+  const matchupCoincide =
+    predHome != null && predAway != null && realHome != null && realAway != null &&
+    ((predHome === realHome && predAway === realAway) ||
+     (predHome === realAway && predAway === realHome));
 
-  // +pts por equipo que avanza en esta ronda
+  if (matchupCoincide) {
+    const swap = predHome === realAway;
+    const oriented = swap ? Object.assign({}, pred, { l: pred.v, v: pred.l }) : pred;
+    // base = signo+exacto+goleador (≤6, matchKey=null → sin IA ni boost, cap 7).
+    let base = calcMatchPoints(oriented, realL, realR, null, opts.scorers != null ? opts.scorers : null);
+    // +1 anti-IA del cruce real, DENTRO del cap 7 (base nunca llega a 7 sola).
+    if (opts.iaPred && _koIaBonus(opts.iaPred, oriented, realL, realR)) {
+      base = Math.min(base + 1, 7);
+    }
+    pts += base;
+  }
+
+  // (b) Avance — por equipo.
   const roundPts = KO_ROUND_PTS[round] || 0;
-  if(roundPts > 0 && realWinner && predWinner && realWinner === predWinner) {
+  if (roundPts > 0 && predAdvancer != null && realAdvancer != null &&
+      predAdvancer === realAdvancer) {
     pts += roundPts;
   }
 
-  // Semis: el ganador pasa a la final → +25 pts adicionales
-  if(round === 'sf' && realWinner && predWinner && realWinner === predWinner) {
-    pts += KO_ROUND_PTS.final_advance;
-  }
+  return pts;
+}
 
+// ── Podio KO (clasificación final) ─────────────────────────
+// ESPEJO de _shared/scoring.mjs calcKoPodiumPoints (§1.5). predPodium/realPodium
+// = { champion, runnerUp, third, fourth } en iso3. UNA vez por usuario.
+function calcKoPodiumPoints(predPodium, realPodium) {
+  if (!predPodium || !realPodium) return 0;
+  let pts = 0;
+  const cmp = (k, ptsKey) => {
+    const p = predPodium[k], r = realPodium[k];
+    if (p != null && r != null && p === r) pts += FINAL_CLASSIFICATION_PTS[ptsKey];
+  };
+  cmp('champion', 'champion');
+  cmp('runnerUp', 'runner_up');
+  cmp('third',    'third');
+  cmp('fourth',   'fourth');
   return pts;
 }
 
@@ -291,11 +353,21 @@ function calcClassificationPoints(userPicks, realResults) {
 }
 
 // ── Total de puntos de un usuario ────────────────────────
-// Función principal que suma todos los conceptos
+// Función agregadora de referencia (NO es la fuente de verdad del leaderboard:
+// los puntos publicados los calcula el backend get-league-standings + user_points_cache).
+// El nuevo modelo KO §1.3 exige la MALLA por slot (equipos+avanzadores en iso3),
+// que NO está en realKoResults (solo l/v/scorers/winner). El caller la provee en
+// `koMesh`; sin ella el marcador/avance KO degradan limpio a 0 (mismo contrato
+// que la EF ante wc_matches_ko vacía).
+//   koMesh.bySlot[slotId] = { predHome, predAway, predAdvancer,
+//                             realHome, realAway, realAdvancer, iaPred }
+//   koMesh.predPodium / koMesh.realPodium = { champion, runnerUp, third, fourth }
 function calcTotalUserPoints(userPredictions, userKoPredictions, userAwPicks,
                               realMatchResults, realKoResults, realAwardWinners,
-                              realClassification) {
+                              realClassification, koMesh) {
   let total = 0;
+  koMesh = koMesh || {};
+  const meshBySlot = koMesh.bySlot || {};
 
   // 1. Partidos de fase de grupos
   PARTIDOS.forEach(m => {
@@ -305,34 +377,41 @@ function calcTotalUserPoints(userPredictions, userKoPredictions, userAwPicks,
     if(pred && real) total += calcMatchPoints(pred, real.l, real.v, key, real.scorers);
   });
 
-  // 2. Partidos eliminatorias (con bonus de ronda)
+  // 2. Partidos eliminatorias (marcador con gate de cruce + avance por equipo)
   const KO_ROUNDS = [
-    { matches: BRACKET.r32,   round: 'r32' },
-    { matches: BRACKET.r16,   round: 'r16' },
-    { matches: BRACKET.qf,    round: 'qf'  },
-    { matches: BRACKET.sf,    round: 'sf'  },
-    { matches: BRACKET.third, round: 'sf'  }, // 3er/4to no da pts extra de ronda
-    { matches: BRACKET.final, round: 'sf'  }, // la final tampoco (ya cubierta con champion)
+    { matches: BRACKET.r32,   round: 'r32'   },
+    { matches: BRACKET.r16,   round: 'r16'   },
+    { matches: BRACKET.qf,    round: 'qf'    },
+    { matches: BRACKET.sf,    round: 'sf'    },
+    { matches: BRACKET.third, round: 'third' }, // 3er puesto: marcador sí, avance no
+    { matches: BRACKET.final, round: 'final' }, // final: marcador + avance (campeón)
   ];
   KO_ROUNDS.forEach(({ matches, round }) => {
     matches.forEach(m => {
       const pred = userKoPredictions[m.id] || userKoPredictions[String(m.id)];
       const real = realKoResults?.[m.id];
-      if(pred && real) total += calcKOMatchPoints(pred, real.l, real.v, round, real.scorers);
+      if(!pred || !real) return;
+      const mesh = meshBySlot[m.id] || meshBySlot[String(m.id)] || {};
+      total += calcKOMatchPoints(pred, real.l, real.v, round, {
+        scorers: real.scorers,
+        predHome: mesh.predHome, predAway: mesh.predAway, predAdvancer: mesh.predAdvancer,
+        realHome: mesh.realHome, realAway: mesh.realAway, realAdvancer: mesh.realAdvancer,
+        iaPred: mesh.iaPred,
+      });
     });
   });
 
-  // 3. Equipos que pasan grupos (calculado aparte)
-  // Se añadirá cuando tengamos datos reales de clasificados
+  // 3. Equipos que pasan grupos (calculado aparte cuando haya clasificados reales)
 
   // 4. Premios individuales
   if(userAwPicks && realAwardWinners) {
     total += calcAwardPoints(userAwPicks, realAwardWinners);
   }
 
-  // 5. Clasificación final (campeón, subcampeón, 3º, 4º)
-  // Derivada de koPredictions de la final y 3er puesto
-  // Se calculará con los datos reales al terminar el torneo
+  // 5. Podio (campeón/subcampeón/3.º/4.º) — una vez, tras la Final.
+  if(koMesh.predPodium && koMesh.realPodium) {
+    total += calcKoPodiumPoints(koMesh.predPodium, koMesh.realPodium);
+  }
 
   return total;
 }

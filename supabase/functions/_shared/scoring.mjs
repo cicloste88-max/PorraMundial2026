@@ -3,13 +3,23 @@
 
 import { scorerMatches } from "./scorer-normalize.mjs";
 
+// Puntos de AVANCE por ronda KO — se otorgan por EQUIPO (predAdvancer ===
+// realAdvancer), independientemente de que el cruce coincida. El motor aplica
+// KO_ROUND_PTS[round(slot)] de forma uniforme:
+//   slot 73-88 (r32) +5 · 89-96 (r16) +10 · 97-100 (qf) +15 · 101-102 (sf) +20
+//   slot 104 (final) +25 (acertar al campeón) · slot 103 (third) SIN avance.
+// §1.5 DECISIÓN (San, review): el campeón acertado suma sf 20 (llegar a la
+// final) + final 25 (ganarla) + champion 30 (podio) = 75. TOGGLE reversible
+// de 1 línea: para el esquema "campeón = 50" (sin el +25 de la final), BORRAR
+// la clave `final` de aquí (y su espejo en public/js/scoring.js) — slot 104
+// dejaría de otorgar avance automáticamente (KO_ROUND_PTS[round] || 0).
 export const KO_ROUND_PTS = {
-  groups:         5,
-  r32:            5,
-  r16:           10,
-  qf:            15,
-  sf:            20,
-  final_advance: 25,
+  groups:  5,
+  r32:     5,
+  r16:    10,
+  qf:     15,
+  sf:     20,
+  final:  25,
 };
 
 export const DEFAULT_AWARDS_PTS = {
@@ -83,33 +93,90 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
   return pts;
 }
 
-// calcKOMatchPoints: puntos base de marcador (calcMatchPoints) + avance de ronda.
-// El ganador REAL se determina, por prioridad:
-//   1) opts.winner ('home'|'away') — lo provee el puente con el desenlace real
-//      (incluye prorroga/penaltis). Imprescindible para KO que acaba en empate.
-//   2) fallback: derivado de realL/realR (KO sin desempate, o datos antiguos).
-// El ganador PREDICHO: del marcador del usuario, o su classifier si predijo empate.
+// calcKOMatchPoints — modelo KO normativo (brief 26-jun-2026, §1.3). Dos
+// componentes INDEPENDIENTES, sumados:
+//
+//   (a) MARCADOR (estilo grupo, máx 7, SIN boost) — SOLO si el cruce coincide:
+//       el conjunto {predHome, predAway} (iso3 de la malla del usuario) es igual
+//       al conjunto {realHome, realAway} (iso3 de wc_matches_ko). Si coincide se
+//       orienta el marcador del usuario al marco real (swap si el usuario puso a
+//       un equipo en local que el real tiene en visitante — invariante ERR-95/96)
+//       y se puntúa signo/exacto/goleador/IA vía calcMatchPoints. Si NO coincide:
+//       0 de marcador (ni signo, ni exacto, ni goleador, ni IA).
+//
+//   (b) AVANCE (por EQUIPO) — independiente del cruce: si predAdvancer ===
+//       realAdvancer (iso3) se suma KO_ROUND_PTS[round]. Se otorga aunque el
+//       cruce no coincida (acertar solo quién avanza paga el avance, nada del
+//       marcador). El slot 103 (3.er puesto) NO da avance (round 'third' ∉
+//       KO_ROUND_PTS).
+//
+// opts (malla, todos iso3 o null; degradan limpio si faltan):
+//   { predHome, predAway, predAdvancer, realHome, realAway, realAdvancer,
+//     scorers, iaPred }  · iaPred = { sign } de la IA para el CRUCE REAL (1.4).
+// pred.l/pred.v vienen orientados a (predHome, predAway). realL/realR a
+// (realHome, realAway). boost SIEMPRE off en KO (§1.6).
 export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
   if (!pred || !pred.saved) return 0;
-  let pts = calcMatchPoints(pred, realL, realR, opts);
+  let pts = 0;
 
-  const realWinner = (opts.winner === 'home' || opts.winner === 'away')
-    ? opts.winner
-    : (realL > realR ? 'home' : realR > realL ? 'away' : null);
+  const predHome = opts.predHome ?? null;
+  const predAway = opts.predAway ?? null;
+  const realHome = opts.realHome ?? null;
+  const realAway = opts.realAway ?? null;
+  const predAdvancer = opts.predAdvancer ?? null;
+  const realAdvancer = opts.realAdvancer ?? null;
 
-  const predWinner = pred.l > pred.v ? 'home'
-                   : pred.v > pred.l ? 'away'
-                   : pred.classifier;
+  // (a) Marcador — gate de cruce (igualdad de CONJUNTO de iso3).
+  const matchupCoincide =
+    predHome != null && predAway != null && realHome != null && realAway != null &&
+    ((predHome === realHome && predAway === realAway) ||
+     (predHome === realAway && predAway === realHome));
 
+  if (matchupCoincide) {
+    // Orientar al marco real: si el usuario invirtió los lados (su home es el
+    // away real), intercambiar su marcador antes de comparar (ERR-95/96).
+    const swap = predHome === realAway;
+    const oriented = swap ? { ...pred, l: pred.v, v: pred.l } : pred;
+    const iaBonus = opts.iaPred
+      ? iaBonusPredicate(opts.iaPred, { l: oriented.l, v: oriented.v }, realL, realR)
+      : false;
+    pts += calcMatchPoints(oriented, realL, realR, {
+      scorers: opts.scorers ?? null,
+      iaBonus,
+      boost: false,
+    });
+  }
+
+  // (b) Avance — por equipo, KO_ROUND_PTS[round] (slot 103 → undefined → 0).
   const roundPts = KO_ROUND_PTS[round] || 0;
-  if (roundPts > 0 && realWinner && predWinner && realWinner === predWinner) {
+  if (roundPts > 0 && predAdvancer != null && realAdvancer != null &&
+      predAdvancer === realAdvancer) {
     pts += roundPts;
   }
 
-  if (round === 'sf' && realWinner && predWinner && realWinner === predWinner) {
-    pts += KO_ROUND_PTS.final_advance;
-  }
+  return pts;
+}
 
+// calcKoPodiumPoints — clasificación final (§1.5), UNA vez por usuario tras la
+// Final. Compara el podio PREDICHO (de la malla del usuario) contra el REAL,
+// ambos en iso3:
+//   champion  = avanzador del slot 104   → +30
+//   runnerUp  = perdedor  del slot 104   → +20
+//   third     = avanzador del slot 103   → +15
+//   fourth    = perdedor  del slot 103   → +10
+// Independiente del avance: un campeón acertado suma además sf 20 + final 25.
+export function calcKoPodiumPoints(predPodium, realPodium) {
+  if (!predPodium || !realPodium) return 0;
+  let pts = 0;
+  const cmp = (predKey, realKey, ptsKey) => {
+    const p = predPodium[predKey];
+    const r = realPodium[realKey];
+    if (p != null && r != null && p === r) pts += FINAL_CLASSIFICATION_PTS[ptsKey];
+  };
+  cmp('champion', 'champion', 'champion');
+  cmp('runnerUp', 'runnerUp', 'runner_up');
+  cmp('third',    'third',    'third');
+  cmp('fourth',   'fourth',   'fourth');
   return pts;
 }
 
