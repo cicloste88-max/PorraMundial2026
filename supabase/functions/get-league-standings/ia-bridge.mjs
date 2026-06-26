@@ -16,6 +16,43 @@ export function flipSign(s) {
   return s === "1" ? "2" : s === "2" ? "1" : s;
 }
 
+// ── Anti-IA en KO: ia_predictions on-demand → { [slot]: { sign } } ──────────
+// Las predicciones IA de cruces KO (is_ko_ondemand=true) se calcularon ON-DEMAND
+// cuando cada usuario montaba su bracket: es la IA que el usuario VIO al
+// pronosticar ese cruce. NO se recomputan — se LEEN tal cual.
+//
+// El `sign` es independiente de la ventaja de campo (verificado in vivo: 36/36
+// pares con ambas orientaciones son flip-consistentes), así que basta UNA
+// entrada por slot orientada al MARCO REAL (realHome=home). calcKOMatchPoints
+// orienta el marcador del usuario y el real a ese marco antes de iaBonusPredicate.
+//
+// iaKoRows: [{ home_code, away_code, sign }]  (iso3 + '1'|'X'|'2')
+// realKoTeamsBySlot: { [slot]: { home, away } }  (iso3 reales de wc_matches_ko)
+// Devuelve: { [slot]: { sign } } — misma forma que el iaPred de grupos.
+//   - par exacto (home_code=realHome && away_code=realAway) → sign tal cual.
+//   - par invertido (home_code=realAway && away_code=realHome) → flipSign (X invariante).
+//   - si existen ambas, gana la exacta (son consistentes).
+//   - sin fila para el par → no se setea (anti-IA degrada a 0 limpio).
+export function buildKoIaSignBySlot(iaKoRows, realKoTeamsBySlot) {
+  const byPair = new Map();
+  for (const r of iaKoRows ?? []) {
+    if (!r?.home_code || !r?.away_code || !r?.sign) continue;
+    byPair.set(`${r.home_code}__${r.away_code}`, String(r.sign));
+  }
+  const out = {};
+  for (const [slotKey, teams] of Object.entries(realKoTeamsBySlot ?? {})) {
+    const home = teams?.home;
+    const away = teams?.away;
+    if (!home || !away) continue;
+    const exact = byPair.get(`${home}__${away}`);
+    if (exact) { out[Number(slotKey)] = { sign: exact }; continue; }
+    const inverted = byPair.get(`${away}__${home}`);
+    if (inverted) { out[Number(slotKey)] = { sign: flipSign(inverted) }; }
+    // sin predicción para el par → no setear
+  }
+  return out;
+}
+
 // iaRows: [{ match_id, sign, home_code }]   (solo claves wc2026_* de grupos)
 // wcRows: [{ match_key, group_letter, home_es, away_es, home_iso3 }]
 // Devuelve: { [legacyKey]: { sign } } con el sign en orientación porra.
