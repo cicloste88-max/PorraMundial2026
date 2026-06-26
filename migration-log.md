@@ -2692,3 +2692,16 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] ACCION (ERR-96 — signo IA, código, PR #165): destapado al corregir el marcador, el card de BRA-ESC pintaba "VS IA +1" fantasma a los Brasil-predictors (split-brain card↔user_points_cache). loadIAPredictions (auth.js) guardaba el signo IA CRUDO (orden SofaScore) mientras el backend lo flipea en ia-bridge.mjs. FIX (opción A, orientar 1 vez al cargar): helper iaSignForCard(sign, ia_home_code, wc_home_iso3), MISMA condición/flip que buildIaSignByLegacyKey; los 5 consumidores del signo (iaBonusWillApply, chip vs-IA ui-groups, v3ComputeIAStandings, label hydrateIABar, renderIA) ya lo asumían orientado. Probabilidades intactas (v3IAOrientProbs en presentación) → barra "IA PREDICE" sin cambios. +5 tests paridad front↔backend en tests/ia-bar-orientation.test.mjs (21/21 IA; suite 302/306, 4 pre-existentes ajenos: ff-scraper/squads-db/calendar/xi-slot, confirmados fallando con cambios stasheados). node --check OK; build local NO (vite ausente en container; public/js copiado verbatim por Vite; Vercel build en deploy). Commit 776cb06 → push → PR #165 (base main, sin merge, gate San).
 
 [--:--] ACCION (docs, Paso 5): ERR-95 + ERR-96 en errores_conocidos_porra.md; invariante de orientación como §nueva en docs/live-scoring.md y regla CRÍTICA en CLAUDE.md (Estado actual + Top-3 refrescados a 25-jun para respetar el límite 10KB del hook). Paso 6 (FUTURO ~28-jun, KO): al sembrar wc_matches_ko + filas espn_event_map, auditar orientación de cada cruce (inverted=false + wc_matches_ko.teams_swapped según fuente); confirmar que el writer SofaScore del KO entrega orden-fuente (porra-apify-webhook). Todo en la rama del PR #165.
+
+## Sesion 26-jun-2026 -- Fix matcher goleador `matchPlayerKey` (ERR-97) + correccion de datos MCP (rama `fix/err97-matchplayerkey`, Code remoto)
+
+**Bug:** gol de van Hecke (NED) acreditado como van Dijk a 3 usuarios. Auditoria 62 finished -> 4 mal-atribuciones (2 con impacto).
+
+**Datos (lane Claude.ai/MCP, ya aplicado 26-jun):**
+- `results.match_results` (jsonb_set del subcampo `scorers`): `F_Tunez_Paises Bajos` VanDijk->Hecke; `F_Suecia_Tunez` Ayari->YasinAyari (x2); `H_Uruguay_Cabo Verde` Canobbio->Cano.
+- `results.overrides` con los 3 objetos `{l,v,status,scorers}` (capa anti-re-bridge: `get-league-standings` hace `{...match_results, ...overrides}`).
+- Reseed `user_points_cache` (3 ligas): lauratorres2002 120->118 / aha2701 99->97 / mrobledanovalverde 59->57 / mavc_999 35->33.
+
+**Codigo (este PR):** `matchPlayerKey` particulas/`jr` peso 0 + apellido obligatorio (Fix 1/P0). Fix 2/3/4 en PR posterior.
+
+**TODO tras deploy del bridge + re-bridge:** retirar `results.overrides` (`UPDATE results SET overrides='{}'::jsonb WHERE id=1`) y re-correr la auditoria -> confirmar 0 mal-atribuciones.
