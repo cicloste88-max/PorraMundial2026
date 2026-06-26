@@ -31,6 +31,8 @@ import {
 import {
   matchPlayerKey,
   fallbackKey,
+  resolveScorerKey,
+  scorerMatches,
 } from '../supabase/functions/_shared/scorer-normalize.mjs';
 
 // ════════════════════════════════════════════════════════════════════
@@ -564,4 +566,25 @@ console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBon
   assert.strictEqual(matchPlayerKey('Saleh Al-Shehri', KSA).key, 'Alshehri', 'ERR-97 KSA: matchPlayerKey resuelve articulo+apellido');
 }
 
+// ERR-97 Fix 2 — resolveScorerKey: cualifica el fallback que colisiona con un
+// pickable del RIVAL (Yasin Ayari SWE fallback "Ayari" vs Khalil Ayari TUN).
+{
+  // colision con rival → cualifica con iso3
+  assert.deepEqual(
+    resolveScorerKey('Yasin Ayari', 'SWE', [], [{ key: 'Ayari', name: 'Khalil Ayari' }]),
+    { key: 'SWE__Ayari', status: 'unresolved_qualified' });
+  // resuelto a pickable propio → sin cambios
+  assert.deepEqual(
+    resolveScorerKey('Alexander Isak', 'SWE', [{ key: 'Isak', name: 'Alexander Isak' }], []),
+    { key: 'Isak', status: 'resolved' });
+  // fallback sin colision con rival → key pelada
+  assert.deepEqual(
+    resolveScorerKey('Jan Paul van Hecke', 'NED', [], [{ key: 'Mastouri', name: 'Hazem Mastouri' }]),
+    { key: 'Hecke', status: 'unresolved' });
+  // scorerMatches descarta la key cualificada y mantiene las normales
+  assert.equal(scorerMatches(['SWE__Ayari', 'Isak'], 'Ayari'), false);
+  assert.equal(scorerMatches(['SWE__Ayari', 'Isak'], 'Isak'), true);
+}
+
 console.log('OK ERR-97 matchPlayerKey regression: particulas peso 0 + apellido obligatorio + guarda ERR-93');
+console.log('OK ERR-97 Fix 2 resolveScorerKey: fallback colisionante con rival se cualifica con iso3');

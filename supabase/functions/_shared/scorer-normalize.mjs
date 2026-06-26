@@ -119,6 +119,22 @@ export function fallbackKey(nombre) {
   return parts.length ? parts[parts.length - 1] : "";
 }
 
+// ERR-97 Fix 2: resuelve el nombre del feed a key final para scorers[]. Si cae a
+// fallback Y ese fallback colisiona con una key PICKABLE del equipo RIVAL, la
+// cualifica con el iso3 del goleador para que no haga falso-match con una
+// predicción de ese jugador rival (Yasin Ayari SWE fallback "Ayari" vs Khalil
+// Ayari TUN pickable). Devuelve { key, status }.
+export function resolveScorerKey(nombre, iso3, ownRoster, oppRoster) {
+  const m = matchPlayerKey(nombre, ownRoster);
+  if (m && m.key) return { key: m.key, status: "resolved" };
+  const fb = fallbackKey(nombre);
+  const collides = Array.isArray(oppRoster)
+    && oppRoster.some((p) => normName(p?.key) === normName(fb));
+  const base = m && m.ambiguous ? "ambiguous" : "unresolved";
+  if (collides) return { key: `${iso3}__${fb}`, status: `${base}_qualified` };
+  return { key: fb, status: base };
+}
+
 // Matcher de goleador: ¿alguno de los scorers (keys canónicas persistidas)
 // coincide con la key predicha? Comparación NORMALIZADA de la key entera —
 // absorbe drift de caja/acentos/jr-junior entre lo persistido y lo predicho

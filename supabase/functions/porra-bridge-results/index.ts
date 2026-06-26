@@ -36,7 +36,7 @@
 // no-volcados. verify_jwt=false (auth secret==service_role).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { matchPlayerKey, fallbackKey } from "../_shared/scorer-normalize.mjs";
+import { matchPlayerKey, fallbackKey, resolveScorerKey } from "../_shared/scorer-normalize.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -68,22 +68,22 @@ function asObj(v: unknown): Record<string, unknown> | null {
 type EquiposPlayer = { key: string; name: string };
 type EquiposPlayersByIso3 = Record<string, EquiposPlayer[]>;
 
-function playerToShortKey(nombre: string, iso3: string, eqMap: EquiposPlayersByIso3): string {
+function playerToShortKey(nombre: string, iso3: string, oppIso3: string, eqMap: EquiposPlayersByIso3): string {
   if (!nombre) return "";
   // Resolucion por tokens normalizados contra el roster (name + key). Cubre la
   // clase-Vinicius (key != apellido: "Vinicius Junior"->Vinicius, y Son,
-  // DeBruyne, VanDijk, MacAllister...) y separa Jimenez de Gimenez. Devuelve
-  // {key} | {ambiguous} | null. Ver _shared/scorer-normalize.mjs (ERR-93).
-  const m = matchPlayerKey(nombre, eqMap[iso3]);
-  if (m && m.key) return m.key;
-  // Sin ganador claro: degradar al fallback (ultimo token, CONSERVA CAJA = key
-  // que guarda el picker para jugadores fuera del roster) y AUDITAR.
-  //   scorer_ambiguous  = empate entre apellidos compartidos → no adivinamos.
-  //   scorer_unresolved = ningun token del roster solapo (jugador ausente).
-  console.warn(
-    `${m && m.ambiguous ? "scorer_ambiguous" : "scorer_unresolved"} iso3=${iso3} raw=${JSON.stringify(nombre)}`,
-  );
-  return fallbackKey(nombre);
+  // DeBruyne, VanDijk, MacAllister...) y separa Jimenez de Gimenez. ERR-97 Fix 2:
+  // si cae a fallback Y ese fallback colisiona con una key PICKABLE del RIVAL, la
+  // cualifica con el iso3 del goleador (SWE__Ayari) para que no haga falso-match
+  // con la prediccion del jugador rival. Ver _shared/scorer-normalize.mjs.
+  const r = resolveScorerKey(nombre, iso3, eqMap[iso3], eqMap[oppIso3]);
+  if (r.status !== "resolved") {
+    //   scorer_ambiguous  = empate entre apellidos compartidos → no adivinamos.
+    //   scorer_unresolved = ningun token del roster solapo (jugador ausente).
+    //   *_qualified       = fallback cualificado con iso3 por colision con rival.
+    console.warn(`scorer_${r.status} iso3=${iso3} raw=${JSON.stringify(nombre)} -> ${r.key}`);
+  }
+  return r.key;
 }
 
 function extractScorers(
@@ -111,7 +111,8 @@ function extractScorers(
     const sofaIsHome = e.isHome === true;
     const projIsHome = teamsSwapped ? !sofaIsHome : sofaIsHome;
     const iso3 = projIsHome ? homeIso3 : awayIso3;
-    const key = playerToShortKey(pname, iso3, eqMap);
+    const oppIso3 = projIsHome ? awayIso3 : homeIso3;
+    const key = playerToShortKey(pname, iso3, oppIso3, eqMap);
     if (key) out.push(key);
   }
   return out;
