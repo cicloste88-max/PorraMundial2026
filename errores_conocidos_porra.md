@@ -2791,3 +2791,8 @@ El partido está `finished` → `espn-poll` no reescribe la fila (guard `.neq('s
 **Fix (P0, este PR):** set `GENERIC_TOKENS` (particulas + `jr`) con peso 0, y se exige que el apellido del feed (ultimo token distintivo) solape con el candidato. Sin apellido valido -> `null` -> `fallbackKey` (ultimo token, no pickeable, no colisiona). No regresa ERR-93 (`Vinicius Junior` -> `Vinicius`). Backend-only (firma intacta); regresion en `tests/scoring.test.mjs` seccion 11.
 
 **Relacionado:** secuela de ERR-93/ERR-94 y misma clase que ERR-73. Fix 2 (cualificar `scorers` por iso3, resuelve C) y Fix 3 (matchear contra `squads`) van en PR aparte.
+**Addendum (review 26-jun, sin debilitar A/B):**
+
+- **KSA / articulo concatenado:** el feed da `Al-Shehri` (tokens `al`+`shehri`) pero `equipos_players` guarda `Saleh Alshehri` (un token `alshehri`). Se acepta `articulo+apellido` (`alshehri`) cuando una particula precede al apellido en el feed -> evita el falso negativo (inverso de van Dijk) en 6/8 pickables saudies. `vanhecke` sigue sin estar en van Dijk y `cano` (sin articulo) sigue rechazado.
+- **Feed 100% generico** (p.ej. `Junior` suelto, sin token distintivo): conserva el contrato previo (solape generico unico -> resuelve; empate -> `ambiguous`, no se adivina). El requisito de apellido solo aplica cuando el feed TIENE token distintivo (donde vivia el bug).
+- **Latente (Fix 2, no este PR):** KSA tiene dos keys que normalizan igual (`AlDawsari`/`Aldawsari`); `scorerMatches` no las distingue -> requiere cualificacion por equipo.
