@@ -559,6 +559,9 @@ console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBon
   assert.strictEqual(matchPlayerKey('Jan Paul van Hecke', NED), null, 'ERR-97: van Hecke no resuelve key (apellido Hecke ausente del roster)');
   assert.strictEqual(matchPlayerKey('Agustin Cano', URU), null, 'ERR-97: Agustin Cano no resuelve (Cano != Canobbio)');
   assert.strictEqual(matchPlayerKey('Vinicius Junior', BRA).key, 'Vinicius', 'ERR-97: Vinicius resuelve por apellido distintivo');
+  const KSA = [{ key: 'Alshehri', name: 'Saleh Alshehri' }, { key: 'Aldawsari', name: 'Salem Aldawsari' }];
+  assert.strictEqual(resolve('Saleh Al-Shehri', KSA), 'Alshehri', 'ERR-97 KSA: articulo concatenado Al-Shehri -> Alshehri');
+  assert.strictEqual(matchPlayerKey('Saleh Al-Shehri', KSA).key, 'Alshehri', 'ERR-97 KSA: matchPlayerKey resuelve articulo+apellido');
 }
 
 console.log('OK ERR-97 matchPlayerKey regression: particulas peso 0 + apellido obligatorio + guarda ERR-93');
