@@ -182,12 +182,12 @@ const BRIDGE_SRC = readFileSync(new URL('../supabase/functions/porra-bridge-resu
 const SHARED_SCORING_SRC = readFileSync(new URL('../supabase/functions/_shared/scoring.mjs', import.meta.url), 'utf8');
 const FRONTEND_SCORING_SRC = readFileSync(new URL('../public/js/scoring.js', import.meta.url), 'utf8');
 
-test('guard bridge: importa scorer-normalize, usa matchPlayerKey/fallbackKey, audita, sin substring', () => {
+test('guard bridge: importa scorer-normalize, delega en resolveScorerKey, audita, sin substring', () => {
   assert.match(BRIDGE_SRC, /from "\.\.\/_shared\/scorer-normalize\.mjs"/);
-  assert.match(BRIDGE_SRC, /matchPlayerKey\(nombre, eqMap\[iso3\]\)/);
-  assert.ok(BRIDGE_SRC.includes('fallbackKey(nombre)'));
-  assert.ok(BRIDGE_SRC.includes('scorer_unresolved'));
-  assert.ok(BRIDGE_SRC.includes('scorer_ambiguous'), 'el bridge debe loguear empates de apellido');
+  // ERR-97 Fix 2: el bridge delega la resolucion (incl. cualificacion por
+  // colision con rival) en resolveScorerKey, pasando ambos rosters.
+  assert.match(BRIDGE_SRC, /resolveScorerKey\(nombre, iso3, eqMap\[iso3\], eqMap\[oppIso3\]\)/);
+  assert.ok(BRIDGE_SRC.includes('scorer_${r.status}'), 'el bridge debe auditar el status no-resuelto');
   // El patrón roto (substring estricto contra el roster) NO debe volver.
   assert.ok(!/p\.name\.includes\(nombre\)/.test(BRIDGE_SRC),
     'el bridge no debe resolver scorers por substring estricto (ERR-93)');
