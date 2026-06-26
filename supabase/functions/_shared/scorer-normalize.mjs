@@ -35,36 +35,47 @@ export function toks(s) {
   return normName(s).split(" ").filter(Boolean);
 }
 
-// nombre del feed → key del roster por solapamiento de tokens. Los tokens
-// distintivos pesan 3; el genérico "jr" pesa 1 — así un apellido distintivo
-// gana SIEMPRE una desambiguación frente a dos jugadores que comparten "jr".
-// Devuelve:
-//   { key }             un único ganador claro,
-//   { ambiguous: true } empate de score entre ≥2 jugadores irresoluble — NO
-//                       adivinar (riesgo de acreditar al jugador equivocado
-//                       ante apellidos compartidos: 2× Rodriguez, Hwang/Heechan),
-//   null                ningún token solapó (el caller cae al fallback).
-// Desempate del empate: se prefiere el jugador cuya KEY normalizada == el feed
-// normalizado (feed "Hwang" → key "Hwang", no "Heechan"); si eso no deja un
-// único candidato, ambiguo.
+// nombre del feed -> key del roster por solapamiento de tokens distintivos.
+// ERR-97: tokens NO distintivos (particulas van/de/di... y "jr") pesaban 3 y
+// resolvian keys erroneas cuando eran el unico token compartido (van Hecke ->
+// VanDijk; Agustin Cano -> Canobbio). Ahora pesan 0 y ADEMAS se exige que el
+// apellido del feed (ultimo token distintivo) solape con el candidato: bloquea
+// el match por solo-nombre-de-pila. Mantiene Vinicius Junior -> Vinicius (no
+// regresa ERR-93). Devuelve { key } | { ambiguous: true } | null (el caller
+// cae al fallback). Tie-break: key normalizada == feed normalizado; si no deja
+// un unico candidato, ambiguo (apellidos compartidos: 2x Rodriguez, etc.).
+const GENERIC_TOKENS = new Set([
+  "jr",
+  "van", "von", "der", "den", "de", "da", "das", "dos", "di", "del", "della",
+  "la", "le", "el", "du", "ter", "te", "bin", "ibn", "al", "ben", "of", "y", "e",
+]);
+// NO incluir mac/mc/st/o: son parte distintiva (MacAllister, McTominay, OBrien).
+
 export function matchPlayerKey(nombre, players) {
   const feed = toks(nombre);
   if (!Array.isArray(players) || feed.length === 0) return null;
+
+  const distinctiveFeed = feed.filter((t) => !GENERIC_TOKENS.has(t));
+  if (distinctiveFeed.length === 0) return null; // feed degenerado (solo genericos)
+  const feedSurname = distinctiveFeed[distinctiveFeed.length - 1];
+
   let best = 0;
   let winners = [];
   for (const p of players) {
     const cand = toks(`${p?.name ?? ""} ${p?.key ?? ""}`);
-    const score = feed.reduce(
-      (a, t) => a + (cand.includes(t) ? (t === "jr" ? 1 : 3) : 0),
-      0,
-    );
-    if (score <= 0) continue;
+    let score = 0;
+    let distinctiveHit = false;
+    for (const t of feed) {
+      if (!cand.includes(t) || GENERIC_TOKENS.has(t)) continue; // genericos: peso 0
+      score += 3;
+      distinctiveHit = true;
+    }
+    if (!distinctiveHit || !cand.includes(feedSurname)) continue; // exige apellido
     if (score > best) { best = score; winners = [p]; }
     else if (score === best) winners.push(p);
   }
   if (winners.length === 0) return null;
   if (winners.length === 1) return { key: winners[0].key };
-  // Empate de score → preferir key exacta; si sigue sin ser único, ambiguo.
   const feedNorm = feed.join(" ");
   const exact = winners.filter((p) => normName(p?.key) === feedNorm);
   if (exact.length === 1) return { key: exact[0].key };
