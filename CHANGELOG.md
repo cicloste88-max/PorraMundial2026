@@ -2,6 +2,12 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [26-jun-2026] Fix matcher de goleador `matchPlayerKey` (ERR-97) + correccion de datos MCP (rama `fix/err97-matchplayerkey`)
+
+**Code (este PR):** `matchPlayerKey` (`_shared/scorer-normalize.mjs`) -- particulas/`jr` a peso 0 + se exige solape de apellido. Resuelve A (van Hecke->VanDijk) y B (Agustin Cano->Canobbio) de la auditoria 62-finished (4 mal-atribuciones, 2 con impacto). Backend-only, drop-in; regresion en `tests/scoring.test.mjs` seccion 11. Fix 2 (cualificar `scorers` por iso3 -> resuelve C: Yasin Ayari/Khalil Ayari) y Fix 3 (matchear contra `squads`) en PR aparte.
+
+**Runtime (lane Claude.ai/MCP, ya aplicado):** parche de datos `results.match_results` en 3 partidos (Tunez-Paises Bajos, Suecia-Tunez, Uruguay-Cabo Verde) + `results.overrides` como capa anti-re-bridge + reseed `user_points_cache` (-2 a lauratorres2002 / aha2701 / mrobledanovalverde / mavc_999). TODO tras desplegar y re-bridgear: retirar `results.overrides` (`UPDATE results SET overrides='{}'::jsonb WHERE id=1`).
+
 ## [13-jun-2026] Jornada: hora de kickoff en Europe/Madrid vía `date_utc` real (rama `fix/jornada-hora-madrid`)
 
 - **Síntoma**: la pantalla Jornada mostraba la hora de la SEDE, no la de Madrid —

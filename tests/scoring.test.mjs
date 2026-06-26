@@ -28,6 +28,11 @@ import {
   KO_ROUND_PTS,
 } from '../supabase/functions/_shared/scoring.mjs';
 
+import {
+  matchPlayerKey,
+  fallbackKey,
+} from '../supabase/functions/_shared/scorer-normalize.mjs';
+
 // ════════════════════════════════════════════════════════════════════
 // 1. SHARED MODULE — canónicos calcMatchPoints (incl. boost + iaBonus)
 // ════════════════════════════════════════════════════════════════════
@@ -526,3 +531,37 @@ const {
 }
 
 console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBonus + boost + regla 0-0 + matcher normalizado) + legacy por marcadores + parity 1:1 (CMP+CKO+CAW+regla00+norm) + EF assembly (scorer→gol + boost)');
+
+// === 11. ERR-97 — matchPlayerKey: token no distintivo resuelve key erronea ===
+// Regresion de las mal-atribuciones de produccion (van Hecke->VanDijk,
+// Agustin Cano->Canobbio) + guarda anti-regresion ERR-93 (Vinicius). El
+// resolver replica playerToShortKey del bridge: matchPlayerKey o fallbackKey.
+{
+  const resolve = (name, players) => {
+    const m = matchPlayerKey(name, players);
+    return (m && m.key) ? m.key : fallbackKey(name);
+  };
+  // equipos_players (8/equipo): van Hecke NO esta en NED; Cano NO esta en URU.
+  const NED = [{ key: 'VanDijk', name: 'Virgil van Dijk' }, { key: 'Depay', name: 'Memphis Depay' }, { key: 'Gakpo', name: 'Cody Gakpo' }];
+  const URU = [{ key: 'Canobbio', name: 'Agustin Canobbio' }, { key: 'Nunez', name: 'Darwin Nunez' }, { key: 'Pellistri', name: 'Facundo Pellistri' }];
+  const BRA = [{ key: 'Vinicius', name: 'Vinicius Junior' }, { key: 'Raphinha', name: 'Raphinha' }, { key: 'Rodrygo', name: 'Rodrygo' }];
+  const KOR = [{ key: 'Hwang', name: 'Hwang In-beom' }, { key: 'Heechan', name: 'Hwang Hee-chan' }, { key: 'SonHM', name: 'Son Heung-min' }];
+  const CAN = [{ key: 'PromiseDavid', name: 'Promise David' }, { key: 'David', name: 'Jonathan David' }, { key: 'Davies', name: 'Alphonso Davies' }];
+  const PAR = [{ key: 'Magalhaes', name: 'Mauricio Magalhaes' }, { key: 'Almiron', name: 'Miguel Almiron' }];
+
+  assert.strictEqual(resolve('Jan Paul van Hecke', NED), 'Hecke', 'ERR-97 A: van Hecke -> fallback Hecke, NO VanDijk');
+  assert.strictEqual(resolve('Agustin Cano', URU), 'Cano', 'ERR-97 B: Agustin Cano -> fallback Cano, NO Canobbio');
+  assert.strictEqual(resolve('Vinicius Junior', BRA), 'Vinicius', 'ERR-97 guarda ERR-93: Vinicius Junior -> Vinicius');
+  assert.strictEqual(resolve('Hwang In-Beom', KOR), 'Hwang', 'ERR-97: Hwang In-Beom -> Hwang, NO Heechan');
+  assert.strictEqual(resolve('Promise David', CAN), 'PromiseDavid', 'ERR-97: Promise David -> PromiseDavid, NO David');
+  assert.strictEqual(resolve('Mauricio', PAR), 'Magalhaes', 'ERR-97: Mauricio nombre de pila -> Magalhaes (no rompe match legitimo)');
+
+  assert.strictEqual(matchPlayerKey('Jan Paul van Hecke', NED), null, 'ERR-97: van Hecke no resuelve key (apellido Hecke ausente del roster)');
+  assert.strictEqual(matchPlayerKey('Agustin Cano', URU), null, 'ERR-97: Agustin Cano no resuelve (Cano != Canobbio)');
+  assert.strictEqual(matchPlayerKey('Vinicius Junior', BRA).key, 'Vinicius', 'ERR-97: Vinicius resuelve por apellido distintivo');
+  const KSA = [{ key: 'Alshehri', name: 'Saleh Alshehri' }, { key: 'Aldawsari', name: 'Salem Aldawsari' }];
+  assert.strictEqual(resolve('Saleh Al-Shehri', KSA), 'Alshehri', 'ERR-97 KSA: articulo concatenado Al-Shehri -> Alshehri');
+  assert.strictEqual(matchPlayerKey('Saleh Al-Shehri', KSA).key, 'Alshehri', 'ERR-97 KSA: matchPlayerKey resuelve articulo+apellido');
+}
+
+console.log('OK ERR-97 matchPlayerKey regression: particulas peso 0 + apellido obligatorio + guarda ERR-93');

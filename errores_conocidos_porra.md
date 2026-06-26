@@ -2775,3 +2775,24 @@ El partido está `finished` → `espn-poll` no reescribe la fila (guard `.neq('s
 **Patrón preventivo**: misma raíz que ERR-95 (orientación del fixture swapped) en la capa frontend/IA. El LOADER del front debe normalizar el signo IA a orden-proyecto UNA vez (espejo de la EF), y los consumidores no re-voltean. Las dos magnitudes que llegan en orden-fuente se orientan en sitios distintos pero coherentes: el **signo** en el load (`iaSignForCard`, dato), las **probabilidades** en presentación (`v3IAOrientProbs`). No convivir orientado/crudo en la misma entry sin marcarlo. Hermano de ERR-95.
 
 **Fecha detección**: 25-jun-2026. **Resuelto**: 25-jun-2026.
+
+## ERR-97 — `matchPlayerKey`: token no distintivo resuelve key erronea
+
+**Detonante (26-jun-2026):** gol de van Hecke (NED) acreditado como van Dijk a 3 usuarios. Auditoria de los 62 partidos finished -> 4 mal-atribuciones, 2 con impacto en puntos.
+
+**Causa raiz:** `matchPlayerKey` (`supabase/functions/_shared/scorer-normalize.mjs`) daba peso 3 a CUALQUIER token solapado salvo `jr`. Cuando el unico token compartido no era distintivo, resolvia una key erronea con falsa confianza:
+
+- **A - Particula nobiliaria:** `Jan Paul van Hecke` -> `VanDijk` ("van" unico token compartido con el unico "van" del roster).
+- **B - Nombre de pila:** `Agustin Cano` -> `Canobbio` ("agustin" unico token compartido).
+- **C - Apellido cross-team:** `Yasin Ayari` (SUE) acredita a `Khalil Ayari` (TUN); el array `scorers` no lleva equipo.
+
+**Agravantes (frecuencia, no algoritmo):** el matcher lee `equipos_players` (8) y no `squads` (26); spellings divergentes feed/roster (`Irankunda`/`Irakunda`, `Schmid`/`Schimid`).
+
+**Fix (P0, este PR):** set `GENERIC_TOKENS` (particulas + `jr`) con peso 0, y se exige que el apellido del feed (ultimo token distintivo) solape con el candidato. Sin apellido valido -> `null` -> `fallbackKey` (ultimo token, no pickeable, no colisiona). No regresa ERR-93 (`Vinicius Junior` -> `Vinicius`). Backend-only (firma intacta); regresion en `tests/scoring.test.mjs` seccion 11.
+
+**Relacionado:** secuela de ERR-93/ERR-94 y misma clase que ERR-73. Fix 2 (cualificar `scorers` por iso3, resuelve C) y Fix 3 (matchear contra `squads`) van en PR aparte.
+**Addendum (review 26-jun, sin debilitar A/B):**
+
+- **KSA / articulo concatenado:** el feed da `Al-Shehri` (tokens `al`+`shehri`) pero `equipos_players` guarda `Saleh Alshehri` (un token `alshehri`). Se acepta `articulo+apellido` (`alshehri`) cuando una particula precede al apellido en el feed -> evita el falso negativo (inverso de van Dijk) en 6/8 pickables saudies. `vanhecke` sigue sin estar en van Dijk y `cano` (sin articulo) sigue rechazado.
+- **Feed 100% generico** (p.ej. `Junior` suelto, sin token distintivo): conserva el contrato previo (solape generico unico -> resuelve; empate -> `ambiguous`, no se adivina). El requisito de apellido solo aplica cuando el feed TIENE token distintivo (donde vivia el bug).
+- **Latente (Fix 2, no este PR):** KSA tiene dos keys que normalizan igual (`AlDawsari`/`Aldawsari`); `scorerMatches` no las distingue -> requiere cualificacion por equipo.
