@@ -145,13 +145,24 @@ Si `wc_matches_ko` no tiene el slot (tabla vacía hasta ~28-jun, o dato parcial)
 ese slot suma **0** sin romper el resto del scoreboard. La rama KO de
 `get-league-standings` (v1.5.0) trata `wc_matches_ko` como **soft-fail**.
 
-### Bonus anti-IA en KO (dependencia, no bloquea)
+### Bonus anti-IA en KO
 
 El +1 anti-IA aplica en KO igual que en grupos (dentro del cap 7, solo si el
-cruce coincide), buscando la predicción IA del **cruce real**. **Hoy degrada a
-0**: el bot `porra-ia-compute` solo genera IA de fase de grupos. La extensión a
-cruces KO reales es follow-up separado (TODO documentado en
-`get-league-standings/index.ts`).
+cruce coincide), buscando la predicción IA del **cruce real**. La fuente es
+`ia_predictions` con **`is_ko_ondemand = true`**: predicciones de cruces KO
+calculadas **on-demand cuando cada usuario montaba su bracket** — es decir, la
+IA que el usuario **vio** al pronosticar ese cruce. **Se LEEN, no se recomputan**
+(`get-league-standings` v1.5.1, `ia-bridge.mjs` → `buildKoIaSignBySlot`).
+
+El `sign` (`'1'|'X'|'2'`) es **independiente de la orientación** (ventaja de
+campo), verificado in vivo (36/36 pares con ambas orientaciones son
+flip-consistentes), así que basta **una entrada por slot** orientada al marco
+real: par exacto → `sign` tal cual; par invertido → `flipSign` (`1↔2`, `X`
+invariante). Es **autoconsistente**: el anti-IA solo entra si el cruce del
+usuario coincide con el real (gate del marcador §1.3), y si coincide es porque
+ese usuario montó ese cruce → la IA lo computó on-demand → la fila existe justo
+cuando hace falta. Cruces que nadie pronosticó no dan marcador → anti-IA
+irrelevante. Si no hay fila para el par → degrada a 0 limpio.
 
 ## Premios individuales (AWARDS_CFG)
 

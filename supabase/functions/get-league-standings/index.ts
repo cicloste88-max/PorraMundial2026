@@ -1,5 +1,12 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.5.0
+// PR-1 · Leaderboard de liga · v1.5.1
+//   v1.5.1 (follow-up KO): anti-IA KO cableado. iaByKoSlot se puebla desde las
+//     predicciones IA on-demand (ia_predictions.is_ko_ondemand=true) que el
+//     usuario VIO al montar su bracket — se LEEN, no se recomputan. Una entrada
+//     por slot orientada al marco real (buildKoIaSignBySlot, flip 1↔2 si la fila
+//     está invertida; X invariante). Reparte el +1 anti-IA en KO (máx partido 7).
+//     Soft-fail. (Antes era un dict vacío con un TODO incorrecto: el bot SÍ tenía
+//     IA de cruces KO on-demand.)
 //   v1.5.0 (KO scoring engine, Paso 6): motor KO reescrito al modelo normativo
 //     §1.3. Antes el KO puntuaba marcador SIN gate de equipos y avance por LADO
 //     ('home'/'away'), inflando puntos en cruces con equipos distintos (un slot
@@ -9,7 +16,7 @@
 //     (predAdvancer===realAdvancer) con KO_ROUND_PTS[round] (final +25 en slot
 //     104, no en semis); (c) podio 30/20/15/10. Reconstruye la malla predicha de
 //     cada usuario con resolveBracket (_shared/ko-bracket.mjs) y la real con
-//     wc_matches_ko + ko_results. IA KO computada (hoy degrada a 0: sin IA de KO).
+//     wc_matches_ko + ko_results. IA KO cableada en v1.5.1 (ver arriba).
 //     boost KO off (§1.6). Degradación limpia si wc_matches_ko no tiene el slot.
 //   v1.4.0 (B11, Item 7 post-J1): (a) bearer service_role PRIVILEGIADO —
 //     porra-bridge-results invoca esta EF tras cada partido bridgeado sin JWT
@@ -53,7 +60,7 @@ import {
 } from "../_shared/scoring.mjs";
 import { resolveBracket } from "../_shared/ko-bracket.mjs";
 import { fetchAllRows } from "./fetch-all.mjs";
-import { buildIaSignByLegacyKey } from "./ia-bridge.mjs";
+import { buildIaSignByLegacyKey, buildKoIaSignBySlot } from "./ia-bridge.mjs";
 
 // ERR-86: shape { data, error } compatible con el manejo de errores existente
 // (loop [err, label]); pageFn debe aplicar .order() estable + .range(from, to).
@@ -232,6 +239,7 @@ serve(async (req: Request) => {
     { data: boosts,    error: bErr },
     { data: wcRows,    error: wcErr },
     { data: wcKoRows,  error: wcKoErr },
+    { data: iaKoRows,  error: iaKoErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
     fetchAllCompat((from, to) => supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId).order("id").range(from, to)),
@@ -251,6 +259,11 @@ serve(async (req: Request) => {
     // y winner relativo a ellos (el puente aplica teams_swapped al escribir),
     // así que el scoring consume la orientación canónica sin re-flip.
     supa.from("wc_matches_ko").select("ko_match_id, round, home_iso3, away_iso3"),
+    // Anti-IA KO: predicciones IA de cruces KO calculadas ON-DEMAND cuando los
+    // usuarios montaron su bracket (la IA que VIERON). ~520 filas (<1000, sin
+    // fetchAll), una por par; sign independiente de orientación (se LEEN, no se
+    // recomputan). Sin filtro de snapshot: el on-demand no cuelga del snapshot.
+    supa.from("ia_predictions").select("home_code, away_code, sign").eq("is_ko_ondemand", true),
   ]);
 
   for (const [err, label] of [
@@ -273,6 +286,9 @@ serve(async (req: Request) => {
   // wc_matches_ko es SOFT-FAIL: un error (o tabla vacía pre-28-jun) NO debe
   // tumbar el scoring de grupos/premios. La rama KO degrada limpio a 0.
   if (wcKoErr) console.error("[standings] wc_matches_ko query failed (KO degrada a 0):", wcKoErr.message);
+  // Anti-IA KO también soft-fail: si la query de ia_predictions on-demand falla,
+  // el bonus +1 anti-IA KO degrada a 0 sin tumbar el scoreboard.
+  if (iaKoErr) console.error("[standings] ia_predictions(is_ko_ondemand) query failed (anti-IA KO degrada a 0):", iaKoErr.message);
 
   const memberUids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   const { data: profiles, error: profErr } = await supa
@@ -404,10 +420,12 @@ serve(async (req: Request) => {
       }
     : null;
 
-  // TODO (follow-up, NO bloquea este PR): el bot porra-ia-compute solo genera IA
-  // de grupos. Cuando produzca IA de cruces KO reales, poblar slot→{sign} (cruce
-  // real = realSlotMesh(slot).home vs .away). Hasta entonces, IA KO = 0 (limpio).
-  const iaByKoSlot: Record<number, { sign: string }> = {};
+  // Anti-IA KO: { slot → { sign } } desde las predicciones IA on-demand que el
+  // usuario VIO al montar su bracket (ia_predictions.is_ko_ondemand). Se LEEN,
+  // no se recomputan. Orientadas al marco real (realHome=home) recorriendo
+  // realKoTeamsBySlot; sin fila para el par → no se setea → anti-IA 0 limpio.
+  // (Hasta sembrar wc_matches_ko, realKoTeamsBySlot está vacío → iaByKoSlot {}.)
+  const iaByKoSlot: Record<number, { sign: string }> = buildKoIaSignBySlot(iaKoRows ?? [], realKoTeamsBySlot);
 
   // Rows crudas por usuario para resolveBracket (cascada de la malla predicha).
   const predRowsByUser: Record<string, Array<{ match_id: string; local: number; visitante: number }>> = {};
@@ -539,7 +557,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.5.0" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.5.1" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
