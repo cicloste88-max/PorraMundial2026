@@ -2797,3 +2797,11 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] NOTA precision: la afirmacion del brief "calcKOMatchPoints iaBonus:false hardcoded" es STALE -- el codigo (post #170) SI computa el anti-IA del marcador (via `opts.iaPred`/`iaBonusPredicate`, standings v1.5.1 `iaByKoSlot`). Solo `boost:false` esta hardcodeado. Documentado lo que hace el codigo, no la afirmacion del brief.
 
 [--:--] Solo docs, sin tocar codigo. Tamanos OK (githook). Push a `claude/docs-ko`; Claude.ai abre el PR; San mergea directo (docs, sin QA).
+
+## 2026-06-29 (Pronósticos KO en detalle de usuario)
+
+[16:05] EDIT EF `get-user-predictions` → **v1.1.0**: añade `ko_predictions` (target) + `ko_real` (`wc_matches_ko` ⨝ `results.ko_results` por slot: home/away_iso3, winner, l, v, scorers, status, date_utc). `wc_matches_ko`/`ko_results` SOFT-FAIL (degradan a {}). Mismo gate Opción A. — supabase/functions/get-user-predictions/index.ts. **Deploy Supabase pendiente (lane Claude.ai): `--no-verify-jwt` obligatorio.**
+[16:10] EDIT frontend `porra-jugador-v3.js`: pestañas KO (16avos/8vos/4tos/Semis/Final+3.º) tras J1/J2/J3. Bracket del visitado vía swap síncrono de globales (predictions/koPredictions/resolvedSlots) + `resolveAllSlots()`; cards `.up-match--ko` con comparación cruce✓/pasa✓/signo/exacto/gol; puntos vía `calcKOMatchPoints` (anti-IA omitido, documentado); Opción B feeder labels para rondas no sembradas / porra incompleta; fecha Madrid (match_start_ts → date_utc). — public/js/v3/porra-jugador-v3.js.
+[16:14] EDIT CSS modal: `.up-tab--ko`, `.up-match--ko`, `.up-ko-cross`, `.up-ko-adv`, `.up-team__flag--tbd`, `.up-team__code.is-tbd`. — public/css/v3/comunidad-v3.css.
+[16:18] BUILD OK (vite). Verificado ERR-22: selectores en `dist/css/v3/comunidad-v3.css`; JS en `dist/js/v3/porra-jugador-v3.js`. `node --check` OK.
+[16:21] COMMIT + PUSH a `claude/user-ko-prediction-tabs-prqq44`; abrir PR. Review adversarial (5 lentes) en paralelo como verificación extra; hallazgos → follow-up si los hay. QA visual en preview la hace Claude.ai (incl. deploy EF).

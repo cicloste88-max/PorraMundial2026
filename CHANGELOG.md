@@ -2,6 +2,40 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [29-jun-2026] Pronósticos KO en el detalle de usuario (Porra de un jugador)
+
+`Predictor → clasificación → (pinchar usuario)` ahora muestra, tras `J1·J2·J3`,
+las pestañas KO **16avos · 8vos · 4tos · Semis · Final** (el 3.º/4.º puesto,
+slot 103, se pliega en la pestaña Final). Cada pestaña pinta el **bracket que ESE
+jugador pronosticó** para la ronda, con la misma lógica de comparación vs. la
+competición real que ya usan las cards de grupos. Feature **solo lectura**.
+
+**Arquitectura (Caso B):** el modal `porra-jugador-v3.js` es renderer propio
+(no reusa `mountPredShell`). El bracket del jugador visitado se reconstruye
+**reutilizando** `resolveAllSlots()` (ko.js) mediante un **swap síncrono** de los
+globales compartidos `predictions`/`koPredictions`/`resolvedSlots` (guardar →
+inyectar los del visitado → resolver → capturar copia → restaurar en `finally`;
+sin `await` entre medias → sin reentrancia). Los puntos por card salen de
+`calcKOMatchPoints` (scoring.js) — paridad exacta con el predictor propio
+(ANNEX_C/ERR-61). Anti-IA KO omitido en este modal (la IA por cruce no se carga
+aquí; divergencia ≤ +1/cruce vs. leaderboard, documentada).
+
+**EF `get-user-predictions` v1.1.0** (deploy Supabase pendiente — lane Claude.ai):
+además de `predictions`/`boost_picks`, devuelve `ko_predictions` del target y
+`ko_real` = `wc_matches_ko` (cruces iso3 sembrados) ⨝ `results.ko_results`
+(`winner`/`l`/`v`/`scorers`/`status`) por slot. El frontend no tiene acceso a esas
+tablas; `wc_matches_ko`/`ko_results` son **soft-fail** (degradan a `{}`). Mismo
+gate de cierre del target (Opción A) que los picks de grupos.
+
+**Comparación por card** (espejo de `calcKOMatchPoints`, iso3): cruce ✓ (par
+`{home,away}` == par real como conjunto), pasa ✓ (avanzador == real), y si el
+cruce coincide, marcador estilo grupo (signo/exacto/gol). Rondas no sembradas
+(R16+) y porras incompletas degradan a **Opción B** (etiquetas feeder
+`W74`/`RU101`/`2.º A`/`3.º (A/B/C/D/F)`), reutilizando el patrón del Directo.
+Fechas KO en `Europe/Madrid` (match_start_ts live → `date_utc` fallback, nunca
+`m.date` crudo, ERR-92). Ficheros: `public/js/v3/porra-jugador-v3.js`,
+`public/css/v3/comunidad-v3.css`, `supabase/functions/get-user-predictions/index.ts`.
+
 ## [29-jun-2026] Bloque KO en vivo: pipeline ESPN + bridge scoring + frontend completo (PRs #171, #172)
 
 Cableado E2E de las eliminatorias en directo. Tres frentes:
@@ -379,72 +413,4 @@ independiente (pg_cron 11-jun) — el puente NO la sustituye.
 + `results.log` en `docs/db-schema.md`; **ERR-82**; tabla EF canónica
 (`architecture.md` + `README.md`: standings v1.2.0, bridge v4, match-live v18,
 apify-webhook v9); `CLAUDE.md`; `.claude/rules/edge-functions.md`.
-
-## [01-jun-2026] Jornada motor + entrada + puente live (B1 #128 · B2 #127 · P1 · P3 · #126)
-
-Sesión multi-lane (Code + Claude.ai). Code commitea docs/datos/tests; Claude.ai
-opera runtime (migraciones + deploys EF) vía MCP. `main` cierra en `b89a5c9`.
-
-### B2 — Ensamblado scoring server-side (PR#127 `ceb7be1`)
-
-EF `get-league-standings` **v1.0.1→v1.1.0** (deploy version 3). El motor
-`_shared/scoring.mjs` NO se toca — era correcto (**ERR-79 reformulado**: el bug
-siempre fue de ENSAMBLADO). Cambios en `index.ts`:
-- **Reader type-tolerant `asObj()`** sustituye los 3 `JSON.parse` → acepta TEXT u
-  objeto ya parseado, sobrevive a la migración `results`→jsonb sin acoplarse.
-- **Boost ×2 grupos** desde `boost_picks` (`boostByUser[uid]` Set por `match_id`).
-  KO sigue sin boost (pendiente backend).
-- **Merge de `results.overrides`** ENCIMA del canónico de grupos por clave.
-
-`update-results` traída al repo desde el deploy v5 (escribe objetos jsonb; NO
-computa puntos). `tests/scoring.test.mjs` extendido: paridad shared↔legacy a las
-3 funciones + boost exacto + iaBonus + wiring de ensamblado; carga del legacy por
-marcadores de función (no `slice` por nº de línea).
-
-### B1 — Entrada UI Tier-0 (PR#128 `8791775`, validado en device real de San)
-
-- **FX-13** scroll del picker de goleador (móvil): el `__inner` pasa a ser el
-  scroller (`overflow-y:auto` + momentum iOS + `overscroll-behavior:contain`),
-  `max-height: calc(100dvh - var(--fc-tab-h) - var(--fc-safe-bottom) - 28px)` con
-  tokens en `public/css/components/tokens.css`. Causa raíz del recorte: tabbar
-  `z-index` 300 > picker 130 (ERR-65/66).
-- **FX-14** quitar porteros del picker (`getScorerCandidates` filtra
-  `j.posicion !== 'Portero'`; fallback sin XI conserva plantilla). Clave de
-  posición = `posicion` (NO `posicion_bucket`).
-- **FX-01** verde indebido en grupos: selector CSS sin `.is-qualified` eliminado
-  + gate `v3GroupHasRealResults()` (realce solo con resultados reales).
-
-### P1 — `results` text→jsonb (runtime, lane Claude.ai/MCP)
-
-Tabla `results` migrada a 6 columnas **jsonb** (contrato F3:
-`match_results`/`ko_results`/`award_winners`/`classification`/`overrides`/`log`);
-`ko_results` normalizada array→objeto. `get-league-standings` v1.1.0 desplegada.
-
-### P3 — Puente `live_scores → results` (datos #129 + runtime bridge)
-
-- **P3c (PR#129 `b89a5c9`)**: `home_iso3`/`away_iso3` en las 72 entradas de
-  `public/data/worldcup-2026-matches.json` (144 valores, 0 nulls, todos ∈
-  `squads.iso3`).
-- **Runtime (lane Claude.ai/MCP)**: EF nueva **`porra-bridge-results` v3** +
-  tablas `wc_matches` (72) y `equipos_players` (48), espejo de los JSON del repo.
-  Lee `live_scores` finished + `wc_matches` → `results.match_results` vía
-  `jsonb_set`, normaliza goleador (`extractScorers` + `playerToShortKey`, ignora
-  `ownGoal`), aplica `teams_swapped`. Detalle en `docs/live-scoring.md` §Puente.
-  ⚠️ Recargar `wc_matches`/`equipos_players` si cambian los JSON fuente.
-
-### #126 — CI + sync (`b065f63`)
-
-Cron Sync Squads `timeout-minutes` 15→30 (el run se cancelaba a 15m antes de
-escribir BD). `country-map.json`: alias `catar`→QAT (Qatar se descartaba de las
-fuentes primarias españolas).
-
-### Docs (este sprint, rama `feat/docs-sync-01jun`)
-
-Tabla EF canónica refrescada a 21 EFs ACTIVE en `docs/architecture.md` +
-`README.md` (drift previo: `porra-match-live` v17, `admin-actions` v8,
-`porra-ia-compute` v14, `get-squad` v8… + altas `get-league-standings` /
-`porra-bridge-results` + 5 EF placeholder pendientes). Nuevas tablas en
-`docs/db-schema.md` (`results`/`wc_matches`/`equipos_players`). Puente en
-`docs/live-scoring.md`. ERR-79 reformulado. Squads (MCP): 48 filas, 46 FINAL, 2
-vacías pendientes ~2-jun (TUR, UZB); QAT cerró FINAL (26) en la sesión.
 

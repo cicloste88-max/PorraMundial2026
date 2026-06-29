@@ -166,6 +166,227 @@
     return out;
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // KO — bracket del jugador VISITADO (16avos … Final) + comparación real
+  // ───────────────────────────────────────────────────────────────
+  // Reutiliza el resolvedor real (resolveAllSlots, ko.js) y el motor de puntos
+  // (calcKOMatchPoints, scoring.js), ambos globales de classic-script. La malla
+  // del jugador se reconstruye con un swap SÍNCRONO de los globales compartidos
+  // (predictions/koPredictions/resolvedSlots); el lado real viene del EF
+  // (ko_real = wc_matches_ko ⨝ results.ko_results). Visualización pura (brief
+  // pronósticos KO en detalle de usuario, 29-jun).
+
+  // Defs de ronda → pestañas. 'kofinal' agrega el 3.º/4.º puesto (slot 103).
+  var KO_ROUND_DEFS = [
+    { id: 'ko16',    short: '16avos', label: 'Dieciseisavos de final', round: 'r32' },
+    { id: 'ko8',     short: '8vos',   label: 'Octavos de final',       round: 'r16' },
+    { id: 'ko4',     short: '4tos',   label: 'Cuartos de final',       round: 'qf'  },
+    { id: 'kosf',    short: 'Semis',  label: 'Semifinales',            round: 'sf'  },
+    { id: 'kofinal', short: 'Final',  label: 'Final',                  round: 'final', includeThird: true },
+  ];
+  function _koBracket() { return (typeof BRACKET !== 'undefined') ? BRACKET : (window.BRACKET || null); }
+  function _koRoundPts() { return (typeof KO_ROUND_PTS !== 'undefined') ? KO_ROUND_PTS : (window.KO_ROUND_PTS || { r32: 5, r16: 10, qf: 15, sf: 20, final: 25, third: 0 }); }
+  function _isoForName(name) {
+    if (!name) return null;
+    var e = _equipos().find(function (t) { return t.name === name; });
+    return e ? e.flag : null;
+  }
+  function _nameForIso(iso) {
+    if (!iso) return null;
+    var e = _equipos().find(function (t) { return t.flag === iso; });
+    return e ? e.name : null;
+  }
+  // Etiqueta de feeder (Opción B, espejo de ui-directo _koSeedLabel) cuando la
+  // malla del jugador no resuelve un lado (porra incompleta, o ronda colgada de
+  // cruces aún sin decidir): W74 / RU101 / 2.º A / 3.º (A/B/C/D/F).
+  function _koSeedLabel(seed) {
+    if (!seed) return 'TBD';
+    var s = String(seed), m;
+    if ((m = /^W(\d+)$/.exec(s))) return 'W' + m[1];
+    if ((m = /^L(\d+)$/.exec(s))) return 'RU' + m[1];
+    if ((m = /^([12])([A-L])$/.exec(s))) return m[1] + '.º ' + m[2];
+    if ((m = /^T_([A-L]+)$/.exec(s))) return '3.º (' + m[1].split('').join('/') + ')';
+    return s;
+  }
+  function _koLiveFor(slot) { return _live()['wc2026_ko_' + slot] || null; }
+  // Fecha+hora KO en Europe/Madrid. Prioriza match_start_ts de la fila live
+  // (epoch, ya en cache); fallback a date_utc del cruce sembrado (UTC). NUNCA
+  // formatear m.date crudo (hora de SEDE, no CEST) — regla ERR-92.
+  function _koWhenLabel(real, live) {
+    var ms = null;
+    if (live && live.match_start_ts != null) {
+      var n = Number(live.match_start_ts);
+      if (isFinite(n) && n > 0) ms = n > 1e12 ? n : n * 1000;
+    }
+    if (ms == null && real && real.date_utc) {
+      var s = String(real.date_utc);
+      if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s = s + (s.length === 16 ? ':00Z' : 'Z');
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) ms = d.getTime();
+    }
+    if (ms == null) return '';
+    var dt = new Date(ms);
+    var dow = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).toUpperCase().replace('.', '');
+    var dd = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
+    var hhmm = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Madrid' });
+    return dow + ' ' + dd + ' · ' + hhmm;
+  }
+
+  // Reconstruye la malla del jugador visitado reutilizando resolveAllSlots, que
+  // opera sobre los globales del usuario LOGUEADO. Swap síncrono: guardar →
+  // inyectar los del visitado → resolver → capturar copia → restaurar (finally).
+  // Sin await entre medias → sin reentrancia. Paridad exacta con el predictor
+  // propio (ANNEX_C/ERR-61) por reutilizar el mismo resolvedor.
+  function _resolveVisitedBracket(efPreds, efKoPreds) {
+    var vKo = {};
+    (efKoPreds || []).forEach(function (k) {
+      var o = { l: k.local, v: k.visitante, classifier: k.classifier, gol: k.scorer, saved: true };
+      vKo[k.match_id] = o;
+      vKo[String(k.match_id)] = o;
+    });
+    if (typeof resolveAllSlots !== 'function' || typeof predictions === 'undefined' ||
+        typeof koPredictions === 'undefined' || typeof resolvedSlots === 'undefined') {
+      return { rs: {}, vKo: vKo };
+    }
+    var vPreds = {};
+    (efPreds || []).forEach(function (p) {
+      vPreds[p.match_id] = { l: p.local, v: p.visitante, gol: p.scorer, saved: true };
+    });
+    var savedP = predictions, savedK = koPredictions, savedR = resolvedSlots, rs = {};
+    try {
+      predictions = vPreds;
+      koPredictions = vKo;
+      resolvedSlots = {};
+      resolveAllSlots();
+      rs = Object.assign({}, resolvedSlots);
+    } catch (e) {
+      console.warn('[porra-jugador] resolución de bracket KO falló:', e);
+    } finally {
+      predictions = savedP;
+      koPredictions = savedK;
+      resolvedSlots = savedR;
+    }
+    return { rs: rs, vKo: vKo };
+  }
+
+  // View-object de una card KO para el slot m (entrada BRACKET de su ronda).
+  // rs = resolvedSlots del visitado (nombres ES); vKo = sus ko_predictions;
+  // koReal = mapa slot→cruce/resultado real (EF). round = 'r32'…'final'|'third'.
+  function buildKoCard(m, round, rs, vKo, koReal, opts) {
+    opts = opts || {};
+    var advPts = _koRoundPts()[round] || 0;
+
+    // ── Lado del jugador (su predicción) ──
+    var predHomeName = rs[m.home] || null;            // nombre ES si su malla lo resuelve
+    var predAwayName = rs[m.away] || null;
+    var homeIso = predHomeName ? _isoForName(predHomeName) : null;
+    var awayIso = predAwayName ? _isoForName(predAwayName) : null;
+    var homeCode = predHomeName ? codeFor(predHomeName) : _koSeedLabel(m.home);
+    var awayCode = predAwayName ? codeFor(predAwayName) : _koSeedLabel(m.away);
+    var pk = vKo[m.id] || vKo[String(m.id)] || null;
+    var hasPred = !!(pk && pk.l != null && pk.v != null);
+    var predAdvName = rs['W' + m.id] || null;
+    var predAdvIso = predAdvName ? _isoForName(predAdvName) : null;
+
+    // ── Lado real (competición) ──
+    var real = koReal ? (koReal[String(m.id)] || koReal[m.id] || null) : null;
+    var live = _koLiveFor(m.id);
+    var realHomeIso = real ? real.home_iso3 : null;
+    var realAwayIso = real ? real.away_iso3 : null;
+    var realHomeName = realHomeIso ? _nameForIso(realHomeIso) : (live && live.home_team_name) || null;
+    var realAwayName = realAwayIso ? _nameForIso(realAwayIso) : (live && live.away_team_name) || null;
+    var realAdvIso = (real && real.winner) ? (real.winner === 'home' ? realHomeIso : realAwayIso) : null;
+
+    // Fase + marcador real: live (en juego) > ko_results finished > live finished.
+    var phase = 'pre', realL = null, realV = null, minute = null;
+    var ls = live ? live.status : null;
+    if (ls === 'inprogress' || ls === 'halftime' || ls === 'overtime' || ls === 'penalties') {
+      phase = 'live'; realL = live.score_home != null ? live.score_home : 0; realV = live.score_away != null ? live.score_away : 0; minute = live.minute || null;
+    } else if (real && real.status === 'finished' && real.l != null && real.v != null) {
+      phase = 'final'; realL = real.l; realV = real.v;
+    } else if (ls === 'finished' && live.score_home != null) {
+      phase = 'final'; realL = live.score_home; realV = live.score_away;
+    }
+    var crossKnown = !!(realHomeIso && realAwayIso);
+
+    // ── Comparación cruce / marcador / avance (iso3) ──
+    var cruceMatch = false, signOk = false, exactOk = false, goleOk = false, pasaMatch = false;
+    if (crossKnown && homeIso && awayIso) {
+      cruceMatch = (homeIso === realHomeIso && awayIso === realAwayIso) ||
+                   (homeIso === realAwayIso && awayIso === realHomeIso);
+    }
+    if (realAdvIso && predAdvIso) pasaMatch = (predAdvIso === realAdvIso);
+    if (cruceMatch && hasPred && (phase === 'final' || phase === 'live')) {
+      // Orientar el marcador del jugador al marco real (su home puede ser el away real).
+      var swap = (homeIso === realAwayIso);
+      var pl = swap ? pk.v : pk.l;
+      var pv = swap ? pk.l : pk.v;
+      signOk = Math.sign(pl - pv) === Math.sign(realL - realV);
+      exactOk = (pl === realL && pv === realV);
+      if (pk.gol && real && Array.isArray(real.scorers) && typeof scorerMatches === 'function') {
+        goleOk = scorerMatches(real.scorers, pk.gol);
+      } else if (!pk.gol && pl === 0 && pv === 0 && realL === 0 && realV === 0) {
+        goleOk = true;
+      }
+    }
+
+    // ── Puntos: motor real calcKOMatchPoints (marcador con gate de cruce +
+    //    avance por equipo). Anti-IA omitido (la IA por cruce no se carga en
+    //    este modal; divergencia ≤ +1/cruce vs leaderboard). Solo finished. ──
+    var pts = 0;
+    if (phase === 'final' && hasPred && typeof calcKOMatchPoints === 'function') {
+      pts = calcKOMatchPoints(
+        { saved: true, l: pk.l, v: pk.v, gol: pk.gol, home: predHomeName, away: predAwayName },
+        realL, realV, round,
+        {
+          predHome: homeIso, predAway: awayIso,
+          realHome: realHomeIso, realAway: realAwayIso,
+          predAdvancer: predAdvIso, realAdvancer: realAdvIso,
+          scorers: (real && real.scorers) || null,
+        }
+      ) || 0;
+    }
+
+    return {
+      id: m.id, round: round, isThird: !!opts.isThird,
+      homeCode: homeCode, awayCode: awayCode, homeName: predHomeName, awayName: predAwayName,
+      homeResolved: !!predHomeName, awayResolved: !!predAwayName,
+      pred: hasPred ? { l: pk.l, v: pk.v } : null,
+      scorer: (pk && pk.gol) ? _scorerName(pk.gol, { home: predHomeName, away: predAwayName }) : '',
+      predAdvName: predAdvName,
+      phase: phase, real: (phase === 'final' || phase === 'live') ? { l: realL, v: realV } : null, minute: minute,
+      realHomeName: realHomeName, realAwayName: realAwayName,
+      realAdvName: realAdvIso ? _nameForIso(realAdvIso) : null,
+      crossKnown: crossKnown, cruceMatch: cruceMatch,
+      signOk: signOk, exactOk: exactOk, goleOk: goleOk, pasaMatch: pasaMatch, advPts: advPts,
+      when: _koWhenLabel(real, live), pts: pts,
+    };
+  }
+
+  function _buildKoRounds(rs, vKo, koReal) {
+    var B = _koBracket();
+    if (!B) return [];
+    var ptsTable = _koRoundPts();
+    return KO_ROUND_DEFS.map(function (def) {
+      var slots = Array.isArray(B[def.round]) ? B[def.round] : [];
+      var cards = slots.map(function (m) { return buildKoCard(m, def.round, rs, vKo, koReal); });
+      if (def.includeThird && Array.isArray(B.third)) {
+        B.third.forEach(function (m) { cards.push(buildKoCard(m, 'third', rs, vKo, koReal, { isThird: true })); });
+      }
+      var state = 'upcoming';
+      if (cards.some(function (c) { return c.phase === 'live'; })) state = 'live';
+      else if (cards.some(function (c) { return c.phase === 'final'; })) state = 'done';
+      return {
+        id: def.id, kind: 'ko', short: def.short, label: def.label, round: def.round,
+        sub: '+' + (ptsTable[def.round] || 0) + ' pts/avance',
+        state: state, cards: cards,
+        pts: cards.reduce(function (s, c) { return s + (c.pts || 0); }, 0),
+        settled: cards.filter(function (c) { return c.phase === 'final'; }).length,
+        exact: cards.filter(function (c) { return c.cruceMatch && c.exactOk; }).length,
+      };
+    });
+  }
+
   function buildPorra(ef, userId, hints, name) {
     var predByKey = {};
     (ef.predictions || []).forEach(function (p) { predByKey[p.match_id] = p; });
@@ -202,10 +423,17 @@
         }
       }
     }
+    jornadas.forEach(function (j) { j.kind = 'group'; });
+
+    // KO: malla del jugador visitado (16avos…Final) + comparación con la real.
+    var bracket = _resolveVisitedBracket(ef.predictions, ef.ko_predictions);
+    var koRounds = _buildKoRounds(bracket.rs, bracket.vKo, ef.ko_real || {});
+    var tabs = jornadas.concat(koRounds);
+
     var meId = window.currentUser && window.currentUser.id;
     var isMe = !!(meId && String(meId) === String(userId));
     var leagueName = (window._activeLeague && window._activeLeague.nombre) || '';
-    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas };
+    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas, koRounds: koRounds, tabs: tabs };
   }
 
   // ── Render ──
@@ -260,6 +488,81 @@
     '</div>';
   }
 
+  function _koTeamSide(side, code, name, resolved) {
+    var flag = resolved ? flagImg(name, 'up-team__flag') : '<span class="up-team__flag up-team__flag--tbd"></span>';
+    var codeHtml = '<span class="up-team__code' + (resolved ? '' : ' is-tbd') + '">' + esc(code) + '</span>';
+    return side === 'home'
+      ? '<div class="up-team up-team--home">' + flag + codeHtml + '</div>'
+      : '<div class="up-team up-team--away">' + codeHtml + flag + '</div>';
+  }
+
+  function renderKoCard(c) {
+    var isFinal = c.phase === 'final', isLive = c.phase === 'live';
+    var cls = ['up-match', 'up-match--ko'];
+    if (isFinal) cls.push((c.pts || 0) > 0 ? ((c.cruceMatch && c.exactOk) ? 'k-exact' : 'k-sign') : 'k-fail');
+    else if (isLive) cls.push('live');
+    else cls.push('pre');
+
+    var status = isFinal ? 'Final'
+      : isLive ? '<span class="dot"></span>En vivo' + (c.minute ? ' · ' + esc(c.minute) + '′' : '')
+      : (c.when ? esc(c.when) : 'Por jugar');
+    if (c.isThird) status = '3.º y 4.º · ' + status;
+
+    var crossChip = c.crossKnown
+      ? '<span class="up-ko-cross ' + (c.cruceMatch ? 'on' : 'off') + '">Cruce ' + (c.cruceMatch ? '✓' : '✗') + '</span>'
+      : '';
+
+    var predHtml = c.pred
+      ? '<span class="up-pred__score">' + c.pred.l + '<span class="up-pred__sep">–</span>' + c.pred.v + '</span>'
+      : '<span class="up-pred__score" style="color:var(--ink-500)">—<span class="up-pred__sep">–</span>—</span>';
+
+    var scorerHtml = c.scorer
+      ? '<div class="up-scorer">⚽ Goleador: <b class="' + (c.goleOk ? 'gol-ok' : '') + '">' + esc(c.scorer) + '</b>' + (c.goleOk ? ' ✓' : '') + '</div>'
+      : '';
+
+    // Clasificado del jugador + comparación con el avance real (cuando se conoce).
+    var advMark = (c.realAdvName != null) ? (c.pasaMatch ? ' <span class="up-ko-ok">✓</span>' : ' <span class="up-ko-no">✗</span>') : '';
+    var advHtml = !c.isThird
+      ? '<div class="up-ko-adv">Pasa: <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advMark + '</div>'
+      : '';
+
+    var chip = function (label, on, gold) {
+      return '<span class="up-chip' + (on ? ' on' : '') + (on && gold ? ' gold' : '') + '">' + label + '</span>';
+    };
+    var chipsHtml = '';
+    if (c.crossKnown && (isFinal || isLive)) {
+      var inner = '';
+      if (c.cruceMatch) inner += chip('Signo +1', c.signOk) + chip('⚽ Gol +2', c.goleOk) + chip('Exacto +3', c.exactOk, true);
+      if (!c.isThird) inner += chip('Avance +' + c.advPts, c.pasaMatch);
+      if (inner) chipsHtml = '<div class="up-chips">' + inner + '</div>';
+    }
+
+    var foot;
+    if (isFinal) {
+      var rc = (c.realHomeName && c.realAwayName)
+        ? (esc(codeFor(c.realHomeName)) + ' <b>' + c.real.l + SEP + c.real.v + '</b> ' + esc(codeFor(c.realAwayName)))
+        : ('<b>' + c.real.l + SEP + c.real.v + '</b>');
+      foot = '<span class="up-foot__real">Real ' + rc + '</span><span class="up-foot__pts">' + (c.pts || 0) + ' pts</span>';
+    } else if (isLive) {
+      foot = '<span class="up-foot__real">En directo <b>' + c.real.l + SEP + c.real.v + '</b></span><span class="up-foot__pts">en juego</span>';
+    } else if (c.crossKnown) {
+      foot = '<span class="up-foot__real">Cruce real: ' + esc(c.realHomeName ? codeFor(c.realHomeName) : '?') + ' vs ' + esc(c.realAwayName ? codeFor(c.realAwayName) : '?') + '</span><span class="up-foot__pts">—</span>';
+    } else {
+      foot = '<span class="up-foot__real">Cruce por definir</span>';
+    }
+
+    return '<div class="' + cls.join(' ') + '">' +
+      '<div class="up-match__head"><span class="up-match__status">' + status + '</span>' + crossChip + '</div>' +
+      '<div class="up-match__teams">' +
+        _koTeamSide('home', c.homeCode, c.homeName, c.homeResolved) +
+        '<div class="up-pred"><span class="up-pred__lbl">Pronóstico</span>' + predHtml + '</div>' +
+        _koTeamSide('away', c.awayCode, c.awayName, c.awayResolved) +
+      '</div>' +
+      scorerHtml + advHtml + chipsHtml +
+      '<div class="up-match__foot">' + foot + '</div>' +
+    '</div>';
+  }
+
   function _nav(name) {
     return '<nav class="pc-nav"><button class="pc-nav__back" type="button" onclick="closePorraJugador()">' + CHEVRON + '<span>Predictor</span></button>' +
       '<div class="pc-nav__title">Porra de ' + esc(name) + '</div><div class="pc-nav__spacer"></div></nav>';
@@ -281,23 +584,39 @@
   }
 
   function renderFullScreen(uc, active) {
-    var aj = null;
-    for (var i = 0; i < uc.jornadas.length; i++) { if (uc.jornadas[i].id === active) { aj = uc.jornadas[i]; break; } }
-    if (!aj) aj = uc.jornadas[0];
+    var allTabs = uc.tabs || uc.jornadas;
+    var at = null;
+    for (var i = 0; i < allTabs.length; i++) { if (allTabs[i].id === active) { at = allTabs[i]; break; } }
+    if (!at) at = allTabs[0];
 
-    var allFinal = [];
-    uc.jornadas.forEach(function (j) { j.matches.forEach(function (m) { if (m.phase === 'final') allFinal.push(m); }); });
-    var totalPts = allFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
-    var exactos = allFinal.filter(function (m) { return (m.scoringTypes || []).indexOf('exact') !== -1; }).length;
-    var settled = allFinal.length;
-    var ajFinal = aj.matches.filter(function (m) { return m.phase === 'final'; });
-    var ajPts = ajFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
+    // Totales de cabecera = grupos (final, con anti-IA) + KO disputado (marcador
+    // + avance; anti-IA omitido). Incluir KO mantiene "Puntos torneo" coherente
+    // según avanza la eliminatoria; el rank/posición sigue siendo autoritativo.
+    var groupFinal = [];
+    uc.jornadas.forEach(function (j) { j.matches.forEach(function (m) { if (m.phase === 'final') groupFinal.push(m); }); });
+    var totalPts = groupFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
+    var exactos = groupFinal.filter(function (m) { return (m.scoringTypes || []).indexOf('exact') !== -1; }).length;
+    var settled = groupFinal.length;
+    (uc.koRounds || []).forEach(function (r) { totalPts += r.pts || 0; exactos += r.exact || 0; settled += r.settled || 0; });
 
-    var tabs = uc.jornadas.map(function (j) {
-      var sub = j.state === 'done' ? (_jornadaPts(j) + ' pts') : j.state === 'live' ? 'en juego' : 'próx.';
-      return '<button type="button" class="up-tab ' + j.state + (j.id === active ? ' active' : '') + '" onclick="porraJugadorSetJornada(\'' + j.id + '\')">' +
-        '<span class="up-tab__t">' + esc(j.short) + '</span><span class="up-tab__s">' + sub + '</span></button>';
+    var tabs = allTabs.map(function (t) {
+      var sub = t.state === 'done' ? ((t.kind === 'ko' ? t.pts : _jornadaPts(t)) + ' pts') : t.state === 'live' ? 'en juego' : 'próx.';
+      var koCls = t.kind === 'ko' ? ' up-tab--ko' : '';
+      return '<button type="button" class="up-tab' + koCls + ' ' + t.state + (t.id === active ? ' active' : '') + '" onclick="porraJugadorSetJornada(\'' + t.id + '\')">' +
+        '<span class="up-tab__t">' + esc(t.short) + '</span><span class="up-tab__s">' + esc(sub) + '</span></button>';
     }).join('');
+
+    var headerHtml, bodyHtml;
+    if (at.kind === 'ko') {
+      var koStateLbl = at.state === 'done' ? 'Disputada' : at.state === 'live' ? 'En juego' : 'Por jugar';
+      headerHtml = '<div class="up-jornada">' + esc(at.label) + ' <span>' + esc(at.sub) + ' · ' + koStateLbl + (at.settled ? ' · ' + at.pts + ' pts' : '') + '</span></div>';
+      bodyHtml = '<div class="up-list">' + at.cards.map(renderKoCard).join('') + '</div>';
+    } else {
+      var atFinal = at.matches.filter(function (m) { return m.phase === 'final'; });
+      var atPts = atFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
+      headerHtml = '<div class="up-jornada">' + esc(at.label) + ' <span>' + esc(at.dates) + ' · ' + STATE_LABEL[at.state] + (atFinal.length ? ' · ' + atPts + ' pts' : '') + '</span></div>';
+      bodyHtml = '<div class="up-list">' + at.matches.map(renderMatchCard).join('') + '</div>';
+    }
 
     var rankNum = (uc.rank != null) ? '#' + uc.rank : '—';
     var rankLbl = (uc.totalPlayers != null) ? 'de ' + uc.totalPlayers + ' · liga' : 'liga';
@@ -314,8 +633,8 @@
         '<div class="up-tabs">' + tabs + '</div>' +
       '</div>' +
       '<div class="up-scroll"><div class="pc-body">' +
-        '<div class="up-jornada">' + esc(aj.label) + ' <span>' + esc(aj.dates) + ' · ' + STATE_LABEL[aj.state] + (ajFinal.length ? ' · ' + ajPts + ' pts' : '') + '</span></div>' +
-        '<div class="up-list">' + aj.matches.map(renderMatchCard).join('') + '</div>' +
+        headerHtml +
+        bodyHtml +
       '</div></div>' +
       '<div class="pc-footer"><div class="pc-footer__l">' +
         '<div class="pc-footer__lbl">Total torneo' + footPos + '</div>' +
@@ -373,8 +692,9 @@
           var payload = buildPorra(ef, userId, hints, name);
           _state.userId = userId;
           _state.payload = payload;
-          var liveJ = payload.jornadas.find(function (j) { return j.state === 'live'; });
-          _state.active = (liveJ || payload.jornadas[0] || { id: 'j1' }).id;
+          // Pestaña por defecto: la primera en juego (grupo o KO), si no la J1.
+          var liveTab = (payload.tabs || payload.jornadas).find(function (t) { return t.state === 'live'; });
+          _state.active = (liveTab || payload.jornadas[0] || { id: 'j1' }).id;
           _paint(userId, renderFullScreen(payload, _state.active));
         });
       })
