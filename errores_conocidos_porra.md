@@ -2814,3 +2814,40 @@ El partido está `finished` → `espn-poll` no reescribe la fila (guard `.neq('s
 **DECISION §1.5 (pendiente review San):** campeon = sf 20 + final 25 + champion 30 = **75**. Toggle reversible de 1 linea (borrar la clave `final` de `KO_ROUND_PTS` en ambos motores -> campeon = 50).
 
 **Patron:** puntuar un slot de bracket exige reconstruir QUE hay en el slot, no solo el marcador/lado. La pieza de reconstruccion (cascada grupos->terceros Anexo C->R32->Final) ya vivia en `_shared/ko-bracket.mjs` (levantada para el comprobante PDF); este PR la consume desde el scoring en vez de reimplementarla.
+
+## ERR-99 — `teams_swapped`: el marcador de `live_scores` va en orientación OPUESTA a los nombres home/away en partidos swapped
+
+**Síntoma**: una query ad-hoc que reconstruye la clasificación REAL de grupos (o
+cualquier cómputo derivado del marcador) directamente desde `live_scores` da
+resultados invertidos en los partidos marcados `teams_swapped=true` en
+`wc_matches`. Ej.: Brasil–Escocia (swapped, `wc2026_gC_15186861`) figura `0-3` en
+`live_scores`, pero el real es **Brasil 3-0** (BRA gana el grupo C).
+
+**Causa**: en `wc_matches`, `teams_swapped=true` significa que la FUENTE
+(ESPN/SofaScore) emite el evento con los equipos en orden invertido respecto a
+los nombres `home_es`/`away_es` del fixture. El writer de `live_scores` **NO
+pre-orienta** (`espn_event_map.inverted=false`): guarda el marcador en orden-
+FUENTE. La corrección se hace UNA vez aguas abajo (ERR-95/96): el puente
+`porra-bridge-results` voltea al escribir `results` (`l = teams_swapped ?
+score_away : score_home`), y el front lo corrige en la card. Una query que lee
+`live_scores` en crudo se salta esa corrección.
+
+**Fix / patrón**: toda lectura de `live_scores` que calcule clasificación o
+marcador REAL debe voltear según `wc_matches.teams_swapped`:
+
+```sql
+-- marcador orientado a (home_es, away_es)
+hs = CASE WHEN m.teams_swapped THEN ls.score_away ELSE ls.score_home END
+as = CASE WHEN m.teams_swapped THEN ls.score_home ELSE ls.score_away END
+```
+
+**Alcance**:
+- **NO** afecta a las predicciones de usuario (van por `match_id`, no por lado).
+- **NO** afecta al bracket sembrado: `wc_matches_ko` se sembró ya correcto (iso3
+  + orientación de malla).
+- **SÍ** es crítico para cualquier cómputo ad-hoc de standings reales y para la
+  futura EF `get-ko-crosses` (que derivará los cruces KO de la clasificación real
+  de grupos). Único fixture swapped a fecha de hoy: BRA-ESC (`wc2026_gC_15186861`).
+
+Ref.: ERR-95/96 (invariante de orientación), `docs/live-scoring.md` §orientación,
+`docs/ko-bracket.md`.

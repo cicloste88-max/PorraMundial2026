@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**26-jun**: **Motor KO reescrito** (ERR-98, rama `claude/ko-scoring-engine-2026-y0yonc`): `calcKOMatchPoints` gate de equipos + avance por EQUIPO + podio; `final_advance`→`final` slot 104. `get-league-standings` v1.5.0 reconstruye malla (`resolveBracket` + `wc_matches_ko`). Espejo `scoring.js`. **NO desplegado** — gate San.
+**29-jun** (fase **KO**): **bloque KO en vivo cableado** (#171/#172 en main). Pipeline ESPN (`espn_event_map`+`live_scores`, 16 slots R32 73–88, `inverted=false`). Bridge `porra-bridge-results` **v13**: rama KO genérica escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1); validado E2E (slot 73). Frontend KO completo: Jornada + Directo (`.dvm`, hero, Opción B, fecha Madrid + orden). Bracket verificado vs FIFA → `docs/ko-bracket.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Merge PR motor KO** (ERR-98) tras QA preview — gate San. **Confirmar §1.5** (campeón=75 vs 50, toggle `KO_ROUND_PTS.final`).
-2. **Sembrar `wc_matches_ko`** (~28-jun, slots 73–104 con iso3 + `teams_swapped` coherente con `ko_results`): sin esto KO=0 limpio.
-3. **`dispatch-live-slots`** (SofaScore activo): unschedule si ESPN estable. **JO-6 ficha lenta**.
+1. **`get-ko-crosses`** (`docs/ko-bracket.md`): derivar cruces R16+ de la clasificación real. **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
+2. **Cablear `calcClassificationPoints`** antes de la Final (19-jul): definida pero SIN caller (hoy el podio va por `calcKoPodiumPoints`). Ver `docs/scoring-engine.md`.
+3. **Sembrar R16+** (3 tablas KO) según resuelva R32; el render KO es round-genérico y los recoge solo.
 
 ## Pendientes — Bugs UI
 
@@ -23,18 +23,14 @@ Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
 2. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
-3. Validar `ko_results` con KO real vía bridge + espn-poll (~28 jun).
-4. IDs SofaScore de KO (~28 jun 2026, post fase grupos).
 
 ## Backlog post-launch / Deuda técnica
 
 1. **HF-BUG-09-bis** — extender `mundial:predictions-changed` al path KO (`diceSimulateAllKO` en `admin.js`, `v3SimulateDice` en `eliminatoria-v3.js`), eliminar `setTimeout(v3RenderBoardGrupos, 100)`. Post-launch.
 2. **HF-BUG-13** — refactor `v3SaveGoleadorGrupos:783` (`grupos-v3.js`): `saved=true` solo desde path marcador; goleador respeta `saved=(l!==null && v!==null)`. F1 (PR #69) ya evita el patrón en KO. Post-launch, solo grupos.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
-4. **JO-1a — resolver KO real** (post-27jun): `_joKOSlotLabel`/`_joKOTeamFromSlot` desde `realHome/realAway` + `ko_results`; **NUNCA** `resolvedSlots` (ERR-76).
-5. **ERR-79 cerrado** (residual KO resuelto en ERR-98).
-6. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
-7. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
+4. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
+5. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
 
 ## Auth & Secrets
 
@@ -82,7 +78,8 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `secrets.md` | Vault, EF secrets, Cloudflare Turnstile, rotación | Cambios en credenciales o auth |
 | `ia-predictor.md` | Fórmula motor + 4 fuentes datos + mapping WC2026_TEAMS | Cambios IA Predictor o scrapers |
 | `live-scoring.md` | Pipeline async+webhook + actores Apify + SofaScore IDs | Bugs en live scores o nuevos eventIds |
-| `scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA | Cambios reglas de puntuación |
+| `scoring-engine.md` | Motor puntuación + estructura torneo + bonus IA + KO | Cambios reglas de puntuación |
+| `ko-bracket.md` | Cuadro KO (slots 73–104, feeders, plantilla R32, `resolveBracket`/ANNEX_C), verificado vs FIFA | Cambios de bracket o EF que lo lean |
 | `db-schema.md` | Schemas SQL + RLS + helpers `schedule_match_crons` | Cambios en tablas o crons de partidos |
 | `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |

@@ -2,6 +2,46 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [29-jun-2026] Bloque KO en vivo: pipeline ESPN + bridge scoring + frontend completo (PRs #171, #172)
+
+Cableado E2E de las eliminatorias en directo. Tres frentes:
+
+**1) Pipeline KO live (DB, lane Claude.ai/MCP):** `espn_event_map` + `live_scores`
+cubren los **16 slots R32 (73–88)** — verificado: 16 filas en cada tabla + 16 en
+`wc_matches_ko`. ESPN event IDs **760486–760501**, todos `inverted=false`
+(abreviaturas ESPN == iso3, orientación home/away == seed del bracket). El cron
+`espn-poll` itera `espn_event_map` sin cambios (gated a la ventana kickoff−30min).
+
+**2) Bridge KO scoring** (`porra-bridge-results` **v13** — contador deploy Supabase):
+rama KO genérica (round-genérica r32→final), escribe
+`ko_results[slot]={l,v,scorers,winner,round,status}` **siempre** al pasar a
+`finished` (antes hacía `bridge_skip` si el empate no resolvía ganador). Empate
+(tanda) → `winner=null` en Fase 1 (se fija a mano; el shape ESPN de la tanda no
+está verificado). `koWinner()` (lectura `score_agg`/`penaltyShootout` estilo
+SofaScore) **eliminado**. Validado **E2E** con el slot 73 (RSA-CAN): el trigger
+`bridge_on_finished` escribió `ko_results['73']={l:0,v:1,winner:"away",
+scorers:["Eustaquio"],round:"r32",status:"finished"}`.
+
+**3) Frontend KO completo (PRs #171 + #172 en main):**
+- **Jornada KO**: `_buildJKOCard` pinta equipos reales + marcador en vivo + status
+  pill; `renderVistaJornada` auto-expande la ronda KO en curso (round-genérica).
+- **Directo**: cruces KO con el formato `.dvm` "marcador FIFA" (helper compartido
+  `_buildDvmCard`), ordenados cronológicamente, con fecha/hora Madrid encima de
+  cada card.
+- **Expansión hero**: clic en card KO abre la hero (camisetas + marcador) vía
+  `_buildDExpanded` + match sintético (`_directoKey`/`_is_ko`), sin duplicar.
+- **Opción B**: lados sin resolver muestran la etiqueta del feeder (`W74`,
+  `RU101`, `2.º A`, `3.º (A/B/C/D/F)`) en vez de "TBD".
+- **`_liveScoresByMatchKey`** ahora incluye las keys `wc2026_ko_*` (fix
+  `normalizeRow` en `live-sync.js`); repaint debounced de la pantalla live activa.
+- **Fix posición fecha** (#172): la fecha sale del marco `.dvm` a una cabecera
+  con ~8px de clearance sobre el trofeo (medido en headless).
+
+Docs de esta sesión: `docs/ko-bracket.md` (nuevo, bracket verificado vs FIFA),
+ERR-99 (`teams_swapped` en standings reales), `docs/scoring-engine.md`
+(`calcClassificationPoints` sin cablear). Fase 2 (ganador de tanda desde ESPN):
+pendiente, NO antes de verificar el shape real.
+
 ## [26-jun-2026] Fix matcher de goleador `matchPlayerKey` (ERR-97) + correccion de datos MCP (rama `fix/err97-matchplayerkey`)
 
 **Code (este PR):** `matchPlayerKey` (`_shared/scorer-normalize.mjs`) -- particulas/`jr` a peso 0 + se exige solape de apellido. Resuelve A (van Hecke->VanDijk) y B (Agustin Cano->Canobbio) de la auditoria 62-finished (4 mal-atribuciones, 2 con impacto). Backend-only, drop-in; regresion en `tests/scoring.test.mjs` seccion 11. Fix 2 (cualificar `scorers` por iso3 -> resuelve C: Yasin Ayari/Khalil Ayari) y Fix 3 (matchear contra `squads`) en PR aparte.
