@@ -1030,16 +1030,19 @@
         idx: mm.id, matchKey: 'wc2026_ko_' + mm.id,
         hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt
       });
-      // FIX (brief #6): la fecha+hora va FUERA del marco .dvm — una línea
+      // FIX (brief #6→#7): la fecha+hora va FUERA del marco .dvm — una línea
       // cabecera encima del recuadro (como en el bracket oficial), aislada del
-      // frame para no solaparse con la copa central. Cada (fecha + card) se
-      // agrupa en un wrapper para que el gap:18px de .dv2-mini-list quede entre
-      // partidos y NO entre la fecha y su card (que van pegadas, margin 4px).
+      // frame. Cada (fecha + card) se agrupa en un wrapper para que el gap:18px
+      // de .dv2-mini-list quede entre partidos y NO entre la fecha y su card.
+      // margin-bottom 18px: el trofeo .dvm__badge (57×72 + borde 2px) sobresale
+      // 10px sobre el borde superior de la card; 18px deja la fecha ~8px CLARAMENTE
+      // por encima del trofeo (medido en headless, brief #7). margin-top 2px da
+      // aire; opacidad .7 lee mejor que .5.
       const when = _koKickoffLabel(live);
       if (when) {
         cards += '<div class="dvm-ko-item">' +
           '<div class="dvm-ko-when" style="text-align:center;font-size:11px;font-weight:700;' +
-          'letter-spacing:.4px;color:rgba(255,255,255,.5);margin:0 0 4px">' + when + '</div>' +
+          'letter-spacing:.4px;color:rgba(255,255,255,.7);margin:2px 0 18px">' + when + '</div>' +
           dvm + '</div>';
       } else {
         cards += dvm;
