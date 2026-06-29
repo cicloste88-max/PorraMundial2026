@@ -304,8 +304,10 @@
 .up-ko-cross.on { color: var(--win); border-color: rgba(0,131,74,.5); background: rgba(0,131,74,.16); }
 .up-ko-cross.off { color: var(--fifa-red); border-color: rgba(214,40,40,.4); background: rgba(214,40,40,.1); }
 /* Fila "Pasa: <clasificado del jugador>" + comparación con el avance real */
-.up-ko-adv { font-family: var(--font-text); font-size: 10px; color: var(--ink-400); padding: 0 12px 9px; }
+.up-ko-adv { font-family: var(--font-text); font-size: 10px; color: var(--ink-400); padding: 0 12px 9px; line-height: 1.5; }
 .up-ko-adv b { font-family: var(--font-display); font-weight: 700; letter-spacing: .02em; color: var(--ink-200); }
+.up-ko-adv__real { color: var(--ink-500); }
+.up-ko-adv__real b { color: var(--ink-100); }
 .up-ko-ok { color: var(--win); font-weight: 900; }
 .up-ko-no { color: var(--fifa-red); font-weight: 900; }
 

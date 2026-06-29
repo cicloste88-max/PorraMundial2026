@@ -303,11 +303,14 @@
     // ── Lado real (competición) ──
     var real = koReal ? (koReal[String(m.id)] || koReal[m.id] || null) : null;
     var live = _koLiveFor(m.id);
-    var realHomeIso = real ? real.home_iso3 : null;
-    var realAwayIso = real ? real.away_iso3 : null;
-    var realHomeName = realHomeIso ? _nameForIso(realHomeIso) : (live && live.home_team_name) || null;
-    var realAwayName = realAwayIso ? _nameForIso(realAwayIso) : (live && live.away_team_name) || null;
-    var realAdvIso = (real && real.winner) ? (real.winner === 'home' ? realHomeIso : realAwayIso) : null;
+    // Cruce real: preferir ko_real (iso3 sembrado, autoritativo); si falta,
+    // derivar del nombre ES de la fila live (_liveScoresByMatchKey YA trae el
+    // cruce real sembrado, orientado, ERR-99) → la comparación funciona aunque
+    // la EF (ko_real) aún no esté desplegada o no cubra el slot.
+    var realHomeName = (real && real.home_iso3) ? _nameForIso(real.home_iso3) : ((live && live.home_team_name) || null);
+    var realAwayName = (real && real.away_iso3) ? _nameForIso(real.away_iso3) : ((live && live.away_team_name) || null);
+    var realHomeIso = (real && real.home_iso3) ? real.home_iso3 : _isoForName(realHomeName);
+    var realAwayIso = (real && real.away_iso3) ? real.away_iso3 : _isoForName(realAwayName);
 
     // Fase + marcador real: live (en juego) > ko_results finished > live finished.
     var phase = 'pre', realL = null, realV = null, minute = null;
@@ -319,6 +322,12 @@
     } else if (ls === 'finished' && live.score_home != null && live.score_away != null) {
       phase = 'final'; realL = live.score_home; realV = live.score_away;
     }
+    // Avanzador real: ko_real.winner (autoritativo, incluye tanda de penaltis);
+    // si falta, derivar del marcador final (más goles pasa; empate sin winner
+    // explícito → indeterminado, null).
+    var realAdvIso = null;
+    if (real && real.winner) realAdvIso = (real.winner === 'home') ? realHomeIso : realAwayIso;
+    else if (phase === 'final' && realL != null && realV != null && realL !== realV) realAdvIso = (realL > realV) ? realHomeIso : realAwayIso;
     var crossKnown = !!(realHomeIso && realAwayIso);
 
     // ── Comparación cruce / marcador / avance (iso3) ──
@@ -515,7 +524,8 @@
     else if (isLive) cls.push('live');
     else cls.push('pre');
 
-    var status = isFinal ? 'Final'
+    // "Finalizado" (no "Final": en KO se confunde con la ronda Final).
+    var status = isFinal ? 'Finalizado'
       : isLive ? '<span class="dot"></span>En vivo' + (c.minute ? ' · ' + esc(c.minute) + '′' : '')
       : (c.when ? esc(c.when) : 'Por jugar');
     if (c.isThird) status = '3.º y 4.º · ' + status;
@@ -532,11 +542,14 @@
       ? '<div class="up-scorer">⚽ Goleador: <b class="' + (c.goleOk ? 'gol-ok' : '') + '">' + esc(c.scorer) + '</b>' + (c.goleOk ? ' ✓' : '') + '</div>'
       : '';
 
-    // Clasificado del jugador + comparación con el avance real (cuando se conoce).
-    var advMark = (c.realAdvName != null) ? (c.pasaMatch ? ' <span class="up-ko-ok">✓</span>' : ' <span class="up-ko-no">✗</span>') : '';
-    var advHtml = !c.isThird
-      ? '<div class="up-ko-adv">Pasa: <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advMark + '</div>'
+    // Clasificado: a quién pronosticó el jugador que pasa + a quién pasó en REAL.
+    // La marca ✓/✗ solo cuando hay pick (no penalizar la ausencia de pronóstico).
+    var advLbl = c.isThird ? 'Gana 3.º' : 'Pasa';
+    var advMark = (c.realAdvName != null && c.predAdvName) ? (c.pasaMatch ? ' <span class="up-ko-ok">✓</span>' : ' <span class="up-ko-no">✗</span>') : '';
+    var advReal = (c.realAdvName != null)
+      ? ' <span class="up-ko-adv__real">· Real: <b>' + esc(c.realAdvName) + '</b></span>' + advMark
       : '';
+    var advHtml = '<div class="up-ko-adv">' + advLbl + ': <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advReal + '</div>';
 
     var chip = function (label, on, gold) {
       return '<span class="up-chip' + (on ? ' on' : '') + (on && gold ? ' gold' : '') + '">' + label + '</span>';
