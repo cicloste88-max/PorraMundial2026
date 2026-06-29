@@ -832,6 +832,67 @@
   const _expandedDays = new Set();
 
   // ─────────────────────────────────────────────────────────────
+  // KO en Directo (TASK 3). Cuando la fase KO está activa, la página Directo
+  // muestra la ronda KO EN CURSO con marcador en vivo (y los ya jugados como
+  // FINAL), igual que mostraba la fase de grupos. ROUND-GENÉRICO (r32→final)
+  // vía ROUND_CONFIG/BRACKET de ko.js. Reutiliza _buildJKOCard (ui-groups.js)
+  // — misma tarjeta + status pill que la vista Jornada, sin duplicar. Devuelve
+  // '' si la fase KO aún no está activa (entonces Directo sigue con grupos).
+  // Equipos/marcador salen de _liveScoresByMatchKey['wc2026_ko_'+id]; sin fila,
+  // _buildJKOCard degrada al esqueleto "Por definir" (nunca resolvedSlots).
+  // ─────────────────────────────────────────────────────────────
+  function _buildDirectoKOHtml() {
+    if (typeof ROUND_CONFIG === 'undefined' || !Array.isArray(ROUND_CONFIG)) return '';
+    if (typeof BRACKET === 'undefined' || !BRACKET) return '';
+    if (typeof _buildJKOCard !== 'function') return '';
+    const liveByKey = window._liveScoresByMatchKey || {};
+
+    // Ronda activa = primera ronda con algún partido no finalizado. Fase KO
+    // activa = hay actividad KO (algún slot con status ≠ 'notstarted').
+    let aliveKey = null, phaseActive = false;
+    ROUND_CONFIG.forEach((cfg) => {
+      const rmatches = Array.isArray(BRACKET[cfg.key]) ? BRACKET[cfg.key] : [];
+      if (!rmatches.length) return;
+      let allFinished = true;
+      rmatches.forEach((mm) => {
+        const krow = liveByKey['wc2026_ko_' + mm.id];
+        const st = krow && krow.status;
+        if (st && st !== 'notstarted') phaseActive = true;
+        if (st !== 'finished') allFinished = false;
+      });
+      if (aliveKey === null && !allFinished) aliveKey = cfg.key;
+    });
+    if (!phaseActive || !aliveKey) return '';
+
+    const cfg = ROUND_CONFIG.find((c) => c.key === aliveKey);
+    const rmatches = Array.isArray(BRACKET[aliveKey]) ? BRACKET[aliveKey] : [];
+    if (!cfg || !rmatches.length) return '';
+
+    let liveCount = 0;
+    rmatches.forEach((mm) => {
+      const krow = liveByKey['wc2026_ko_' + mm.id];
+      const st = krow && krow.status;
+      if (st === 'inprogress' || st === 'halftime' || st === 'overtime' || st === 'penalties') liveCount++;
+    });
+    const liveBadge = liveCount > 0
+      ? '<span class="directo-live-count">🔴 ' + liveCount + ' EN VIVO</span>' : '';
+    const name = (typeof _JO_KO_SHORT === 'object' && _JO_KO_SHORT && _JO_KO_SHORT[cfg.key])
+      ? _JO_KO_SHORT[cfg.key] : (cfg.name || cfg.key);
+
+    let cards = '';
+    rmatches.forEach((mm) => { cards += _buildJKOCard(mm); });
+
+    return '<div class="directo-section directo-section--ko" id="directo-ko-' + cfg.key + '">' +
+             '<div class="directo-header">' +
+               '<span class="directo-label">KO</span>' +
+               '<span class="directo-date">' + name + '</span>' +
+               liveBadge +
+             '</div>' +
+             cards +
+           '</div>';
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Render completo de la vista Directo
   // ─────────────────────────────────────────────────────────────
   function renderVistaDirecto() {
@@ -861,6 +922,27 @@
       jornadasMap[date].push({ m, idx });
     });
     const dias = Object.keys(jornadasMap).sort();
+
+    // TASK 3: si la fase KO está activa, la página Directo muestra la ronda KO
+    // en curso (marcador en vivo + FINAL), igual que mostraba los grupos. Los
+    // grupos (ya finalizados) ceden el protagonismo a la ronda viva. Si la fase
+    // KO aún no empezó, koHtml='' y sigue el render de grupos de siempre.
+    const koHtml = _buildDirectoKOHtml();
+    if (koHtml) {
+      const sidebarHtmlKO = (typeof window._buildJornadaRanking === 'function')
+        ? window._buildJornadaRanking() : '';
+      const simsHtmlKO = (window._isAdminCached === true) ? _buildSimulacrosSectionHtml() : '';
+      const mainHtmlKO = simsHtmlKO + koHtml;
+      container.innerHTML = sidebarHtmlKO
+        ? '<div class="directo-wrap"><div class="directo-main">' + mainHtmlKO + '</div>' +
+          '<div class="directo-sidebar">' + sidebarHtmlKO + '</div></div>'
+        : '<div class="directo-main">' + mainHtmlKO + '</div>';
+      // Las cards KO son estáticas (sin expand); mantenemos el handler por
+      // paridad (cierre de simulacros admin, teclado).
+      container.onclick = _onDirectoClick;
+      container.onkeydown = _onDirectoClick;
+      return;
+    }
 
     // Resolver expanded match (validar que existe en PARTIDOS y aún tiene matchKey)
     let expandedEntry = null;

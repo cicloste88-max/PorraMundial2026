@@ -238,28 +238,31 @@
     if (!norm) return; // silencioso: match_key no del Mundial ni simulacro válido
     window._liveScoresByMatchKey[norm.match_key] = norm;
     if (norm.status === 'finished') scheduleMatchResultsRefresh(norm.match_key);
-    // KO: la pantalla Directo solo itera PARTIDOS (grupos) → updateDirectoCard
-    // no encuentra card. La vista Jornada SÍ pinta las secciones KO, así que si
-    // está activa repintamos (debounced) para reflejar el marcador en vivo. Los
-    // grupos siguen por updateDirectoCard como hasta ahora (sin cambios).
+    // KO: ni la pantalla Directo ni la vista Jornada pintan las cards KO por
+    // match_key indexado a PARTIDOS (updateDirectoCard solo cubre grupos). Ambas
+    // construyen las secciones KO con _buildJKOCard a partir de la live cache,
+    // así que un cambio KO en vivo dispara un re-render (debounced) de la
+    // pantalla live activa. Los grupos siguen por updateDirectoCard sin cambios.
     if (norm._is_ko) {
-      scheduleJornadaKORepaint();
+      scheduleKORepaint();
     } else if (typeof window.updateDirectoCard === 'function') {
       window.updateDirectoCard(norm.match_key);
     }
   }
 
-  // Repintado debounced de la vista Jornada cuando llega un cambio KO en vivo y
-  // esa pantalla está visible. _joSectionCollapsed (ui-groups.js) vive en
-  // memoria de módulo → el re-render conserva el estado de colapso del usuario.
-  let _jornadaKORepaintTimer = null;
-  function scheduleJornadaKORepaint() {
-    if (window._currentPage !== 'jornada') return;
-    if (typeof window.renderVistaJornada !== 'function') return;
-    if (_jornadaKORepaintTimer) clearTimeout(_jornadaKORepaintTimer);
-    _jornadaKORepaintTimer = setTimeout(() => {
-      _jornadaKORepaintTimer = null;
-      if (window._currentPage === 'jornada' && typeof window.renderVistaJornada === 'function') {
+  // Repintado debounced de la pantalla live activa (Directo o Jornada) cuando
+  // llega un cambio KO. _joSectionCollapsed / _expandedDays (módulos UI) viven
+  // en memoria → el re-render conserva el estado de colapso del usuario.
+  let _koRepaintTimer = null;
+  function scheduleKORepaint() {
+    const page = window._currentPage;
+    if (page !== 'directo' && page !== 'jornada') return;
+    if (_koRepaintTimer) clearTimeout(_koRepaintTimer);
+    _koRepaintTimer = setTimeout(() => {
+      _koRepaintTimer = null;
+      if (window._currentPage === 'directo' && typeof window.renderVistaDirecto === 'function') {
+        window.renderVistaDirecto();
+      } else if (window._currentPage === 'jornada' && typeof window.renderVistaJornada === 'function') {
         window.renderVistaJornada();
       }
     }, 1200);
