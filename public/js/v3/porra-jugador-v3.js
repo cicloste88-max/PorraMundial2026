@@ -286,6 +286,18 @@
     var pk = vKo[m.id] || vKo[String(m.id)] || null;
     var hasPred = !!(pk && pk.l != null && pk.v != null);
     var predAdvName = rs['W' + m.id] || null;
+    // resolveAllSlots() NO itera BRACKET.final (ko.js:750-754) → 'W104' nunca se
+    // resuelve; un empate sin classifier tampoco deja 'W<slot>'. Derivar el
+    // avanzador del marcador/classifier del propio pick (espejo de resolveKO,
+    // ko.js:721-747) para que la card de la Final muestre al campeón y compute
+    // el avance (+25), y para slots empatados sin classifier explícito.
+    if (!predAdvName && hasPred) {
+      if (pk.l > pk.v) predAdvName = predHomeName;
+      else if (pk.v > pk.l) predAdvName = predAwayName;
+      else if (pk.classifier === 'home') predAdvName = predHomeName;
+      else if (pk.classifier === 'away') predAdvName = predAwayName;
+      else if (pk.classifier) predAdvName = pk.classifier;
+    }
     var predAdvIso = predAdvName ? _isoForName(predAdvName) : null;
 
     // ── Lado real (competición) ──
@@ -304,7 +316,7 @@
       phase = 'live'; realL = live.score_home != null ? live.score_home : 0; realV = live.score_away != null ? live.score_away : 0; minute = live.minute || null;
     } else if (real && real.status === 'finished' && real.l != null && real.v != null) {
       phase = 'final'; realL = real.l; realV = real.v;
-    } else if (ls === 'finished' && live.score_home != null) {
+    } else if (ls === 'finished' && live.score_home != null && live.score_away != null) {
       phase = 'final'; realL = live.score_home; realV = live.score_away;
     }
     var crossKnown = !!(realHomeIso && realAwayIso);
