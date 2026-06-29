@@ -843,6 +843,25 @@
   const _expandedDays = new Set();
 
   // ─────────────────────────────────────────────────────────────
+  // Etiqueta legible del feeder del bracket cuando un lado del cruce KO aún no
+  // está resuelto (estilo bracket oficial FIFA, brief #4 Opción B). El home/away
+  // de cada slot de BRACKET (ko.js) ES la clave del feeder:
+  //   · R16→Final: 'W<slot>' (ganador del slot xx) → "W74" tal cual.
+  //   · 3er/4º puesto: 'L<slot>' (perdedor de semi) → "RU101" (runner-up).
+  //   · R32 (fallback raro, siempre sembrado a tiempo): posición de grupo
+  //     '2A'/'1E' → "2.º A"/"1.º E"; tercero 'T_ABCDF' → "3.º (A/B/C/D/F)".
+  // Sin clave reconocible → la clave cruda (defensa). Sin clave → "TBD".
+  function _koSeedLabel(seed) {
+    if (!seed) return 'TBD';
+    const s = String(seed);
+    let m;
+    if ((m = /^W(\d+)$/.exec(s)))      return 'W' + m[1];
+    if ((m = /^L(\d+)$/.exec(s)))      return 'RU' + m[1];
+    if ((m = /^([12])([A-L])$/.exec(s))) return m[1] + '.º ' + m[2];
+    if ((m = /^T_([A-L]+)$/.exec(s)))  return '3.º (' + m[1].split('').join('/') + ')';
+    return s;
+  }
+
   // KO en Directo (TASK 3, corregido brief #3). Cuando la fase KO está activa,
   // la página Directo muestra la ronda KO EN CURSO con marcador en vivo (y los
   // ya jugados, con su score). Formato IDÉNTICO al de grupos en Directo: las
@@ -894,10 +913,11 @@
     // Cada cruce KO se pinta con el MISMO formato .dvm "marcador FIFA" que los
     // grupos (helper compartido _buildDvmCard), NO con _buildJKOCard (formato
     // Jornada). Equipos REALES desde la fila live del slot (home_team_name/
-    // away_team_name ES ≡ EQUIPOS.name; NUNCA resolvedSlots — ERR-76). Sin fila
-    // o equipo sin resolver → "TBD" + score "—" (la copa 🏆 central queda como
-    // en el fallback de _buildDvmCard). data-match-key = key KO; data-match-idx
-    // = slot (mm.id, 73..104, fuera del rango PARTIDOS → el click no expande).
+    // away_team_name ES ≡ EQUIPOS.name; NUNCA resolvedSlots — ERR-76). Lado sin
+    // resolver → etiqueta del feeder del bracket (W74/RU101/"2.º A", brief #4)
+    // en vez de "TBD"; score "—" (la copa 🏆 central queda como en el fallback
+    // de _buildDvmCard). data-match-key = key KO; data-match-idx = slot (mm.id,
+    // 73..104, fuera del rango PARTIDOS → el click no expande una card de grupo).
     let cards = '';
     rmatches.forEach((mm) => {
       const live = liveByKey['wc2026_ko_' + mm.id];
@@ -905,8 +925,8 @@
       const aName = (live && live.away_team_name) ? live.away_team_name : null;
       const hTeam = hName ? EQUIPOS.find((e) => e.name === hName) : null;
       const aTeam = aName ? EQUIPOS.find((e) => e.name === aName) : null;
-      const hCode = hTeam ? hTeam.flag : 'TBD';
-      const aCode = aTeam ? aTeam.flag : 'TBD';
+      const hCode = hTeam ? hTeam.flag : _koSeedLabel(mm.home);
+      const aCode = aTeam ? aTeam.flag : _koSeedLabel(mm.away);
       const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
       const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
       const hSrc = hIso2 ? (SB + '/miniatures/flags-sm/' + hIso2 + '.webp')
