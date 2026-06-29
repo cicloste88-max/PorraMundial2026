@@ -2,6 +2,16 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [29-jun-2026] Fix: avance KO infravalorado → escalera coherente +5 (`fix/ko-advance-ladder`)
+
+`KO_ROUND_PTS` en **ambos** motores (`_shared/scoring.mjs` + espejo
+`public/js/scoring.js`, 1:1): `r32 5→10 · r16 10→15 · qf 15→20 · sf 20→25 ·
+final 25→30` (`groups` sigue 5). **Podio** (30/20/15/10) intacto. Campeón
+75 → **85**; toggle §1.5 "= 50" → "= 55". Sin avance KO hardcodeado fuera de
+`KO_ROUND_PTS`. Suite **349/349** (3 ficheros KO realineados). Docs:
+`scoring-engine.md` + ERR-98 §1.5. **Pendiente (Claude.ai):** redeploy
+`get-league-standings` + reseed `user_points_cache`.
+
 ## [29-jun-2026] Pronósticos KO en el detalle de usuario (Porra de un jugador)
 
 `Predictor → clasificación → (pinchar usuario)` ahora muestra, tras `J1·J2·J3`,

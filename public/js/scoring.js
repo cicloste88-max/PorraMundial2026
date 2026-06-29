@@ -18,17 +18,17 @@
 ================================================================ */
 // ── Puntos por ronda KO (equipos que avanzan) ─────────────
 // ESPEJO de _shared/scoring.mjs. Avance por EQUIPO (predAdvancer===realAdvancer),
-// aplicado uniforme KO_ROUND_PTS[round(slot)]: r32 +5 · r16 +10 · qf +15 ·
-// sf +20 · final (slot 104) +25. slot 103 (third) SIN avance. Campeón = sf 20 +
-// final 25 + champion 30 = 75. TOGGLE §1.5 (campeón = 50): borrar la clave
+// aplicado uniforme KO_ROUND_PTS[round(slot)]: r32 +10 · r16 +15 · qf +20 ·
+// sf +25 · final (slot 104) +30. slot 103 (third) SIN avance. Campeón = sf 25 +
+// final 30 + champion 30 = 85. TOGGLE §1.5 (campeón = 55): borrar la clave
 // `final` aquí Y en _shared/scoring.mjs (slot 104 deja de dar avance).
 const KO_ROUND_PTS = {
   groups:  5,   // equipo que pasa fase de grupos → 1/16
-  r32:     5,   // avanza en dieciseisavos → octavos
-  r16:    10,   // avanza en octavos → cuartos
-  qf:     15,   // avanza en cuartos → semifinales
-  sf:     20,   // avanza en semis → final
-  final:  25,   // gana la final (campeón) — slot 104
+  r32:    10,   // avanza en dieciseisavos → octavos
+  r16:    15,   // avanza en octavos → cuartos
+  qf:     20,   // avanza en cuartos → semifinales
+  sf:     25,   // avanza en semis → final
+  final:  30,   // gana la final (campeón) — slot 104
 };
 
 // ── Puntos por clasificación final ────────────────────────

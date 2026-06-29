@@ -70,12 +70,12 @@ test('gate de equipos §1.3: mismo 2-1/lado, equipos distintos → 0 (el bug)', 
   const userKoPred = { saved: true, l: 2, v: 1, gol: null, classifier: null };
 
   // (1) Cruce coincide exactamente (mismos equipos, misma orientación) → marcador
-  //     exacto 4 + avance r32 5 = 9.
+  //     exacto 4 + avance r32 10 = 14.
   const ptsMatch = calcKOMatchPoints(userKoPred, 2, 1, 'r32', {
     predHome, predAway, predAdvancer,
     realHome: predHome, realAway: predAway, realAdvancer: predHome,
   });
-  assert.strictEqual(ptsMatch, 9, 'cruce coincide: marcador exacto (4) + avance r32 (5)');
+  assert.strictEqual(ptsMatch, 14, 'cruce coincide: marcador exacto (4) + avance r32 (10)');
 
   // (2) Equipos DISTINTOS, mismo 2-1/lado → 0 de marcador y 0 de avance.
   const ptsGate = calcKOMatchPoints(userKoPred, 2, 1, 'r32', {
@@ -84,12 +84,12 @@ test('gate de equipos §1.3: mismo 2-1/lado, equipos distintos → 0 (el bug)', 
   });
   assert.strictEqual(ptsGate, 0, 'gate: equipos distintos, mismo 2-1 → 0 (antes daba +8)');
 
-  // (3) Cruce distinto pero el avanzador coincide → 0 marcador + avance r32 (5).
+  // (3) Cruce distinto pero el avanzador coincide → 0 marcador + avance r32 (10).
   const ptsAdv = calcKOMatchPoints(userKoPred, 2, 1, 'r32', {
     predHome, predAway, predAdvancer,
     realHome: predHome, realAway: 'FRA', realAdvancer: predHome,
   });
-  assert.strictEqual(ptsAdv, 5, 'avanzador coincide, cruce no: 0 marcador + avance r32 (5)');
+  assert.strictEqual(ptsAdv, 10, 'avanzador coincide, cruce no: 0 marcador + avance r32 (10)');
 });
 
 test('§1.7 clasificados de grupos: +5 por participante de R32 predicho que clasifica de verdad', () => {

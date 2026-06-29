@@ -6,20 +6,20 @@ import { scorerMatches } from "./scorer-normalize.mjs";
 // Puntos de AVANCE por ronda KO — se otorgan por EQUIPO (predAdvancer ===
 // realAdvancer), independientemente de que el cruce coincida. El motor aplica
 // KO_ROUND_PTS[round(slot)] de forma uniforme:
-//   slot 73-88 (r32) +5 · 89-96 (r16) +10 · 97-100 (qf) +15 · 101-102 (sf) +20
-//   slot 104 (final) +25 (acertar al campeón) · slot 103 (third) SIN avance.
-// §1.5 DECISIÓN (San, review): el campeón acertado suma sf 20 (llegar a la
-// final) + final 25 (ganarla) + champion 30 (podio) = 75. TOGGLE reversible
-// de 1 línea: para el esquema "campeón = 50" (sin el +25 de la final), BORRAR
+//   slot 73-88 (r32) +10 · 89-96 (r16) +15 · 97-100 (qf) +20 · 101-102 (sf) +25
+//   slot 104 (final) +30 (acertar al campeón) · slot 103 (third) SIN avance.
+// §1.5 DECISIÓN (San, review): el campeón acertado suma sf 25 (llegar a la
+// final) + final 30 (ganarla) + champion 30 (podio) = 85. TOGGLE reversible
+// de 1 línea: para el esquema "campeón = 55" (sin el +30 de la final), BORRAR
 // la clave `final` de aquí (y su espejo en public/js/scoring.js) — slot 104
 // dejaría de otorgar avance automáticamente (KO_ROUND_PTS[round] || 0).
 export const KO_ROUND_PTS = {
   groups:  5,
-  r32:     5,
-  r16:    10,
-  qf:     15,
-  sf:     20,
-  final:  25,
+  r32:    10,
+  r16:    15,
+  qf:     20,
+  sf:     25,
+  final:  30,
 };
 
 export const DEFAULT_AWARDS_PTS = {
@@ -164,7 +164,7 @@ export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
 //   runnerUp  = perdedor  del slot 104   → +20
 //   third     = avanzador del slot 103   → +15
 //   fourth    = perdedor  del slot 103   → +10
-// Independiente del avance: un campeón acertado suma además sf 20 + final 25.
+// Independiente del avance: un campeón acertado suma además sf 25 + final 30.
 export function calcKoPodiumPoints(predPodium, realPodium) {
   if (!predPodium || !realPodium) return 0;
   let pts = 0;
