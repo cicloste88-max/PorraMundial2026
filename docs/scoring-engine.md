@@ -96,14 +96,14 @@ y nada del marcador):
 | Ronda (slots) | Avance |
 |---------------|--------|
 | Grupos → R32 (clasificados) | +5 |
-| R32 → R16 (73–88) | +5 |
-| R16 → Cuartos (89–96) | +10 |
-| Cuartos → Semifinales (97–100) | +15 |
-| Semifinales → Final (101–102) | +20 |
-| Final → Campeón (**slot 104**) | +25 |
+| R32 → R16 (73–88) | +10 |
+| R16 → Cuartos (89–96) | +15 |
+| Cuartos → Semifinales (97–100) | +20 |
+| Semifinales → Final (101–102) | +25 |
+| Final → Campeón (**slot 104**) | +30 |
 | 3.er puesto (**slot 103**) | **sin avance** |
 
-El `+25` del campeón se aplica en la **Final (slot 104)**, no en las semis. El
+El `+30` del campeón se aplica en la **Final (slot 104)**, no en las semis. El
 slot 103 (3.er puesto) puntúa marcador pero **no** da avance (`round` `'third'`
 ∉ `KO_ROUND_PTS`).
 
@@ -127,17 +127,18 @@ REAL, ambos en iso3:
 | Tercero | avanzador del slot 103 | +15 |
 | Cuarto | perdedor del slot 103 | +10 |
 
-El podio es **independiente** del avance: un campeón acertado suma **sf 20**
-(llegar a la final) + **final 25** (ganarla) + **champion 30** (podio) = **75**.
+El podio es **independiente** del avance: un campeón acertado suma **sf 25**
+(llegar a la final) + **final 30** (ganarla) + **champion 30** (podio) = **85**.
 
 ### Aritmética del campeón — DECISIÓN §1.5 (toggle reversible)
 
-Esquema activo: `KO_ROUND_PTS.final = 25` aplicado en el slot 104 → campeón = 75.
-**Toggle de 1 línea** para el esquema alternativo "campeón = 50" (sin el +25 de
-la final): borrar la clave `final` de `KO_ROUND_PTS` en **ambos** motores
-(`_shared/scoring.mjs` y `public/js/scoring.js`) — el slot 104 deja de otorgar
-avance automáticamente (`KO_ROUND_PTS[round] || 0`). Pendiente de confirmación de
-San en review.
+Esquema activo (escalera coherente +5, San 29-jun-2026): la escalera de avance KO
+arranca en `r32 = 10` y sube +5 por ronda (`r16 15 · qf 20 · sf 25 · final 30`);
+`groups` se mantiene en 5. `KO_ROUND_PTS.final = 30` aplicado en el slot 104 →
+campeón = 85. **Toggle de 1 línea** para el esquema alternativo "campeón = 55"
+(sin el +30 de la final): borrar la clave `final` de `KO_ROUND_PTS` en **ambos**
+motores (`_shared/scoring.mjs` y `public/js/scoring.js`) — el slot 104 deja de
+otorgar avance automáticamente (`KO_ROUND_PTS[round] || 0`).
 
 ### Degradación limpia
 

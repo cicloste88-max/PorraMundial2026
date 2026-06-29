@@ -69,13 +69,13 @@ test('e2e: cruce coincide + usuario DIFIERE del sign IA + acierta → +1 (máx K
   );
   assert.deepStrictEqual(iaByKoSlot[89], { sign: '2' });
   // Usuario predice GER 2-0 (signo '1', difiere de la IA), real GER 2-0:
-  // marcador signo+1 exacto+3 = 4, +1 anti-IA = 5; +avance r16 (10) = 15.
+  // marcador signo+1 exacto+3 = 4, +1 anti-IA = 5; +avance r16 (15) = 20.
   const pts = calcKOMatchPoints({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
     predHome: 'GER', predAway: 'FRA', predAdvancer: 'GER',
     realHome: 'GER', realAway: 'FRA', realAdvancer: 'GER',
     iaPred: iaByKoSlot[89],
   });
-  assert.strictEqual(pts, 15, 'marcador 4 + anti-IA 1 + avance r16 10 = 15');
+  assert.strictEqual(pts, 20, 'marcador 4 + anti-IA 1 + avance r16 15 = 20');
 
   // Cap 7: exacto+gol+IA en el marcador no pasa de 7. r16 exacto 2-0 + gol + IA.
   const capped = calcKOMatchPoints({ saved: true, l: 2, v: 0, gol: 'mueller' }, 2, 0, 'r16', {
@@ -84,7 +84,7 @@ test('e2e: cruce coincide + usuario DIFIERE del sign IA + acierta → +1 (máx K
     realHome: 'GER', realAway: 'FRA', realAdvancer: 'GER',
     iaPred: iaByKoSlot[89],
   });
-  assert.strictEqual(capped, 17, 'marcador cap 7 (1+3+2+1) + avance r16 10 = 17');
+  assert.strictEqual(capped, 22, 'marcador cap 7 (1+3+2+1) + avance r16 15 = 22');
 });
 
 test('e2e: cruce coincide + usuario IGUAL que el sign IA → sin bonus', () => {
@@ -98,7 +98,7 @@ test('e2e: cruce coincide + usuario IGUAL que el sign IA → sin bonus', () => {
     realHome: 'GER', realAway: 'FRA', realAdvancer: 'GER',
     iaPred: iaByKoSlot[89],
   });
-  assert.strictEqual(pts, 14, 'marcador 4 (sin anti-IA) + avance r16 10 = 14');
+  assert.strictEqual(pts, 19, 'marcador 4 (sin anti-IA) + avance r16 15 = 19');
 });
 
 test('e2e: orientación invertida da el MISMO resultado que la exacta', () => {
@@ -114,7 +114,7 @@ test('e2e: orientación invertida da el MISMO resultado que la exacta', () => {
     realHome: 'GER', realAway: 'FRA', realAdvancer: 'GER',
     iaPred: inverted[89],
   });
-  assert.strictEqual(pts, 15, 'orientación invertida → mismo +1 anti-IA → 15');
+  assert.strictEqual(pts, 20, 'orientación invertida → mismo +1 anti-IA → 20');
 });
 
 test('e2e: par sin predicción IA → iaPred null → 0 anti-IA limpio', () => {
@@ -124,5 +124,5 @@ test('e2e: par sin predicción IA → iaPred null → 0 anti-IA limpio', () => {
     realHome: 'GER', realAway: 'FRA', realAdvancer: 'GER',
     iaPred: iaByKoSlot[89] ?? null,
   });
-  assert.strictEqual(pts, 14, 'sin IA del par → marcador 4 + avance 10 = 14 (sin +1)');
+  assert.strictEqual(pts, 19, 'sin IA del par → marcador 4 + avance 15 = 19 (sin +1)');
 });

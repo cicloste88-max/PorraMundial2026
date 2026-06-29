@@ -2797,3 +2797,11 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] NOTA precision: la afirmacion del brief "calcKOMatchPoints iaBonus:false hardcoded" es STALE -- el codigo (post #170) SI computa el anti-IA del marcador (via `opts.iaPred`/`iaBonusPredicate`, standings v1.5.1 `iaByKoSlot`). Solo `boost:false` esta hardcodeado. Documentado lo que hace el codigo, no la afirmacion del brief.
 
 [--:--] Solo docs, sin tocar codigo. Tamanos OK (githook). Push a `claude/docs-ko`; Claude.ai abre el PR; San mergea directo (docs, sin QA).
+
+## 2026-06-29 (fix/ko-advance-ladder)
+
+[17:18] FIX scoring: el bonus de avance KO estaba infravalorado -> escalera coherente +5 arrancando en 10. `KO_ROUND_PTS` reescrito en AMBOS motores (`supabase/functions/_shared/scoring.mjs` fuente de verdad + espejo `public/js/scoring.js`): r32 5->10, r16 10->15, qf 15->20, sf 20->25, final 25->30 (`groups` sigue en 5). `FINAL_CLASSIFICATION_PTS` (podio 30/20/15/10) NO tocado. Campeon 75->85; comentarios de cabecera + toggle §1.5 ("campeon = 50"->"= 55") actualizados para que cuadren. Rama `fix/ko-advance-ladder` (aparte del trabajo de #175).
+
+[17:18] TESTS realineados al nuevo ladder (los assertions hardcodeaban los valores viejos): `tests/scoring.test.mjs` (KO #1/#4/#5/#6/#7/#8, §1.5 a/b/sum, legacy CKO r16/final, EF-assembly KO, regla00 KO, `KO_ROUND_PTS.final`, label parity "final exacto+30"), `tests/ko-ia-bridge.test.mjs` (4 e2e anti-IA KO), `tests/ko-standings-mesh.test.mjs` (cruce coincide + avanzador-solo r32). `npm test` = 349/349 verde con cheerio presente; los 4 fallos en sandbox sin cheerio son ambientales (dependencia declarada `^1.2.0`, CI corre `npm ci`).
+
+[17:18] DOCS: `docs/scoring-engine.md` (tabla de avance KO + aritmetica del campeon + DECISION §1.5/toggle), `errores_conocidos_porra.md` (ERR-98 §1.5 -> review San 29-jun + nuevo ladder), `CHANGELOG.md` (entrada fix), este `migration-log.md`. NO desplegado: el redeploy de `get-league-standings` + reseed de `user_points_cache` + verificacion los hace la lane Claude.ai tras el push (la EF importa `KO_ROUND_PTS` del shared, el valor propaga al redeploy; sin hardcodes de avance KO en codigo de produccion).
