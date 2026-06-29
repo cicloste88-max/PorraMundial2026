@@ -72,16 +72,69 @@ function _joKOTeamFromSlot(slot) {
   return null;
 }
 
-// Tarjeta KO esqueleto. Misma estructura visual que _buildJCard pero sin
-// pronóstico (P1b — KO esqueleto puro), sin chips (no hay live), sin boost
-// row y sin "Ver tarjeta". Hora exacta no disponible hasta ~28-jun: solo
-// pintamos día corto. Si match.date falta, omitimos el bloque cuando-pinta.
+// Fila de live_scores para un slot KO (match.id de BRACKET). La cache la
+// rellena normalizeRow (live-sync.js) con nombres ES + marcador + status.
+// Null mientras no exista la fila. ROUND-GENÉRICO: vale r32→final (73..104).
+function _joKOLiveRow(match) {
+  if (!match || match.id == null) return null;
+  var cache = window._liveScoresByMatchKey || {};
+  return cache['wc2026_ko_' + match.id] || null;
+}
+
+// Equipo EQUIPOS{name,flag,...} desde el nombre ES del feed KO
+// (home_team_name/away_team_name de live_scores ≡ EQUIPOS.name). Null si no
+// resuelve (banderas caen al fallback gris, patrón badge-with-flag-fallback).
+function _joKOTeamFromName(name) {
+  if (!name || typeof EQUIPOS === 'undefined') return null;
+  return EQUIPOS.find(function (e) { return e.name === name; }) || null;
+}
+
+// Etiqueta día (+ hora si hay kickoff real) para una card KO no empezada.
+// Prefiere match_start_ts del feed (instante UTC real, igual que Directo);
+// fallback a match.date (solo-día del BRACKET) anclado a mediodía para no
+// generar Invalid Date con el "+02:00" de _joParseMatchDate.
+function _joKODayLabel(match, live) {
+  var raw = (live && live.match_start_ts != null) ? Number(live.match_start_ts) : null;
+  var ms = (raw != null && isFinite(raw)) ? (raw < 1e12 ? raw * 1000 : raw) : null;
+  if (ms != null) {
+    var d = new Date(ms);
+    var ds = d.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+    var hh = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
+    return ds + ' · ' + hh;
+  }
+  if (match && match.date) {
+    var rawDate = match.date.indexOf('T') === -1 ? match.date + 'T12:00:00' : match.date;
+    var dt = _joParseMatchDate(rawDate);
+    if (dt && !isNaN(dt.getTime())) {
+      var dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+      var dayNum = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
+      var monthShort = dt.toLocaleDateString('es-ES', { month: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
+      return dayShort + ' · ' + dayNum + ' ' + monthShort;
+    }
+  }
+  return '';
+}
+
+// Tarjeta KO con marcador EN VIVO (JO-1a live). Misma estructura visual que
+// _buildJCard pero sin pronóstico (KO se predice en Fase Final). Los equipos
+// REALES + marcador salen de la fila live_scores del slot (competición real,
+// NUNCA resolvedSlots de predicciones — ERR-76). Si aún no hay fila, degrada al
+// esqueleto "Por definir". ROUND-GENÉRICO (r32→final).
 function _buildJKOCard(match) {
-  var hSlot = match.home, aSlot = match.away;
-  var hName = _joKOSlotLabel(hSlot);
-  var aName = _joKOSlotLabel(aSlot);
-  var hTeam = _joKOTeamFromSlot(hSlot);
-  var aTeam = _joKOTeamFromSlot(aSlot);
+  var live = _joKOLiveRow(match);
+
+  var hName, aName, hTeam, aTeam;
+  if (live && live.home_team_name && live.away_team_name) {
+    hName = live.home_team_name;
+    aName = live.away_team_name;
+    hTeam = _joKOTeamFromName(live.home_team_name) || _joKOTeamFromSlot(match.home);
+    aTeam = _joKOTeamFromName(live.away_team_name) || _joKOTeamFromSlot(match.away);
+  } else {
+    hName = _joKOSlotLabel(match.home);
+    aName = _joKOSlotLabel(match.away);
+    hTeam = _joKOTeamFromSlot(match.home);
+    aTeam = _joKOTeamFromSlot(match.away);
+  }
 
   // Bandera rectangular del bucket miniatures (ISO2) cuando hay team.
   // Reutilizamos ISO3_TO_ISO2 que ya está en top-level de este fichero.
@@ -93,31 +146,38 @@ function _buildJKOCard(match) {
   var hFlagFallback  = hTeam ? (SB_LOCAL + '/flags/' + hTeam.flag + '.png') : '';
   var aFlagFallback  = aTeam ? (SB_LOCAL + '/flags/' + aTeam.flag + '.png') : '';
 
-  // Card top: venue + día (formato CEST). Sin hora — no existe aún para KO.
-  // HOTFIX JO-1a: BRACKET de ko.js trae fechas solo-día ("2026-06-28"); el
-  // helper _joParseMatchDate aplicaría "+02:00" sobre eso y produciría
-  // Invalid Date. Anclamos mediodía si falta 'T' (mismo patrón que ya usan
-  // _buildMatchButtons + renderVistaJornada con date + 'T12:00:00'). Si tras
-  // parsear el Date sigue inválido, omitimos el bloque día en vez de pintar
-  // "INVALID DATE".
-  var venue = match.venue || '';
-  var dayLabel = '';
-  if (match.date) {
-    var rawDate = match.date.indexOf('T') === -1 ? match.date + 'T12:00:00' : match.date;
-    var dt = _joParseMatchDate(rawDate);
-    if (dt && !isNaN(dt.getTime())) {
-      var dayShort = dt.toLocaleDateString('es-ES', { weekday: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
-      var dayNum = dt.toLocaleDateString('es-ES', { day: 'numeric', timeZone: 'Europe/Madrid' });
-      var monthShort = dt.toLocaleDateString('es-ES', { month: 'short', timeZone: 'Europe/Madrid' }).replace('.', '').toUpperCase();
-      dayLabel = dayShort + ' · ' + dayNum + ' ' + monthShort;
-    }
+  // Estado + marcador en vivo desde la fila live.
+  var status = live ? (live.status || 'notstarted') : 'notstarted';
+  var isLive = status === 'inprogress' || status === 'halftime' ||
+               status === 'overtime'   || status === 'penalties';
+  var isFinished = status === 'finished';
+  var hasScore = !!(live && live.score_home != null && live.score_away != null);
+  var scoreL = hasScore ? live.score_home : '—';
+  var scoreR = hasScore ? live.score_away : '—';
+
+  // Píldora superior derecha: live → minuto/estado; finalizado → FINAL; si no,
+  // día (+ hora si hay kickoff real en el feed).
+  var whenLabel;
+  if (isLive) {
+    if (status === 'halftime') whenLabel = '🔴 DESCANSO';
+    else if (status === 'penalties') whenLabel = '🔴 PENALTIS';
+    else if (status === 'overtime') whenLabel = '🔴 PRÓRROGA';
+    else if (live && live.minute != null) whenLabel = '🔴 ' + live.minute + "'";
+    else whenLabel = '🔴 EN VIVO';
+  } else if (isFinished) {
+    whenLabel = 'FINAL';
+  } else {
+    whenLabel = _joKODayLabel(match, live);
   }
 
+  var venue = match.venue || '';
+  var cardCls = 'jv2-card jv2-card--ko' + (isLive ? ' is-live' : '') + (isFinished ? ' is-finished' : '');
+
   return (
-    '<div class="jv2-card jv2-card--ko">' +
+    '<div class="' + cardCls + '">' +
       '<div class="jv2-card-top">' +
         (venue ? '<div class="jv2-card-stadium">🏟️ ' + venue + '</div>' : '<div class="jv2-card-stadium"></div>') +
-        (dayLabel ? '<div class="jv2-card-when">' + dayLabel + '</div>' : '<div class="jv2-card-when"></div>') +
+        (whenLabel ? '<div class="jv2-card-when">' + whenLabel + '</div>' : '<div class="jv2-card-when"></div>') +
       '</div>' +
       '<div class="jv2-card-mid">' +
         '<div class="jv2-team">' +
@@ -127,9 +187,9 @@ function _buildJKOCard(match) {
           '<div class="jv2-team-code" title="' + hName + '">' + hName + '</div>' +
         '</div>' +
         '<div class="jv2-score">' +
-          '<span class="jv2-score-num">—</span>' +
+          '<span class="jv2-score-num">' + scoreL + '</span>' +
           '<span class="jv2-score-sep">:</span>' +
-          '<span class="jv2-score-num">—</span>' +
+          '<span class="jv2-score-num">' + scoreR + '</span>' +
         '</div>' +
         '<div class="jv2-team">' +
           '<div class="jv2-flag"' + aFlagRectStyle + '>' +
@@ -509,6 +569,31 @@ function renderVistaJornada() {
     if (hasPorJugar) { aliveDate = _d; break; }
   }
 
+  // JO-1a live: ronda KO "actual" (round-genérico r32→final) = primera ronda de
+  // ROUND_CONFIG con algún partido aún no finalizado. Solo se auto-expande cuando
+  // la fase KO está activa: grupos terminados (aliveDate===null) o ya hay
+  // actividad KO (algún slot con status ≠ 'notstarted'). Antes de eso el foco
+  // queda en los grupos y las secciones KO arrancan colapsadas como hasta ahora.
+  // "Avanzar la jornada actual a la ronda KO": al terminar los grupos, la ronda
+  // KO en curso queda expandida y las jornadas de grupos colapsadas.
+  let koAliveKey = null;
+  let koPhaseActive = (aliveDate === null);
+  if (typeof ROUND_CONFIG !== 'undefined' && Array.isArray(ROUND_CONFIG) &&
+      typeof BRACKET === 'object' && BRACKET) {
+    ROUND_CONFIG.forEach(function (cfg) {
+      const rmatches = Array.isArray(BRACKET[cfg.key]) ? BRACKET[cfg.key] : [];
+      if (!rmatches.length) return;
+      let allFinished = true;
+      rmatches.forEach(function (mm) {
+        const krow = _joLiveByKey['wc2026_ko_' + mm.id];
+        const st = krow && krow.status;
+        if (st && st !== 'notstarted') koPhaseActive = true;
+        if (st !== 'finished') allFinished = false;
+      });
+      if (koAliveKey === null && !allFinished) koAliveKey = cfg.key;
+    });
+  }
+
   // JO-3: aplicar defaults SOLO la primera vez. Después respetamos clicks
   // del usuario. Si una sección nueva aparece en re-renders posteriores
   // (poco probable, calendario fijo), por defecto queda colapsada.
@@ -518,7 +603,8 @@ function renderVistaJornada() {
     });
     if (typeof ROUND_CONFIG !== 'undefined' && Array.isArray(ROUND_CONFIG)) {
       ROUND_CONFIG.forEach(function (cfg) {
-        _joSectionCollapsed['ko:' + cfg.key] = true;
+        // Expandida solo la ronda KO en curso cuando la fase KO está activa.
+        _joSectionCollapsed['ko:' + cfg.key] = !(koPhaseActive && cfg.key === koAliveKey);
       });
     }
     _joCollapseInit = true;

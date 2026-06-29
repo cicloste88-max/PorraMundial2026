@@ -2,6 +2,16 @@
 // Fuente de verdad hasta esta fecha: runtime Supabase. A partir de ahora: este fichero.
 // supabase/functions/porra-bridge-results/index.ts
 // P4/D — Puente live_scores(finished) → results. BLOQUE CRITICO del torneo.
+//   v10 (KO ESPN, 29-jun): la rama KO escribe SIEMPRE el resultado en cuanto el
+//     partido esta finished (antes hacia bridge_skip si el empate no resolvia
+//     ganador). winner = marcador a 90'/prorroga (l>v?home:v>l?away:null). En
+//     empate (l===v → tanda) winner=null en Fase 1: el shape ESPN de la tanda
+//     no esta verificado (TODO espn-poll), asi que NO se infiere el ganador de
+//     penaltis aqui — se fija a mano hasta Fase 2. get-league-standings v1.5.1
+//     puntua el marcador con l/v y SOLO el avance si winner ∈ {home,away}; con
+//     winner=null el avance queda sin puntuar (correcto, no rectifica de mas).
+//     Se retira koWinner (lectura score_agg/penaltyShootout estilo SofaScore);
+//     Fase 2 reintroducira la deteccion de tanda contra el shape ESPN real.
 //   v9 (ERR-93): playerToShortKey resuelve el nombre del feed contra el roster
 //     por TOKENS normalizados (_shared/scorer-normalize.mjs), NO por substring
 //     estricto. "Vinicius Junior" (feed) vs "7 · Vinicius Jr" (roster) fallaba
@@ -24,10 +34,9 @@
 //     tumban el bridge (console.error + cache_refresh en la respuesta).
 //   v4: GUARDAS (no escribe con dato incompleto) + soporte FASE FINAL (KO).
 //     - Grupos: results.match_results["{grupo}_{home_es}_{away_es}"] = {l,v,scorers,status}
-//     - KO:     results.ko_results["{ko_match_id}"] = {l,v,scorers,winner,status}
-//       winner ('home'|'away') derivado de prorroga/penaltis (score_agg / shootout)
-//       — imprescindible para que el avance de ronda puntue en empates resueltos
-//       por penaltis (el usuario indica classifier en la card KO).
+//     - KO:     results.ko_results["{ko_match_id}"] = {l,v,scorers,winner,round,status}
+//       winner = marcador (l>v?home:v>l?away). En empate (tanda) winner=null
+//       en Fase 1 (ver v10) — se fija a mano hasta verificar el shape ESPN.
 //   GUARDAS (no rectificar despues): solo escribe si status='finished' Y score no-null
 //     Y la clave resuelve en diccionario. Si algo falla, NO escribe y lo loguea
 //     en results.log. Idempotente (trigger + barrido de respaldo convergen aqui).
@@ -118,44 +127,6 @@ function extractScorers(
   return out;
 }
 
-// Determina el ganador KO (perspectiva PROYECTO: home_es/away_es) considerando
-// prorroga (score regular) y penaltis (score_agg o tanda). Devuelve 'home'|'away'|null.
-function koWinner(
-  ls: Record<string, unknown>,
-  l: number,
-  v: number,
-  teamsSwapped: boolean,
-): string | null {
-  // 1) Si el marcador (ya orientado a proyecto) no es empate, ese es el ganador.
-  if (l > v) return "home";
-  if (v > l) return "away";
-  // 2) Empate en regular/prorroga → penaltis. Usar score_agg (SofaScore aggregated
-  //    suele reflejar el global; en KO a partido unico, el desempate). Orientar a proyecto.
-  const aggHomeSofa = ls.score_agg_home as number | null;
-  const aggAwaySofa = ls.score_agg_away as number | null;
-  if (aggHomeSofa != null && aggAwaySofa != null && aggHomeSofa !== aggAwaySofa) {
-    const aggHome = teamsSwapped ? aggAwaySofa : aggHomeSofa;
-    const aggAway = teamsSwapped ? aggHomeSofa : aggAwaySofa;
-    return aggHome > aggAway ? "home" : "away";
-  }
-  // 3) Contar penaltis de tanda en events (incidentType penaltyShootout, incidentClass scored).
-  const events = ls.events;
-  if (Array.isArray(events)) {
-    let homeSo = 0, awaySo = 0;
-    for (const ev of events) {
-      const e = ev as Record<string, unknown>;
-      if (String(e.incidentType ?? "") !== "penaltyShootout") continue;
-      if (String(e.incidentClass ?? "") !== "scored") continue;
-      const sofaIsHome = e.isHome === true;
-      const projIsHome = teamsSwapped ? !sofaIsHome : sofaIsHome;
-      if (projIsHome) homeSo++; else awaySo++;
-    }
-    if (homeSo !== awaySo) return homeSo > awaySo ? "home" : "away";
-  }
-  // 4) No determinable con los datos → null (no se fuerza; el barrido reintentará).
-  return null;
-}
-
 async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -175,7 +146,7 @@ async function handle(req: Request): Promise<Response> {
   const supa = createClient(SUPABASE_URL, SERVICE_KEY);
 
   let q = supa.from("live_scores")
-    .select("match_key, status, score_home, score_away, score_agg_home, score_agg_away, events, had_penalties, had_overtime")
+    .select("match_key, status, score_home, score_away, events")
     .eq("status", "finished");
   if (onlyKey) q = q.eq("match_key", onlyKey);
 
@@ -246,21 +217,24 @@ async function handle(req: Request): Promise<Response> {
       matchResults[rk] = { l, v, scorers, status: "finished" };
       bridgedG.push(rk);
     } else {
-      // ── KO (FASE FINAL) ──
+      // ── KO (FASE FINAL) ── round-genérico (r32→final), sin hardcodear ronda.
+      // Marcador a 90'/prórroga (NO penaltis), orientado a proyecto vía teams_swapped.
       const l = dK.teams_swapped ? ls.score_away : ls.score_home;
       const v = dK.teams_swapped ? ls.score_home : ls.score_away;
       const scorers = extractScorers(ls.events, dK.home_iso3, dK.away_iso3, dK.teams_swapped, eqMap);
-      const winner = koWinner(ls as Record<string, unknown>, l, v, dK.teams_swapped);
-      // GUARDA 3 (KO): si es empate y no se pudo determinar ganador, NO escribir
-      // (el avance quedaria sin puntuar mal). Reintenta el barrido cuando llegue el dato.
-      if (l === v && !winner) {
-        skipped.push({ match_key: mk, reason: "ko_winner_undetermined" });
-        log.push({ ts: nowIso, match_key: mk, event: "bridge_skip", reason: "ko_winner_undetermined" });
-        continue;
-      }
+      // winner: el marcador decide salvo empate → tanda. En empate winner=null
+      // (Fase 1): el shape ESPN de la tanda no está verificado, así que NO se
+      // infiere el ganador de penaltis aquí; se fija a mano hasta Fase 2. El
+      // resultado SÍ se escribe (a diferencia del skip anterior) para que el
+      // marcador puntúe ya; get-league-standings solo deriva avance si
+      // winner ∈ {home,away}.
+      const winner: "home" | "away" | null = l > v ? "home" : (v > l ? "away" : null);
       const id = String(dK.ko_match_id);
-      koResults[id] = { l, v, scorers, winner: winner ?? (l > v ? "home" : "away"), round: dK.round, status: "finished" };
+      koResults[id] = { l, v, scorers, winner, round: dK.round, status: "finished" };
       bridgedK.push(id);
+      if (winner === null) {
+        log.push({ ts: nowIso, match_key: mk, event: "bridge_ko_tie_winner_pending", ko_match_id: id });
+      }
     }
   }
 

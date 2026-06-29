@@ -112,7 +112,34 @@
   function normalizeRow(row) {
     if (!row || !row.match_key) return null;
     const meta = matchesByKey[row.match_key];
-    if (!meta) return null; // match_key de otra competición (UCL test, etc.)
+    if (!meta) {
+      // KO (Fase Final): wc2026_ko_<slot> NO vive en worldcup-2026-matches.json
+      // (ese JSON solo tiene los 72 de grupos). Las filas KO se siembran ya
+      // orientadas a la malla (home/away = siembra, teams_swapped=false) con
+      // nombres ES en home_team_name/away_team_name. Sin esta rama, normalizeRow
+      // devolvía null y _liveScoresByMatchKey ignoraba las filas KO → la pantalla
+      // Jornada nunca pintaba marcador en vivo de eliminatorias. Round-genérico:
+      // cualquier slot r32→final (73..104) cae aquí por el patrón del match_key.
+      const koM = /^wc2026_ko_(\d+)$/.exec(row.match_key);
+      if (koM) {
+        return {
+          match_key:      row.match_key,
+          status:         row.status,
+          score_home:     row.score_home,
+          score_away:     row.score_away,
+          home_team_name: row.home_team_name,
+          away_team_name: row.away_team_name,
+          match_start_ts: row.match_start_ts,
+          events:         Array.isArray(row.events) ? row.events : [],
+          minute:         row.minute ?? null,
+          _ko_slot:       Number(koM[1]),
+          _is_ko:         true,
+          _teams_swapped: false,
+          raw:            row
+        };
+      }
+      return null; // match_key de otra competición (UCL test, etc.)
+    }
 
     let scoreHome = row.score_home;
     let scoreAway = row.score_away;
@@ -211,9 +238,34 @@
     if (!norm) return; // silencioso: match_key no del Mundial ni simulacro válido
     window._liveScoresByMatchKey[norm.match_key] = norm;
     if (norm.status === 'finished') scheduleMatchResultsRefresh(norm.match_key);
-    if (typeof window.updateDirectoCard === 'function') {
+    // KO: ni la pantalla Directo ni la vista Jornada pintan las cards KO por
+    // match_key indexado a PARTIDOS (updateDirectoCard solo cubre grupos). Ambas
+    // construyen las secciones KO con _buildJKOCard a partir de la live cache,
+    // así que un cambio KO en vivo dispara un re-render (debounced) de la
+    // pantalla live activa. Los grupos siguen por updateDirectoCard sin cambios.
+    if (norm._is_ko) {
+      scheduleKORepaint();
+    } else if (typeof window.updateDirectoCard === 'function') {
       window.updateDirectoCard(norm.match_key);
     }
+  }
+
+  // Repintado debounced de la pantalla live activa (Directo o Jornada) cuando
+  // llega un cambio KO. _joSectionCollapsed / _expandedDays (módulos UI) viven
+  // en memoria → el re-render conserva el estado de colapso del usuario.
+  let _koRepaintTimer = null;
+  function scheduleKORepaint() {
+    const page = window._currentPage;
+    if (page !== 'directo' && page !== 'jornada') return;
+    if (_koRepaintTimer) clearTimeout(_koRepaintTimer);
+    _koRepaintTimer = setTimeout(() => {
+      _koRepaintTimer = null;
+      if (window._currentPage === 'directo' && typeof window.renderVistaDirecto === 'function') {
+        window.renderVistaDirecto();
+      } else if (window._currentPage === 'jornada' && typeof window.renderVistaJornada === 'function') {
+        window.renderVistaJornada();
+      }
+    }, 1200);
   }
 
   // ─────────────────────────────────────────────────────────────
