@@ -1,10 +1,13 @@
 // supabase/functions/get-user-predictions/index.ts
-// F4 · Screen 2 "Porra de un jugador" — picks crudos de un jugador (grupos).
-// Versión 1.0.0 — 09-jun-2026
+// F4 · Screen 2 "Porra de un jugador" — picks crudos de un jugador (grupos + KO).
+// Versión 1.1.0 — 29-jun-2026
 //
-// Devuelve los pronósticos de grupos (predictions) + boosts (boost_picks) de un
-// user_id objetivo, CRUDOS. NO computa chips ni puntos: el motor real
-// (v3CalcMatchPointsGrupos / calcMatchPoints) los calcula client-side en F5.
+// Devuelve los pronósticos de grupos (predictions) + boosts (boost_picks) +
+// KO (ko_predictions) de un user_id objetivo, CRUDOS. NO computa chips ni
+// puntos: el motor real (v3CalcMatchPointsGrupos / calcKOMatchPoints) los
+// calcula client-side. Para la comparación KO contra la competición real,
+// devuelve también ko_real: el cruce sembrado (wc_matches_ko) + resultado
+// (results.ko_results) por slot — el frontend no tiene acceso a esas tablas.
 //
 // Verja dura de cierre (Opción A, aprobada San): si la porra del TARGET en la
 // liga NO está cerrada (is_porra_abierta(target, league)=true), responde
@@ -12,8 +15,9 @@
 // Gate canónico: league_members.porra_cerrada vía RPC is_porra_abierta.
 //
 // Caller: debe estar autenticado (JWT manual) y ser miembro de la liga.
-// service_role bypasea RLS (patrón get-league-standings). KO fuera de scope
-// (ko_predictions no se consulta; wc_matches_ko vacía hasta ~28-jun).
+// service_role bypasea RLS (patrón get-league-standings). ko_real NO es
+// user-specific (es la competición real); wc_matches_ko/ko_results son
+// SOFT-FAIL (degradan a {} sin tumbar la respuesta) y vacíos hasta ~28-jun.
 //
 // JWT: verify_jwt=false a nivel deploy (ES256 → 401 con verify_jwt=true, ERR-16).
 
@@ -94,26 +98,69 @@ serve(async (req: Request) => {
   } catch (e) { return json({ error: "gate_check_failed", detail: String(e) }, 500, corsHeaders); }
 
   if (targetOpen) {
-    return json({ gated: true, user_id: targetUid, league_id: leagueId, version: "1.0.0" }, 200, corsHeaders);
+    return json({ gated: true, user_id: targetUid, league_id: leagueId, version: "1.1.0" }, 200, corsHeaders);
   }
 
-  // ── Picks crudos del target en esta liga (grupos) ──
+  // ── Picks crudos del target en esta liga (grupos + KO) + KO real ──
   const [
     { data: preds, error: pErr },
     { data: boosts, error: bErr },
+    { data: koPreds, error: koErr },
+    { data: resultRow, error: rErr },
+    { data: wcKoRows, error: wcKoErr },
   ] = await Promise.all([
     supa.from("predictions").select("match_id, local, visitante, scorer")
       .eq("user_id", targetUid).eq("league_id", leagueId),
     supa.from("boost_picks").select("match_id")
       .eq("user_id", targetUid).eq("league_id", leagueId),
+    supa.from("ko_predictions").select("match_id, local, visitante, scorer, classifier")
+      .eq("user_id", targetUid).eq("league_id", leagueId),
+    supa.from("results").select("ko_results").limit(1).maybeSingle(),
+    supa.from("wc_matches_ko").select("ko_match_id, round, home_iso3, away_iso3, teams_swapped, date_utc").order("ko_match_id"),
   ]);
   if (pErr) return json({ error: "predictions_query_failed", detail: pErr.message }, 500, corsHeaders);
   if (bErr) return json({ error: "boost_query_failed", detail: bErr.message }, 500, corsHeaders);
+  if (koErr) return json({ error: "ko_predictions_query_failed", detail: koErr.message }, 500, corsHeaders);
+  // results(ko_results) y wc_matches_ko son SOFT-FAIL: la comparación KO degrada
+  // a {} (bracket propio sin lado real) sin tumbar la respuesta de grupos.
+  if (rErr) console.error("[get-user-predictions] results(ko_results) query failed (KO real → {}):", rErr.message);
+  if (wcKoErr) console.error("[get-user-predictions] wc_matches_ko query failed (KO real → {}):", wcKoErr.message);
 
   const predictions = (preds ?? []).map((p: { match_id: string; local: number; visitante: number; scorer: string | null }) => ({
     match_id: p.match_id, local: p.local, visitante: p.visitante, scorer: p.scorer,
   }));
   const boost_picks = (boosts ?? []).map((b: { match_id: string }) => b.match_id);
+  const ko_predictions = (koPreds ?? []).map((k: { match_id: number; local: number; visitante: number; scorer: string | null; classifier: string | null }) => ({
+    match_id: k.match_id, local: k.local, visitante: k.visitante, scorer: k.scorer, classifier: k.classifier,
+  }));
 
-  return json({ gated: false, user_id: targetUid, league_id: leagueId, predictions, boost_picks, version: "1.0.0" }, 200, corsHeaders);
+  // KO real — cruces sembrados (wc_matches_ko) ⨝ resultado (results.ko_results),
+  // por slot. ko_results ya viene orientado a (home_iso3, away_iso3) y winner
+  // relativo a ellos (el puente aplica teams_swapped al escribir, ERR-99), así
+  // que el frontend lo consume sin re-flip. Slots no sembrados (R16+ pre-cuadre)
+  // simplemente no aparecen → el frontend muestra "pendiente".
+  const koResultsRaw: Record<string, { l?: number; v?: number; winner?: string; status?: string; scorers?: string[] }> =
+    (resultRow && resultRow.ko_results && typeof resultRow.ko_results === "object") ? resultRow.ko_results : {};
+  const ko_real: Record<string, {
+    home_iso3: string | null; away_iso3: string | null; round: string | null; date_utc: string | null;
+    teams_swapped: boolean; l: number | null; v: number | null; winner: string | null; status: string | null; scorers: string[];
+  }> = {};
+  for (const row of (wcKoRows ?? []) as Array<{ ko_match_id: number; round: string | null; home_iso3: string | null; away_iso3: string | null; teams_swapped: boolean | null; date_utc: string | null }>) {
+    const slot = String(row.ko_match_id);
+    const res = (koResultsRaw[slot] && typeof koResultsRaw[slot] === "object") ? koResultsRaw[slot] : null;
+    ko_real[slot] = {
+      home_iso3: row.home_iso3 ?? null,
+      away_iso3: row.away_iso3 ?? null,
+      round: row.round ?? null,
+      date_utc: row.date_utc ?? null,
+      teams_swapped: !!row.teams_swapped,
+      l: res && res.l != null ? res.l : null,
+      v: res && res.v != null ? res.v : null,
+      winner: res && res.winner ? res.winner : null,   // 'home' | 'away' (relativo a home_iso3/away_iso3)
+      status: res && res.status ? res.status : null,
+      scorers: res && Array.isArray(res.scorers) ? res.scorers : [],
+    };
+  }
+
+  return json({ gated: false, user_id: targetUid, league_id: leagueId, predictions, boost_picks, ko_predictions, ko_real, version: "1.1.0" }, 200, corsHeaders);
 });
