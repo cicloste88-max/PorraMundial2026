@@ -421,6 +421,49 @@
   // Hooks conservados: outer .dvm (role/tabindex/id/data-match-key/
   // data-match-idx) + banderas .dv2-mini-flag-btn[data-iso3].
   // ─────────────────────────────────────────────────────────────
+  // Markup .dvm "marcador FIFA" (PR#164). Helper PURO compartido por grupos
+  // (_buildDMini) y KO (_buildDirectoKOHtml) para que el resultado visual sea
+  // IDÉNTICO. Conserva los hooks de PR#164: outer .dvm (role/tabindex/id/
+  // data-match-key/data-match-idx), banderas .dvm__flag.dv2-mini-flag-btn
+  // [data-iso3] (la pizarra táctica engancha ahí) y la copa 🏆 con fallback.
+  // o = { idx, matchKey, hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt }.
+  function _buildDvmCard(o) {
+    const TROPHY = SB + '/miniatures/Logos/2026_FIFA_World_Cup.png';
+    const flagImg = (src) => src
+      ? '<img src="' + src + '" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '';
+    // Mismo markup en ambos lados; el espejado del lado derecho lo hace el CSS
+    // (.dvm__side.is-right { flex-direction: row-reverse }). Sin .dvm__dot:
+    // bandera + código se agrupan al extremo (cluster, justify flex-start).
+    const side = (cls, code, src, teamName) =>
+      '<div class="dvm__side ' + cls + '">' +
+        '<div class="dvm__id">' +
+          '<button type="button" class="dvm__flag dv2-mini-flag-btn" data-iso3="' + code + '" ' +
+            'aria-label="Ver plantilla ' + (teamName || '') + '">' + flagImg(src) + '</button>' +
+        '</div>' +
+        '<span class="dvm__code">' + code + '</span>' +
+      '</div>';
+
+    return (
+      '<div class="dvm" role="button" tabindex="0" id="dcard-' + o.idx + '" ' +
+        'data-match-key="' + (o.matchKey || '') + '" data-match-idx="' + o.idx + '">' +
+        '<div class="dvm__bar">' +
+          side('is-left', o.hCode, o.hSrc, o.hName) +
+          '<div class="dvm__center">' +
+            '<div class="dvm__score is-l">' + o.lTxt + '</div>' +
+            '<div class="dvm__badge">' +
+              '<img src="' + TROPHY + '" alt="" ' +
+                'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
+              '<span class="dvm__fallback">🏆</span>' +
+            '</div>' +
+            '<div class="dvm__score is-r">' + o.vTxt + '</div>' +
+          '</div>' +
+          side('is-right', o.aCode, o.aSrc, o.aName) +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function _buildDMini(m, idx) {
     const ctx = _getMatchCtx(m);
     const hTeam = EQUIPOS.find(e => e.name === m.home);
@@ -441,42 +484,10 @@
     const lTxt = ctx.hasScore ? String(ctx.scoreH) : '—';
     const vTxt = ctx.hasScore ? String(ctx.scoreA) : '—';
 
-    const TROPHY = SB + '/miniatures/Logos/2026_FIFA_World_Cup.png';
-
-    const flagImg = (src) => src
-      ? '<img src="' + src + '" loading="lazy" onerror="this.style.display=\'none\'">'
-      : '';
-
-    // Mismo markup en ambos lados; el espejado del lado derecho lo hace el CSS
-    // (.dvm__side.is-right { flex-direction: row-reverse }). Sin .dvm__dot:
-    // bandera + código se agrupan al extremo (cluster, justify flex-start).
-    const side = (cls, code, src, teamName) =>
-      '<div class="dvm__side ' + cls + '">' +
-        '<div class="dvm__id">' +
-          '<button type="button" class="dvm__flag dv2-mini-flag-btn" data-iso3="' + code + '" ' +
-            'aria-label="Ver plantilla ' + (teamName || '') + '">' + flagImg(src) + '</button>' +
-        '</div>' +
-        '<span class="dvm__code">' + code + '</span>' +
-      '</div>';
-
-    return (
-      '<div class="dvm" role="button" tabindex="0" id="dcard-' + idx + '" ' +
-        'data-match-key="' + (ctx.directoKey || '') + '" data-match-idx="' + idx + '">' +
-        '<div class="dvm__bar">' +
-          side('is-left', hCode, hSrc, m.home) +
-          '<div class="dvm__center">' +
-            '<div class="dvm__score is-l">' + lTxt + '</div>' +
-            '<div class="dvm__badge">' +
-              '<img src="' + TROPHY + '" alt="" ' +
-                'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
-              '<span class="dvm__fallback">🏆</span>' +
-            '</div>' +
-            '<div class="dvm__score is-r">' + vTxt + '</div>' +
-          '</div>' +
-          side('is-right', aCode, aSrc, m.away) +
-        '</div>' +
-      '</div>'
-    );
+    return _buildDvmCard({
+      idx, matchKey: ctx.directoKey,
+      hCode, aCode, hSrc, aSrc, hName: m.home, aName: m.away, lTxt, vTxt
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -832,19 +843,20 @@
   const _expandedDays = new Set();
 
   // ─────────────────────────────────────────────────────────────
-  // KO en Directo (TASK 3). Cuando la fase KO está activa, la página Directo
-  // muestra la ronda KO EN CURSO con marcador en vivo (y los ya jugados como
-  // FINAL), igual que mostraba la fase de grupos. ROUND-GENÉRICO (r32→final)
-  // vía ROUND_CONFIG/BRACKET de ko.js. Reutiliza _buildJKOCard (ui-groups.js)
-  // — misma tarjeta + status pill que la vista Jornada, sin duplicar. Devuelve
-  // '' si la fase KO aún no está activa (entonces Directo sigue con grupos).
-  // Equipos/marcador salen de _liveScoresByMatchKey['wc2026_ko_'+id]; sin fila,
-  // _buildJKOCard degrada al esqueleto "Por definir" (nunca resolvedSlots).
+  // KO en Directo (TASK 3, corregido brief #3). Cuando la fase KO está activa,
+  // la página Directo muestra la ronda KO EN CURSO con marcador en vivo (y los
+  // ya jugados, con su score). Formato IDÉNTICO al de grupos en Directo: las
+  // cards usan el .dvm "marcador FIFA" (helper compartido _buildDvmCard, el
+  // mismo que alimenta _buildDMini), NO _buildJKOCard (ése es el formato de la
+  // vista Jornada). ROUND-GENÉRICO (r32→final) vía ROUND_CONFIG/BRACKET de
+  // ko.js. Devuelve '' si la fase KO aún no está activa (Directo sigue con
+  // grupos). Equipos/marcador salen de _liveScoresByMatchKey['wc2026_ko_'+id]
+  // (nombres ES reales; nunca resolvedSlots — ERR-76); sin fila → TBD + "—".
   // ─────────────────────────────────────────────────────────────
   function _buildDirectoKOHtml() {
     if (typeof ROUND_CONFIG === 'undefined' || !Array.isArray(ROUND_CONFIG)) return '';
     if (typeof BRACKET === 'undefined' || !BRACKET) return '';
-    if (typeof _buildJKOCard !== 'function') return '';
+    if (typeof EQUIPOS === 'undefined') return '';
     const liveByKey = window._liveScoresByMatchKey || {};
 
     // Ronda activa = primera ronda con algún partido no finalizado. Fase KO
@@ -879,8 +891,38 @@
     const name = (typeof _JO_KO_SHORT === 'object' && _JO_KO_SHORT && _JO_KO_SHORT[cfg.key])
       ? _JO_KO_SHORT[cfg.key] : (cfg.name || cfg.key);
 
+    // Cada cruce KO se pinta con el MISMO formato .dvm "marcador FIFA" que los
+    // grupos (helper compartido _buildDvmCard), NO con _buildJKOCard (formato
+    // Jornada). Equipos REALES desde la fila live del slot (home_team_name/
+    // away_team_name ES ≡ EQUIPOS.name; NUNCA resolvedSlots — ERR-76). Sin fila
+    // o equipo sin resolver → "TBD" + score "—" (la copa 🏆 central queda como
+    // en el fallback de _buildDvmCard). data-match-key = key KO; data-match-idx
+    // = slot (mm.id, 73..104, fuera del rango PARTIDOS → el click no expande).
     let cards = '';
-    rmatches.forEach((mm) => { cards += _buildJKOCard(mm); });
+    rmatches.forEach((mm) => {
+      const live = liveByKey['wc2026_ko_' + mm.id];
+      const hName = (live && live.home_team_name) ? live.home_team_name : null;
+      const aName = (live && live.away_team_name) ? live.away_team_name : null;
+      const hTeam = hName ? EQUIPOS.find((e) => e.name === hName) : null;
+      const aTeam = aName ? EQUIPOS.find((e) => e.name === aName) : null;
+      const hCode = hTeam ? hTeam.flag : 'TBD';
+      const aCode = aTeam ? aTeam.flag : 'TBD';
+      const hIso2 = hTeam && ISO3_TO_ISO2[hTeam.flag];
+      const aIso2 = aTeam && ISO3_TO_ISO2[aTeam.flag];
+      const hSrc = hIso2 ? (SB + '/miniatures/flags-sm/' + hIso2 + '.webp')
+                         : (hTeam ? (SB + '/flags/' + hTeam.flag + '.png') : '');
+      const aSrc = aIso2 ? (SB + '/miniatures/flags-sm/' + aIso2 + '.webp')
+                         : (aTeam ? (SB + '/flags/' + aTeam.flag + '.png') : '');
+      // KO se siembra sin swap (teams_swapped=false): la fila live ya está
+      // orientada a la malla, score_home/away se usan tal cual.
+      const hasScore = !!(live && live.score_home != null && live.score_away != null);
+      const lTxt = hasScore ? String(live.score_home) : '—';
+      const vTxt = hasScore ? String(live.score_away) : '—';
+      cards += _buildDvmCard({
+        idx: mm.id, matchKey: 'wc2026_ko_' + mm.id,
+        hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt
+      });
+    });
 
     return '<div class="directo-section directo-section--ko" id="directo-ko-' + cfg.key + '">' +
              '<div class="directo-header">' +
@@ -888,7 +930,7 @@
                '<span class="directo-date">' + name + '</span>' +
                liveBadge +
              '</div>' +
-             cards +
+             '<div class="dv2-mini-list">' + cards + '</div>' +
            '</div>';
   }
 
