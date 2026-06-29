@@ -164,6 +164,33 @@ ese usuario montó ese cruce → la IA lo computó on-demand → la fila existe 
 cuando hace falta. Cruces que nadie pronosticó no dan marcador → anti-IA
 irrelevante. Si no hay fila para el par → degrada a 0 limpio.
 
+### Boost en KO
+
+El boost ×2 **nunca** aplica en cards KO: `calcKOMatchPoints` pasa `boost: false`
+hardcodeado a `calcMatchPoints` (§1.6). El anti-IA **sí** entra (arriba). Resumen
+de lo que se desactiva/activa en KO vs grupos: boost off; anti-IA on; goleador de
+**tanda de penaltis** no cuenta (solo 90'+prórroga, ver §Excepción KO).
+
+### ⚠️ `calcClassificationPoints` — definida pero NO cableada (verificar antes del 19-jul)
+
+`_shared/scoring.mjs` exporta DOS funciones de podio:
+
+- **`calcKoPodiumPoints(predPodium, realPodium)`** — **SÍ cableada** en
+  `get-league-standings` (compara el podio derivado de la malla del usuario
+  contra el real; champion +30 / runnerUp +20 / third +15 / fourth +10). Es la
+  que puntúa la clasificación final hoy.
+- **`calcClassificationPoints(userPicks, realResults)`** — **definida pero SIN
+  caller** (alterna API keyed `champion`/`runner_up`/`third`/`fourth` sobre
+  `FINAL_CLASSIFICATION_PTS`). No la invoca ninguna EF.
+
+Si la clasificación final se computa **solo** desde la malla del bracket, el
+podio ya está cubierto por `calcKoPodiumPoints` y `calcClassificationPoints` es
+redundante (código muerto). Si en algún momento hay una predicción de
+clasificación final **separada del bracket**, esa función sería su scorer y hoy
+**no se está sumando** → **bug latente para la Final**. **Acción**: confirmar el
+modelo antes del **19-jul** (Final, slot 104) y, o bien cablear
+`calcClassificationPoints`, o bien retirarla como código muerto.
+
 ## Premios individuales (AWARDS_CFG)
 
 | Premio | Puntos |

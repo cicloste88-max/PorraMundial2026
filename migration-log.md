@@ -2783,3 +2783,17 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] FIX (solo posición, `ui-directo.js`): subido el margin de la fecha KO. MEDIDO en headless (playwright-core + chromium del sistema, harness aislado con `directo-v3.css` real + markup `.dvm`): el trofeo `.dvm__badge` (57×72 + borde 2px = 76px de alto, centrado en una barra de 56px) sobresale **10px** por encima del borde superior de la card (no 8 — el borde sumaba 2px). Con `margin-bottom:4px` la fecha solapaba el trofeo **−6px** (confirmado el bug). Nuevo `margin:2px 0 18px` → clearance **+8px** (la fecha queda claramente por encima del trofeo, verificado por captura). Opacidad `.5`→`.7` (legibilidad, bonus del brief). Sin tocar formato/orden/wrapper. Sin cambios de CSS file (inline). `node --check` + `npm run build` OK. (playwright-core instalado con `--no-save`, no toca package.json; node_modules gitignored.)
 
 [--:--] PENDIENTE: avisar a Claude.ai con rama+commit → abre el PR (estilo #171) → San mergea. NO desplegado por Code.
+
+## Sesion 29-jun-2026 -- Documentacion de cierre del bloque KO (rama `claude/docs-ko`)
+
+[--:--] CONTEXTO: PRs #171 (KO scoring+visualizacion) y #172 (fix posicion fecha) ya en main. Cierre documental del bloque KO. Rama `claude/docs-ko` desde main.
+
+[--:--] DB cableado (lane Claude.ai/MCP, verificado por Code esta sesion via Supabase): `espn_event_map` 16 filas KO (`wc2026_ko_73..88`), todas `inverted=false`, ESPN event IDs 760486-760501. `live_scores` 16 filas KO (73-88), 1 finished (slot 73 RSA-CAN). `wc_matches_ko` 16 filas. `results.ko_results['73']={l:0,v:1,winner:"away",scorers:["Eustaquio"],round:"r32",status:"finished"}` -> bridge KO validado E2E por el trigger `bridge_on_finished`.
+
+[--:--] EF: `porra-bridge-results` **v13** (contador deploy Supabase) -- rama KO generica, `ko_results[slot]` siempre en finished, empate->winner=null Fase 1, koWinner() eliminado (desplegado por lane Claude.ai). `get-league-standings` queda en v1.5.1 (anti-IA KO); cablear `calcClassificationPoints` -> futura version antes de la Final.
+
+[--:--] DOCS escritos: `docs/ko-bracket.md` (NUEVO -- estructura BRACKET slots 73-104, feeders R16+ por cuadrante, plantilla R32, semantica 1X/2X/T_/W/L, resolveBracket+ANNEX_C, fuente `_shared/ko-data.mjs`, verificado 1:1 vs FIFA, cross-ref ERR-99). `errores_conocidos_porra.md` ERR-99 (`teams_swapped`: marcador `live_scores` en orientacion opuesta a home/away en swapped; voltear en queries de standings reales; critico para get-ko-crosses; NO afecta predicciones ni bracket sembrado). `docs/scoring-engine.md` (+§Boost en KO + §`calcClassificationPoints` definida pero SIN caller -> bug latente Final 19-jul; el podio hoy va por `calcKoPodiumPoints`, SI cableado). `CHANGELOG.md` (entrada 29-jun: pipeline+bridge+frontend). `CLAUDE.md` (Estado actual -> KO en vivo/bridge v13/frontend completo; Top-3 -> get-ko-crosses / cablear calcClassificationPoints / sembrar R16+; podados items resueltos: JO-1a, ERR-79, validar ko_results, IDs SofaScore KO; +fila ko-bracket.md en el mapa de docs).
+
+[--:--] NOTA precision: la afirmacion del brief "calcKOMatchPoints iaBonus:false hardcoded" es STALE -- el codigo (post #170) SI computa el anti-IA del marcador (via `opts.iaPred`/`iaBonusPredicate`, standings v1.5.1 `iaByKoSlot`). Solo `boost:false` esta hardcodeado. Documentado lo que hace el codigo, no la afirmacion del brief.
+
+[--:--] Solo docs, sin tocar codigo. Tamanos OK (githook). Push a `claude/docs-ko`; Claude.ai abre el PR; San mergea directo (docs, sin QA).
