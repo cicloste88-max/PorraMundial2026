@@ -452,17 +452,9 @@
         '<span class="dvm__code">' + code + '</span>' +
       '</div>';
 
-    // Línea de fecha+hora de inicio (Madrid) — solo KO la pasa (los grupos la
-    // muestran en el header de la jornada/día). Inline style: no hay clase en
-    // directo-v3.css y evita tocar CSS (ERR-22). FIX B brief #5.
-    const whenHtml = o.when
-      ? '<div class="dvm__when" style="text-align:center;font-size:10px;font-weight:700;' +
-        'letter-spacing:.4px;color:rgba(255,255,255,.5);padding:5px 0 1px">' + o.when + '</div>'
-      : '';
     return (
       '<div class="dvm" role="button" tabindex="0" id="dcard-' + o.idx + '" ' +
         'data-match-key="' + (o.matchKey || '') + '" data-match-idx="' + o.idx + '">' +
-        whenHtml +
         '<div class="dvm__bar">' +
           side('is-left', o.hCode, o.hSrc, o.hName) +
           '<div class="dvm__center">' +
@@ -1034,11 +1026,24 @@
       const hasScore = !!(live && live.score_home != null && live.score_away != null);
       const lTxt = hasScore ? String(live.score_home) : '—';
       const vTxt = hasScore ? String(live.score_away) : '—';
-      cards += _buildDvmCard({
+      const dvm = _buildDvmCard({
         idx: mm.id, matchKey: 'wc2026_ko_' + mm.id,
-        hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt,
-        when: _koKickoffLabel(live)
+        hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt
       });
+      // FIX (brief #6): la fecha+hora va FUERA del marco .dvm — una línea
+      // cabecera encima del recuadro (como en el bracket oficial), aislada del
+      // frame para no solaparse con la copa central. Cada (fecha + card) se
+      // agrupa en un wrapper para que el gap:18px de .dv2-mini-list quede entre
+      // partidos y NO entre la fecha y su card (que van pegadas, margin 4px).
+      const when = _koKickoffLabel(live);
+      if (when) {
+        cards += '<div class="dvm-ko-item">' +
+          '<div class="dvm-ko-when" style="text-align:center;font-size:11px;font-weight:700;' +
+          'letter-spacing:.4px;color:rgba(255,255,255,.5);margin:0 0 4px">' + when + '</div>' +
+          dvm + '</div>';
+      } else {
+        cards += dvm;
+      }
     });
 
     return heroHtml +
