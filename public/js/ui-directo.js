@@ -323,6 +323,10 @@
   // Delega en window.matchKeyFor (expuesto por live-sync.js)
   // ─────────────────────────────────────────────────────────────
   function getDirectoKey(m) {
+    // KO: el match sintético lleva el key directo (wc2026_ko_<slot>) ya resuelto
+    // — matchKeyFor solo conoce los 72 de grupos (firma del JSON), así que sin
+    // este atajo la hero KO no encontraría su fila live (FIX A brief #5).
+    if (m && m._directoKey) return m._directoKey;
     if (typeof window.matchKeyFor === 'function') return window.matchKeyFor(m);
     return null;
   }
@@ -360,7 +364,11 @@
       else if (status === 'halftime') minuteStr = 'DESCANSO';
     }
 
-    const matchKey = (typeof getMatchKey === 'function') ? getMatchKey(m) : null;
+    // KO no tiene predicción de grupo (getMatchKey es helper de grupos y
+    // ko_predictions no se cargan en esta vista) → matchKey null para que la
+    // sección "Tu predicción" de la hero quede vacía (FIX A brief #5).
+    const matchKey = (m && m._is_ko) ? null
+      : ((typeof getMatchKey === 'function') ? getMatchKey(m) : null);
     const pred = matchKey ? (predictions[matchKey] || {}) : {};
     const hasPred = pred.l !== null && pred.l !== undefined &&
                     pred.v !== null && pred.v !== undefined;
@@ -444,9 +452,17 @@
         '<span class="dvm__code">' + code + '</span>' +
       '</div>';
 
+    // Línea de fecha+hora de inicio (Madrid) — solo KO la pasa (los grupos la
+    // muestran en el header de la jornada/día). Inline style: no hay clase en
+    // directo-v3.css y evita tocar CSS (ERR-22). FIX B brief #5.
+    const whenHtml = o.when
+      ? '<div class="dvm__when" style="text-align:center;font-size:10px;font-weight:700;' +
+        'letter-spacing:.4px;color:rgba(255,255,255,.5);padding:5px 0 1px">' + o.when + '</div>'
+      : '';
     return (
       '<div class="dvm" role="button" tabindex="0" id="dcard-' + o.idx + '" ' +
         'data-match-key="' + (o.matchKey || '') + '" data-match-idx="' + o.idx + '">' +
+        whenHtml +
         '<div class="dvm__bar">' +
           side('is-left', o.hCode, o.hSrc, o.hName) +
           '<div class="dvm__center">' +
@@ -723,8 +739,10 @@
           '</div>' +
         '</div>' +
 
-        // Resto IGUAL que v1
-        '<div class="dv2-exp-meta">Grupo ' + m.group + ' · 🏟️ ' + stadium + '</div>' +
+        // Resto IGUAL que v1 (KO: ronda en vez de "Grupo X").
+        '<div class="dv2-exp-meta">' +
+          (m._is_ko ? (m._ko_round_name || 'KO') : ('Grupo ' + m.group)) +
+          ' · 🏟️ ' + stadium + '</div>' +
         scorersHtml +
         predHtml +
         '<button class="dv2-exp-collapse" type="button" data-collapse="1" aria-label="Contraer tarjeta">▲ Contraer</button>' +
@@ -862,6 +880,55 @@
     return s;
   }
 
+  // Fecha+hora de inicio en Europe/Madrid "DD/MM HH:MM" desde match_start_ts de
+  // la fila live (epoch UTC, ya en la cache). NUNCA date_utc/m.date crudo (ERR-92).
+  // Reutiliza _kickoffMs (mismo origen que la hora de grupos). FIX B brief #5.
+  function _koKickoffLabel(liveRow) {
+    const ms = _kickoffMs(liveRow);
+    if (ms == null) return '';
+    try {
+      const parts = new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(new Date(ms));
+      const g = {};
+      parts.forEach((p) => { g[p.type] = p.value; });
+      // Pad manual: algunas builds ICU no rellenan month/day a 2 dígitos pese a
+      // '2-digit' → forzamos "DD/MM HH:MM" estable en cualquier navegador.
+      const pad = (x) => String(x == null ? '' : x).padStart(2, '0');
+      return pad(g.day) + '/' + pad(g.month) + ' ' + pad(g.hour) + ':' + pad(g.minute);
+    } catch {
+      return formatStartCEST(ms);
+    }
+  }
+
+  // Match sintético (shape PARTIDOS-like) para montar la hero KO con _buildDExpanded
+  // sin duplicar el markup del kit-hero (FIX A brief #5). Equipos REALES desde la
+  // fila live del slot; null si el cruce aún no está resuelto (TBD → no expandir).
+  // _directoKey enruta _getMatchCtx a la fila KO; _is_ko apaga grupo/predicción.
+  function _koMatchForSlot(slot) {
+    if (typeof ROUND_CONFIG === 'undefined' || !Array.isArray(ROUND_CONFIG)) return null;
+    if (typeof BRACKET === 'undefined' || !BRACKET) return null;
+    const liveByKey = window._liveScoresByMatchKey || {};
+    for (const cfg of ROUND_CONFIG) {
+      const rmatches = Array.isArray(BRACKET[cfg.key]) ? BRACKET[cfg.key] : [];
+      const mm = rmatches.find((x) => x.id === slot);
+      if (!mm) continue;
+      const live = liveByKey['wc2026_ko_' + slot];
+      const hName = live && live.home_team_name;
+      const aName = live && live.away_team_name;
+      if (!hName || !aName) return null; // TBD → no expandir
+      const roundName = (typeof _JO_KO_SHORT === 'object' && _JO_KO_SHORT && _JO_KO_SHORT[cfg.key])
+        ? _JO_KO_SHORT[cfg.key] : (cfg.name || cfg.key);
+      return {
+        home: hName, away: aName,
+        _directoKey: 'wc2026_ko_' + slot, _is_ko: true, _ko_round_name: roundName,
+        date: mm.date || '', stadium: mm.venue || '', group: ''
+      };
+    }
+    return null;
+  }
+
   // KO en Directo (TASK 3, corregido brief #3). Cuando la fase KO está activa,
   // la página Directo muestra la ronda KO EN CURSO con marcador en vivo (y los
   // ya jugados, con su score). Formato IDÉNTICO al de grupos en Directo: las
@@ -910,16 +977,45 @@
     const name = (typeof _JO_KO_SHORT === 'object' && _JO_KO_SHORT && _JO_KO_SHORT[cfg.key])
       ? _JO_KO_SHORT[cfg.key] : (cfg.name || cfg.key);
 
+    // FIX B: ordenar la ronda por kickoff real (match_start_ts ASC, cronológico
+    // — lo que pide San, difiere del orden de bracket). Sin ts → al final.
+    const sorted = rmatches.slice().sort((a, b) => {
+      const ta = _kickoffMs(liveByKey['wc2026_ko_' + a.id]);
+      const tb = _kickoffMs(liveByKey['wc2026_ko_' + b.id]);
+      if (ta == null && tb == null) return a.id - b.id;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return ta - tb;
+    });
+
+    // FIX A: hero expandida de un cruce KO resuelto (mismas camisetas + marcador
+    // que en grupos, vía _buildDExpanded + match sintético). Solo si _expandedKey
+    // apunta a un slot de ESTA ronda y el cruce está resuelto (TBD → no expande).
+    let expSlot = null;
+    if (_expandedKey) {
+      const em = /^wc2026_ko_(\d+)$/.exec(_expandedKey);
+      if (em) {
+        const s = Number(em[1]);
+        if (rmatches.some((x) => x.id === s) && _koMatchForSlot(s)) expSlot = s;
+      }
+    }
+    let heroHtml = '';
+    if (expSlot != null) {
+      const synthM = _koMatchForSlot(expSlot);
+      if (synthM) heroHtml = '<div class="dv2-expanded-wrap">' + _buildDExpanded(synthM, expSlot) + '</div>';
+    }
+
     // Cada cruce KO se pinta con el MISMO formato .dvm "marcador FIFA" que los
     // grupos (helper compartido _buildDvmCard), NO con _buildJKOCard (formato
     // Jornada). Equipos REALES desde la fila live del slot (home_team_name/
     // away_team_name ES ≡ EQUIPOS.name; NUNCA resolvedSlots — ERR-76). Lado sin
     // resolver → etiqueta del feeder del bracket (W74/RU101/"2.º A", brief #4)
-    // en vez de "TBD"; score "—" (la copa 🏆 central queda como en el fallback
-    // de _buildDvmCard). data-match-key = key KO; data-match-idx = slot (mm.id,
-    // 73..104, fuera del rango PARTIDOS → el click no expande una card de grupo).
+    // en vez de "TBD"; score "—". data-match-key = key KO; data-match-idx = slot
+    // (mm.id, 73..104, fuera del rango PARTIDOS). El cruce expandido se omite de
+    // la lista (su hero va arriba), igual que en grupos.
     let cards = '';
-    rmatches.forEach((mm) => {
+    sorted.forEach((mm) => {
+      if (mm.id === expSlot) return;
       const live = liveByKey['wc2026_ko_' + mm.id];
       const hName = (live && live.home_team_name) ? live.home_team_name : null;
       const aName = (live && live.away_team_name) ? live.away_team_name : null;
@@ -940,11 +1036,13 @@
       const vTxt = hasScore ? String(live.score_away) : '—';
       cards += _buildDvmCard({
         idx: mm.id, matchKey: 'wc2026_ko_' + mm.id,
-        hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt
+        hCode, aCode, hSrc, aSrc, hName, aName, lTxt, vTxt,
+        when: _koKickoffLabel(live)
       });
     });
 
-    return '<div class="directo-section directo-section--ko" id="directo-ko-' + cfg.key + '">' +
+    return heroHtml +
+           '<div class="directo-section directo-section--ko" id="directo-ko-' + cfg.key + '">' +
              '<div class="directo-header">' +
                '<span class="directo-label">KO</span>' +
                '<span class="directo-date">' + name + '</span>' +
@@ -999,8 +1097,19 @@
         ? '<div class="directo-wrap"><div class="directo-main">' + mainHtmlKO + '</div>' +
           '<div class="directo-sidebar">' + sidebarHtmlKO + '</div></div>'
         : '<div class="directo-main">' + mainHtmlKO + '</div>';
-      // Las cards KO son estáticas (sin expand); mantenemos el handler por
-      // paridad (cierre de simulacros admin, teclado).
+      // FIX A: si hay una hero KO expandida (.dv2-exp), dispara el check de
+      // conflicto cromático de camisetas con su match sintético (PARTIDOS[idx]
+      // no aplica a KO; reconstruimos el m por el slot del data-match-key).
+      const koExp = container.querySelector('.dv2-exp');
+      if (koExp) {
+        const ke = /^wc2026_ko_(\d+)$/.exec(koExp.getAttribute('data-match-key') || '');
+        if (ke) {
+          const sm = _koMatchForSlot(Number(ke[1]));
+          if (sm) _postInjectExpanded(koExp, sm);
+        }
+      }
+      // _onDirectoClick maneja .dvm (click/teclado) → expande la hero KO, y
+      // [data-collapse] de la hero la cierra.
       container.onclick = _onDirectoClick;
       container.onkeydown = _onDirectoClick;
       return;
