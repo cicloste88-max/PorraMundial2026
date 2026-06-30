@@ -184,6 +184,7 @@ Lista canónica EN VIVO a 01-jun-2026 (verificada vía Supabase MCP, proyecto `c
 | `get-squad` | v8 | true | Sirve datos de `squads` (XI + roster + entrenador) a la Pizarra Táctica (`public/js/ui-pizarra-tactica.js`). |
 | `porra-tm-photos-sync` | v6 | true | Pendiente documentar (follow-up). |
 | `porra-flag-batch-upload` | v3 | true | Pendiente documentar (follow-up). |
+| `ko-winner-sync` | v1 | false | **Ganador KO automático ESPN** (30-jun-2026). Lee `competitions[0].competitors[].winner==="true"` del scoreboard ESPN (`STATUS_FINAL_PEN`/`state=post`), proyecta vía `espn_event_map.inverted` y fuerza `results.ko_results[slot].winner` (+ `pens` si tanda). **No toca** `live_scores` ni el bridge; idempotente (solo escribe en diff); reseedea `user_points_cache` invocando `get-league-standings` por liga. Cron `ko-winner-sync` (jobid 31, `*/2`, gate `EXISTS (KO finished con winner=null)`). Modos: `POST {}` (ciclo), `{dry_run:true}` (informe), `{dates:"YYYYMMDD-YYYYMMDD"}` (override ventana). ERR-100. |
 
 ## Stack infraestructura
 

@@ -9,6 +9,7 @@
 | `porra-match-live` EF | v18 | async + webhook (Webshare principal + fallback automático). Disparada batched por `dispatch-live-slots` (ver §Bloque crítico) |
 | `porra-apify-webhook` EF | v9 | logging completo, detecta goles + status, llama Twilio directo. Aún no persiste `home_team_name` / `away_team_name` / `competition` / `match_start_ts` (cosmético — **ya NO bloquea el puente**, que resuelve equipos vía `wc_matches` por `match_key`) |
 | `porra-bridge-results` EF | v4 | puente `live_scores`→`results` (grupos + **rama KO**, goleador normalizado, `teams_swapped`, **guardas anti-dato-incompleto**). Disparo automático vía **trigger + barrido** — ver §Bloque crítico + §Puente |
+| `ko-winner-sync` EF | v1 | **Ganador KO automático ESPN** (KO-pens). Cron `*/2`, gate `EXISTS (KO finished con winner=null)`. Aditivo: NO toca `live_scores` ni el bridge; idempotente. ERR-100 |
 | `porra-whatsapp-send` EF | v2 | form-urlencoded via fetch |
 | `porra-whatsapp-webhook` EF | v5 | OK |
 | Actor Azzouzana `VzKtdb1t0Qnc07X8V` | — | NO usar — caché CDN ~15min |
@@ -103,6 +104,10 @@ live_scores (status→'finished' Y score no-null)
   └─[red de seguridad: cron sweep-unbridged-finished */5min]────────────┘
 
 results ──[on-read]──→ get-league-standings v1.2.0 (motor _shared/scoring.mjs) → puntuación
+
+ko-winner-sync (cron */2min, gated por EXISTS KO finished con winner=null)
+  └─ scoreboard ESPN → competitor.winner ──→ results.ko_results[slot].winner (+pens)
+                                            └─ reseed user_points_cache (write-through get-league-standings)
 ```
 
 > ⚠️ **Drift runtime↔repo**: el cron `dispatch-live-slots` (`cron.job` jobid 24,
@@ -110,7 +115,9 @@ results ──[on-read]──→ get-league-standings v1.2.0 (motor _shared/scor
 > y `trg_bridge_on_finished()` **existen solo en runtime** (creadas vía Supabase
 > MCP, sin fichero en `supabase/migrations/`) y **NO están versionadas en el
 > repo**. Pendiente backfill a `supabase/migrations/` o docs. Mismo lane que las
-> EFs del puente (Claude.ai/MCP).
+> EFs del puente (Claude.ai/MCP). El cron `ko-winner-sync` (jobid 31, `*/2min`)
+> sí está versionado en `supabase/migrations/20260630010000_ko_winner_sync_cron.sql`
+> (alta runtime via MCP el 30-jun, migración backfill idempotente).
 
 ### Pieza A — Trigger `bridge_on_finished`
 

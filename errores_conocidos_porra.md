@@ -2851,3 +2851,58 @@ as = CASE WHEN m.teams_swapped THEN ls.score_home ELSE ls.score_away END
 
 Ref.: ERR-95/96 (invariante de orientación), `docs/live-scoring.md` §orientación,
 `docs/ko-bracket.md`.
+
+---
+
+## ERR-100 — Cruce KO a penaltis: `ko_results.winner=null` (bridge infiere del marcador + espn-poll descarta la tanda)
+
+**Síntoma**: un cruce KO resuelto por penaltis (90'+prórroga acaban en empate, se
+decide en la tanda) queda en `results.ko_results[slot]` con `winner=null`. Ni se
+reparte el `+N` de avance ni se resuelve el bracket aguas abajo (R16+). Vivido
+el 29-jun-2026 con GER-PAR (slot 74, 1-1 + penaltis 3-4 a favor de Paraguay,
+batacazo histórico): pasaron horas sin que ningún ganador apareciera.
+
+**Causa raíz** (doble): (1) **`espn-poll` descarta la tanda** —
+`buildGoalEvents()` filtra `shootout !== true`, así que solo el 1-1 del 90' se
+escribe en `live_scores`; los penaltis no se persisten. (2) **El bridge
+`porra-bridge-results` infiere el ganador del marcador** (`l` vs `v`) — empate
+→ `winner=null`. Los KO decisivos por marcador (slot 73 CAN 0-1, slot 76 BRA
+2-1) salían bien; los desempatados en pens caían en silencio. El header del
+propio `espn-poll` ya avisaba de que habría que extender el modelo a tanda.
+
+**Datos autoritativos en ESPN**: el scoreboard sí da el ganador explícito en
+`competitions[0].competitors[].winner === "true"` (+ `shootoutScore` por lado),
+con `status.type.name = "STATUS_FINAL_PEN"` / `state = "post"`.
+
+**Fix aplicado**: nueva EF **`ko-winner-sync` v1.0.0** (`verify_jwt=false`, gate
+`X-Cron-Key` fail-closed). Lee `competitor.winner` del scoreboard ESPN
+(rango ayer-mañana, override `dates` para tests), orienta vía
+`espn_event_map.inverted`, fuerza `winner` (+ `pens` si `STATUS_FINAL_PEN`)
+sobre `results.ko_results[slot]`. **NO toca `live_scores` ni el bridge** —
+aditivo e idempotente; solo escribe en diff. Tras cualquier cambio reseedea
+`user_points_cache` invocando `get-league-standings` por liga (write-through
+del motor canónico). Cron **`ko-winner-sync`** (jobid 31 en prod, runtime via
+MCP + migración versionada `20260630010000_ko_winner_sync_cron.sql`), schedule
+`*/2 * * * *`, **gated** por `EXISTS (KO finished con winner=null)` para que en
+reposo no llame a ESPN.
+
+Modos:
+
+- `POST {}` ciclo normal.
+- `POST { "dry_run": true }` reporta stored vs ESPN sin escribir/reseed.
+- `POST { "dates": "YYYYMMDD-YYYYMMDD" }` override ventana ESPN.
+
+**Patrón preventivo**: **en KO nunca inferir el ganador del marcador**. El
+ganador autoritativo es `competitor.winner === "true"` de ESPN; el bridge se
+queda como propietario del marcador (`l`/`v`) y de los `scorers`, y este EF
+es el propietario único de `winner`/`pens` para KO empatado en 90'. Slot 74
+parcheado en caliente con impacto cero en porra (nadie acertó el batacazo,
+clasificaciones idénticas). **Pendiente menor**: el gate del cron no acota
+por recencia — si un KO quedara `null` fuera de la ventana ESPN
+(ayer-mañana), habría busy-loop benigno cada 2 min. Idea: acotar el gate por
+fecha del match (`wc_matches_ko.date_utc`).
+
+**Fecha detección**: 29-jun-2026 (GER-PAR R32 slot 74).
+Ref.: `supabase/functions/ko-winner-sync/index.ts`,
+`supabase/migrations/20260630010000_ko_winner_sync_cron.sql`,
+`docs/live-scoring.md` §puente, ERR-82 (winner explícito en standings).

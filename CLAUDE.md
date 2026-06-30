@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**29-jun** (fase **KO**): **bloque KO en vivo cableado** (#171/#172 en main). Pipeline ESPN (`espn_event_map`+`live_scores`, 16 slots R32 73–88, `inverted=false`). Bridge `porra-bridge-results` **v13**: rama KO genérica escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1); validado E2E (slot 73). Frontend KO completo: Jornada + Directo (`.dvm`, hero, Opción B, fecha Madrid + orden). Bracket verificado vs FIFA → `docs/ko-bracket.md`.
+**30-jun** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo. Bracket FIFA → `docs/ko-bracket.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
@@ -101,7 +101,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 
 ### Errores conocidos
 
-ERR-01..91: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86), forma cache normalizada (87), init latch live-sync (88), anti-bot per-IP (89), jsonb double-encoded (90), fallback param opcional (91).
+ERR-01..100: detalle completo en `errores_conocidos_porra.md`. **Consultar antes de debuggear.** Categorías: JS lifecycle, Vite/CSS, Auth/Secrets, Live scoring, EFs, UI mobile, KO/Globo, Overlay v3, sync-squads, RLS (51,58), HF Pack v3 (52-57), name-matcher (72-75,93-94), competición real (76), name globo (77), auth bootstrap (78), ensamblado EF (79), window scope (80), clip overflow (81), puente P4 (82), cliente RLS (83), currentUser (84), actor lockfile (85), agregado liga RLS (86), forma cache normalizada (87), init latch live-sync (88), anti-bot per-IP (89), jsonb double-encoded (90), fallback param opcional (91), live-scoring KO (95-97/99), scoring KO gate (98), KO winner pens (100).
 
 ### Otros ficheros de contexto
 
