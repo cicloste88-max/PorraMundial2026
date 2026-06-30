@@ -43,19 +43,41 @@ export const FINAL_CLASSIFICATION_PTS = {
 // window.BOOST_INCLUYE_IA (scoring.js; false para volver al alternativo).
 export const BOOST_INCLUYE_IA = true;
 
-export function calcMatchPoints(pred, realL, realR, opts = {}) {
-  if (!pred || !pred.saved) return 0;
-  let pts = 0;
+// calcMatchPointsBreakdown — variante "todo lo que computé" para el dashboard
+// y otras consumidoras que necesitan los flags individuales. calcMatchPoints
+// es un wrapper trivial: devuelve .pts de aquí. Mantener la lógica EN UNA
+// SOLA FUNCIÓN garantiza cero divergencia entre el total publicado y el
+// breakdown (la suite de scoring.test.mjs verifica .pts contra los canónicos).
+//
+// Devuelve { pts, signOk, exact, golOk, iaBonus, doubled, capped }:
+//   signOk  — Math.sign(pred.l-pred.v) === Math.sign(realL-realR), defensa null.
+//   exact   — pred.l===realL && pred.v===realR.
+//   golOk   — goleador acertado (matcher normalizado) o regla 0-0.
+//   iaBonus — opts.iaBonus efectivamente aplicado (false si saved=false).
+//   doubled — boost ×2 efectivo (exact+golOk+opts.boost===true).
+//   capped  — true si el cap 7 recortó la suma base.
+export function calcMatchPointsBreakdown(pred, realL, realR, opts = {}) {
+  const empty = { pts: 0, signOk: false, exact: false, golOk: false, iaBonus: false, doubled: false, capped: false };
+  if (!pred || !pred.saved) return empty;
 
-  const isExact = pred.l === realL && pred.v === realR;
+  // Defensa partido NO jugado: si el real es null/undefined no se debe
+  // computar signo ni exacto (Math.sign(NaN)===0 emparejaba empates con
+  // empates → +1 espurio en cruces KO confirmados pero sin jugar — caso
+  // luisalvarez15 GALLOS slots 83/87 en user_points_cache pre-PR). Usa
+  // `== null` (captura null+undefined, NO 0) para que un 0-0 jugado siga
+  // puntuando. Las EFs (get-league-standings, get-dashboard) ya gateaban
+  // grupos con `if (!real) continue`, pero KO ya no (set-based, San
+  // 30-jun-2026) y la rama de marcador entra con real=null cuando el
+  // cruce coincide y el slot aún no se ha jugado.
+  if (realL == null || realR == null) return empty;
 
-  if (pred.l !== null && pred.l !== undefined &&
-      pred.v !== null && pred.v !== undefined &&
-      Math.sign(pred.l - pred.v) === Math.sign(realL - realR)) {
-    pts += 1;
-  }
+  const exact = pred.l === realL && pred.v === realR;
 
-  if (isExact) pts += 3;
+  const signOk = (
+    pred.l !== null && pred.l !== undefined &&
+    pred.v !== null && pred.v !== undefined &&
+    Math.sign(pred.l - pred.v) === Math.sign(realL - realR)
+  );
 
   // Goleador (+2). golOk alimenta también la condición del boost (R3).
   // Matcher NORMALIZADO (ERR-93, _shared/scorer-normalize.mjs): absorbe drift
@@ -73,24 +95,34 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
     // acertado CUENTA (golOk=true).
     golOk = true;
   }
-  if (golOk) pts += 2;
 
   // Boost ×2 — REGLA CANÓNICA (San product owner, 12-jun-2026, R3 post-J1):
   // SOLO dobla cuando se aciertan RESULTADO EXACTO y GOLEADOR a la vez.
   // El bug previo (doblar con solo exacto) infló 8↔4 a 3 usuarios en J1.
-  const doubled = isExact && golOk && opts.boost === true;
+  const doubled = exact && golOk && opts.boost === true;
+  const iaBonus = !!opts.iaBonus;
 
+  let pts = 0;
+  if (signOk) pts += 1;
+  if (exact)  pts += 3;
+  if (golOk)  pts += 2;
+
+  let capped = false;
   if (BOOST_INCLUYE_IA) {
-    if (opts.iaBonus) pts += 1;
-    pts = Math.min(pts, 7);
+    if (iaBonus) pts += 1;
+    if (pts > 7) { pts = 7; capped = true; }
     if (doubled) pts *= 2; // máx 14
   } else {
-    pts = Math.min(pts, 7); // defensa; sin IA dentro, el máximo base es 6
+    if (pts > 7) { pts = 7; capped = true; } // defensa; sin IA dentro, el máximo base es 6
     if (doubled) pts *= 2;
-    if (opts.iaBonus) pts += 1; // máx 13
+    if (iaBonus) pts += 1; // máx 13
   }
 
-  return pts;
+  return { pts, signOk, exact, golOk, iaBonus, doubled, capped };
+}
+
+export function calcMatchPoints(pred, realL, realR, opts = {}) {
+  return calcMatchPointsBreakdown(pred, realL, realR, opts).pts;
 }
 
 // calcKOMatchPoints — modelo KO normativo (brief 26-jun-2026, §1.3). Dos
@@ -115,9 +147,28 @@ export function calcMatchPoints(pred, realL, realR, opts = {}) {
 //     scorers, iaPred }  · iaPred = { sign } de la IA para el CRUCE REAL (1.4).
 // pred.l/pred.v vienen orientados a (predHome, predAway). realL/realR a
 // (realHome, realAway). boost SIEMPRE off en KO (§1.6).
-export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
-  if (!pred || !pred.saved) return 0;
-  let pts = 0;
+// calcKOMatchPointsBreakdown — variante con flags y subtotales para el
+// dashboard. calcKOMatchPoints delega aquí.
+//
+// Devuelve {
+//   pts,           // total del slot (marcador + avance)
+//   matchupOk,     // {predHome,predAway} ≡ {realHome,realAway}
+//   swap,          // true si el marcador del usuario tuvo que invertirse
+//   signOk,        // marcador: signo correcto (post-orientación)
+//   exact,         // marcador: exacto (post-orientación)
+//   golOk,         // marcador: goleador acertado
+//   iaBonus,       // marcador: bono anti-IA aplicado
+//   matchPts,      // subtotal del marcador (0 si matchupOk=false)
+//   advanced,      // avance: predAdvancer ∈ realRoundAdvancers (o per-slot fallback)
+//   advancePts,    // KO_ROUND_PTS[round] si avanzó, 0 en otro caso
+// }
+export function calcKOMatchPointsBreakdown(pred, realL, realR, round, opts = {}) {
+  const empty = {
+    pts: 0, matchupOk: false, swap: false,
+    signOk: false, exact: false, golOk: false, iaBonus: false,
+    matchPts: 0, advanced: false, advancePts: 0,
+  };
+  if (!pred || !pred.saved) return empty;
 
   const predHome = opts.predHome ?? null;
   const predAway = opts.predAway ?? null;
@@ -127,24 +178,33 @@ export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
   const realAdvancer = opts.realAdvancer ?? null;
 
   // (a) Marcador — gate de cruce (igualdad de CONJUNTO de iso3).
-  const matchupCoincide =
+  const matchupOk =
     predHome != null && predAway != null && realHome != null && realAway != null &&
     ((predHome === realHome && predAway === realAway) ||
      (predHome === realAway && predAway === realHome));
 
-  if (matchupCoincide) {
+  let matchPts = 0;
+  let swap = false;
+  let signOk = false, exact = false, golOk = false, iaBonus = false;
+
+  if (matchupOk) {
     // Orientar al marco real: si el usuario invirtió los lados (su home es el
     // away real), intercambiar su marcador antes de comparar (ERR-95/96).
-    const swap = predHome === realAway;
+    swap = predHome === realAway;
     const oriented = swap ? { ...pred, l: pred.v, v: pred.l } : pred;
-    const iaBonus = opts.iaPred
+    const ia = opts.iaPred
       ? iaBonusPredicate(opts.iaPred, { l: oriented.l, v: oriented.v }, realL, realR)
       : false;
-    pts += calcMatchPoints(oriented, realL, realR, {
+    const bd = calcMatchPointsBreakdown(oriented, realL, realR, {
       scorers: opts.scorers ?? null,
-      iaBonus,
+      iaBonus: ia,
       boost: false,
     });
+    matchPts = bd.pts;
+    signOk   = bd.signOk;
+    exact    = bd.exact;
+    golOk    = bd.golOk;
+    iaBonus  = bd.iaBonus;
   }
 
   // (b) Avance — SET-BASED por equipo (San 30-jun-2026). +KO_ROUND_PTS[round] si
@@ -155,14 +215,26 @@ export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
   // ronda (solo slots resueltos; 103 'third' excluido vía KO_ROUND_PTS).
   // Fallback al criterio por-slot si el caller no pasa el set (compat).
   const roundPts = KO_ROUND_PTS[round] || 0;
-  const advanced = opts.realRoundAdvancers instanceof Set
-    ? opts.realRoundAdvancers.has(predAdvancer)
-    : (realAdvancer != null && predAdvancer === realAdvancer);
-  if (roundPts > 0 && predAdvancer != null && advanced) {
-    pts += roundPts;
-  }
+  const advanced = (
+    predAdvancer != null && (
+      opts.realRoundAdvancers instanceof Set
+        ? opts.realRoundAdvancers.has(predAdvancer)
+        : (realAdvancer != null && predAdvancer === realAdvancer)
+    )
+  );
+  const advancePts = (roundPts > 0 && advanced) ? roundPts : 0;
 
-  return pts;
+  return {
+    pts: matchPts + advancePts,
+    matchupOk, swap,
+    signOk, exact, golOk, iaBonus,
+    matchPts,
+    advanced, advancePts,
+  };
+}
+
+export function calcKOMatchPoints(pred, realL, realR, round, opts = {}) {
+  return calcKOMatchPointsBreakdown(pred, realL, realR, round, opts).pts;
 }
 
 // calcKoPodiumPoints — clasificación final (§1.5), UNA vez por usuario tras la

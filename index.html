@@ -603,6 +603,22 @@ try {
 
 
 <!-- ═══════════════════════════════════════════════════════════════
+     HTML · PAGE: DASHBOARD — vista por jugador (mountPorra)
+     Archivo destino : index.html
+     ─────────────────────────────────────────────────────────────
+     Usa             : showPage
+     Expone          : #page-dashboard
+     Deps            : js-porra-dashboard (LAZY, ui-nav.js inyecta el
+                       <script>/<link> la primera vez que showPage('dashboard')
+                       se dispara, igual que loadScript en main-entry).
+     Notas           : porra-dashboard.js añade class="pd" al root del mount
+                       (window.mountPorra(host, opts)); todos los estilos de
+                       porra-dashboard.css están scoped bajo .pd.
+════════════════════════════════════════════════════════════════ -->
+<div id="page-dashboard" style="display:none"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
      HTML · PAGE: ELIMINATORIAS  (id=page-elim)
      Archivo destino : index.html
      ─────────────────────────────────────────────────────────────

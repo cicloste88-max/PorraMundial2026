@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**30-jun** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo. Bracket FIFA → `docs/ko-bracket.md`.
+**30-jun** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo + **Dashboard porra** v1. Bracket FIFA → `docs/ko-bracket.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 

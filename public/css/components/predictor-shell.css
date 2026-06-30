@@ -67,18 +67,23 @@
   padding: 16px 0 12px;
 }
 
+/* Cluster Dashboard + Clasificación, alineado a la IZQUIERDA. La fila se
+   colapsó: ya no contiene el eyebrow "PREDICTOR" (eliminado por
+   redundante con el botón Dashboard que ya identifica la pantalla); los
+   dos botones quedan como un grupo de pills con gap. */
 .fc-pred-eyebrow-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   margin-bottom: 6px;
 }
 
-/* Item 9 post-J1 — el trofeo abre Clasificación (la pantalla más buscada
-   cada jornada) y pasaba desapercibido: 32px gris translúcido sin label.
-   Ahora pill dorada (paleta trofeo de los chips: --fifa-gold #C9A961) con
-   label corto y target táctil ≥44px. Destaca sin gritar: fondo tenue +
-   borde, nunca sólido. */
+/* Dashboard + Clasificación comparten el MISMO pill dorado (--fifa-gold
+   #C9A961): target táctil ≥44px, fondo tenue translúcido + borde dorado,
+   nunca sólido. Antes el Dashboard tenía un pill neutro (gris) que rompía
+   la simetría visual y empujaba a Clasificación; ahora son simétricos. */
+.fc-pred-dashboard-btn,
 .fc-pred-trophy-btn {
   display: inline-flex;
   align-items: center;
@@ -94,14 +99,18 @@
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
+.fc-pred-dashboard-btn:hover,
+.fc-pred-dashboard-btn:focus-visible,
 .fc-pred-trophy-btn:hover,
 .fc-pred-trophy-btn:focus-visible {
   background: rgba(201, 169, 97, 0.2);
   outline: none;
 }
+.fc-pred-dashboard-btn:active,
 .fc-pred-trophy-btn:active {
   transform: scale(0.97);
 }
+.fc-pred-dashboard-label,
 .fc-pred-trophy-label {
   font-family: var(--font-display);
   font-size: 11px;
@@ -112,6 +121,7 @@
 }
 @media (max-width: 350px) {
   /* Pantallas mínimas: icono solo — el target 44px se mantiene. */
+  .fc-pred-dashboard-label,
   .fc-pred-trophy-label { display: none; }
 }
 

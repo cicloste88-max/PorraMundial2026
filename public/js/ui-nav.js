@@ -496,6 +496,58 @@ function koInit() {
   // ─────────────────────────────────────────────────────────────
   // NAVEGACIÓN SPA — showPage, updateKOPts, initWelcome
   // ─────────────────────────────────────────────────────────────
+
+// Lazy-load del Dashboard de la porra (porra-dashboard.js + porra-dashboard.css).
+// Idempotente: si ya está cargado, sólo re-monta. La CSS está scoped a `.pd`
+// así que no contamina el resto de pages mientras está en el <head>.
+var _dashLoadPromise = null;
+function _mountDashboardLazy() {
+  var host = document.getElementById('page-dashboard');
+  if (!host) return;
+  function _doMount() {
+    if (typeof window.mountPorra !== 'function') {
+      console.warn('[dashboard] mountPorra no disponible tras carga');
+      return;
+    }
+    // getActiveLeagueId vive en leagues.js (window-exposed L379). Fallback al
+    // bare-identifier si fuera necesario (no es el caso hoy, pero defensa
+    // espejo del patrón de porra-dashboard.js::_getActiveLeagueId).
+    var leagueId = null;
+    try {
+      if (typeof window.getActiveLeagueId === 'function') leagueId = window.getActiveLeagueId();
+      else if (typeof getActiveLeagueId === 'function') leagueId = getActiveLeagueId();
+    } catch (_e) {}
+    window.mountPorra(host, {
+      league: leagueId,
+      lockLeague: true,
+      openGroups: false,
+      onBack: function () { showPage('predictor'); },
+    });
+  }
+  if (typeof window.mountPorra === 'function') { _doMount(); return; }
+  if (_dashLoadPromise) { _dashLoadPromise.then(_doMount); return; }
+  _dashLoadPromise = new Promise(function (resolve) {
+    // CSS link (idempotente vía data-attribute).
+    if (!document.querySelector('link[data-porra-dashboard]')) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/css/porra-dashboard.css';
+      link.setAttribute('data-porra-dashboard', '1');
+      document.head.appendChild(link);
+    }
+    // Script (classic, no module — patrón loadScript de main-entry).
+    var s = document.createElement('script');
+    s.src = '/js/porra-dashboard.js';
+    s.onload = function () { resolve(); };
+    s.onerror = function () {
+      console.error('[dashboard] No se pudo cargar porra-dashboard.js');
+      resolve();
+    };
+    document.head.appendChild(s);
+  });
+  _dashLoadPromise.then(_doMount);
+}
+
 /* ══ NAVEGACIÓN SPA ══ */
 function showPage(page) {
   // F7.4-D-1: exponer página actual ANTES de cualquier toggle/render.
@@ -509,7 +561,7 @@ function showPage(page) {
   if (_lockCss && page === 'welcome') return;
   if (_lockCss && page !== 'welcome') _lockCss.remove();
   if ((page === 'grupos' || page === 'elim' || page === 'score' || page === 'perfil' ||
-       page === 'jornada' || page === 'directo' || page === 'predictor') && !currentUser) { openAuthModal('login'); return; }
+       page === 'jornada' || page === 'directo' || page === 'predictor' || page === 'dashboard') && !currentUser) { openAuthModal('login'); return; }
   if (page === 'admin' && (!currentUser || !currentUser.is_admin)) return;
 
   // Capturar página actual ANTES de cambiar display (para el botón volver de score)
@@ -528,6 +580,8 @@ function showPage(page) {
   document.getElementById('page-elim').style.display      = page==='elim'      ? 'block' : 'none';
   document.getElementById('page-score').style.display     = page==='score'     ? 'block' : 'none';
   document.getElementById('page-admin').style.display     = page==='admin'     ? 'block' : 'none';
+  var pageDash = document.getElementById('page-dashboard');
+  if (pageDash) pageDash.style.display = page==='dashboard' ? 'block' : 'none';
   // Auth bar fixed: solo en welcome
   const authBar = document.getElementById('wc-auth-bar');
   if (authBar) authBar.style.display = page==='welcome' ? 'flex' : 'none';
@@ -572,6 +626,10 @@ function showPage(page) {
   if(page === 'predictor') {
     window.scrollTo(0,0);
     if (typeof window.mountPredShell === 'function') window.mountPredShell();
+  }
+  if(page === 'dashboard') {
+    window.scrollTo(0,0);
+    _mountDashboardLazy();
   }
   if(page === 'welcome') { if(currentUser && typeof leagueRenderPanel === 'function') setTimeout(leagueRenderPanel, 50); }
   if(page === 'welcome') window.scrollTo(0,0);

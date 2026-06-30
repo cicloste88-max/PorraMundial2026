@@ -2,6 +2,54 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [30-jun-2026] Feat: Dashboard de la porra — vista por jugador (`claude/predictor-league-dashboard-u0zjzt`)
+
+Nueva pantalla **Dashboard de la porra** accesible desde el botón
+**Dashboard** (icono grid 4-cell) a la **izquierda de Clasificación** en el
+header del Predictor. Permite consultar el desglose completo de puntuación
+de cualquier miembro de la liga (post-cierre 10-jun el detalle ajeno está
+permitido entre miembros): hero (totales), evolución por hitos, bracket
+reconstruido + podio predicho, jornadas 1-3 partido a partido (signo/exacto/
+goleador/IA/boost desglosados), KO clasificados a R32 (aciertos+fallos),
+KO R32 cerrados (marcador+avance subtotales), premios individuales.
+
+**Backend**: nueva EF `get-dashboard` v1.0.0 (`verify_jwt=false`, mismo
+contrato auth que `get-league-standings`: bearer del usuario +
+service_role privileged + membership gate del caller). Reutiliza el motor
+compartido (`_shared/scoring.mjs` con las nuevas funciones
+`calcMatchPointsBreakdown` + `calcKOMatchPointsBreakdown` que devuelven
+flags individuales) + `_shared/ko-bracket.mjs` (cascada del bracket
+predicho) + `ia-bridge.mjs` (puente ia_predictions ↔ predictions). El
+bloque de ingest se duplica con `get-league-standings` (~250 LOC, anotado
+como deuda técnica post-launch).
+
+**Frontend**: `public/js/porra-dashboard.js` (adaptación del pack de San,
+30-jun) expone `window.mountPorra(root, opts)`. Selector poblado con
+`get-league-standings` (lista + totales, filtra bots + `cicloste88`);
+detalle por usuario con `get-dashboard` (lazy fetch al cambiar `<select>`,
+evita servir 290KB+ de payload sin necesidad). Catálogos FLAG/ISO_TO_ES
+derivados de `EQUIPOS` (data.js) + `ISO3_TO_FLAG` (ui-globo-equipos.js).
+CSS `public/css/porra-dashboard.css` scoped bajo `.pd` para no chocar con
+clases legacy unprefixed (`.match`, `.score`, `.chip`, `.badge`, `.pts`).
+
+**Refactor motor**: `_shared/scoring.mjs` introduce `calcMatchPointsBreakdown`
+y `calcKOMatchPointsBreakdown` con `{ pts, signOk, exact, golOk, iaBonus,
+doubled, matchupOk, swap, matchPts, advanced, advancePts }`.
+`calcMatchPoints` y `calcKOMatchPoints` son ahora wrappers triviales que
+devuelven `.pts` del breakdown — **cero divergencia** entre total publicado
+y flags emitidos al dashboard. `public/js/scoring.js` (legacy) **intacto**;
+parity tests shared↔legacy 1:1 siguen verdes. Suite 228/228 ok.
+
+**Nav**: `showPage('dashboard')` añade auth gate, toggle de
+`#page-dashboard`, lazy-load idempotente de `porra-dashboard.js`+`.css`
+(`<link data-porra-dashboard>` + `<script>` inyectados al primer toque,
+cached via `_dashLoadPromise`); invoca `mountPorra` con `lockLeague:true`
++ `onBack:()=>showPage('predictor')`.
+
+**Build**: `dist/css/porra-dashboard.css` + `dist/js/porra-dashboard.js`
+en `dist/` (ERR-22 ✓). Botón verificado en `dist/css/components/
+predictor-shell.css` (`.fc-pred-dashboard-btn`).
+
 ## [30-jun-2026] Feat: avance KO SET-BASED por equipo (`claude/ko-advancement-set-based-lqb9xf`)
 
 `calcKOMatchPoints` (`_shared/scoring.mjs` + espejo `public/js/scoring.js`,

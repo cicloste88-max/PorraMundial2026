@@ -1,5 +1,9 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.6.0
+// PR-1 · Leaderboard de liga · v1.7.0
+//   v1.7.0 (Dashboard PR #179): añade `leagueName` (string|null) top-level al
+//     response leyendo leagues.nombre por league_id (soft-fail). Cero impacto
+//     en scoring/ingest; permite al cliente (porra-dashboard.js) renderizar
+//     el nombre real de la liga sin mantener un catálogo estático LEAGUE_NAME.
 //   v1.6.0 (KO avance set-based): el +pts de avance KO se otorga si el equipo
 //     que el usuario marcó avanzar está entre los que REALMENTE avanzaron en la
 //     ronda (independiente del slot/cruce). Antes era predAdvancer===realAdvancer
@@ -249,6 +253,7 @@ serve(async (req: Request) => {
     { data: wcRows,    error: wcErr },
     { data: wcKoRows,  error: wcKoErr },
     { data: iaKoRows,  error: iaKoErr },
+    { data: leagueRow, error: lgErr },
   ] = await Promise.all([
     supa.from("league_members").select("user_id").eq("league_id", leagueId),
     fetchAllCompat((from, to) => supa.from("predictions").select("user_id, match_id, local, visitante, scorer").eq("league_id", leagueId).order("id").range(from, to)),
@@ -273,6 +278,10 @@ serve(async (req: Request) => {
     // fetchAll), una por par; sign independiente de orientación (se LEEN, no se
     // recomputan). Sin filtro de snapshot: el on-demand no cuelga del snapshot.
     supa.from("ia_predictions").select("home_code, away_code, sign").eq("is_ko_ondemand", true),
+    // v1.7.0: leagueName en el response para que el cliente no tenga que
+    // mantener un catálogo estático LEAGUE_NAME (Dashboard pill). SOFT-FAIL:
+    // si la query falla, el cliente cae a un nombre vacío y muestra el icono.
+    supa.from("leagues").select("nombre").eq("id", leagueId).maybeSingle(),
   ]);
 
   for (const [err, label] of [
@@ -298,6 +307,9 @@ serve(async (req: Request) => {
   // Anti-IA KO también soft-fail: si la query de ia_predictions on-demand falla,
   // el bonus +1 anti-IA KO degrada a 0 sin tumbar el scoreboard.
   if (iaKoErr) console.error("[standings] ia_predictions(is_ko_ondemand) query failed (anti-IA KO degrada a 0):", iaKoErr.message);
+  // leagueName soft-fail: si la query falla (RLS, liga eliminada en concurrente),
+  // el cliente recibe leagueName=null y muestra solo el icono.
+  if (lgErr) console.error("[standings] leagues query failed (leagueName degrada a null):", lgErr.message);
 
   const memberUids = (members ?? []).map((m: { user_id: string }) => m.user_id);
   const { data: profiles, error: profErr } = await supa
@@ -583,7 +595,12 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.6.0" }),
+    JSON.stringify({
+      rows: filtered,
+      league_id: leagueId,
+      leagueName: leagueRow?.nombre ?? null,
+      version: "1.7.0",
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
