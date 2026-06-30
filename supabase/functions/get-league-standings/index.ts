@@ -1,5 +1,14 @@
 // supabase/functions/get-league-standings/index.ts
-// PR-1 · Leaderboard de liga · v1.5.1
+// PR-1 · Leaderboard de liga · v1.6.0
+//   v1.6.0 (KO avance set-based): el +pts de avance KO se otorga si el equipo
+//     que el usuario marcó avanzar está entre los que REALMENTE avanzaron en la
+//     ronda (independiente del slot/cruce). Antes era predAdvancer===realAdvancer
+//     del MISMO slot → ignoraba "equipo correcto, slot equivocado" (típico: Brasil
+//     cae en otro cruce pero pasa). Se construye realRoundAdvancers (Set<iso3>
+//     por ronda, solo slots resueltos; 103 'third' excluido vía KO_ROUND_PTS) y
+//     se pasa a calcKOMatchPoints. El gate `if (!real) continue` se retira para
+//     que el avance pueda pagar aunque MI slot no esté resuelto todavía (el
+//     motor degrada limpio: sin scores → 0 marcador, set pasa el avance).
 //   v1.5.1 (follow-up KO): anti-IA KO cableado. iaByKoSlot se puebla desde las
 //     predicciones IA on-demand (ia_predictions.is_ko_ondemand=true) que el
 //     usuario VIO al montar su bracket — se LEEN, no se recomputan. Una entrada
@@ -427,6 +436,21 @@ serve(async (req: Request) => {
   // (Hasta sembrar wc_matches_ko, realKoTeamsBySlot está vacío → iaByKoSlot {}.)
   const iaByKoSlot: Record<number, { sign: string }> = buildKoIaSignBySlot(iaKoRows ?? [], realKoTeamsBySlot);
 
+  // Avance SET-BASED por equipo (San 30-jun-2026): para cada ronda con avance
+  // (r32 r16 qf sf final; slot 103 'third' excluido vía KO_ROUND_PTS), conjunto
+  // de iso3 que REALMENTE avanzaron en CUALQUIER slot de la ronda (solo slots
+  // resueltos). Permite puntuar el +pts cuando el usuario acierta el EQUIPO
+  // aunque el slot/cruce no coincida (p.ej. Brasil cae en otro cruce pero pasa).
+  const realRoundAdvancers: Record<string, Set<string>> = {
+    r32: new Set<string>(), r16: new Set<string>(), qf: new Set<string>(),
+    sf: new Set<string>(), final: new Set<string>(),
+  };
+  for (const [slotStr, rnd] of Object.entries(KO_ROUND_BY_ID)) {
+    if (rnd === "third") continue;
+    const mesh = realSlotMesh(Number(slotStr));
+    if (mesh?.advancer) realRoundAdvancers[rnd].add(mesh.advancer);
+  }
+
   // Rows crudas por usuario para resolveBracket (cascada de la malla predicha).
   const predRowsByUser: Record<string, Array<{ match_id: string; local: number; visitante: number }>> = {};
   for (const p of preds ?? []) {
@@ -481,20 +505,22 @@ serve(async (req: Request) => {
       const matchId = Number(matchIdStr);
       const round = KO_ROUND_BY_ID[matchId];
       if (!round) continue;
-      const real = realKoResults?.[String(matchId)];
-      if (!real) continue;
+      // Set-based: no se cortocircuita por falta de `real` o `realMesh` — el
+      // avance puede pagar aunque MI slot no tenga resultado todavía, si mi
+      // equipo avanzó en otro slot de la ronda (calcKOMatchPoints lee la set).
+      const real = realKoResults?.[String(matchId)] ?? null;
       const realMesh = realSlotMesh(matchId);
-      if (!realMesh) continue; // slot sin entrada en wc_matches_ko → 0 limpio
       const ps = predSlots[matchId] ?? {};
-      koPts += calcKOMatchPoints({ ...pred, saved: true as const }, real.l, real.v, round, {
-        scorers: real.scorers ?? null,
+      koPts += calcKOMatchPoints({ ...pred, saved: true as const }, real?.l ?? null, real?.v ?? null, round, {
+        scorers: real?.scorers ?? null,
         boost: false,
         predHome:     toIso3(ps.home),
         predAway:     toIso3(ps.away),
         predAdvancer: toIso3(ps.winner),
-        realHome:     realMesh.home,
-        realAway:     realMesh.away,
-        realAdvancer: realMesh.advancer,
+        realHome:     realMesh?.home ?? null,
+        realAway:     realMesh?.away ?? null,
+        realAdvancer: realMesh?.advancer ?? null,
+        realRoundAdvancers: realRoundAdvancers[round] ?? null,
         iaPred:       iaByKoSlot[matchId] ?? null,
       });
     }
@@ -557,7 +583,7 @@ serve(async (req: Request) => {
     .sort((a, b) => b.total - a.total || b.grpPts - a.grpPts);
 
   return new Response(
-    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.5.1" }),
+    JSON.stringify({ rows: filtered, league_id: leagueId, version: "1.6.0" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

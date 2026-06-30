@@ -269,12 +269,49 @@
     return { rs: rs, vKo: vKo };
   }
 
+  // Avanzador real iso3 de UN slot (mirror exacto de la lógica de buildKoCard
+  // para realAdvIso): prioriza real.winner; fallback a marcador final cuando el
+  // ganador es deducible. Usado por _buildRealRoundAdvancers para poblar la set
+  // SET-BASED por ronda (San 30-jun-2026, set-based KO advance).
+  function _realAdvIsoForKoSlot(m, koReal) {
+    var real = koReal ? (koReal[String(m.id)] || koReal[m.id] || null) : null;
+    var live = _koLiveFor(m.id);
+    var realHomeName = (real && real.home_iso3) ? _nameForIso(real.home_iso3) : ((live && live.home_team_name) || null);
+    var realAwayName = (real && real.away_iso3) ? _nameForIso(real.away_iso3) : ((live && live.away_team_name) || null);
+    var realHomeIso = (real && real.home_iso3) ? real.home_iso3 : _isoForName(realHomeName);
+    var realAwayIso = (real && real.away_iso3) ? real.away_iso3 : _isoForName(realAwayName);
+    if (real && real.winner) return (real.winner === 'home') ? realHomeIso : realAwayIso;
+    var realL = null, realV = null;
+    var ls = live ? live.status : null;
+    if (real && real.status === 'finished' && real.l != null && real.v != null) { realL = real.l; realV = real.v; }
+    else if (ls === 'finished' && live.score_home != null && live.score_away != null) { realL = live.score_home; realV = live.score_away; }
+    if (realL != null && realV != null && realL !== realV) return (realL > realV) ? realHomeIso : realAwayIso;
+    return null;
+  }
+  // Set<iso3> de avanzadores reales por ronda (slot 103 'third' excluido, no da
+  // avance). Conjunto vivo: crece según se finalizan slots de la ronda.
+  function _buildRealRoundAdvancers(B, koReal) {
+    var rounds = ['r32', 'r16', 'qf', 'sf', 'final'];
+    var out = {};
+    rounds.forEach(function (rnd) {
+      var set = new Set();
+      var slots = Array.isArray(B[rnd]) ? B[rnd] : [];
+      slots.forEach(function (m) {
+        var iso = _realAdvIsoForKoSlot(m, koReal);
+        if (iso) set.add(iso);
+      });
+      out[rnd] = set;
+    });
+    return out;
+  }
+
   // View-object de una card KO para el slot m (entrada BRACKET de su ronda).
   // rs = resolvedSlots del visitado (nombres ES); vKo = sus ko_predictions;
   // koReal = mapa slot→cruce/resultado real (EF). round = 'r32'…'final'|'third'.
   function buildKoCard(m, round, rs, vKo, koReal, opts) {
     opts = opts || {};
     var advPts = _koRoundPts()[round] || 0;
+    var roundAdvSet = (opts.realRoundAdvancers instanceof Set) ? opts.realRoundAdvancers : null;
 
     // ── Lado del jugador (su predicción) ──
     var predHomeName = rs[m.home] || null;            // nombre ES si su malla lo resuelve
@@ -336,7 +373,15 @@
       cruceMatch = (homeIso === realHomeIso && awayIso === realAwayIso) ||
                    (homeIso === realAwayIso && awayIso === realHomeIso);
     }
-    if (realAdvIso && predAdvIso) pasaMatch = (predAdvIso === realAdvIso);
+    // Avance SET-BASED (San 30-jun-2026): el equipo del usuario avanzó si está
+    // entre los avanzadores reales de la RONDA (cualquier slot). Para 'third'
+    // (sin set: no hay avance, solo "Gana 3.º") se mantiene el criterio
+    // slot-bound = comparación con realAdvIso.
+    if (roundAdvSet && predAdvIso) {
+      pasaMatch = roundAdvSet.has(predAdvIso);
+    } else if (realAdvIso && predAdvIso) {
+      pasaMatch = (predAdvIso === realAdvIso);
+    }
     if (cruceMatch && hasPred && (phase === 'final' || phase === 'live')) {
       // Orientar el marcador del jugador al marco real (su home puede ser el away real).
       var swap = (homeIso === realAwayIso);
@@ -352,17 +397,23 @@
     }
 
     // ── Puntos: motor real calcKOMatchPoints (marcador con gate de cruce +
-    //    avance por equipo). Anti-IA omitido (la IA por cruce no se carga en
-    //    este modal; divergencia ≤ +1/cruce vs leaderboard). Solo finished. ──
+    //    avance set-based por equipo). Anti-IA omitido (la IA por cruce no se
+    //    carga en este modal; divergencia ≤ +1/cruce vs leaderboard). El
+    //    marcador solo paga si phase==='final' (necesita realL/realV); el
+    //    avance puede pagar aunque MI slot no esté resuelto, si el equipo
+    //    pasó en otro slot (set membership). ──
     var pts = 0;
-    if (phase === 'final' && hasPred && typeof calcKOMatchPoints === 'function') {
+    if (hasPred && typeof calcKOMatchPoints === 'function') {
+      var passL = (phase === 'final') ? realL : null;
+      var passV = (phase === 'final') ? realV : null;
       pts = calcKOMatchPoints(
         { saved: true, l: pk.l, v: pk.v, gol: pk.gol, home: predHomeName, away: predAwayName },
-        realL, realV, round,
+        passL, passV, round,
         {
           predHome: homeIso, predAway: awayIso,
           realHome: realHomeIso, realAway: realAwayIso,
           predAdvancer: predAdvIso, realAdvancer: realAdvIso,
+          realRoundAdvancers: roundAdvSet,
           scorers: (real && real.scorers) || null,
         }
       ) || 0;
@@ -388,9 +439,12 @@
     var B = _koBracket();
     if (!B) return [];
     var ptsTable = _koRoundPts();
+    // Set<iso3> de avanzadores reales por ronda (set-based, San 30-jun-2026).
+    var realByRound = _buildRealRoundAdvancers(B, koReal);
     return KO_ROUND_DEFS.map(function (def) {
       var slots = Array.isArray(B[def.round]) ? B[def.round] : [];
-      var cards = slots.map(function (m) { return buildKoCard(m, def.round, rs, vKo, koReal); });
+      var roundSet = realByRound[def.round] || null;
+      var cards = slots.map(function (m) { return buildKoCard(m, def.round, rs, vKo, koReal, { realRoundAdvancers: roundSet }); });
       if (def.includeThird && Array.isArray(B.third)) {
         B.third.forEach(function (m) { cards.push(buildKoCard(m, 'third', rs, vKo, koReal, { isThird: true })); });
       }
@@ -542,14 +596,26 @@
       ? '<div class="up-scorer">⚽ Goleador: <b class="' + (c.goleOk ? 'gol-ok' : '') + '">' + esc(c.scorer) + '</b>' + (c.goleOk ? ' ✓' : '') + '</div>'
       : '';
 
-    // Clasificado: a quién pronosticó el jugador que pasa + a quién pasó en REAL.
-    // La marca ✓/✗ solo cuando hay pick (no penalizar la ausencia de pronóstico).
+    // Clasificado: a quién pronosticó el jugador que pasa. Mark ✓/✗ solo
+    // cuando hay pick (no penalizar la ausencia de pronóstico).
+    // - 'third' (slot 103, sin avance): slot-bound — muestra "Real: <X>" y
+    //   compara contra el ganador del 3.º puesto.
+    // - Resto (avance set-based, San 30-jun-2026): el "Real: X" del slot es
+    //   engañoso (mi equipo puede haber pasado en otro slot); se omite. ✓ si
+    //   mi equipo pasó (en cualquier slot de la ronda), ✗ solo cuando MI slot
+    //   está finalizado y mi equipo no pasó (señal definitiva).
     var advLbl = c.isThird ? 'Gana 3.º' : 'Pasa';
-    var advMark = (c.realAdvName != null && c.predAdvName) ? (c.pasaMatch ? ' <span class="up-ko-ok">✓</span>' : ' <span class="up-ko-no">✗</span>') : '';
-    var advReal = (c.realAdvName != null)
-      ? ' <span class="up-ko-adv__real">· Real: <b>' + esc(c.realAdvName) + '</b></span>' + advMark
-      : '';
-    var advHtml = '<div class="up-ko-adv">' + advLbl + ': <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advReal + '</div>';
+    var advHtml;
+    if (c.isThird) {
+      var advMarkT = (c.realAdvName != null && c.predAdvName) ? (c.pasaMatch ? ' <span class="up-ko-ok">✓</span>' : ' <span class="up-ko-no">✗</span>') : '';
+      var advRealT = (c.realAdvName != null) ? ' <span class="up-ko-adv__real">· Real: <b>' + esc(c.realAdvName) + '</b></span>' + advMarkT : '';
+      advHtml = '<div class="up-ko-adv">' + advLbl + ': <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advRealT + '</div>';
+    } else {
+      var advMarkS = '';
+      if (c.predAdvName && c.pasaMatch) advMarkS = ' <span class="up-ko-ok">✓</span>';
+      else if (c.predAdvName && c.phase === 'final') advMarkS = ' <span class="up-ko-no">✗</span>';
+      advHtml = '<div class="up-ko-adv">' + advLbl + ': <b>' + (c.predAdvName ? esc(c.predAdvName) : '—') + '</b>' + advMarkS + '</div>';
+    }
 
     var chip = function (label, on, gold) {
       return '<span class="up-chip' + (on ? ' on' : '') + (on && gold ? ' gold' : '') + '">' + label + '</span>';

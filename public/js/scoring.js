@@ -285,10 +285,18 @@ function calcKOMatchPoints(pred, realL, realR, round, opts) {
     pts += base;
   }
 
-  // (b) Avance — por equipo.
+  // (b) Avance — SET-BASED por equipo (San 30-jun-2026). +KO_ROUND_PTS[round] si
+  // el equipo que el usuario marcó avanzar en este slot está entre los que
+  // REALMENTE avanzaron en la ronda (independiente de slot/cruce). Antes era
+  // predAdvancer === realAdvancer (mismo slot) → ignoraba "equipo correcto, slot
+  // equivocado". opts.realRoundAdvancers: Set<iso3> de avanzadores reales de la
+  // ronda (solo slots resueltos; 103 'third' excluido vía KO_ROUND_PTS).
+  // Fallback al criterio por-slot si el caller no pasa el set (compat).
   const roundPts = KO_ROUND_PTS[round] || 0;
-  if (roundPts > 0 && predAdvancer != null && realAdvancer != null &&
-      predAdvancer === realAdvancer) {
+  const advanced = (opts.realRoundAdvancers instanceof Set)
+    ? opts.realRoundAdvancers.has(predAdvancer)
+    : (realAdvancer != null && predAdvancer === realAdvancer);
+  if (roundPts > 0 && predAdvancer != null && advanced) {
     pts += roundPts;
   }
 
