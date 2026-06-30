@@ -66,6 +66,43 @@
 .pd .section-collapsible[open] h2::after { color:var(--gold); }
 .pd .pts-tot { font-family:var(--fdisp); font-size:11px; font-weight:900; color:var(--gold); background:rgba(201,169,97,.12); border:1px solid rgba(201,169,97,.3); border-radius:999px; padding:2px 9px; }
 
+/* Rondas KO pendientes — placeholders muted (no expandibles) que muestran
+   la estructura del bracket aunque no haya datos. Se distinguen del estado
+   "ronda jugada" por la opacidad, los tokens muted (ink-500/600), el cursor
+   default y el badge "pendiente" (gris en vez de dorado). */
+.pd .section-collapsible--pending { opacity: 0.55; }
+.pd .section-collapsible__pending-summary {
+  cursor: default;
+  list-style: none;
+  padding: 15px 0 12px;
+  user-select: none;
+}
+.pd .section-collapsible--pending h2 {
+  margin: 0;
+  font-family: var(--fdisp);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pd .section-collapsible--pending h2::after {
+  content: '🔒';
+  margin-left: auto;
+  color: var(--ink-600);
+  font-size: 11px;
+}
+.pd .pts-tot--pending {
+  color: var(--ink-400);
+  background: rgba(122, 129, 148, 0.14);
+  border: 1px solid var(--ink-700);
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
 .pd .evo { display:flex; flex-direction:column; gap:9px; padding-bottom:8px; }
 .pd .evo-row { display:grid; grid-template-columns:92px 1fr 36px; gap:10px; align-items:center; }
 .pd .evo-lbl { font-size:10px; color:var(--ink-300); }

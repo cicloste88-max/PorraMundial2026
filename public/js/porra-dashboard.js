@@ -435,30 +435,32 @@
       +   '</div>'
       + '</details>'
 
-      // KO · una sección POR RONDA con filas. r32 → r16 → qf → sf → 3er →
-      // final. Si una ronda no tiene filas en u.kr, su sección se omite. Si
-      // NINGUNA ronda tiene filas, se muestra un único placeholder.
-      + (function () {
-          const sections = [];
-          for (const rd of KO_ROUND_ORDER) {
-            const rows = koByRound[rd];
-            if (!rows.length) continue;
+      // KO · UNA sección por ronda, las 6 SIEMPRE visibles en orden
+      // cronológico (r32 → r16 → qf → sf → third → final). Rondas con
+      // filas en u.kr renderizan sus slots + subtotal. Rondas vacías
+      // (futuras, aún no sembradas en wc_matches_ko) renderizan un
+      // placeholder atenuado con badge "pendiente" — la estructura del
+      // bracket se ve completa desde el primer día y se rellena sola
+      // cuando los slots se siembren (get-dashboard ya devuelve `rd`).
+      + KO_ROUND_ORDER.map(function (rd) {
+          const rows = koByRound[rd];
+          const label = esc(KO_ROUND_LABEL[rd]);
+          if (rows.length) {
             const subtotal = rows.reduce(function (s, k) { return s + (k.p || 0); }, 0);
-            sections.push(''
-              + '<details class="section-collapsible">'
-              +   '<summary><h2>KO · ' + esc(KO_ROUND_LABEL[rd]) + ' <span class="pts-tot">' + subtotal + ' pts</span></h2></summary>'
-              +   '<div class="match-list">' + rows.map(koSlotCard).join('') + '</div>'
-              + '</details>');
-          }
-          if (!sections.length) {
             return ''
               + '<details class="section-collapsible">'
-              +   '<summary><h2>KO · slots cerrados <span class="pts-tot">0 pts</span></h2></summary>'
-              +   '<div class="match-list"><div class="empty">Sin slots cerrados.</div></div>'
+              +   '<summary><h2>KO · ' + label + ' <span class="pts-tot">' + subtotal + ' pts</span></h2></summary>'
+              +   '<div class="match-list">' + rows.map(koSlotCard).join('') + '</div>'
               + '</details>';
           }
-          return sections.join('');
-        })()
+          // Placeholder muted, no expandible (div en lugar de details).
+          return ''
+            + '<div class="section-collapsible section-collapsible--pending" aria-disabled="true">'
+            +   '<div class="section-collapsible__pending-summary">'
+            +     '<h2>KO · ' + label + ' <span class="pts-tot pts-tot--pending">pendiente</span></h2>'
+            +   '</div>'
+            + '</div>';
+        }).join('')
 
       + '<details class="section-collapsible">'
       +   '<summary><h2>Premios individuales '
