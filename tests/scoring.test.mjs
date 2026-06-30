@@ -22,7 +22,9 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
   calcMatchPoints as sharedCalcMatchPoints,
+  calcMatchPointsBreakdown as sharedCalcMatchPointsBreakdown,
   calcKOMatchPoints as sharedCalcKOMatchPoints,
+  calcKOMatchPointsBreakdown as sharedCalcKOMatchPointsBreakdown,
   calcKoPodiumPoints as sharedCalcKoPodiumPoints,
   calcAwardPoints as sharedCalcAwardPoints,
   iaBonusPredicate,
@@ -805,3 +807,165 @@ console.log('✓ scoring tests pasados: shared (canónicos + KO + awards + iaBon
 
 console.log('OK ERR-97 matchPlayerKey regression: particulas peso 0 + apellido obligatorio + guarda ERR-93');
 console.log('OK ERR-97 Fix 2 resolveScorerKey: fallback colisionante con rival se cualifica con iso3');
+
+// ════════════════════════════════════════════════════════════════════
+// 12. BREAKDOWN — calcMatchPointsBreakdown / calcKOMatchPointsBreakdown
+//
+// Variantes "todo lo que computé" para el dashboard. Garantía estructural:
+// calcMatchPoints y calcKOMatchPoints son wrappers triviales que devuelven
+// .pts del breakdown — cero divergencia entre el total publicado y el
+// breakdown. Los tests verifican (a) que .pts coincide con el motor canónico
+// en una batería representativa, y (b) que los flags reflejan la lógica
+// (signo/exacto/goleador/IA/doubled).
+// ════════════════════════════════════════════════════════════════════
+{
+  // ── calcMatchPointsBreakdown ──────────────────────────────────────
+  // bd1: solo signo. signOk=true, exact=false, golOk=false, iaBonus=false.
+  const bd1 = sharedCalcMatchPointsBreakdown({ saved: true, l: 2, v: 0, gol: null }, 3, 1);
+  assert.strictEqual(bd1.pts, 1, 'bd1 grupos pts');
+  assert.strictEqual(bd1.signOk, true, 'bd1 signOk');
+  assert.strictEqual(bd1.exact, false, 'bd1 exact');
+  assert.strictEqual(bd1.golOk, false, 'bd1 golOk');
+  assert.strictEqual(bd1.iaBonus, false, 'bd1 iaBonus');
+  assert.strictEqual(bd1.doubled, false, 'bd1 doubled');
+
+  // bd2: exacto + goleador + IA → cap 7. iaBonus=true, doubled=false, capped=false (7 limpio).
+  const bd2 = sharedCalcMatchPointsBreakdown(
+    { saved: true, l: 3, v: 2, gol: 'lozano' }, 3, 2, { scorers: ['lozano'], iaBonus: true }
+  );
+  assert.strictEqual(bd2.pts, 7, 'bd2 pts (cap 7)');
+  assert.strictEqual(bd2.signOk, true, 'bd2 signOk');
+  assert.strictEqual(bd2.exact, true, 'bd2 exact');
+  assert.strictEqual(bd2.golOk, true, 'bd2 golOk');
+  assert.strictEqual(bd2.iaBonus, true, 'bd2 iaBonus');
+  assert.strictEqual(bd2.doubled, false, 'bd2 doubled');
+
+  // bd3: boost dobla con exacto+goleador → doubled=true, pts=12 (sin IA), capped=false.
+  const bd3 = sharedCalcMatchPointsBreakdown(
+    { saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, { scorers: ['lozano'], boost: true }
+  );
+  assert.strictEqual(bd3.pts, 12, 'bd3 pts (×2)');
+  assert.strictEqual(bd3.doubled, true, 'bd3 doubled');
+
+  // bd4: boost sin goleador → NO dobla.
+  const bd4 = sharedCalcMatchPointsBreakdown(
+    { saved: true, l: 2, v: 0, gol: null }, 2, 0, { boost: true }
+  );
+  assert.strictEqual(bd4.pts, 4, 'bd4 pts (sin doblar)');
+  assert.strictEqual(bd4.doubled, false, 'bd4 doubled false (sin gol)');
+
+  // bd5: cap 7 marcado. exacto+gol+IA = 1+3+2+1 = 7 → capped=false (=7, no >7).
+  // exacto+gol+IA+ falsa subida → para forzar capped real con boost: 7 → ×2 = 14.
+  const bd5 = sharedCalcMatchPointsBreakdown(
+    { saved: true, l: 2, v: 0, gol: 'lozano' }, 2, 0, { scorers: ['lozano'], iaBonus: true, boost: true }
+  );
+  assert.strictEqual(bd5.pts, 14, 'bd5 pts (cap 7 × 2 = 14)');
+  assert.strictEqual(bd5.iaBonus, true, 'bd5 iaBonus');
+  assert.strictEqual(bd5.doubled, true, 'bd5 doubled');
+
+  // bd6: saved=false → todo cero.
+  const bd6 = sharedCalcMatchPointsBreakdown({ saved: false, l: 3, v: 0 }, 3, 0);
+  assert.strictEqual(bd6.pts, 0, 'bd6 saved=false');
+  assert.strictEqual(bd6.signOk, false, 'bd6 signOk false');
+
+  // bd7: regla 0-0. pred 0-0 sin gol + real 0-0 → golOk=true (sin gol explicit).
+  const bd7 = sharedCalcMatchPointsBreakdown(
+    { saved: true, l: 0, v: 0, gol: null }, 0, 0, { scorers: [] }
+  );
+  assert.strictEqual(bd7.pts, 6, 'bd7 0-0 pts');
+  assert.strictEqual(bd7.exact, true, 'bd7 exact');
+  assert.strictEqual(bd7.golOk, true, 'bd7 regla 0-0 golOk');
+
+  // ── calcKOMatchPointsBreakdown ────────────────────────────────────
+  // ko1: cruce coincide + exacto + avance r16 = 4 marcador + 15 avance = 19.
+  const ko1 = sharedCalcKOMatchPointsBreakdown(
+    { saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16',
+    { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+      realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX' }
+  );
+  assert.strictEqual(ko1.pts, 19, 'ko1 pts');
+  assert.strictEqual(ko1.matchupOk, true, 'ko1 matchupOk');
+  assert.strictEqual(ko1.swap, false, 'ko1 swap false');
+  assert.strictEqual(ko1.matchPts, 4, 'ko1 matchPts');
+  assert.strictEqual(ko1.advanced, true, 'ko1 advanced');
+  assert.strictEqual(ko1.advancePts, 15, 'ko1 advancePts');
+  assert.strictEqual(ko1.exact, true, 'ko1 exact');
+  assert.strictEqual(ko1.signOk, true, 'ko1 signOk');
+
+  // ko2: orientación swap (ERR-95/96): pred MEX 0-2 KOR; real KOR 2-0 MEX.
+  // Tras swap el marcador queda 2-0 vs 2-0 (exacto).
+  const ko2 = sharedCalcKOMatchPointsBreakdown(
+    { saved: true, l: 0, v: 2, gol: null }, 2, 0, 'r16',
+    { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'KOR',
+      realHome: 'KOR', realAway: 'MEX', realAdvancer: 'KOR' }
+  );
+  assert.strictEqual(ko2.pts, 19, 'ko2 pts swap');
+  assert.strictEqual(ko2.swap, true, 'ko2 swap=true');
+  assert.strictEqual(ko2.exact, true, 'ko2 exact tras swap');
+
+  // ko3: cruce distinto, equipo correcto vía set → 0 marcador + 15 avance.
+  const ko3 = sharedCalcKOMatchPointsBreakdown(
+    { saved: true, l: 2, v: 1, gol: null }, 0, 0, 'r16',
+    { predHome: 'BRA', predAway: 'MAR', predAdvancer: 'BRA',
+      realHome: 'KOR', realAway: 'JPN', realAdvancer: 'KOR',
+      realRoundAdvancers: new Set(['BRA', 'GER', 'KOR']) }
+  );
+  assert.strictEqual(ko3.pts, 15, 'ko3 set-based pts');
+  assert.strictEqual(ko3.matchupOk, false, 'ko3 matchupOk false');
+  assert.strictEqual(ko3.matchPts, 0, 'ko3 matchPts');
+  assert.strictEqual(ko3.advanced, true, 'ko3 advanced set');
+
+  // ko4: third NO da avance aunque el clasificador acierte ('third' ∉
+  // KO_ROUND_PTS). advanced refleja la condición lógica (predAdvancer===
+  // realAdvancer); advancePts es el pago efectivo, 0 para third.
+  const ko4 = sharedCalcKOMatchPointsBreakdown(
+    { saved: true, l: 2, v: 1, gol: null }, 2, 1, 'third',
+    { predHome: 'POR', predAway: 'NED', predAdvancer: 'POR',
+      realHome: 'POR', realAway: 'NED', realAdvancer: 'POR' }
+  );
+  assert.strictEqual(ko4.pts, 4, 'ko4 third pts');
+  assert.strictEqual(ko4.advancePts, 0, 'ko4 advancePts third (sin pago)');
+
+  // ko5: sin malla → todo cero limpio.
+  const ko5 = sharedCalcKOMatchPointsBreakdown(
+    { saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {}
+  );
+  assert.strictEqual(ko5.pts, 0, 'ko5 sin malla');
+  assert.strictEqual(ko5.matchupOk, false, 'ko5 matchupOk');
+  assert.strictEqual(ko5.advanced, false, 'ko5 advanced');
+
+  // ── PARIDAD breakdown.pts ≡ calcMatchPoints/calcKOMatchPoints ────
+  // Misma batería que el bloque 6 (parity shared↔legacy) verificando ahora
+  // que el wrapper devuelve .pts del breakdown sin divergencia.
+  const grpCases = [
+    { pred: { saved: true, l: 2, v: 0, gol: null },     rl: 3, rv: 1, opts: {} },
+    { pred: { saved: true, l: 3, v: 1, gol: null },     rl: 3, rv: 1, opts: {} },
+    { pred: { saved: true, l: 3, v: 2, gol: 'lozano' }, rl: 3, rv: 2, opts: { scorers: ['lozano'] } },
+    { pred: { saved: true, l: 3, v: 2, gol: 'lozano' }, rl: 3, rv: 2, opts: { scorers: ['lozano'], iaBonus: true } },
+    { pred: { saved: true, l: 0, v: 0, gol: null },     rl: 0, rv: 0, opts: {} },
+    { pred: { saved: true, l: 0, v: 0, gol: null },     rl: 0, rv: 0, opts: { boost: true } },
+    { pred: { saved: true, l: 2, v: 0, gol: 'lozano' }, rl: 2, rv: 0, opts: { scorers: ['lozano'], iaBonus: true, boost: true } },
+    { pred: { saved: false, l: 3, v: 0, gol: null },    rl: 3, rv: 0, opts: {} },
+  ];
+  for (const c of grpCases) {
+    const bd = sharedCalcMatchPointsBreakdown(c.pred, c.rl, c.rv, c.opts);
+    const pts = sharedCalcMatchPoints(c.pred, c.rl, c.rv, c.opts);
+    assert.strictEqual(bd.pts, pts, `bd.pts ≡ calcMatchPoints (caso ${JSON.stringify(c.pred)})`);
+  }
+
+  const M = { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX', realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX' };
+  const koCases = [
+    { pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: { ...M } },
+    { pred: { saved: true, l: 1, v: 0, gol: null }, rl: 1, rv: 0, round: 'final', opts: { ...M, predAway: 'FRA', realAway: 'FRA' } },
+    { pred: { saved: true, l: 0, v: 2, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'KOR', realHome: 'KOR', realAway: 'MEX', realAdvancer: 'KOR' } },
+    { pred: { saved: true, l: 2, v: 1, gol: null }, rl: 0, rv: 0, round: 'r16',   opts: { predHome: 'BRA', predAway: 'MAR', predAdvancer: 'BRA', realHome: 'KOR', realAway: 'JPN', realAdvancer: 'KOR', realRoundAdvancers: new Set(['BRA']) } },
+    { pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: {} },
+  ];
+  for (const c of koCases) {
+    const bd = sharedCalcKOMatchPointsBreakdown(c.pred, c.rl, c.rv, c.round, c.opts);
+    const pts = sharedCalcKOMatchPoints(c.pred, c.rl, c.rv, c.round, c.opts);
+    assert.strictEqual(bd.pts, pts, `bd.pts ≡ calcKOMatchPoints (caso ${c.round} ${JSON.stringify(c.pred)})`);
+  }
+}
+
+console.log('OK breakdown: calcMatchPointsBreakdown + calcKOMatchPointsBreakdown + parity wrapper');

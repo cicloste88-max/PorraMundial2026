@@ -359,14 +359,30 @@
       '<path d="M9 17h6"/><path d="M12 13v4"/><path d="M8 21h8"/>' +
       '</svg>';
 
+    // SVG inline para el botón Dashboard (4-grid icon).
+    var dashSvg =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="3" y="3" width="7" height="9" rx="1"/>' +
+      '<rect x="14" y="3" width="7" height="5" rx="1"/>' +
+      '<rect x="14" y="12" width="7" height="9" rx="1"/>' +
+      '<rect x="3" y="16" width="7" height="5" rx="1"/>' +
+      '</svg>';
+
     mount.className = 'fc-pred-header';
     mount.innerHTML =
       '<div class="fc-pred-eyebrow-row">' +
         '<span class="fc-eyebrow">PREDICTOR</span>' +
-        '<button class="fc-pred-trophy-btn" type="button" aria-label="Clasificación de liga">' +
-          trophySvg +
-          '<span class="fc-pred-trophy-label">Clasificación</span>' +
-        '</button>' +
+        '<div class="fc-pred-eyebrow-actions">' +
+          '<button class="fc-pred-dashboard-btn" type="button" aria-label="Dashboard de la porra">' +
+            dashSvg +
+            '<span class="fc-pred-dashboard-label">Dashboard</span>' +
+          '</button>' +
+          '<button class="fc-pred-trophy-btn" type="button" aria-label="Clasificación de liga">' +
+            trophySvg +
+            '<span class="fc-pred-trophy-label">Clasificación</span>' +
+          '</button>' +
+        '</div>' +
       '</div>' +
       '<h1 class="fc-pred-title">Tus predicciones</h1>' +
       '<p class="fc-pred-subtitle">' + _esc(subtitle) + '</p>';
@@ -374,6 +390,10 @@
     var trophyBtn = mount.querySelector('.fc-pred-trophy-btn');
     if (trophyBtn && typeof state.onTrophyTap === 'function') {
       trophyBtn.addEventListener('click', function () { state.onTrophyTap(); });
+    }
+    var dashBtn = mount.querySelector('.fc-pred-dashboard-btn');
+    if (dashBtn && typeof state.onDashboardTap === 'function') {
+      dashBtn.addEventListener('click', function () { state.onDashboardTap(); });
     }
   }
 
@@ -1043,6 +1063,11 @@
         // desglose dentro de page-score (re-home, solo cuando porra abierta)
         // y desde la card de awards de Fase Final (ko.js, ya existente).
         if (typeof showPage === 'function') showPage('score');
+      },
+      onDashboardTap: function () {
+        // Dashboard de la porra (vista por jugador). Lazy-load del script +
+        // CSS la primera vez; showPage('dashboard') monta porra-dashboard.js.
+        if (typeof showPage === 'function') showPage('dashboard');
       },
       onFilterChange: function (key) {
         _state.activeFilter = key;

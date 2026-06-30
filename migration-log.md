@@ -2845,3 +2845,29 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] TESTS: `tests/scoring.test.mjs` — 4 casos set-based (S1 equipo correcto slot equivocado → +avance; S2 no en set → 0 avance; S3 regresión slot correcto → +avance; S4a/b backwards-compat sin set; S5 set vacío → 0; S6 'third' set ignorado) + parity shared↔legacy (4 nuevos casos). Suite completa 349/349 ok.
 
 [--:--] BUILD: `npm run build` OK, `dist/` limpio.
+
+## Sesión 30-jun-2026 — Feat: Dashboard de la porra (vista por jugador) (`claude/predictor-league-dashboard-u0zjzt`)
+
+[--:--] AÑADIR funciones breakdown a `_shared/scoring.mjs`: `calcMatchPointsBreakdown` + `calcKOMatchPointsBreakdown` devuelven `{pts, signOk, exact, golOk, iaBonus, doubled, ...}`. `calcMatchPoints` y `calcKOMatchPoints` ahora son wrappers triviales que devuelven `.pts` del breakdown — cero divergencia entre el total publicado y los flags emitidos por el dashboard. Sin tocar `public/js/scoring.js` (parity tests 1:1 siguen verdes).
+
+[--:--] EXTENDER `tests/scoring.test.mjs` — sección 12: 12 asserts cubriendo casos canónicos (signo solo, exacto+IA cap 7, boost×2, sin gol, cap×boost=14, saved=false, regla 0-0) + 5 casos KO breakdown (matchupOk, swap, set-based, third sin avance, sin malla) + paridad estructural `bd.pts ≡ calcMatchPoints / calcKOMatchPoints` en batería de 8+5 escenarios. **228/228 ok** en `tests/*.test.mjs`.
+
+[--:--] AÑADIR EF `supabase/functions/get-dashboard/index.ts` v1.0.0 — desglose por usuario para el render. Mismo motor (`_shared/scoring.mjs` + `_shared/ko-bracket.mjs` + `ia-bridge.mjs`) que `get-league-standings`; `verify_jwt=false`, auth bearer + privileged service_role + membership gate del CALLER (no del target — post-cierre 10-jun el detalle ajeno está permitido entre miembros). Output: objeto `u={u,ui,l,ln,cached,t,g,k,a,br,qp,rp,qh,qm,bo,aw,gr,kr,bp,bs,is_bot}` con `gr` (rows itemización grupos: r/m/ps/rs/pSg/rSg/ex/go/si/pg/rg/b/ia/ib/p) y `kr` (rows KO: m/rd/pc/rc/ps/ops/rs/cl/ra/pSg/rSg/pg/rg/se/ao/ko_si/ko_ex/ko_go/pm/pa/rpts/p). El bloque de ingest se duplica con `get-league-standings` (~250 LOC) — anotado como deuda técnica post-launch para extraer a `_shared/ingest-user.mjs` cuando pase el Mundial.
+
+[--:--] DEUDA TÉCNICA: copias locales `fetch-all.mjs` + `ia-bridge.mjs` en `supabase/functions/get-dashboard/` (idénticas byte-a-byte a las de `get-league-standings/`). Mismo patrón que la EF hermana — cada EF Supabase es self-contained.
+
+[--:--] AÑADIR `public/js/porra-dashboard.js` — render adaptado del pack original de San (`mountPorra(root, opts)`): consume EFs en lugar del `window.PORRA.DATA` estático. Selector poblado con `get-league-standings` (lista + totales); detalle por jugador con `get-dashboard` (lazy fetch al cambiar `<select>`). Catálogos `FLAG`/`ISO_TO_ES` derivados perezosamente de `EQUIPOS` (data.js) + `ISO3_TO_FLAG` (ui-globo-equipos.js). Filtro bots + cicloste88 en el selector. Marca `.pd` en el root del mount para scope CSS.
+
+[--:--] AÑADIR `public/css/porra-dashboard.css` — todas las reglas scoped bajo `.pd` (originalmente unprefixed: `.match`, `.score`, `.chip`, `.badge`, `.pts` chocarían con CSS legacy). Sin contaminar otras pages.
+
+[--:--] AÑADIR botón Dashboard en `ui-pred-shell.js::_renderHeader` — `.fc-pred-dashboard-btn` a la IZQUIERDA del trofeo, agrupados en `.fc-pred-eyebrow-actions`. Icono grid 4-cell. `state.onDashboardTap` invoca `showPage('dashboard')` análogo a `onTrophyTap`.
+
+[--:--] CSS botón dashboard en `public/css/components/predictor-shell.css` — pill neutro (vs el dorado del trofeo) con target táctil ≥44px y label oculto en pantallas <350px. Hover dorado a juego.
+
+[--:--] CABLEAR `ui-nav.js::showPage` — auth gate extendido a `'dashboard'`. Toggle de `#page-dashboard`. `_mountDashboardLazy()` carga `porra-dashboard.js`+`porra-dashboard.css` la primera vez (idempotente vía `data-porra-dashboard` attr + cached `_dashLoadPromise`), luego invoca `window.mountPorra(host, { league:getActiveLeagueId(), lockLeague:true, onBack:()=>showPage('predictor') })`.
+
+[--:--] AÑADIR `<div id="page-dashboard" style="display:none">` en `index.html` (vacío — `mountPorra` puebla el `innerHTML`).
+
+[--:--] BUILD: `npm run build` OK. `dist/css/porra-dashboard.css` + `dist/js/porra-dashboard.js` presentes. `grep -l "\.pd-hero" dist/css/*.css` → match (ERR-22 ✓). `grep -l "fc-pred-dashboard-btn" dist/css/components/predictor-shell.css` → match.
+
+[--:--] TESTS: `node --test tests/*.test.mjs` → 228/228 ok.

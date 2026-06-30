@@ -1,0 +1,588 @@
+/* porra-dashboard.js — Dashboard de la porra (vista por jugador).
+ *
+ * Versión adaptada del pack original (San, Claude.ai 30-jun-2026): los datos
+ * estáticos `window.PORRA.DATA` se sustituyen por fetches LAZY a las EFs
+ * `get-league-standings` (lista + totales) y `get-dashboard` (detalle por
+ * jugador). FLAG/ISO_TO_ES/LEAGUE_* se inicializan al primer mount desde
+ * EQUIPOS (data.js) + ISO3_TO_FLAG (ui-globo-equipos.js).
+ *
+ * Expone `window.mountPorra(root, opts)`:
+ *   opts.league      — league_id (string) a mostrar. lockLeague=true asume
+ *                      que es la liga del usuario logado.
+ *   opts.lockLeague  — bool. Si true muestra la "league lock chip" en vez
+ *                      de los tabs Gallos/Tilín (preview no-locked).
+ *   opts.openGroups  — bool. Si true los <details> de jornadas se abren.
+ *   opts.onBack      — fn. Si está definida, renderiza un botón "Predictor"
+ *                      arriba a la izquierda que la invoca.
+ *
+ * Carga lazy desde ui-nav.js::showPage('dashboard'). NO usa DOMContentLoaded
+ * (ERR-01) — al cargarse el script se ejecuta su IIFE y expone mountPorra.
+ *
+ * Deps runtime: window.db (Supabase client desde auth.js), window.EQUIPOS
+ * (data.js), window.ISO3_TO_FLAG (ui-globo-equipos.js) — todos ya cargados
+ * cuando llegamos al click en el botón Dashboard del Predictor.
+ */
+(function () {
+  // ─────────────────────────────────────────────────────────────
+  // Catálogos estáticos (inicializados perezosamente al primer mount).
+  // ─────────────────────────────────────────────────────────────
+  let FLAG = null;        // { es_name → emoji bandera }
+  let ISO_TO_ES = null;   // { iso3 → es_name }
+  let ES_TO_ISO = null;   // { es_name → iso3 } (inverso, para qh/qm si necesario)
+
+  function _initCatalogs() {
+    if (FLAG && ISO_TO_ES) return;
+    FLAG = {};
+    ISO_TO_ES = {};
+    ES_TO_ISO = {};
+    const iso3ToFlag = (typeof window !== 'undefined' && window.ISO3_TO_FLAG) ? window.ISO3_TO_FLAG : null;
+    const equipos = (typeof window !== 'undefined' && Array.isArray(window.EQUIPOS)) ? window.EQUIPOS : [];
+    for (const e of equipos) {
+      if (!e || !e.name || !e.flag) continue;
+      ISO_TO_ES[e.flag] = e.name;
+      ES_TO_ISO[e.name] = e.flag;
+      if (iso3ToFlag && iso3ToFlag[e.flag]) FLAG[e.name] = iso3ToFlag[e.flag];
+    }
+    // Fallback: ISO3 → emoji directo si entra una key iso3 en flagFor.
+    if (iso3ToFlag) {
+      for (const iso of Object.keys(iso3ToFlag)) {
+        if (!FLAG[iso]) FLAG[iso] = iso3ToFlag[iso];
+      }
+    }
+  }
+
+  // Liga: nombre + icono. Si la liga no es una de las dos canónicas, usamos
+  // el nombre que venga en el payload (`u.ln`) y un icono genérico.
+  const LEAGUE_ICON = {
+    'b735a3c0': '🐓',
+    'd5cb4dd6': '🔔',
+  };
+  const LEAGUE_SHORT = {
+    'b735a3c0': 'Gallos',
+    'd5cb4dd6': 'Tilín',
+  };
+  function leagueIconFor(id) { return LEAGUE_ICON[id] || '🏆'; }
+  function leagueShortFor(id, fallbackName) {
+    return LEAGUE_SHORT[id] || (fallbackName || '').split(' ').slice(0, 1).join('') || 'Liga';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Estado del mount actual + opts.
+  // ─────────────────────────────────────────────────────────────
+  let OPTS = { league: null, openGroups: false, lockLeague: false, onBack: null };
+
+  // ─────────────────────────────────────────────────────────────
+  // Helpers de render (puros).
+  // ─────────────────────────────────────────────────────────────
+  function flagFor(es) { return (FLAG && FLAG[es]) || '🏳️'; }
+  function flagIso(iso) { return flagFor((ISO_TO_ES && ISO_TO_ES[iso]) || ''); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function parseMatch(id) {
+    const m = String(id || '').match(/^([A-L])_(.+?)_(.+)$/);
+    return m ? { grp: m[1], home: m[2], away: m[3] } : null;
+  }
+
+  function statusBadge(r) {
+    if (r.ex && r.go) return '<span class="badge badge--exact-gol">EXACTO + GOL</span>';
+    if (r.ex) return '<span class="badge badge--exact">EXACTO</span>';
+    if (r.si && r.go) return '<span class="badge badge--sign-gol">SIGNO + GOL</span>';
+    if (r.si) return '<span class="badge badge--sign">SIGNO</span>';
+    if (r.go) return '<span class="badge badge--gol">GOL</span>';
+    return '<span class="badge badge--miss">FALLO</span>';
+  }
+  function ptsClass(p) { return p === 0 ? 'pts--zero' : p >= 4 ? 'pts--high' : 'pts--mid'; }
+
+  function matchCard(r) {
+    const m = parseMatch(r.m);
+    const fh = m ? flagFor(m.home) : '';
+    const fa = m ? flagFor(m.away) : '';
+    const realList = (r.rg || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    const realHtml = realList.length
+      ? realList.map(function (s) { return '<span class="pill">' + esc(s) + '</span>'; }).join('')
+      : '<span class="pill pill--mute">sin goles</span>';
+    const cls = ptsClass(r.p);
+    const mods = [];
+    if (r.b) mods.push('<span class="mod mod--boost">⚡ Boost</span>');
+    if (r.ib) mods.push('<span class="mod mod--ia">🤖 anti-IA +1</span>');
+    const signCls = (r.pSg === r.rSg) ? 'score--ok' : 'score--no';
+    return ''
+      + '<details class="match" data-pts="' + r.p + '" data-boost="' + (r.b ? 1 : 0) + '" data-ia="' + (r.ib ? 1 : 0) + '">'
+      +   '<summary>'
+      +     '<div class="match__line">'
+      +       '<span class="match__grp">[' + esc(m ? m.grp : '?') + ']</span>'
+      +       '<span class="match__team match__team--home"><span class="flag">' + fh + '</span>' + esc(m ? m.home : '') + '</span>'
+      +       '<span class="match__score">'
+      +         '<span class="score score--pred ' + signCls + '">' + esc(r.ps) + '</span>'
+      +         '<span class="arrow">→</span>'
+      +         '<span class="score score--real">' + esc(r.rs) + '</span>'
+      +       '</span>'
+      +       '<span class="match__team match__team--away"><span class="flag">' + fa + '</span>' + esc(m ? m.away : '') + '</span>'
+      +       statusBadge(r)
+      +       '<span class="pts ' + cls + '">' + r.p + '</span>'
+      +     '</div>'
+      +   '</summary>'
+      +   '<div class="match__detail">'
+      +     '<div class="kv">'
+      +       '<div class="kv__row"><span class="kv__k">Signo pred / real</span>'
+      +         '<span class="kv__v">' + esc(r.pSg) + ' ' + (r.si ? '✅' : '❌') + ' ' + esc(r.rSg) + '</span></div>'
+      +       '<div class="kv__row"><span class="kv__k">Exacto</span>'
+      +         '<span class="kv__v">' + (r.ex ? '✅ sí' : '❌ no') + '</span></div>'
+      +       '<div class="kv__row"><span class="kv__k">Goleador predicho</span>'
+      +         '<span class="kv__v">' + esc(r.pg) + ' ' + (r.go ? '✅' : '❌') + '</span></div>'
+      +       '<div class="kv__row"><span class="kv__k">Goleadores reales</span>'
+      +         '<span class="kv__v scorers">' + realHtml + '</span></div>'
+      +       '<div class="kv__row"><span class="kv__k">IA dijo</span>'
+      +         '<span class="kv__v">' + esc(r.ia || '—') + ' · ' + (r.ib ? '<strong>+1 anti-IA aplicado</strong>' : (r.ia === r.pSg ? '(coincide)' : '(no aplica)')) + '</span></div>'
+      +       '<div class="kv__row"><span class="kv__k">Modificadores</span>'
+      +         '<span class="kv__v">' + (mods.length ? mods.join(' ') : '—') + '</span></div>'
+      +       '<div class="kv__row kv__row--total"><span class="kv__k">Puntos</span>'
+      +         '<span class="kv__v"><strong class="' + cls + '">' + r.p + ' pts</strong></span></div>'
+      +     '</div>'
+      +   '</div>'
+      + '</details>';
+  }
+
+  function koSlotCard(r) {
+    const ph = (r.pc || '').split(' vs ');
+    const rh = (r.rc || '').split(' vs ');
+    const predHome = (ph[0] || '').trim() || '?';
+    const predAway = (ph[1] || '').trim() || '?';
+    const realHomeISO = (rh[0] || '').trim();
+    const realAwayISO = (rh[1] || '').trim();
+    const realHome = (ISO_TO_ES && ISO_TO_ES[realHomeISO]) || realHomeISO || '?';
+    const realAway = (ISO_TO_ES && ISO_TO_ES[realAwayISO]) || realAwayISO || '?';
+    const cls = r.p === 0 ? 'pts--zero' : r.p >= 10 ? 'pts--high' : 'pts--mid';
+    const realList = (r.rg || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    const realHtml = realList.length
+      ? realList.map(function (s) { return '<span class="pill">' + esc(s) + '</span>'; }).join('')
+      : '<span class="pill pill--mute">sin goles</span>';
+    const bdRows = [];
+    if (r.se) {
+      bdRows.push(['Cruce de equipos', '✅ coincide → marcador habilitado', null]);
+      bdRows.push(['Signo predicho / real', esc(r.pSg) + ' ' + (r.ko_si ? '✅' : '❌') + ' ' + esc(r.rSg), r.ko_si ? '+1' : '0']);
+      bdRows.push(['Exacto', esc(r.ops || r.ps) + ' vs ' + esc(r.rs) + ' → ' + (r.ko_ex ? '✅' : '❌'), r.ko_ex ? '+3' : '0']);
+      bdRows.push(['Goleador predicho', esc(r.pg) + ' ' + (r.ko_go ? '✅' : '❌'), r.ko_go ? '+2' : '0']);
+      bdRows.push(['Marcador (cap 7, sin boost en KO)', '—', '<strong>' + r.pm + '</strong>']);
+    } else {
+      bdRows.push(['Cruce de equipos', '❌ no coincide → marcador 0', '0']);
+      bdRows.push(['Marcador (gate fallado)', 'No se evalúa signo/exacto/goleador', '0']);
+    }
+    bdRows.push(['Avance (clasificador)',
+      'pred \'' + esc(r.cl || '—') + '\' / real \'' + esc((ISO_TO_ES && ISO_TO_ES[r.ra]) || r.ra || '—') + '\' → ' + (r.ao ? '✅' : '❌'),
+      r.ao ? '+' + r.rpts : '0']);
+    const bdHtml = bdRows.map(function (kvp) {
+      const k = kvp[0], v = kvp[1], p = kvp[2];
+      return '<div class="kv__row"><span class="kv__k">' + esc(k) + '</span>'
+        + '<span class="kv__v">' + v + (p !== null ? ' <span class="pts-mini">' + p + '</span>' : '') + '</span></div>';
+    }).join('');
+    const ps = String(r.ps || '').split('-');
+    const psHome = ps[0] || '?';
+    const psAway = ps[1] || '?';
+    const rs = String(r.rs || '').split('-');
+    const rsHome = rs[0] || '?';
+    const rsAway = rs[1] || '?';
+    return ''
+      + '<details class="match" data-pts="' + r.p + '">'
+      +   '<summary>'
+      +     '<div class="match__line match__line--ko">'
+      +       '<span class="match__grp">' + esc(String(r.m)) + '·' + esc(r.rd) + '</span>'
+      +       '<span class="match__score">'
+      +         '<span class="score">' + esc(r.ps) + '</span><span class="arrow">→</span><span class="score">' + esc(r.rs) + '</span>'
+      +       '</span>'
+      +       '<span class="badge ' + (r.se ? 'badge--exact' : 'badge--miss') + '">' + (r.se ? 'CRUCE ✓' : 'CRUCE ✗') + '</span>'
+      +       '<span class="badge ' + (r.ao ? 'badge--sign-gol' : 'badge--miss') + '">' + (r.ao ? 'AVANCE +' + r.rpts : 'AVANCE ✗') + '</span>'
+      +       '<span class="pts ' + cls + '">' + r.p + '</span>'
+      +     '</div>'
+      +   '</summary>'
+      +   '<div class="match__detail">'
+      +     '<div class="ko-vs">'
+      +       '<div class="ko-vs__col">'
+      +         '<h4>Predicho</h4>'
+      +         '<p>' + flagFor(predHome) + ' ' + esc(predHome) + ' <strong>' + esc(psHome) + '</strong></p>'
+      +         '<p>' + flagFor(predAway) + ' ' + esc(predAway) + ' <strong>' + esc(psAway) + '</strong></p>'
+      +         '<p>Goleador: <strong>' + esc(r.pg) + '</strong></p>'
+      +         '<p class="adv">Clasifica → <strong>' + esc(r.cl || '—') + '</strong></p>'
+      +       '</div>'
+      +       '<div class="ko-vs__col ko-vs__col--real">'
+      +         '<h4>Real</h4>'
+      +         '<p>' + flagFor(realHome) + ' ' + esc(realHome) + ' <strong>' + esc(rsHome) + '</strong></p>'
+      +         '<p>' + flagFor(realAway) + ' ' + esc(realAway) + ' <strong>' + esc(rsAway) + '</strong></p>'
+      +         '<p>Goleadores: <span class="scorers" style="display:inline-flex">' + realHtml + '</span></p>'
+      +         '<p class="adv">Avanza → <strong>' + flagIso(r.ra) + ' ' + esc((ISO_TO_ES && ISO_TO_ES[r.ra]) || r.ra || '—') + '</strong></p>'
+      +       '</div>'
+      +     '</div>'
+      +     '<div class="kv" style="margin-top:10px">'
+      +       bdHtml
+      +       '<div class="kv__row kv__row--subtotal">'
+      +         '<span class="kv__k">Subtotal marcador + avance</span>'
+      +         '<span class="kv__v"><strong>' + r.pm + ' + ' + r.pa + ' = ' + r.p + ' pts</strong></span>'
+      +       '</div>'
+      +     '</div>'
+      +   '</div>'
+      + '</details>';
+  }
+
+  function bracketSlot(s) {
+    if (!s) return '<span class="muted">—</span>';
+    return flagFor(s.home) + ' ' + esc(s.home || '?') + ' <span class="vs">vs</span> '
+      + flagFor(s.away) + ' ' + esc(s.away || '?') + ' → <strong>' + flagFor(s.winner) + ' ' + esc(s.winner || '?') + '</strong>';
+  }
+
+  function renderUser(root, u, leagueListSorted) {
+    // leagueListSorted: array de standings filas {uid, total} ordenadas desc.
+    // El render original calcula rankInLeague de DATA — aquí lo recibimos del
+    // payload de get-league-standings para evitar refetch.
+    const rankInLeague = leagueListSorted.findIndex(function (x) { return x.uid === u.ui; }) + 1;
+    const totalInLeague = leagueListSorted.length;
+    const max = (u.br['1'] || 0) + (u.br['2'] || 0) + (u.br['3'] || 0) + (u.qp || 0) + (u.rp || 0);
+    const milestones = [
+      ['Fin J1 grupos', u.br['1'] || 0],
+      ['Fin J2 grupos', (u.br['1'] || 0) + (u.br['2'] || 0)],
+      ['Fin grupos', u.g],
+      ['+ Bonus R32', u.g + u.qp],
+      ['Tras R32', u.t],
+    ];
+    const grpByRound = { 1: [], 2: [], 3: [] };
+    for (let i = 0; i < (u.gr || []).length; i++) {
+      const r = u.gr[i];
+      if (grpByRound[r.r]) grpByRound[r.r].push(r);
+    }
+    for (let j = 1; j <= 3; j++) grpByRound[j].sort(function (a, b) { return b.p - a.p; });
+
+    const html = ''
+      + '<div class="pd-hero">'
+      +   '<div class="pd-profile">'
+      +     '<div class="pd-avatar">' + leagueIconFor(u.l) + '</div>'
+      +     '<div class="pd-id">'
+      +       '<div class="pd-id__name">' + esc(u.u) + '</div>'
+      +       '<div class="pd-id__meta">' + esc(u.ln || '') + '</div>'
+      +     '</div>'
+      +     '<div class="pd-rank">#' + rankInLeague + '<small>/' + totalInLeague + '</small></div>'
+      +   '</div>'
+      +   '<div class="pd-total">'
+      +     '<span class="pd-total__big">' + u.t + '</span>'
+      +     '<span class="pd-total__lbl">pts totales</span>'
+      +     '<span class="pd-total__delta">Caché ' + u.cached + ' · Δ ' + (u.t - u.cached) + ' ' + (u.t === u.cached ? '✓' : '⚠') + '</span>'
+      +   '</div>'
+      +   '<div class="pd-kpis">'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Grupos</div><div class="pd-kpi__val">' + u.g + '</div><div class="pd-kpi__sub">J1 ' + (u.br['1'] || 0) + ' · J2 ' + (u.br['2'] || 0) + ' · J3 ' + (u.br['3'] || 0) + '</div></div>'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">KO</div><div class="pd-kpi__val">' + u.k + '</div><div class="pd-kpi__sub">+5×' + (u.qh || []).length + ' clasif · R32 ' + (u.rp || 0) + '</div></div>'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Premios</div><div class="pd-kpi__val">' + u.a + '</div><div class="pd-kpi__sub">pdte. Final</div></div>'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Boosts</div><div class="pd-kpi__val">' + (u.bo || 0) + '</div><div class="pd-kpi__sub">activados</div></div>'
+      +   '</div>'
+      + '</div>'
+
+      + '<details class="section-collapsible" open>'
+      +   '<summary><h2>Evolución <span class="pts-tot">' + u.t + ' pts</span></h2></summary>'
+      +   '<div class="evo">'
+      +     milestones.map(function (kv) {
+            const lbl = kv[0], v = kv[1];
+            const pct = (v / Math.max(max, 1) * 100).toFixed(1);
+            return '<div class="evo-row">'
+              + '<span class="evo-lbl">' + esc(lbl) + '</span>'
+              + '<div class="evo-bar"><div class="evo-bar-fill" style="width:' + pct + '%"></div></div>'
+              + '<span class="evo-val">' + v + '</span>'
+              + '</div>';
+          }).join('')
+      +   '</div>'
+      + '</details>'
+
+      + '<details class="section-collapsible">'
+      +   '<summary><h2>Bracket reconstruido</h2></summary>'
+      +   '<div class="bracket">'
+      +     '<div class="bracket-row"><span class="bracket-row__lbl">SF1 · 101</span><span>' + bracketSlot(u.bs && u.bs['101']) + '</span></div>'
+      +     '<div class="bracket-row"><span class="bracket-row__lbl">SF2 · 102</span><span>' + bracketSlot(u.bs && u.bs['102']) + '</span></div>'
+      +     '<div class="bracket-row"><span class="bracket-row__lbl">3.º · 103</span><span>' + bracketSlot(u.bs && u.bs['103']) + '</span></div>'
+      +     '<div class="bracket-row bracket-row--final"><span class="bracket-row__lbl">FINAL · 104</span><span>' + bracketSlot(u.bs && u.bs['104']) + '</span></div>'
+      +   '</div>'
+      +   '<div class="podium">'
+      +     '<div class="podium-card"><div class="podium-card__pos">🥇</div><div class="podium-card__flag">' + flagFor(u.bp && u.bp.champion) + '</div><div class="podium-card__team">' + esc((u.bp && u.bp.champion) || '—') + '</div></div>'
+      +     '<div class="podium-card"><div class="podium-card__pos">🥈</div><div class="podium-card__flag">' + flagFor(u.bp && u.bp.runnerUp) + '</div><div class="podium-card__team">' + esc((u.bp && u.bp.runnerUp) || '—') + '</div></div>'
+      +     '<div class="podium-card"><div class="podium-card__pos">🥉</div><div class="podium-card__flag">' + flagFor(u.bp && u.bp.third) + '</div><div class="podium-card__team">' + esc((u.bp && u.bp.third) || '—') + '</div></div>'
+      +     '<div class="podium-card"><div class="podium-card__pos">4º</div><div class="podium-card__flag">' + flagFor(u.bp && u.bp.fourth) + '</div><div class="podium-card__team">' + esc((u.bp && u.bp.fourth) || '—') + '</div></div>'
+      +   '</div>'
+      + '</details>'
+
+      + [1, 2, 3].map(function (J) {
+        const open = OPTS.openGroups ? ' open' : '';
+        const rows = grpByRound[J];
+        return ''
+          + '<details class="section-collapsible"' + open + '>'
+          +   '<summary><h2>Jornada ' + J + ' grupos <span class="pts-tot">' + (u.br[J] || 0) + ' pts</span></h2></summary>'
+          +   '<div class="filter-bar" data-scope="j' + J + '">'
+          +     '<span class="chip chip--active" data-filter="all">Todos ' + rows.length + '</span>'
+          +     '<span class="chip" data-filter="hit">Aciertos ' + rows.filter(function (r) { return r.p > 0; }).length + '</span>'
+          +     '<span class="chip" data-filter="miss">Fallos ' + rows.filter(function (r) { return r.p === 0; }).length + '</span>'
+          +     '<span class="chip" data-filter="boost">⚡ ' + rows.filter(function (r) { return r.b; }).length + '</span>'
+          +     '<span class="chip" data-filter="ia">🤖 ' + rows.filter(function (r) { return r.ib; }).length + '</span>'
+          +   '</div>'
+          +   '<div class="match-list">' + rows.map(matchCard).join('') + '</div>'
+          + '</details>';
+      }).join('')
+
+      + '<details class="section-collapsible">'
+      +   '<summary><h2>KO · Clasificados a R32 <span class="pts-tot">+' + (u.qp || 0) + ' pts</span></h2></summary>'
+      +   '<h4 class="grid-h grid-h--ok">✅ Aciertos (' + (u.qh || []).length + ')</h4>'
+      +   '<div class="team-grid">'
+      +     (u.qh || []).slice().sort().map(function (iso) {
+            return '<div class="team-pill team-pill--ok">' + flagIso(iso) + ' ' + ((ISO_TO_ES && ISO_TO_ES[iso]) || iso) + '</div>';
+          }).join('')
+      +   '</div>'
+      +   '<h4 class="grid-h grid-h--miss">❌ No clasificaron (' + (u.qm || []).length + ')</h4>'
+      +   '<div class="team-grid">'
+      +     ((u.qm || []).length
+            ? (u.qm || []).map(function (iso) {
+                return '<div class="team-pill team-pill--miss">' + flagIso(iso) + ' ' + ((ISO_TO_ES && ISO_TO_ES[iso]) || iso) + '</div>';
+              }).join('')
+            : '<div class="empty">¡Pleno!</div>')
+      +   '</div>'
+      + '</details>'
+
+      + '<details class="section-collapsible">'
+      +   '<summary><h2>KO · R32 cerrados <span class="pts-tot">' + (u.rp || 0) + ' pts</span></h2></summary>'
+      +   '<div class="match-list">'
+      +     ((u.kr || []).length ? (u.kr || []).map(koSlotCard).join('') : '<div class="empty">Sin slots cerrados.</div>')
+      +   '</div>'
+      + '</details>'
+
+      + '<details class="section-collapsible">'
+      +   '<summary><h2>Premios individuales <span class="pts-tot">' + u.a + ' / 65</span></h2></summary>'
+      +     (u.aw
+            ? '<div class="awards">'
+              + '<div class="award"><span class="award__k">Balón Oro</span><span class="award__v">' + esc(u.aw.golden_ball || '—') + '</span></div>'
+              + '<div class="award"><span class="award__k">Bota Oro</span><span class="award__v">' + esc(u.aw.golden_boot || '—') + '</span></div>'
+              + '<div class="award"><span class="award__k">Guante Oro</span><span class="award__v">' + esc(u.aw.golden_glove || '—') + '</span></div>'
+              + '<div class="award"><span class="award__k">Mejor Joven</span><span class="award__v">' + esc(u.aw.young_player || '—') + '</span></div>'
+              + '</div>'
+            : '<div class="empty">Sin picks.</div>')
+      + '</details>';
+
+    const host = root.querySelector('#pd-dashboard');
+    if (host) host.innerHTML = html;
+
+    // Filtros (cada filter-bar opera sobre los .match de su sección).
+    root.querySelectorAll('.filter-bar').forEach(function (bar) {
+      const section = bar.closest('details');
+      const chips = bar.querySelectorAll('.chip');
+      chips.forEach(function (chip) {
+        chip.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          chips.forEach(function (c) { c.classList.remove('chip--active'); });
+          chip.classList.add('chip--active');
+          const f = chip.dataset.filter;
+          section.querySelectorAll('.match').forEach(function (m) {
+            const pts = Number(m.dataset.pts);
+            let show = true;
+            if (f === 'hit') show = pts > 0;
+            else if (f === 'miss') show = pts === 0;
+            else if (f === 'boost') show = m.dataset.boost === '1';
+            else if (f === 'ia') show = m.dataset.ia === '1';
+            m.dataset.hidden = show ? '0' : '1';
+          });
+        });
+      });
+    });
+
+    // Animación de barras de evolución (re-flow).
+    root.querySelectorAll('.evo-bar-fill').forEach(function (b) {
+      const w = b.style.width;
+      b.style.width = '0%';
+      requestAnimationFrame(function () { b.style.width = w; });
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // FETCHES — get-league-standings (selector) + get-dashboard (detalle).
+  // ─────────────────────────────────────────────────────────────
+  async function _fetchStandings(leagueId) {
+    if (!window.db || !window.db.functions) {
+      throw new Error('db.functions no disponible (auth.js no inicializado)');
+    }
+    const res = await window.db.functions.invoke('get-league-standings', {
+      body: { league_id: leagueId },
+    });
+    if (res.error) throw res.error;
+    if (!res.data || !Array.isArray(res.data.rows)) throw new Error('respuesta inválida de get-league-standings');
+    return res.data.rows;
+  }
+
+  async function _fetchDashboard(leagueId, userId) {
+    const res = await window.db.functions.invoke('get-dashboard', {
+      body: { league_id: leagueId, user_id: userId },
+    });
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.u) throw new Error('respuesta inválida de get-dashboard');
+    return res.data.u;
+  }
+
+  // Filtro bots + cicloste88 (acordado con San). Conservamos miembros de la
+  // liga con `hasPreds=true` (la EF ya descarta los demás). is_bot lo añadimos
+  // a través de un fetch a profiles si el response no lo trae — la EF actual
+  // no devuelve is_bot, así que lo obtenemos del payload de get-dashboard al
+  // pedirlo, o (más eficiente) con un join puntual.
+  async function _enrichStandingsWithProfile(rows) {
+    if (!rows.length) return rows;
+    const uids = rows.map(function (r) { return r.uid; });
+    try {
+      const r = await window.db.from('profiles').select('id, is_bot, nombre').in('id', uids);
+      const map = {};
+      (r.data || []).forEach(function (p) { map[p.id] = p; });
+      return rows.map(function (row) {
+        const p = map[row.uid] || {};
+        return Object.assign({}, row, {
+          is_bot: !!p.is_bot,
+          nombre: row.nombre || p.nombre || '—',
+        });
+      });
+    } catch (_e) {
+      return rows.map(function (row) { return Object.assign({}, row, { is_bot: false }); });
+    }
+  }
+
+  function _filterStandings(rows) {
+    return rows.filter(function (r) {
+      if (r.is_bot) return false;
+      if ((r.nombre || '').toLowerCase() === 'cicloste88') return false;
+      return true;
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Helpers de UI: select + estado de carga.
+  // ─────────────────────────────────────────────────────────────
+  function _populateSelect(root, list, selectedUid) {
+    const sel = root.querySelector('#pd-user-select');
+    if (!sel) return;
+    sel.innerHTML = list.map(function (u, i) {
+      const sel = u.uid === selectedUid ? ' selected' : '';
+      return '<option value="' + esc(u.uid) + '"' + sel + '>#' + (i + 1) + ' · ' + esc(u.nombre || '—') + ' — ' + u.total + ' pts</option>';
+    }).join('');
+  }
+
+  function _setBodyState(root, mode, msg) {
+    const host = root.querySelector('#pd-dashboard');
+    if (!host) return;
+    if (mode === 'loading') {
+      host.innerHTML = '<div class="empty" style="padding:32px 14px">Cargando…</div>';
+    } else if (mode === 'error') {
+      host.innerHTML = '<div class="empty" style="padding:32px 14px">⚠ ' + esc(msg || 'Error') + '</div>';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // mountPorra — entrada pública.
+  // ─────────────────────────────────────────────────────────────
+  async function mountPorra(root, opts) {
+    if (!root) return;
+    _initCatalogs();
+    OPTS = Object.assign({ league: null, openGroups: false, lockLeague: true, onBack: null }, opts || {});
+
+    // Marcar el root con la clase `.pd` (raíz de los estilos del pack).
+    root.classList.add('pd');
+
+    let currentLeague = OPTS.league;
+    if (!currentLeague) {
+      // Sin league_id en opts intentamos del store global.
+      if (typeof window.getActiveLeagueId === 'function') {
+        currentLeague = window.getActiveLeagueId();
+      }
+    }
+    if (!currentLeague) {
+      root.innerHTML = '<div class="empty" style="padding:64px 24px;text-align:center">Selecciona una liga para ver el dashboard.</div>';
+      return;
+    }
+
+    // Liga: nombre real (de _activeLeague o se actualiza al primer fetch).
+    let leagueName = '';
+    try {
+      const lg = (window._activeLeague && window._activeLeague.id === currentLeague) ? window._activeLeague : null;
+      if (lg && lg.nombre) leagueName = lg.nombre;
+    } catch (_) {}
+
+    const leagueControl = OPTS.lockLeague
+      ? '<div class="league-lock" title="Liga en la que estás logado">'
+        + '<span class="league-lock__ico">' + leagueIconFor(currentLeague) + '</span>'
+        + '<span class="league-lock__name">Liga ' + esc(leagueShortFor(currentLeague, leagueName)) + '</span>'
+        + '<span class="league-lock__cnt" id="pd-league-cnt"></span>'
+        + '</div>'
+      : '';
+
+    const backBtn = OPTS.onBack
+      ? '<button class="pd-back" id="pd-back" type="button" aria-label="Volver al Predictor">'
+        + '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12 L5 8 L10 4"/></svg>'
+        + '<span>Predictor</span>'
+        + '</button>'
+      : '';
+
+    root.innerHTML = ''
+      + '<div class="pd-topbar">'
+      +   backBtn
+      +   '<div class="pd-brand">'
+      +     '<div class="pd-brand__txt">'
+      +       '<div class="pd-brand__t">Dashboard de la porra</div>'
+      +       '<div class="pd-brand__s">Mundial 2026</div>'
+      +     '</div>'
+      +   '</div>'
+      +   leagueControl
+      +   '<div class="pd-select-wrap">'
+      +     '<select id="pd-user-select" aria-label="Jugador"></select>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="pd-scroll">'
+      +   '<div id="pd-dashboard"></div>'
+      +   '<div class="pd-foot">Motor compartido scoring v1.6.0 · datos en directo</div>'
+      + '</div>';
+
+    const backEl = root.querySelector('#pd-back');
+    if (backEl && OPTS.onBack) backEl.addEventListener('click', OPTS.onBack);
+
+    // 1. Fetch del leaderboard (selector) + enriquecimiento con is_bot.
+    _setBodyState(root, 'loading');
+    let standings;
+    try {
+      const raw = await _fetchStandings(currentLeague);
+      const enriched = await _enrichStandingsWithProfile(raw);
+      standings = _filterStandings(enriched);
+    } catch (err) {
+      console.error('[porra-dashboard] standings fetch failed', err);
+      _setBodyState(root, 'error', 'No se pudo cargar la clasificación.');
+      return;
+    }
+    if (!standings.length) {
+      _setBodyState(root, 'error', 'Sin jugadores en esta liga.');
+      return;
+    }
+    standings.sort(function (a, b) { return b.total - a.total || b.grpPts - a.grpPts; });
+
+    const cntEl = root.querySelector('#pd-league-cnt');
+    if (cntEl) cntEl.textContent = standings.length + ' jugadores';
+
+    _populateSelect(root, standings, standings[0].uid);
+
+    // 2. Render del primer usuario (lazy fetch).
+    let currentUid = standings[0].uid;
+    async function _renderSelected() {
+      const uid = root.querySelector('#pd-user-select').value;
+      currentUid = uid;
+      _setBodyState(root, 'loading');
+      try {
+        const u = await _fetchDashboard(currentLeague, uid);
+        renderUser(root, u, standings);
+        const scrollEl = root.querySelector('.pd-scroll');
+        if (scrollEl) scrollEl.scrollTop = 0;
+      } catch (err) {
+        console.error('[porra-dashboard] dashboard fetch failed', err);
+        _setBodyState(root, 'error', 'No se pudo cargar el detalle.');
+      }
+    }
+    root.querySelector('#pd-user-select').addEventListener('change', _renderSelected);
+    await _renderSelected();
+  }
+
+  window.mountPorra = mountPorra;
+})();
