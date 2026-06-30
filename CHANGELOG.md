@@ -2,6 +2,27 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [30-jun-2026] Fix: ganador de cruces KO automático desde ESPN (`claude/ko-winner-sync-espn-d43pyo`)
+
+Nueva EF **`ko-winner-sync`** v1.0.0 (`verify_jwt=false`, gate `X-Cron-Key`).
+Lee `competitions[0].competitors[].winner === "true"` del scoreboard ESPN
+(`STATUS_FINAL_PEN`/`state=post`), proyecta vía `espn_event_map.inverted` y
+fuerza `results.ko_results[slot].winner` (+ `pens` si tanda). **Aditivo**: NO
+toca `live_scores` ni el bridge; idempotente (solo escribe en diff). Tras
+cualquier cambio reseedea `user_points_cache` invocando `get-league-standings`
+por liga. Modos: `POST {}` (ciclo), `{dry_run:true}` (informe), `{dates:"…"}`
+(override ventana). Cron `ko-winner-sync` jobid 31 (`*/2 * * * *`), gate
+interno `EXISTS (KO finished con winner=null)` — en reposo no llama a ESPN.
+Migración versionada `20260630010000_ko_winner_sync_cron.sql` (idempotente,
+backfill del alta runtime via MCP). **Origen del bug** (vivido 29-jun, slot 74
+GER-PAR 1-1 + pens 3-4 Paraguay, batacazo): bridge infiere `winner` del
+marcador (empate → null) y `espn-poll` descarta la tanda (`buildGoalEvents`
+filtra `shootout!==true`). Slot 74 parcheado en caliente, impacto 0 en porra
+(nadie acertó el batacazo). Detalle ERR-100; **deploy EF y cron ya live**, este
+push solo mirror al repo. **Pendiente menor**: gate sin recencia
+(busy-loop benigno si un KO queda `null` fuera de ventana ESPN; idea:
+acotar por `wc_matches_ko.date_utc`).
+
 ## [29-jun-2026] Fix: avance KO infravalorado → escalera coherente +5 (`fix/ko-advance-ladder`)
 
 `KO_ROUND_PTS` en **ambos** motores (`_shared/scoring.mjs` + espejo
