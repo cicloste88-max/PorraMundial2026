@@ -99,20 +99,31 @@
     }
   }
 
-  // Liga: nombre + icono. Si la liga no es una de las dos canónicas, usamos
-  // el nombre que venga en el payload (`u.ln`) y un icono genérico.
+  // Icono de liga: solo los 2 canónicos están mapeados; cualquier otra
+  // liga futura cae al icono genérico 🏆. El NOMBRE viene en vivo de
+  // `get-league-standings` v1.7.0 (campo `leagueName`), así no
+  // mantenemos un catálogo estático que se quede desincronizado.
   const LEAGUE_ICON = {
     'b735a3c0': '🐓',
     'd5cb4dd6': '🔔',
   };
-  const LEAGUE_SHORT = {
-    'b735a3c0': 'Gallos',
-    'd5cb4dd6': 'Tilín',
-  };
   function leagueIconFor(id) { return LEAGUE_ICON[id] || '🏆'; }
-  function leagueShortFor(id, fallbackName) {
-    return LEAGUE_SHORT[id] || (fallbackName || '').split(' ').slice(0, 1).join('') || 'Liga';
-  }
+
+  // Rondas KO en orden cronológico + etiquetas legibles. El render agrupa
+  // u.kr por `rd` y emite UNA sección por ronda con filas (puro forward-
+  // ready: R16+ aparecerán automáticamente cuando los slots se siembren).
+  // 'third' va antes de 'final' por orden de partido (el 3er puesto se
+  // disputa antes de la Final). KO_ROUND_PTS.third no da avance, por
+  // diseño del motor — la sección sí se muestra cuando hay slot resuelto.
+  const KO_ROUND_ORDER = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
+  const KO_ROUND_LABEL = {
+    r32:   'R32',
+    r16:   'Octavos',
+    qf:    'Cuartos',
+    sf:    'Semifinales',
+    third: '3er puesto',
+    final: 'Final',
+  };
 
   // ─────────────────────────────────────────────────────────────
   // Estado del mount actual + opts.
@@ -286,14 +297,48 @@
     // payload de get-league-standings para evitar refetch.
     const rankInLeague = leagueListSorted.findIndex(function (x) { return x.uid === u.ui; }) + 1;
     const totalInLeague = leagueListSorted.length;
-    const max = (u.br['1'] || 0) + (u.br['2'] || 0) + (u.br['3'] || 0) + (u.qp || 0) + (u.rp || 0);
+
+    // Agrupa u.kr por ronda KO; el render emite UNA sección por cada ronda
+    // que tenga al menos una fila. Forward-ready: R16/QF/SF/3er/Final
+    // aparecerán automáticamente cuando los slots se siembren.
+    const koByRound = { r32: [], r16: [], qf: [], sf: [], third: [], final: [] };
+    for (let i = 0; i < (u.kr || []).length; i++) {
+      const k = u.kr[i];
+      if (koByRound[k.rd]) koByRound[k.rd].push(k);
+    }
+    // Cumulative KO pts por ronda (orden cronológico) para los hitos de la
+    // sección Evolución — el usuario ve cómo crece su puntuación a medida
+    // que avanza el torneo.
+    const koCum = {};
+    let _running = 0;
+    for (const rd of KO_ROUND_ORDER) {
+      _running += koByRound[rd].reduce(function (s, k) { return s + (k.p || 0); }, 0);
+      koCum[rd] = _running;
+    }
+    const koGrandTotal = _running; // total KO sin podio ni qp (suma de kr[].p)
+
+    // Hitos de evolución: grupos → bonus clasificados → fin de cada ronda KO
+    // que ya tenga al menos un slot resuelto → premios (si > 0). El total
+    // final del último hito === u.t.
     const milestones = [
       ['Fin J1 grupos', u.br['1'] || 0],
       ['Fin J2 grupos', (u.br['1'] || 0) + (u.br['2'] || 0)],
       ['Fin grupos', u.g],
-      ['+ Bonus R32', u.g + u.qp],
-      ['Tras R32', u.t],
+      ['+ Clasificados', (u.g || 0) + (u.qp || 0)],
     ];
+    let _evoCum = (u.g || 0) + (u.qp || 0);
+    for (const rd of KO_ROUND_ORDER) {
+      const rounSum = koByRound[rd].reduce(function (s, k) { return s + (k.p || 0); }, 0);
+      if (rounSum > 0) {
+        _evoCum += rounSum;
+        milestones.push(['Tras ' + KO_ROUND_LABEL[rd], _evoCum]);
+      }
+    }
+    if ((u.a || 0) > 0) milestones.push(['+ Premios', u.t]);
+    const max = milestones.length
+      ? milestones[milestones.length - 1][1]
+      : (u.t || 1);
+
     const grpByRound = { 1: [], 2: [], 3: [] };
     for (let i = 0; i < (u.gr || []).length; i++) {
       const r = u.gr[i];
@@ -318,8 +363,8 @@
       +   '</div>'
       +   '<div class="pd-kpis">'
       +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Grupos</div><div class="pd-kpi__val">' + u.g + '</div><div class="pd-kpi__sub">J1 ' + (u.br['1'] || 0) + ' · J2 ' + (u.br['2'] || 0) + ' · J3 ' + (u.br['3'] || 0) + '</div></div>'
-      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">KO</div><div class="pd-kpi__val">' + u.k + '</div><div class="pd-kpi__sub">+5×' + (u.qh || []).length + ' clasif · R32 ' + (u.rp || 0) + '</div></div>'
-      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Premios</div><div class="pd-kpi__val">' + u.a + '</div><div class="pd-kpi__sub">pdte. Final</div></div>'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">KO</div><div class="pd-kpi__val">' + u.k + '</div><div class="pd-kpi__sub">' + (u.qh || []).length + '/32 clasif (+' + (u.qp || 0) + ') · ' + koGrandTotal + ' rondas</div></div>'
+      +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Premios</div><div class="pd-kpi__val">' + u.a + '</div><div class="pd-kpi__sub">' + ((u.a || 0) > 0 ? 'resueltos' : 'pdte.') + '</div></div>'
       +     '<div class="pd-kpi"><div class="pd-kpi__lbl">Boosts</div><div class="pd-kpi__val">' + (u.bo || 0) + '</div><div class="pd-kpi__sub">activados</div></div>'
       +   '</div>'
       + '</div>'
@@ -390,15 +435,37 @@
       +   '</div>'
       + '</details>'
 
-      + '<details class="section-collapsible">'
-      +   '<summary><h2>KO · R32 cerrados <span class="pts-tot">' + (u.rp || 0) + ' pts</span></h2></summary>'
-      +   '<div class="match-list">'
-      +     ((u.kr || []).length ? (u.kr || []).map(koSlotCard).join('') : '<div class="empty">Sin slots cerrados.</div>')
-      +   '</div>'
-      + '</details>'
+      // KO · una sección POR RONDA con filas. r32 → r16 → qf → sf → 3er →
+      // final. Si una ronda no tiene filas en u.kr, su sección se omite. Si
+      // NINGUNA ronda tiene filas, se muestra un único placeholder.
+      + (function () {
+          const sections = [];
+          for (const rd of KO_ROUND_ORDER) {
+            const rows = koByRound[rd];
+            if (!rows.length) continue;
+            const subtotal = rows.reduce(function (s, k) { return s + (k.p || 0); }, 0);
+            sections.push(''
+              + '<details class="section-collapsible">'
+              +   '<summary><h2>KO · ' + esc(KO_ROUND_LABEL[rd]) + ' <span class="pts-tot">' + subtotal + ' pts</span></h2></summary>'
+              +   '<div class="match-list">' + rows.map(koSlotCard).join('') + '</div>'
+              + '</details>');
+          }
+          if (!sections.length) {
+            return ''
+              + '<details class="section-collapsible">'
+              +   '<summary><h2>KO · slots cerrados <span class="pts-tot">0 pts</span></h2></summary>'
+              +   '<div class="match-list"><div class="empty">Sin slots cerrados.</div></div>'
+              + '</details>';
+          }
+          return sections.join('');
+        })()
 
       + '<details class="section-collapsible">'
-      +   '<summary><h2>Premios individuales <span class="pts-tot">' + u.a + ' / 65</span></h2></summary>'
+      +   '<summary><h2>Premios individuales '
+      +     (u.aw
+            ? '<span class="pts-tot">' + ((u.a || 0) > 0 ? (u.a + ' pts') : 'pdte.') + '</span>'
+            : '')
+      +   '</h2></summary>'
       +     (u.aw
             ? '<div class="awards">'
               + '<div class="award"><span class="award__k">Balón Oro</span><span class="award__v">' + esc(u.aw.golden_ball || '—') + '</span></div>'
@@ -457,7 +524,9 @@
     });
     if (res.error) throw res.error;
     if (!res.data || !Array.isArray(res.data.rows)) throw new Error('respuesta inválida de get-league-standings');
-    return res.data.rows;
+    // v1.7.0 del EF expone `leagueName` top-level; pre-v1.7.0 (mientras no
+    // se redespliegue) es undefined → caller cae al fallback.
+    return { rows: res.data.rows, leagueName: res.data.leagueName ?? null };
   }
 
   async function _fetchDashboard(leagueId, userId) {
@@ -547,15 +616,20 @@
       return;
     }
 
-    // Liga: nombre real (de _activeLeague o se actualiza al primer fetch).
+    // Liga: nombre real. Fallback inicial al _activeLeague (window-cached);
+    // tras el fetch de get-league-standings v1.7.0 sustituimos por el
+    // leagueName autoritativo de la BD. Si el EF está en v1.6.x (no
+    // redesplegado todavía) seguimos con el fallback.
     let leagueName = '';
     const lg = _activeLeague();
     if (lg && lg.id === currentLeague && lg.nombre) leagueName = lg.nombre;
 
+    // La pill se rellena de forma diferida con el nombre del fetch (línea de
+    // abajo `#pd-league-name`). Hardcoded ICON, nombre dinámico.
     const leagueControl = OPTS.lockLeague
       ? '<div class="league-lock" title="Liga en la que estás logado">'
         + '<span class="league-lock__ico">' + leagueIconFor(currentLeague) + '</span>'
-        + '<span class="league-lock__name">Liga ' + esc(leagueShortFor(currentLeague, leagueName)) + '</span>'
+        + '<span class="league-lock__name" id="pd-league-name">' + esc(leagueName || 'Liga') + '</span>'
         + '<span class="league-lock__cnt" id="pd-league-cnt"></span>'
         + '</div>'
       : '';
@@ -583,7 +657,7 @@
       + '</div>'
       + '<div class="pd-scroll">'
       +   '<div id="pd-dashboard"></div>'
-      +   '<div class="pd-foot">Motor compartido scoring v1.6.0 · datos en directo</div>'
+      +   '<div class="pd-foot">Motor compartido scoring · datos en directo</div>'
       + '</div>';
 
     const backEl = root.querySelector('#pd-back');
@@ -593,8 +667,14 @@
     _setBodyState(root, 'loading');
     let standings;
     try {
-      const raw = await _fetchStandings(currentLeague);
-      const enriched = await _enrichStandingsWithProfile(raw);
+      const stRes = await _fetchStandings(currentLeague);
+      // v1.7.0 expone leagueName en el response. Sustituye el fallback inicial.
+      if (stRes.leagueName) {
+        leagueName = stRes.leagueName;
+        const nameEl = root.querySelector('#pd-league-name');
+        if (nameEl) nameEl.textContent = leagueName;
+      }
+      const enriched = await _enrichStandingsWithProfile(stRes.rows);
       standings = _filterStandings(enriched);
     } catch (err) {
       console.error('[porra-dashboard] standings fetch failed', err);
