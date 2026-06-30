@@ -2833,3 +2833,15 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] PENDIENTE MENOR (anotado, no urgente): el gate del cron no acota por recencia. Si un KO quedara null fuera de la ventana ESPN (ayer-manana), habria busy-loop benigno cada 2 min (la EF responde 200 con `events=[]`). Idea: acotar el gate por `wc_matches_ko.date_utc` para que solo dispare en ventana ±48h del cruce afectado.
 
 [--:--] NO TOCAR PROD: la EF ya esta deployed y el cron ya esta scheduled. Tras el push de Code, Claude.ai redespliega el EF desde main via `porra-ef-deployer` para que `deployed==repo` y revalida con `dry_run`. Code no toca `supabase functions deploy` ni `cron.schedule` en este flujo.
+
+## 2026-06-30 — Feat: avance KO SET-BASED por equipo (`claude/ko-advancement-set-based-lqb9xf`)
+
+[--:--] EDITAR: `calcKOMatchPoints` (`_shared/scoring.mjs` + espejo `public/js/scoring.js`) — el +pts de avance ahora se otorga si `predAdvancer ∈ opts.realRoundAdvancers` (Set<iso3> por ronda); fallback al criterio per-slot si el caller no pasa la set (backwards-compat).
+
+[--:--] CABLEAR: `get-league-standings/index.ts` v1.6.0 — construye `realRoundAdvancers` por ronda (r32/r16/qf/sf/final; 103 'third' excluido) desde `realSlotMesh` recorriendo `KO_ROUND_BY_ID`; pasa el set a `calcKOMatchPoints`. Retira gate `if (!real) continue` (el avance puede pagar aunque MI slot no esté resuelto, si el equipo pasó en otro slot). Bump v1.5.1 → v1.6.0.
+
+[--:--] CABLEAR: `public/js/v3/porra-jugador-v3.js` — añade `_realAdvIsoForKoSlot` + `_buildRealRoundAdvancers`; `_buildKoRounds` calcula la set y la pasa a `buildKoCard` para non-third; `buildKoCard` usa set membership para `pasaMatch` y relaja phase gate para que el `pts` capture +avance set-based. `renderKoCard`: drop "Real: X" en non-third (slot-bound, engañoso con set-based) y reframe ✓/✗ basado en pertenencia a la set.
+
+[--:--] TESTS: `tests/scoring.test.mjs` — 4 casos set-based (S1 equipo correcto slot equivocado → +avance; S2 no en set → 0 avance; S3 regresión slot correcto → +avance; S4a/b backwards-compat sin set; S5 set vacío → 0; S6 'third' set ignorado) + parity shared↔legacy (4 nuevos casos). Suite completa 349/349 ok.
+
+[--:--] BUILD: `npm run build` OK, `dist/` limpio.

@@ -189,6 +189,68 @@ import {
   assert.strictEqual(KO_ROUND_PTS.final, 30, 'KO_ROUND_PTS.final = 30 (renombrado de final_advance)');
   assert.strictEqual(KO_ROUND_PTS.final_advance, undefined, 'KO_ROUND_PTS.final_advance eliminado');
   assert.strictEqual(KO_ROUND_PTS.third, undefined, 'KO_ROUND_PTS.third ausente (3er puesto sin avance)');
+
+  // ── SET-BASED advance (San 30-jun-2026): el +pts de avance se otorga si el
+  //    equipo del usuario está en realRoundAdvancers de la ronda, aunque el
+  //    slot/cruce no coincida. Cubre "equipo correcto, slot equivocado":
+  //    tarjeta de Brasil en cruce A (Brasil cae en cruce B pero pasa) → +pts.
+  // ────────────────────────────────────────────────────────────────────
+  // S1 — Equipo correcto, slot equivocado: cruce no coincide (predHome/Away
+  //      distintos de realHome/Away), pero predAdvancer ('BRA') está en la set
+  //      de avanzadores reales de la ronda → +avance r16 (15), 0 marcador.
+  const s1 = KO({ saved: true, l: 2, v: 1, gol: null }, 0, 0, 'r16', {
+    predHome: 'BRA', predAway: 'MAR', predAdvancer: 'BRA',
+    realHome: 'KOR', realAway: 'JPN', realAdvancer: 'KOR',
+    realRoundAdvancers: new Set(['BRA', 'GER', 'KOR']),
+  });
+  assert.strictEqual(s1, 15, 'KO S1 (set-based): equipo correcto en slot equivocado → 0 marcador + avance r16 (15)');
+
+  // S2 — predAdvancer NO está en la set (equipo eliminado) → 0 avance.
+  //      Cruce coincide y marcador exacto → 4 marcador, 0 avance.
+  const s2 = KO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'KOR',
+    realRoundAdvancers: new Set(['KOR', 'GER', 'BRA']),
+  });
+  assert.strictEqual(s2, 4, 'KO S2 (set-based): predAdv no en set → 0 avance; marcador exacto = 4');
+
+  // S3 — Regresión: equipo correcto EN slot correcto sigue pagando +pts.
+  //      Pasa por set membership (set incluye al equipo). Marcador exacto.
+  const s3 = KO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+    realRoundAdvancers: new Set(['MEX', 'GER', 'BRA']),
+  });
+  assert.strictEqual(s3, 19, 'KO S3 (set-based regresión): equipo correcto en slot correcto → 4 + avance r16 (15) = 19');
+
+  // S4 — Backwards-compat: sin realRoundAdvancers → fallback per-slot
+  //      (predAdvancer===realAdvancer). Sigue funcionando la firma vieja.
+  const s4a = KO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+  });
+  assert.strictEqual(s4a, 19, 'KO S4a (compat): sin set, per-slot match → 4 + 15 = 19');
+  const s4b = KO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'KOR',
+  });
+  assert.strictEqual(s4b, 4, 'KO S4b (compat): sin set, per-slot mismatch → 4 + 0 = 4');
+
+  // S5 — Set vacío (ronda sin slots resueltos) → 0 avance.
+  const s5 = KO({ saved: true, l: 2, v: 0, gol: null }, 2, 0, 'r16', {
+    predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX',
+    realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX',
+    realRoundAdvancers: new Set(),
+  });
+  assert.strictEqual(s5, 4, 'KO S5 (set-based): set vacío → 4 marcador + 0 avance');
+
+  // S6 — slot 103 'third' (sin avance): el set es irrelevante (roundPts=0).
+  const s6 = KO({ saved: true, l: 2, v: 1, gol: null }, 2, 1, 'third', {
+    predHome: 'POR', predAway: 'NED', predAdvancer: 'POR',
+    realHome: 'POR', realAway: 'NED', realAdvancer: 'NED',
+    realRoundAdvancers: new Set(['POR']),
+  });
+  assert.strictEqual(s6, 4, 'KO S6 (set-based): third sin avance, set ignorado → solo marcador 4');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -420,6 +482,14 @@ const {
     { name: 'gol-fail r16',       pred: { saved: true, l: 2, v: 0, gol: 'wrong' }, rl: 2, rv: 1, round: 'r16', opts: { ...M, scorers: ['lozano'] } },
     { name: 'IA KO bonus',        pred: { saved: true, l: 0, v: 1, gol: null }, rl: 0, rv: 1, round: 'r16',   opts: { ...M, iaPred: { sign: '1' } } },
     { name: 'sin malla',          pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16',   opts: {} },
+    // Set-based (San 30-jun-2026): equipo correcto en slot equivocado → +avance.
+    { name: 'set: equipo OK slot KO', pred: { saved: true, l: 2, v: 1, gol: null }, rl: 0, rv: 0, round: 'r16', opts: { predHome: 'BRA', predAway: 'MAR', predAdvancer: 'BRA', realHome: 'KOR', realAway: 'JPN', realAdvancer: 'KOR', realRoundAdvancers: new Set(['BRA', 'GER', 'KOR']) } },
+    // Set-based: predAdv NO en set → 0 avance (marcador 4 si exacto + cruce).
+    { name: 'set: equipo no en set',  pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16', opts: { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX', realHome: 'MEX', realAway: 'KOR', realAdvancer: 'KOR', realRoundAdvancers: new Set(['KOR', 'GER']) } },
+    // Set-based: regresión slot correcto sigue pagando.
+    { name: 'set: slot correcto OK',  pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16', opts: { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX', realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX', realRoundAdvancers: new Set(['MEX', 'GER']) } },
+    // Set-based: set vacío → 0 avance.
+    { name: 'set: vacío',             pred: { saved: true, l: 2, v: 0, gol: null }, rl: 2, rv: 0, round: 'r16', opts: { predHome: 'MEX', predAway: 'KOR', predAdvancer: 'MEX', realHome: 'MEX', realAway: 'KOR', realAdvancer: 'MEX', realRoundAdvancers: new Set() } },
   ];
   for (const c of koCases) {
     const sharedPts = sharedCalcKOMatchPoints(c.pred, c.rl, c.rv, c.round, c.opts);

@@ -2,6 +2,24 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [30-jun-2026] Feat: avance KO SET-BASED por equipo (`claude/ko-advancement-set-based-lqb9xf`)
+
+`calcKOMatchPoints` (`_shared/scoring.mjs` + espejo `public/js/scoring.js`,
+1:1): el +pts de avance se otorga si el equipo que el usuario marcó avanzar en
+un slot está entre los que REALMENTE avanzaron en la **ronda** (cualquier slot),
+no solo si coincide con el avanzador del MISMO slot. Antes: tarjeta de Brasil en
+cruce vs Marruecos, real Brasil cae en otro cruce pero pasa → 0 avance. Ahora:
++15 (avance r16). Nuevo opts `realRoundAdvancers: Set<iso3>` (compat: fallback
+al criterio per-slot si el caller no lo pasa). Callers cableados:
+`get-league-standings` v1.6.0 construye `realRoundAdvancers` por ronda (solo
+slots resueltos; 103 'third' excluido vía `KO_ROUND_PTS`) y retira el gate
+`if (!real) continue` (set puede pagar aunque MI slot no esté resuelto);
+`porra-jugador-v3.js` espejo del wiring + drop de la línea "Real: X" en cards
+non-third (slot-bound, engañoso con set-based) + ✓/✗ basado en pertenencia a la
+set. Tests: 4 casos set-based (equipo correcto slot equivocado, no en set,
+regresión slot correcto, set vacío) + parity shared↔legacy. Marcador/§1.7/boost/
+podio intactos.
+
 ## [30-jun-2026] Fix: ganador de cruces KO automático desde ESPN (`claude/ko-winner-sync-espn-d43pyo`)
 
 Nueva EF **`ko-winner-sync`** v1.0.0 (`verify_jwt=false`, gate `X-Cron-Key`).
