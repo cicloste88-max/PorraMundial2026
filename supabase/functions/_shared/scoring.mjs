@@ -60,6 +60,17 @@ export function calcMatchPointsBreakdown(pred, realL, realR, opts = {}) {
   const empty = { pts: 0, signOk: false, exact: false, golOk: false, iaBonus: false, doubled: false, capped: false };
   if (!pred || !pred.saved) return empty;
 
+  // Defensa partido NO jugado: si el real es null/undefined no se debe
+  // computar signo ni exacto (Math.sign(NaN)===0 emparejaba empates con
+  // empates → +1 espurio en cruces KO confirmados pero sin jugar — caso
+  // luisalvarez15 GALLOS slots 83/87 en user_points_cache pre-PR). Usa
+  // `== null` (captura null+undefined, NO 0) para que un 0-0 jugado siga
+  // puntuando. Las EFs (get-league-standings, get-dashboard) ya gateaban
+  // grupos con `if (!real) continue`, pero KO ya no (set-based, San
+  // 30-jun-2026) y la rama de marcador entra con real=null cuando el
+  // cruce coincide y el slot aún no se ha jugado.
+  if (realL == null || realR == null) return empty;
+
   const exact = pred.l === realL && pred.v === realR;
 
   const signOk = (

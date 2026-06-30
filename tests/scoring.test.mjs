@@ -969,3 +969,77 @@ console.log('OK ERR-97 Fix 2 resolveScorerKey: fallback colisionante con rival s
 }
 
 console.log('OK breakdown: calcMatchPointsBreakdown + calcKOMatchPointsBreakdown + parity wrapper');
+
+// ════════════════════════════════════════════════════════════════════
+// 13. GUARD partido NO jugado (real null/undefined → 0 pts)
+//
+// Bug detectado en smoke get-dashboard 30-jun-2026: el motor sumaba +1
+// por signo en cruces KO confirmados pero sin jugar — Math.sign(NaN)===0
+// emparejaba pred 2-2 (empate, sign X) con real null/null (sign X) → +1
+// espurio. Casos reales en user_points_cache: luisalvarez15 GALLOS slots
+// 83 (POR-CRO notstarted, pred 2-2) y 87 (notstarted, pred 1-1). El bug
+// es PRE-EXISTENTE (el dashboard solo lo hizo visible).
+//
+// Fix: guard `if (realL == null || realR == null) return empty` en
+// calcMatchPointsBreakdown (+ espejo en public/js/scoring.js para
+// calcMatchPoints). Usa `== null` (NO `=== null`) para capturar null +
+// undefined SIN tocar 0 → un 0-0 jugado sigue puntuando exacto.
+// ════════════════════════════════════════════════════════════════════
+{
+  // shared — pred empate vs real null/null → 0 pts.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 2, gol: null }, null, null),
+    0, 'guard-noJugado #1: pred 2-2 + real null/null → 0 (no +1 espurio)',
+  );
+  // shared — pred 1-1 vs real null/null → 0.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 1, gol: null }, null, null),
+    0, 'guard-noJugado #2: pred 1-1 + real null/null → 0',
+  );
+  // shared — pred X vs real undefined/undefined → 0.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, undefined, undefined),
+    0, 'guard-noJugado #3: pred 0-0 + real undefined/undefined → 0 (no exacto)',
+  );
+  // shared — Cualquier pred (no empate) vs real null → 0.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 2, v: 0, gol: null }, null, null),
+    0, 'guard-noJugado #4: pred 2-0 + real null/null → 0',
+  );
+  // shared — Asimétrico: realL=1, realR=null → 0 (cualquier null tumba).
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 0, gol: null }, 1, null),
+    0, 'guard-noJugado #5: realR null → 0 (defensa simétrica)',
+  );
+  // shared — breakdown devuelve todos los flags en false.
+  const bdNull = sharedCalcMatchPointsBreakdown({ saved: true, l: 1, v: 1, gol: null }, null, null);
+  assert.strictEqual(bdNull.pts, 0, 'guard-noJugado #6: breakdown.pts=0');
+  assert.strictEqual(bdNull.signOk, false, 'guard-noJugado #6: signOk=false');
+  assert.strictEqual(bdNull.exact, false, 'guard-noJugado #6: exact=false');
+
+  // Regresión: 0-0 jugado SIGUE puntuando (el guard usa == null, NO === null).
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 0, v: 0, gol: null }, 0, 0, { scorers: [] }),
+    6, 'guard-noJugado regresión: 0-0 jugado vs 0-0 pred → 6 (regla 0-0 intacta)',
+  );
+  // Regresión: 1-1 jugado vs 1-1 pred → exacto.
+  assert.strictEqual(
+    sharedCalcMatchPoints({ saved: true, l: 1, v: 1, gol: null }, 1, 1),
+    4, 'guard-noJugado regresión: 1-1 jugado vs 1-1 pred → 1+3 (exacto sin gol)',
+  );
+
+  // Legacy — espejo del guard en public/js/scoring.js (paridad).
+  globalThis.iaBonusWillApply = () => false;
+  globalThis.PARTIDOS = [];
+  globalThis.boostPicks = {};
+  assert.strictEqual(
+    legacyCMP({ saved: true, l: 2, v: 2, gol: null }, null, null, null, null),
+    0, 'guard-noJugado legacy #1: pred 2-2 + real null → 0',
+  );
+  assert.strictEqual(
+    legacyCMP({ saved: true, l: 0, v: 0, gol: null }, 0, 0, null, []),
+    6, 'guard-noJugado legacy regresión: 0-0 jugado → 6',
+  );
+}
+
+console.log('OK guard partido no jugado: real null/undefined → 0 pts; 0-0 jugado intacto');

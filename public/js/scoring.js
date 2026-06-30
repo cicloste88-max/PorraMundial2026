@@ -127,6 +127,12 @@ function _liveScorerKey(name, iso3) {
 // signo/exacto/goleador y antes del cap de 7 y del boost ×2.
 function calcMatchPoints(pred, realL, realR, matchKey, realScorers) {
   if(!pred || !pred.saved) return 0;
+  // Defensa partido NO jugado: si el real es null/undefined no se debe
+  // computar signo ni exacto. Math.sign(NaN)===0 emparejaba pred=empate
+  // (X) con real=null/null (X) → +1 espurio en cruces KO confirmados
+  // pero sin jugar. Espejo de _shared/scoring.mjs. `== null` captura
+  // null+undefined pero NO 0 → un 0-0 jugado sigue puntuando.
+  if(realL == null || realR == null) return 0;
   let pts = 0;
 
   const isExact = pred.l === realL && pred.v === realR;

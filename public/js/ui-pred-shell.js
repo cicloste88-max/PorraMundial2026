@@ -359,9 +359,10 @@
       '<path d="M9 17h6"/><path d="M12 13v4"/><path d="M8 21h8"/>' +
       '</svg>';
 
-    // SVG inline para el botón Dashboard (4-grid icon).
+    // SVG inline para el botón Dashboard (4-grid icon). Mismo tamaño que el
+    // trophy (18×18) para que las dos pills queden visualmente alineadas.
     var dashSvg =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
       'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<rect x="3" y="3" width="7" height="9" rx="1"/>' +
       '<rect x="14" y="3" width="7" height="5" rx="1"/>' +
@@ -372,17 +373,14 @@
     mount.className = 'fc-pred-header';
     mount.innerHTML =
       '<div class="fc-pred-eyebrow-row">' +
-        '<span class="fc-eyebrow">PREDICTOR</span>' +
-        '<div class="fc-pred-eyebrow-actions">' +
-          '<button class="fc-pred-dashboard-btn" type="button" aria-label="Dashboard de la porra">' +
-            dashSvg +
-            '<span class="fc-pred-dashboard-label">Dashboard</span>' +
-          '</button>' +
-          '<button class="fc-pred-trophy-btn" type="button" aria-label="Clasificación de liga">' +
-            trophySvg +
-            '<span class="fc-pred-trophy-label">Clasificación</span>' +
-          '</button>' +
-        '</div>' +
+        '<button class="fc-pred-dashboard-btn" type="button" aria-label="Dashboard de la porra">' +
+          dashSvg +
+          '<span class="fc-pred-dashboard-label">Dashboard</span>' +
+        '</button>' +
+        '<button class="fc-pred-trophy-btn" type="button" aria-label="Clasificación de liga">' +
+          trophySvg +
+          '<span class="fc-pred-trophy-label">Clasificación</span>' +
+        '</button>' +
       '</div>' +
       '<h1 class="fc-pred-title">Tus predicciones</h1>' +
       '<p class="fc-pred-subtitle">' + _esc(subtitle) + '</p>';
