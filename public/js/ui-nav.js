@@ -509,7 +509,14 @@ function _mountDashboardLazy() {
       console.warn('[dashboard] mountPorra no disponible tras carga');
       return;
     }
-    var leagueId = (typeof window.getActiveLeagueId === 'function') ? window.getActiveLeagueId() : null;
+    // getActiveLeagueId vive en leagues.js (window-exposed L379). Fallback al
+    // bare-identifier si fuera necesario (no es el caso hoy, pero defensa
+    // espejo del patrón de porra-dashboard.js::_getActiveLeagueId).
+    var leagueId = null;
+    try {
+      if (typeof window.getActiveLeagueId === 'function') leagueId = window.getActiveLeagueId();
+      else if (typeof getActiveLeagueId === 'function') leagueId = getActiveLeagueId();
+    } catch (_e) {}
     window.mountPorra(host, {
       league: leagueId,
       lockLeague: true,

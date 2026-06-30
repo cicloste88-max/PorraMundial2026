@@ -30,24 +30,72 @@
   let ISO_TO_ES = null;   // { iso3 → es_name }
   let ES_TO_ISO = null;   // { es_name → iso3 } (inverso, para qh/qm si necesario)
 
+  // ISO3 → emoji bandera (espejo de ui-globo-equipos.js::ISO3_TO_FLAG).
+  // INLINED a propósito: el original vive dentro de un IIFE en
+  // ui-globo-equipos.js (var dentro de `(function () { ... })()`) — NO está
+  // expuesto en window (ERR-02). Replicado aquí para no acoplar a un módulo
+  // que tendría que romper su encapsulación. Si añades países al
+  // calendario, sincroniza ambas tablas.
+  const ISO3_FLAGS = {
+    'MEX': '🇲🇽', 'RSA': '🇿🇦', 'KOR': '🇰🇷', 'CZE': '🇨🇿',
+    'CAN': '🇨🇦', 'QAT': '🇶🇦', 'SUI': '🇨🇭', 'BIH': '🇧🇦',
+    'BRA': '🇧🇷', 'MAR': '🇲🇦', 'HAI': '🇭🇹', 'SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'USA': '🇺🇸', 'AUS': '🇦🇺', 'NZL': '🇳🇿', 'PAR': '🇵🇾',
+    'GER': '🇩🇪', 'ECU': '🇪🇨', 'CIV': '🇨🇮', 'CUW': '🇨🇼',
+    'NED': '🇳🇱', 'JPN': '🇯🇵', 'TUN': '🇹🇳',
+    'BEL': '🇧🇪', 'EGY': '🇪🇬', 'IRN': '🇮🇷',
+    'ESP': '🇪🇸', 'URU': '🇺🇾', 'KSA': '🇸🇦', 'CPV': '🇨🇻',
+    'FRA': '🇫🇷', 'SEN': '🇸🇳', 'NOR': '🇳🇴', 'IRQ': '🇮🇶',
+    'ARG': '🇦🇷', 'ALG': '🇩🇿', 'AUT': '🇦🇹', 'JOR': '🇯🇴',
+    'POR': '🇵🇹', 'COL': '🇨🇴', 'UZB': '🇺🇿',
+    'ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'CRO': '🇭🇷', 'GHA': '🇬🇭', 'PAN': '🇵🇦',
+    'TUR': '🇹🇷', 'SWE': '🇸🇪', 'COD': '🇨🇩',
+    'KAZ': '🇰🇿', 'ANG': '🇦🇴',
+  };
+
+  // EQUIPOS / db / getActiveLeagueId viven en classic scripts (data.js,
+  // auth.js, leagues.js) que comparten el global lexical environment de
+  // los scripts clásicos. Las declaraciones top-level `const` NO se exponen
+  // en `window` (ERR-02), pero SÍ son visibles a través del scope chain
+  // desde este IIFE. Helpers con guard `typeof` (espejo de
+  // porra-jugador-v3.js::_equipos:35).
+  function _equipos() {
+    try { return (typeof EQUIPOS !== 'undefined') ? EQUIPOS : (window.EQUIPOS || []); }
+    catch (_) { return (typeof window !== 'undefined' && window.EQUIPOS) || []; }
+  }
+  function _db() {
+    try { return (typeof db !== 'undefined') ? db : (window.db || null); }
+    catch (_) { return (typeof window !== 'undefined' && window.db) || null; }
+  }
+  function _getActiveLeagueId() {
+    try {
+      if (typeof getActiveLeagueId === 'function') return getActiveLeagueId();
+      if (typeof window !== 'undefined' && typeof window.getActiveLeagueId === 'function') return window.getActiveLeagueId();
+    } catch (_) {}
+    return null;
+  }
+  function _activeLeague() {
+    try {
+      if (typeof window !== 'undefined' && window._activeLeague) return window._activeLeague;
+    } catch (_) {}
+    return null;
+  }
+
   function _initCatalogs() {
     if (FLAG && ISO_TO_ES) return;
     FLAG = {};
     ISO_TO_ES = {};
     ES_TO_ISO = {};
-    const iso3ToFlag = (typeof window !== 'undefined' && window.ISO3_TO_FLAG) ? window.ISO3_TO_FLAG : null;
-    const equipos = (typeof window !== 'undefined' && Array.isArray(window.EQUIPOS)) ? window.EQUIPOS : [];
+    const equipos = _equipos();
     for (const e of equipos) {
       if (!e || !e.name || !e.flag) continue;
       ISO_TO_ES[e.flag] = e.name;
       ES_TO_ISO[e.name] = e.flag;
-      if (iso3ToFlag && iso3ToFlag[e.flag]) FLAG[e.name] = iso3ToFlag[e.flag];
+      if (ISO3_FLAGS[e.flag]) FLAG[e.name] = ISO3_FLAGS[e.flag];
     }
     // Fallback: ISO3 → emoji directo si entra una key iso3 en flagFor.
-    if (iso3ToFlag) {
-      for (const iso of Object.keys(iso3ToFlag)) {
-        if (!FLAG[iso]) FLAG[iso] = iso3ToFlag[iso];
-      }
+    for (const iso of Object.keys(ISO3_FLAGS)) {
+      if (!FLAG[iso]) FLAG[iso] = ISO3_FLAGS[iso];
     }
   }
 
@@ -400,10 +448,11 @@
   // FETCHES — get-league-standings (selector) + get-dashboard (detalle).
   // ─────────────────────────────────────────────────────────────
   async function _fetchStandings(leagueId) {
-    if (!window.db || !window.db.functions) {
+    const dbRef = _db();
+    if (!dbRef || !dbRef.functions) {
       throw new Error('db.functions no disponible (auth.js no inicializado)');
     }
-    const res = await window.db.functions.invoke('get-league-standings', {
+    const res = await dbRef.functions.invoke('get-league-standings', {
       body: { league_id: leagueId },
     });
     if (res.error) throw res.error;
@@ -412,7 +461,9 @@
   }
 
   async function _fetchDashboard(leagueId, userId) {
-    const res = await window.db.functions.invoke('get-dashboard', {
+    const dbRef = _db();
+    if (!dbRef || !dbRef.functions) throw new Error('db.functions no disponible');
+    const res = await dbRef.functions.invoke('get-dashboard', {
       body: { league_id: leagueId, user_id: userId },
     });
     if (res.error) throw res.error;
@@ -427,9 +478,13 @@
   // pedirlo, o (más eficiente) con un join puntual.
   async function _enrichStandingsWithProfile(rows) {
     if (!rows.length) return rows;
+    const dbRef = _db();
+    if (!dbRef || typeof dbRef.from !== 'function') {
+      return rows.map(function (row) { return Object.assign({}, row, { is_bot: false }); });
+    }
     const uids = rows.map(function (r) { return r.uid; });
     try {
-      const r = await window.db.from('profiles').select('id, is_bot, nombre').in('id', uids);
+      const r = await dbRef.from('profiles').select('id, is_bot, nombre').in('id', uids);
       const map = {};
       (r.data || []).forEach(function (p) { map[p.id] = p; });
       return rows.map(function (row) {
@@ -486,12 +541,7 @@
     root.classList.add('pd');
 
     let currentLeague = OPTS.league;
-    if (!currentLeague) {
-      // Sin league_id en opts intentamos del store global.
-      if (typeof window.getActiveLeagueId === 'function') {
-        currentLeague = window.getActiveLeagueId();
-      }
-    }
+    if (!currentLeague) currentLeague = _getActiveLeagueId();
     if (!currentLeague) {
       root.innerHTML = '<div class="empty" style="padding:64px 24px;text-align:center">Selecciona una liga para ver el dashboard.</div>';
       return;
@@ -499,10 +549,8 @@
 
     // Liga: nombre real (de _activeLeague o se actualiza al primer fetch).
     let leagueName = '';
-    try {
-      const lg = (window._activeLeague && window._activeLeague.id === currentLeague) ? window._activeLeague : null;
-      if (lg && lg.nombre) leagueName = lg.nombre;
-    } catch (_) {}
+    const lg = _activeLeague();
+    if (lg && lg.id === currentLeague && lg.nombre) leagueName = lg.nombre;
 
     const leagueControl = OPTS.lockLeague
       ? '<div class="league-lock" title="Liga en la que estás logado">'

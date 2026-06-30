@@ -480,8 +480,11 @@ serve(async (req: Request) => {
     koPts += bd.pts;
     if (round === "r32") rpPts += bd.pts;
 
-    // Solo emitimos slots con resultado real (kr de la UI).
-    if (real == null && !realMesh) continue;
+    // Emisión del row kr: además de tener resultado real o malla, emitimos
+    // si el slot pagó avance set-based (predAdvancer ∈ realRoundAdvancers
+    // por OTRO slot de la ronda). De lo contrario el dashboard mostraría
+    // koPts > sum(kr[].p) sin que el usuario vea de dónde sale el avance.
+    if (real == null && !realMesh && bd.advancePts === 0) continue;
 
     // Orientación: si swap, el marcador "oriented" (ops) coincide con la malla
     // real; ps queda como el marcador tal y como lo introdujo el usuario.
