@@ -5,7 +5,7 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**30-jun** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo + **Dashboard porra** v1. Bracket FIFA → `docs/ko-bracket.md`.
+**02-jul** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo + **Dashboard porra** v1. Bracket FIFA → `docs/ko-bracket.md`. Audit salud 02-jul → `docs/sanity-check-02jul2026.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
@@ -83,7 +83,7 @@ Hook pre-commit one-time en clones nuevos: `git config core.hooksPath .githooks`
 | `db-schema.md` | Schemas SQL + RLS + helpers `schedule_match_crons` | Cambios en tablas o crons de partidos |
 | `whatsapp.md` | Twilio sandbox + notifs + migración Meta | Cambios notificaciones |
 | `simulacros.md` | Workflow testing live pre-Mundial | Activar/desactivar simulacros |
-| `sanity-check-20abr2026.md` | Deuda técnica priorizada 8 semanas | Decidir qué invertir antes del 11 jun |
+| `sanity-check-02jul2026.md` | Audit salud 02-jul: 52 hallazgos + runbook limpieza | Triage deuda técnica / limpieza |
 | `globo-mundial.md` | Globo 3D — factory globe.gl, OVERRIDE/ALIAS, polygonsData re-render, panel detalle, banderas Supabase, WIKI_BIO v3 | Cambios en globo o países |
 | `sync-squads.md` | CLI scripts/sync-squads.mjs + workflow CI: modos, pipeline FF/TM, calendario operativo, casos especiales | Cambios en sync de plantillas o frecuencia cron |
 | `v3-vs-legacy.md` | Inventario funcionalidades v3 vs legacy + reminiscencias + gaps + roadmap consolidación estética | Audit redesign v3 / decidir recolocación de features |
@@ -107,15 +107,14 @@ ERR-01..100: detalle completo en `errores_conocidos_porra.md`. **Consultar antes
 
 - `CHANGELOG.md` — histórico de bugs resueltos y limpiezas (retención 90d, auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB).
 - `migration-log.md` — cronología append-only de acciones por sesión.
-- `errores_conocidos_porra.md` — catálogo exhaustivo ERR-01..91 (síntoma/causa/fix/patrón).
 - `docs/AUDIT_LEGACY_VS_V3.md` — audit features legacy vs v3: 15 match-card features + 9 puntos integración I1-I9 + Backlog F3 (HF-08, 5 bloques A-E). NO implementado — ref. F3 wiring.
 
 ## End-of-session protocol
 
 1. Actualizar `Estado actual` + top-3 en este `CLAUDE.md` + commit.
-2. Bugs resueltos → `CHANGELOG.md` (90d, auto-archive a `CHANGELOG-archive-YYYYMM.md` si >30KB). NO en `CLAUDE.md`.
+2. Bugs resueltos → `CHANGELOG.md` (política retención: ver §Otros ficheros). NO en `CLAUDE.md`.
 3. Append `[HH:MM] ACCION: …` a `migration-log.md`.
-4. Verificar tamaños con `.githooks/pre-commit` (10KB CLAUDE.md / 30KB CHANGELOG.md; activar one-time con `git config core.hooksPath .githooks`).
+4. Verificar tamaños con `.githooks/pre-commit` (10KB CLAUDE.md / 30KB CHANGELOG.md).
 5. Revisar política retención CHANGELOG el 20 jul 2026 (post-Mundial: revertir a 30d).
 
 ## Frase inicio sesión

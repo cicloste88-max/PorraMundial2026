@@ -80,7 +80,7 @@ El puente trae **guardas anti-dato-incompleto**: si el marcador es NULL, la clav
 
 **Rama KO**: resuelve el `match_key` de KO contra `wc_matches_ko` (tabla diccionario, runtime-only, vacía hasta ~28-jun) y escribe `ko_results` con `winner` (incluye desempate por penaltis; `penaltyShootout` NO cuenta como goleador). Detalle: `docs/live-scoring.md` §Bloque crítico + ERR-82.
 
-> ⚠️ **Drift**: el trigger `trg_bridge_on_finished()`, las funciones `sweep_unbridged_finished()` / `dispatch_live_slots()` (cron `dispatch-live-slots`, `*/3min`) y la tabla `wc_matches_ko` viven **solo en runtime** (creados vía MCP, sin migration file). Pendiente backfill a `supabase/migrations/`.
+> ✅ **Drift cerrado** (verificado 02-jul-2026): `trg_bridge_on_finished()`, `sweep_unbridged_finished()`, `dispatch_live_slots()` y la tabla `wc_matches_ko` están backfilled en `supabase/migrations/20260609234824_backfill_live_pipeline_runtime.sql` (el remoto además registra las versiones 20260602*). Nota operativa: el cron `dispatch-live-slots` (jobid 24, `*/3min`) está **inactivo** en runtime desde que el polling primario pasó a `espn-poll-mundial-2026` (jobid 30, cada minuto, gated por ventana de partido) — confirmar si es permanente y entonces hacer `cron.unschedule`. Ver `docs/sanity-check-02jul2026.md`.
 
 ## Migration log obligatorio
 

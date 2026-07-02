@@ -2871,3 +2871,21 @@ Brief de 2 pantallas nuevas (San): **Predicciones de la liga** (`openPrediccione
 [--:--] BUILD: `npm run build` OK. `dist/css/porra-dashboard.css` + `dist/js/porra-dashboard.js` presentes. `grep -l "\.pd-hero" dist/css/*.css` → match (ERR-22 ✓). `grep -l "fc-pred-dashboard-btn" dist/css/components/predictor-shell.css` → match.
 
 [--:--] TESTS: `node --test tests/*.test.mjs` → 228/228 ok.
+
+---
+
+## Sesión 02-jul-2026 — Chequeo general de salud + limpieza (rama `claude/project-health-cleanup-s0kpjj`)
+
+[11:45] AUDIT: workflow multi-agente (7 auditores paralelos read-only: repo-hygiene, dead-code-js, css-audit, docs-consistency, deps-and-build, supabase-health, github-state + 4 verificadores adversariales de candidatos a borrado). 52 findings. Informe + runbook → `docs/sanity-check-02jul2026.md`.
+
+[12:05] ARCHIVAR CHANGELOG: 6 entradas 02-jun→10-jun (139 líneas, 8.845 bytes) movidas 1:1 a `CHANGELOG-archive-202606.md` (orden cronológico). CHANGELOG.md 34.604→25.759 bytes (cap 30.720 restaurado; estaba excedido → pre-commit bloqueado).
+
+[12:10] TRIM CLAUDE.md: 10.264→10.158 bytes (cap 10.240; excedido +24). 3 redundancias internas eliminadas (línea dup errores_conocidos con "ERR-01..91" stale, comando hooksPath dup, política retención dup). Estado actual → 02-jul + ref audit. Fila mapa docs `sanity-check-20abr2026.md` (vencida) → `sanity-check-02jul2026.md`.
+
+[12:15] BORRAR (verificación adversarial 0 refs vivas; recuperables de historial git): `docs/Design System.zip` (105KB, la doc decía "no entra al repo"), `deploy-and-qa.ps1` (era Netlify + push directo a main), `qa-login.ps1`, `setup-credentials.ps1`. MOVER: `BRIEF_TM_MARKET_VALUES_SCRAPER.md` → `docs/brief-tm-market-values.md` (convención briefs en docs/).
+
+[12:20] DRIFT DOCS: `.claude/rules/frontend-css.md` "siete enlaces"→26 (9 raíz + 11 components/ + 6 v3/). `.claude/rules/edge-functions.md` bloque "⚠️ Drift" obsoleto → backfill YA en `20260609234824_backfill_live_pipeline_runtime.sql`; anotado estado real cron jobid 24 dispatch-live-slots (INACTIVO; polling primario = jobid 30 espn-poll, 2880 runs OK/48h).
+
+[12:25] FLAGS OPERATIVOS (sin acción, decisión San — detalle en informe §2-3): jobid 24 inactivo sin constancia escrita; advisor ERROR 2 vistas SECURITY DEFINER (`v_boost_control`, `v_league_member_count`); 5 EFs `verify_jwt=true` (ERR-16: get-squad, porra-tm-photos-sync, gh-proxy, porra-flag-batch-upload, load-staging-fifa-tmp); EFs tmp runtime-only (`load-staging-fifa-tmp`, `enrich-photo-tmp`); crons vencidos 21/22/26; fix 1 línea perdido `fix/winrate-label-forma` (label "% Victorias · 12m" en prod); 10 ramas remotas SAFE-DELETE (comando en informe, las borra San — ERR-17); PR #151 parado 22d (destapa test rojo enmascarado por --test-skip-pattern); issues #23-27 sin actividad 67d (#27 cerrable).
+
+[12:30] BUILD: `npm run build` OK (dist 2.2MB, entry 189KB→49KB gzip). TESTS: 349/349 verde. Hook pre-commit activado en clon (`git config core.hooksPath .githooks`).

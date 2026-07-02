@@ -2,6 +2,27 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [02-jul-2026] Chequeo general de salud + limpieza (`claude/project-health-cleanup-s0kpjj`)
+
+Auditoría multi-agente (repo, JS/CSS muerto, docs, deps/build, Supabase, GitHub): 52
+hallazgos → informe completo + runbook en `docs/sanity-check-02jul2026.md`. Aplicado:
+
+- **Tamaños hook restaurados**: CHANGELOG.md 34.6KB→25.8KB (6 entradas 02→10-jun archivadas
+  a `CHANGELOG-archive-202606.md`, 1:1); CLAUDE.md 10.264→~10.1KB (3 redundancias internas,
+  cero reglas perdidas). Ambos excedían el cap y el pre-commit habría bloqueado a San.
+- **Borrados** (verificación adversarial, 0 referencias vivas): `docs/Design System.zip`
+  (105KB — la doc decía "no entra al repo"), `deploy-and-qa.ps1` (era Netlify, push directo
+  a main), `qa-login.ps1` + `setup-credentials.ps1` (helpers QA era Netlify).
+- **Movido**: `BRIEF_TM_MARKET_VALUES_SCRAPER.md` (raíz) → `docs/brief-tm-market-values.md`.
+- **Drift docs corregido**: frontend-css.md "siete enlaces"→26; edge-functions.md bloque
+  Drift obsoleto (backfill live-pipeline YA existe en `20260609234824`) + estado real del
+  cron jobid 24 (inactivo, polling primario = espn-poll jobid 30).
+- **Flags operativos** (ver §2 del informe): dispatch-live-slots inactivo sin constancia,
+  2 vistas SECURITY DEFINER (advisor ERROR), 5 EFs con verify_jwt=true (ERR-16), fix de 1
+  línea perdido en `fix/winrate-label-forma`, 10 ramas remotas safe-delete, PR #151 parado 22d.
+
+Build OK + suite 349/349 verde tras los cambios.
+
 ## [30-jun-2026] Feat: Dashboard de la porra — vista por jugador (`claude/predictor-league-dashboard-u0zjzt`)
 
 Nueva pantalla **Dashboard de la porra** accesible desde el botón
@@ -371,143 +392,4 @@ ERR-86). Sustituye a la rama great-wozniak (neutralización; OBSOLETA, no mergea
   jugada→J2, hoy→J1, post-grupos→null, parse UTC, date_utc malformado).
   Verificado vs BD: 24/24/24 por round, 0 `date_utc` no parseables; paridad
   deploy↔repo de los 2 ficheros + boot 401 OK. Suite 143/143.
-
-## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
-
-Refresh pre-torneo completo de XIs y datos IA, con 4 bugs cerrados por el camino
-(QA San en localhost OK):
-
-- **FF movió las páginas de equipo a `/world-cup/equipos/<slug>`** — la ruta vieja
-  devolvía 404 y el scrape de XI fallaba silenciosamente. Fix en `ff-scraper.mjs`.
-- **Artefacto "Más info"**: overlay nuevo de FF cuyo `img[alt]` se colaba como nombre
-  de titular (6 selecciones, slot PO sobre todo). Filtro `isUiArtifact` + promoción de
-  la alternativa al slot vacío.
-- **Aliases post-load-fifa** (+13): los nombres FIFA del 03-jun rompieron matches FF
-  (Vinicius Junior→Vinicius Jr, Ben Doak→Ben Gannon-Doak, Kevin Lenini→Kevin Pina
-  confirmado por San…) y un alias KOR apuntaba a un nombre extinto (→Taehyeon KIM).
-  **Gemelo Aldawsari (KSA)**: el fuzzy ponía a Nasser en el xi cuando FF alinea a
-  Salem ("Salem Al Dawsari" con espacios).
-- **18 formaciones desfasadas** (pin de mayo): nueva `detectFormacion()` en
-  `xi-slot-map.mjs` — prueba las 12 rejillas contra las coords FF, cambia
-  `squads.formacion` solo con 11 coords + mejora ≥15%. CRO/CUW→3-5-2,
-  JPN/CZE/PAN/SUI→3-4-3, SCO/URU→4-4-2, GER/NED/POR/MEX/KSA/QAT/JOR/COD/NOR/PAR→4-3-3.
-  maxDist anómalos resueltos (MEX 61→15, KSA 49→20).
-- **Pipeline**: `--reseed-xi` ahora funciona en `scrape --refresh-final` (re-marca XI
-  pineados con el roster FIFA-official ÍNTEGRO — NUNCA usar detect para esto:
-  pisaría nombre_camiseta/estatura_cm/posicion_fifa) + `--build-xi` tras scrape.
-- **IA/rachas**: default `scrape_last5` 8→10 + re-scrape elo/h2h/last5 (amistosos
-  hasta 09-jun en BD). ⚠️ Deploy CLI de EFs: **SIEMPRE `--no-verify-jwt`** — el 1er
-  deploy sin flag reseteó `verify_jwt=true` y habría tumbado el cron freeze del 11-jun.
-
-Final BD: 48/48 `squads.xi`=11 sin placeholders · 48/48 `es_titular`=11 · formaciones
-4-3-3×23 / 4-2-3-1×9 / 3-4-3×8 / 4-4-2×4 / 3-5-2×4. Smoke `get-squad` CRO OK.
-
-## [10-jun-2026] Actor webshare 1.0.13 — drift cerrado + modo auto + secrets (rama `claude/upbeat-hopper-s4qe2t`)
-
-**Drift descubierto**: el repo tenía el actor pre-batch (1.0.7) mientras producción corría
-1.0.10 (`eventIds[]`) — el PR #131 que portaba el batch al repo quedó abierto sin mergear.
-Reconciliado vía `apify pull` + refactor Nivel 1 encima, **deploy build 1.0.13**:
-
-- **Modo `auto` (default)**: reuse de cookies del KV Store SIN cargar sofascore.com
-  (~5-6s/run, mínimo bandwidth Webshare); self-healing — si 403/timeout, recapture +
-  retry solo de los ids fallidos. `capture`/`reuse`/`normal` quedan para debug.
-- **Batch paralelo**: todos los ids en 1 `page.evaluate` con `AbortSignal.timeout(15s)`
-  por fetch (antes serial, sin timeout). 3 partidos en ~1,7s.
-- **Credenciales Webshare fuera del código** → `apify secrets` + refs `@` en
-  `.actor/actor.json` (rotación de password pendiente, trámite documentado).
-- **Dockerfile**: `COPY package.json` + `--no-package-lock` → **ERR-85** (lockfile
-  rompía el build por API Y por `apify push`; supersede la lección "ERR-82" del PR #131).
-- **defaultRunOptions vía API**: 2048MB (antes 4096 → ~50% coste/run) + timeout 300s
-  (antes 3600 — un run colgado facturaba 1h).
-
-**Validación**: smokes single/batch/capture/reuse 200 + **partido EN DIRECTO**
-(Ponte Preta-Cuiabá, `inprogress` 2nd half, 1-2 live con goleadores correctos, ~2s).
-
-**Docs portadas del PR #131** (que se cierra sin merge — superseded): §Batching por slot
-(seed 72, índice `live_scores_match_key_uidx`, clustering 60 slots, supersede
-`schedule_match_crons` para grupos), descubrimiento eventId vía `og:image` (SofaScore
-retiró `#id:` de URLs), EF `porra-sofascore-proxy` MUERTA, modelo `incidentClass` del
-goleador. Pendiente heredado del #131: **rotar `APIFY_TOKEN`** (quedó expuesto en chat MCP).
-
-## [08-jun-2026] #137 — feat(receipt): comprobante de porra por email (squash `2da570e`)
-
-EF `send-porra-receipt` v3: al cierre envía al usuario un email con copia íntegra
-de sus pronósticos (cuerpo ligero + adjunto HTML para evitar el recorte de Gmail).
-Resend + Vault `RESEND_API_KEY`. Tabla `sent_receipts` (UNIQUE `user_id`+`league_id`,
-RLS on). Cron `cerrar-porras-mundial-2026` extendido (`bulk:true`, 1 POST/liga).
-Podio derivado solo de classifiers. Auth `requireAdminOrCron` + opcional `to_override`.
-
-## [08-jun-2026] #139 — fix(boost): cliente JWT + espejo currentUser (squash `617577e`)
-
-`boost_picks` vacía server-side pese a usuarios con boosts marcados. Dos capas:
-
-1. `saveBoostPicks`/`loadBoostPicks` usaban `window._porraDb` (cliente AUTH sin
-   JWT) → la RLS `auth.uid()=user_id` rechazaba el INSERT y devolvía `[]` en
-   SELECT, en silencio. Fix: usar `getQueryDb()` (con `accessToken` vía
-   `window._porraToken`) + auto-migración one-shot localStorage→DB en
-   `loadBoostPicks`. → **ERR-83**.
-2. `data.js` L256/L285 leían `window.currentUser?.id` pero `auth.js` declara `let
-   currentUser` (scope global de script clásico, NO va a `window`) → el guard
-   salía silencioso. Fix: espejo `window.currentUser = currentUser` tras cada
-   mutación (L586 post-restore, L740 post-logout); repara 5 call sites de golpe.
-   → **ERR-84**.
-
-Validado vía Chrome MCP sobre preview de Vercel: tras `606ea7f`, el flujo normal
-de bootstrap inserta las filas sin forzar nada.
-
-## [08-jun-2026] Gate de boosts obligatorios antes de cerrar la porra (v3, #138)
-
-Rama `claude/wonderful-thompson-K5LK5`. El cierre v3 (`v3FinalizarPorra` en
-`public/js/v3/eliminatoria-v3.js`) **no validaba los boosts** de jornada
-(obligatorios: 1 por día de grupos). El botón "Cerrar y enviar mi porra" saltaba
-la regla publicada ("Sin todos los boosts asignados no se puede cerrar la
-porra") — **7 usuarios cerraron con 0 boosts**. El cierre legacy
-`close-porra.js` sí los gateaba; el path v3 no.
-
-- **Fix**: el chequeo BD del cierre suma una 4.ª query (`boost_picks`) y exige
-  **1 boost por jornada de grupos**, mapeando los días con el mismo calendario
-  que usa el front (`PARTIDOS`). Validación por pertenencia de día (no `count≥N`):
-  "2 boosts en un día y 0 en otro" bloquea igual.
-- **UX**: si falta algún boost → mensaje claro + navegación al selector
-  (`showPage('jornada')` + scroll a `#boost-ticker`), **sin** ejecutar el UPDATE
-  de `league_members.porra_cerrada`. Fail-closed ante error de lectura.
-- **Nota**: la regla son **17** jornadas (jun 11–27), no 12 — confirmado por
-  `PARTIDOS`, `close-porra.js:150`, checklist `index.html` ("0/17") y la regla en
-  `index.html`; el gate lo deriva dinámicamente. No se toca el selector de boosts
-  (verificado operativo: escribe en `boost_picks`, `match_id` = clave de
-  `predictions.match_id`). Los 7 cierres previos sin boosts eran el bot Zayu
-  (×6 ligas + 1 huérfana), NO humanos → sin backfill.
-- **Pre-flight + rebase (2.º commit)**: `await loadBoostPicks()` antes del
-  `Promise.all` — auto-curativo, sube a DB los boosts atrapados en localStorage
-  pre-#139 antes de validar (try/catch aislado: si falla, el gate sigue).
-  Rebaseado sobre main post-#139 sin conflictos; validado E2E vía Chrome MCP.
-
-## [02-jun-2026] Bloque crítico P4 — pipeline live→puntuación automático
-
-Multi-lane (runtime Claude.ai/MCP + docs Code, rama `feat/docs-p4-bloque-critico`).
-El volcado `live_scores` → `results` pasa a **automático**; cierra la vía del
-**puente** (SofaScore). `update-results` (football-data.org) sigue pendiente e
-independiente (pg_cron 11-jun) — el puente NO la sustituye.
-
-### Runtime (lane Claude.ai/MCP — no vive en git)
-
-- **Motor `get-league-standings` v1.1.0→v1.2.0**: `calcKOMatchPoints` acepta
-  `opts.winner` con fallback `l`/`v` → arregla el avance de ronda en **KO por
-  penaltis** (antes `realWinner=null` no puntuaba el classifier acertado, ERR-82).
-- **Puente `porra-bridge-results` v3→v4**: rama **KO** (`wc_matches_ko` →
-  `ko_results` con `winner` vía `koWinner()`/desempate por tanda; `penaltyShootout`
-  fuera de `scorers`) + **guardas anti-dato-incompleto** (skip + `results.log`).
-- **Trigger `bridge_on_finished`** + **cron `sweep-unbridged-finished` (`*/5min`)**
-  = disparo automático del puente (antes manual). Validado en vivo (MEX-RSA) +
-  simulacro KO penaltis.
-- **Drift**: trigger/funciones/`dispatch-live-slots`/`wc_matches_ko` solo en
-  runtime (sin migration file). Upstream verificado: match-live **v18**,
-  apify-webhook **v9**.
-
-### Docs (lane Code)
-
-§Bloque crítico en `docs/live-scoring.md`; `wc_matches_ko` + contrato `ko_results`
-+ `results.log` en `docs/db-schema.md`; **ERR-82**; tabla EF canónica
-(`architecture.md` + `README.md`: standings v1.2.0, bridge v4, match-live v18,
-apify-webhook v9); `CLAUDE.md`; `.claude/rules/edge-functions.md`.
 

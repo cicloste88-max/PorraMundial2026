@@ -19,7 +19,7 @@ Referencia: ERR-18.
 
 ## Referencias en `index.html`
 
-Existen siete enlaces `<link rel="stylesheet">` en el `<head>` de `index.html`, todos apuntando a rutas con prefijo `/css/fichero.css`. Los estilos inline que estaban dentro de etiquetas `<style>` fueron extraídos a ficheros dedicados en el commit `9e93fe8`. Cualquier nuevo CSS deberá enlazarse siguiendo este mismo patrón.
+Los enlaces `<link rel="stylesheet">` del `<head>` de `index.html` (26 a fecha jul-2026: 9 en raíz + 11 en `components/` + 6 en `v3/`) apuntan todos a rutas con prefijo `/css/…`. Los estilos inline que estaban dentro de etiquetas `<style>` fueron extraídos a ficheros dedicados en el commit `9e93fe8`. Cualquier nuevo CSS deberá enlazarse siguiendo este mismo patrón.
 
 ## Verificación obligatoria post-build
 
