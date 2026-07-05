@@ -1,5 +1,5 @@
 // supabase/functions/ko-round-seeder/index.ts
-// EF ko-round-seeder v1.0.0 — siembra AUTOMÁTICA de rondas KO (R16→final).
+// EF ko-round-seeder v1.0.3 — siembra AUTOMÁTICA de rondas KO (R16→final).
 //
 // Problema (5-jul-2026): R32 completo (16/16 en results.ko_results) pero los
 // octavos (slots 89-96) NO existían en wc_matches_ko / espn_event_map /
@@ -58,6 +58,18 @@
 // deploy MCP). NO importa _shared/ko-data.mjs (59KB de ANNEX_C irrelevante en
 // R16+): los feeders viven en seeder-logic.mjs::KO_FEEDERS, verificados 1:1
 // contra BRACKET por tests/ko-round-seeder.test.mjs.
+//
+// Changelog (v1.0.1-1.0.3 = hotfixes de los runs reales del 5-jul, bugs de
+// constraints de BD viva + concurrencia no detectables en container):
+//   v1.0.1  live_scores ANTES que espn_event_map — espn_event_map.match_key
+//           tiene FK → live_scores(match_key); el orden inverso violaba el FK
+//           en todos los slots.
+//   v1.0.2  live_scores.sofascore_url es NOT NULL sin default (único NOT NULL
+//           además de match_key) → se rellena con la URL ESPN del evento
+//           (patrón siembra R32, fila referencia wc2026_ko_73).
+//   v1.0.3  bridges SECUENCIALES — en paralelo (Promise.allSettled) dos
+//           bridges hacen read-modify-write de results.ko_results (id=1) y se
+//           pisan: el write del slot 89 machacó el del 90 (re-puente a mano).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto as stdCrypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
@@ -287,16 +299,19 @@ async function handle(req: Request): Promise<Response> {
       });
       if (error) { entry.action = "error"; entry.reason = `wc_matches_ko_insert: ${error.message}`; continue; }
     }
-    // 4b) espn_event_map.
-    if (!mapByKey.has(mk)) {
-      const { error } = await supa.from("espn_event_map").insert({ espn_event_id: espnEventId, match_key: mk, inverted });
-      if (error) { entry.action = "error"; entry.reason = `espn_event_map_insert: ${error.message}`; continue; }
-    }
-    // 4c) live_scores esqueleto (orientado a proyecto — el writer nunca
+    // 4b) live_scores esqueleto (orientado a proyecto — el writer nunca
     //     pre-orienta: inverted vive en espn_event_map y aquí ya se aplicó).
+    //     ⚠️ INVARIANTE de orden (v1.0.1, descubierto en el run real 5-jul):
+    //     live_scores DEBE insertarse ANTES que espn_event_map —
+    //     espn_event_map.match_key tiene FK → live_scores(match_key) y el
+    //     orden inverso violaba el FK en todos los slots. Lo fija un
+    //     source-assert en tests/ko-round-seeder.test.mjs.
     if (!liveByKey.has(mk)) {
       const { error } = await supa.from("live_scores").insert({
         match_key: mk,
+        // sofascore_url es NOT NULL sin default (v1.0.2, run real 5-jul):
+        // se rellena con la URL ESPN del evento (patrón de la siembra R32).
+        sofascore_url: `https://www.espn.com/soccer/match/_/gameId/${espnEventId}`,
         status: live.status, status_code: live.status_code, minute: live.minute,
         score_home: live.score_home, score_away: live.score_away, events: live.events,
         poll_active: live.poll_active, poll_interval: live.poll_interval,
@@ -306,6 +321,11 @@ async function handle(req: Request): Promise<Response> {
       });
       if (error) { entry.action = "error"; entry.reason = `live_scores_insert: ${error.message}`; continue; }
       if (live.status === "finished") bridgeKeys.push(mk);
+    }
+    // 4c) espn_event_map (SIEMPRE después de live_scores — FK, ver 4b).
+    if (!mapByKey.has(mk)) {
+      const { error } = await supa.from("espn_event_map").insert({ espn_event_id: espnEventId, match_key: mk, inverted });
+      if (error) { entry.action = "error"; entry.reason = `espn_event_map_insert: ${error.message}`; continue; }
     }
     entry.action = "seeded";
   }
@@ -338,25 +358,31 @@ async function handle(req: Request): Promise<Response> {
 
   // 6) Puente explícito de las filas sembradas ya-finished (el trigger AFTER
   //    UPDATE no salta en INSERT; el sweep */5min queda de red de seguridad).
+  //    SECUENCIAL, nunca en paralelo (v1.0.3, race REAL observada 5-jul): el
+  //    bridge hace read-modify-write del jsonb results.ko_results (fila única
+  //    id=1); dos bridges concurrentes leen el mismo snapshot y el último
+  //    write pisa al otro (el del slot 89 machacó el del 90 → re-puente a mano).
   const bridged: Rec[] = [];
   if (!dryRun && bridgeKeys.length) {
-    const calls = await Promise.allSettled(bridgeKeys.map((mk) =>
-      fetch(`${SUPABASE_URL}/functions/v1/porra-bridge-results`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_KEY}` },
-        body: JSON.stringify({ match_key: mk }),
-        signal: AbortSignal.timeout(BRIDGE_TIMEOUT_MS),
-      }).then(async (r) => ({ match_key: mk, status: r.status, body: await r.json().catch(() => null) }))
-    ));
-    for (const c of calls) {
-      bridged.push(c.status === "fulfilled" ? c.value as Rec : { error: String((c as PromiseRejectedResult).reason) });
+    for (const mk of bridgeKeys) {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/porra-bridge-results`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ match_key: mk }),
+          signal: AbortSignal.timeout(BRIDGE_TIMEOUT_MS),
+        });
+        bridged.push({ match_key: mk, status: r.status, body: await r.json().catch(() => null) });
+      } catch (e) {
+        bridged.push({ match_key: mk, error: String(e) });
+      }
     }
   }
 
   const seededCount = report.filter((r) => r.action === "seeded").length;
   return json({
     ok: true,
-    version: "1.0.0",
+    version: "1.0.3",
     dry_run: dryRun,
     dates,
     already_seeded: [...wcKoBySlot.keys()].filter((s) => s >= 89).sort((a, b) => a - b),

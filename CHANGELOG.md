@@ -2,6 +2,17 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [05-jul-2026] Hotfix ko-round-seeder v1.0.1→v1.0.3 — bugs de runs reales (misma rama, PR #180)
+
+Desplegada v1.0.3 vía MCP y validada E2E (R16 8/8, slots 89/90 puenteados con
+scorers; cron jobid 32 activo). 3 bugs no detectables en container, ya en rama:
+**v1.0.1** INSERT `live_scores` ANTES que `espn_event_map` (FK
+`espn_event_map.match_key` → `live_scores(match_key)`, violada en todos los
+slots). **v1.0.2** `sofascore_url` NOT NULL sin default → URL ESPN del evento
+(patrón R32). **v1.0.3** puentes SECUENCIALES: en paralelo dos bridges hacen
+read-modify-write de `results.ko_results` (id=1) y se pisan (el 89 machacó el
+90). +3 source-asserts fijando los invariantes (patrón bridge-hardening).
+
 ## [05-jul-2026] Feat: EF `ko-round-seeder` — siembra automática de rondas KO R16→final (`claude/ko-round-seeder-oauzvw`, PR #180)
 
 R32 estaba 16/16 en `ko_results` pero octavos (89-96) inexistentes en las 3

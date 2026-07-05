@@ -16,6 +16,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { BRACKET } from '../supabase/functions/_shared/ko-data.mjs';
 import {
   KO_FEEDERS,
@@ -235,4 +236,40 @@ test('evento post con marcador desigual: inverted reorienta el marcador', async 
   assert.strictEqual(row.score_away, 2);
   assert.strictEqual(row.had_penalties, false);
   assert.strictEqual(row.minute, 90);
+});
+
+// ─── 6 · Invariantes v1.0.1-1.0.3 — source-asserts sobre index.ts ───────────
+// Bugs de los runs REALES del 5-jul (constraints de BD viva + concurrencia,
+// no detectables en container). index.ts es Deno (imports URL) → no importable
+// en node:test; el patrón del repo para fijar invariantes de una EF es el
+// source-assert (tests/bridge-hardening.test.mjs).
+
+const INDEX_SRC = readFileSync(
+  new URL('../supabase/functions/ko-round-seeder/index.ts', import.meta.url), 'utf8',
+);
+
+test('v1.0.1: INSERT live_scores va ANTES que INSERT espn_event_map (FK)', () => {
+  const liveIdx = INDEX_SRC.indexOf('from("live_scores").insert(');
+  const mapIdx = INDEX_SRC.indexOf('from("espn_event_map").insert(');
+  assert.ok(liveIdx > 0, 'falta el INSERT de live_scores');
+  assert.ok(mapIdx > 0, 'falta el INSERT de espn_event_map');
+  assert.ok(
+    liveIdx < mapIdx,
+    'espn_event_map.match_key tiene FK → live_scores(match_key): live_scores debe insertarse PRIMERO (violación real 5-jul)',
+  );
+});
+
+test('v1.0.2: el INSERT live_scores rellena sofascore_url (NOT NULL sin default)', () => {
+  assert.match(
+    INDEX_SRC,
+    /sofascore_url: `https:\/\/www\.espn\.com\/soccer\/match\/_\/gameId\/\$\{espnEventId\}`/,
+  );
+});
+
+test('v1.0.3: bridges SECUENCIALES — nunca Promise.allSettled sobre bridgeKeys', () => {
+  assert.ok(
+    !/Promise\.allSettled\([\s\S]{0,120}bridgeKeys/.test(INDEX_SRC),
+    'el bridge hace read-modify-write de results.ko_results (fila única id=1): en paralelo los writes se pisan (race real 5-jul, el 89 machacó el 90)',
+  );
+  assert.match(INDEX_SRC, /for \(const mk of bridgeKeys\)/);
 });
