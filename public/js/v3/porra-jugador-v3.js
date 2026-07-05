@@ -508,7 +508,15 @@
     var meId = window.currentUser && window.currentUser.id;
     var isMe = !!(meId && String(meId) === String(userId));
     var leagueName = (window._activeLeague && window._activeLeague.nombre) || '';
-    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas, koRounds: koRounds, tabs: tabs };
+
+    // EF v1.2.0: total canónico (user_points_cache.total_pts, el mismo número
+    // que Clasificación/Dashboard) + bonus §1.7 clasificados. null si el EF
+    // desplegado aún es v1.1.0 o soft-fail → la cabecera degrada a la suma
+    // local y el tile CLASIFICADOS no se pinta (sin romper pantalla).
+    var cacheTotal = (typeof ef.cache_total === 'number' && isFinite(ef.cache_total)) ? ef.cache_total : null;
+    var qpPts = (typeof ef.qp_pts === 'number' && isFinite(ef.qp_pts)) ? ef.qp_pts : null;
+
+    return { user: { name: name, initials: _initials(name), user_id: userId, leagueName: leagueName, isMe: isMe }, rank: rank, totalPlayers: totalPlayers, jornadas: jornadas, koRounds: koRounds, tabs: tabs, cacheTotal: cacheTotal, qpPts: qpPts };
   }
 
   // ── Render ──
@@ -680,22 +688,38 @@
     for (var i = 0; i < allTabs.length; i++) { if (allTabs[i].id === active) { at = allTabs[i]; break; } }
     if (!at) at = allTabs[0];
 
-    // Totales de cabecera = grupos (final, con anti-IA) + KO disputado (marcador
-    // + avance; anti-IA omitido). Incluir KO mantiene "Puntos torneo" coherente
-    // según avanza la eliminatoria; el rank/posición sigue siendo autoritativo.
+    // Cabecera "Puntos torneo" AUTORITATIVA: user_points_cache.total_pts vía
+    // EF (uc.cacheTotal) — el MISMO número que Clasificación y Dashboard. La
+    // suma local (grupos final + KO marcador/avance) omite el bonus §1.7 de
+    // clasificados y el anti-IA KO (cabecera 270 vs caché 415, caso
+    // luisalvarez15/GALLOS) → queda SOLO como fallback si la caché no llegó
+    // (EF v1.1.0 aún desplegada o soft-fail). Exactos/settled siguen locales
+    // (son recuentos de cards, no puntos).
     var groupFinal = [];
     uc.jornadas.forEach(function (j) { j.matches.forEach(function (m) { if (m.phase === 'final') groupFinal.push(m); }); });
-    var totalPts = groupFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
+    var localPts = groupFinal.reduce(function (s, m) { return s + (m.pts || 0); }, 0);
     var exactos = groupFinal.filter(function (m) { return (m.scoringTypes || []).indexOf('exact') !== -1; }).length;
     var settled = groupFinal.length;
-    (uc.koRounds || []).forEach(function (r) { totalPts += r.pts || 0; exactos += r.exact || 0; settled += r.settled || 0; });
+    (uc.koRounds || []).forEach(function (r) { localPts += r.pts || 0; exactos += r.exact || 0; settled += r.settled || 0; });
+    var totalPts = (uc.cacheTotal != null) ? uc.cacheTotal : localPts;
 
-    var tabs = allTabs.map(function (t) {
+    var tabParts = allTabs.map(function (t) {
       var sub = t.state === 'done' ? ((t.kind === 'ko' ? t.pts : _jornadaPts(t)) + ' pts') : t.state === 'live' ? 'en juego' : 'próx.';
       var koCls = t.kind === 'ko' ? ' up-tab--ko' : '';
       return '<button type="button" class="up-tab' + koCls + ' ' + t.state + (t.id === active ? ' active' : '') + '" onclick="porraJugadorSetJornada(\'' + t.id + '\')">' +
         '<span class="up-tab__t">' + esc(t.short) + '</span><span class="up-tab__s">' + esc(sub) + '</span></button>';
-    }).join('');
+    });
+    // Tile §1.7 CLASIFICADOS (informativo, no navegable — sin onclick): bonus
+    // de clasificados de grupos, entre J3 y 16avos. Solo se pinta si el EF lo
+    // liquidó (qpPts != null; 0 es legítimo). Mismo estilo que los tiles KO.
+    if (uc.qpPts != null) {
+      var qpTile = '<button type="button" class="up-tab up-tab--ko up-tab--qp done" tabindex="-1">' +
+        '<span class="up-tab__t">Clasificados</span><span class="up-tab__s">+' + uc.qpPts + ' pts</span></button>';
+      var firstKo = -1;
+      for (var ki = 0; ki < allTabs.length; ki++) { if (allTabs[ki].kind === 'ko') { firstKo = ki; break; } }
+      if (firstKo >= 0) tabParts.splice(firstKo, 0, qpTile); else tabParts.push(qpTile);
+    }
+    var tabs = tabParts.join('');
 
     var headerHtml, bodyHtml;
     if (at.kind === 'ko') {

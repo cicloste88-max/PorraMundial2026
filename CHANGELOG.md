@@ -2,6 +2,28 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [05-jul-2026] Fix: "Puntos torneo" inconsistente en detalle de jugador (`claude/predictor-total-autoritativo-x4q7dn`)
+
+La cabecera de "porra de \<user\>" (porra-jugador-v3.js) sumaba EN LOCAL grupos
+final + KO (marcador+avance), omitiendo el bonus §1.7 de clasificados y el
+anti-IA KO → 270 aquí vs 415 en Clasificación/Dashboard (luisalvarez15/GALLOS,
+pre-octavos). Fix SOLO presentación (cero cambios de scoring): **(1)** EF
+`get-user-predictions` v1.1.0→**v1.2.0** devuelve `cache_total`
+(`user_points_cache.total_pts` del target+liga, el número canónico) y `qp_pts`
+(§1.7, nuevo `qp-bonus.mjs` puro — espejo del cómputo inline de standings
+v1.7.0 sobre la cascada compartida `resolveBracket`); ambos SOFT-FAIL → null.
+**(2)** Cabecera y footer usan `cache_total` (fallback: suma local si el EF
+viejo/soft-fail — no rompe pantalla). **(3)** Tile **Clasificados** (`+N pts`,
+estilo tabs KO, no navegable, `.up-tab--qp`) entre J3 y 16avos; oculto si
+`qp_pts` null. Verificado con datos REALES (read-only): qp de luisalvarez15 =
+**+145** (29×5) y total vigente de caché 445 (la caché ya recogió los octavos
+89/90 puenteados hoy). Tests `tests/qp-bonus.test.mjs` (8: fixture determinista
++ semántica del motor con malla vacía + source-asserts de wiring). Suite
+357/357; build + grep dist OK (`up-tab--qp` en dist/css, wiring en dist/js).
+⚠️ **Redeploy EF vía CLI** (`--no-verify-jwt`): el import de ko-bracket.mjs
+arrastra ko-data.mjs → bundle ~103KB > 70KB MCP (ERR-29). Hasta el redeploy la
+cabecera degrada a la suma local (comportamiento previo).
+
 ## [05-jul-2026] Hotfix ko-round-seeder v1.0.1→v1.0.3 — bugs de runs reales (misma rama, PR #180)
 
 Desplegada v1.0.3 vía MCP y validada E2E (R16 8/8, slots 89/90 puenteados con
@@ -403,34 +425,4 @@ ERR-86). Sustituye a la rama great-wozniak (neutralización; OBSOLETA, no mergea
   jugada→J2, hoy→J1, post-grupos→null, parse UTC, date_utc malformado).
   Verificado vs BD: 24/24/24 por round, 0 `date_utc` no parseables; paridad
   deploy↔repo de los 2 ficheros + boot 401 OK. Suite 143/143.
-
-## [10-jun-2026] Pizarra reescrita: XI 48/48 + 18 formaciones + rachas N=10 (rama `claude/upbeat-hopper-s4qe2t`)
-
-Refresh pre-torneo completo de XIs y datos IA, con 4 bugs cerrados por el camino
-(QA San en localhost OK):
-
-- **FF movió las páginas de equipo a `/world-cup/equipos/<slug>`** — la ruta vieja
-  devolvía 404 y el scrape de XI fallaba silenciosamente. Fix en `ff-scraper.mjs`.
-- **Artefacto "Más info"**: overlay nuevo de FF cuyo `img[alt]` se colaba como nombre
-  de titular (6 selecciones, slot PO sobre todo). Filtro `isUiArtifact` + promoción de
-  la alternativa al slot vacío.
-- **Aliases post-load-fifa** (+13): los nombres FIFA del 03-jun rompieron matches FF
-  (Vinicius Junior→Vinicius Jr, Ben Doak→Ben Gannon-Doak, Kevin Lenini→Kevin Pina
-  confirmado por San…) y un alias KOR apuntaba a un nombre extinto (→Taehyeon KIM).
-  **Gemelo Aldawsari (KSA)**: el fuzzy ponía a Nasser en el xi cuando FF alinea a
-  Salem ("Salem Al Dawsari" con espacios).
-- **18 formaciones desfasadas** (pin de mayo): nueva `detectFormacion()` en
-  `xi-slot-map.mjs` — prueba las 12 rejillas contra las coords FF, cambia
-  `squads.formacion` solo con 11 coords + mejora ≥15%. CRO/CUW→3-5-2,
-  JPN/CZE/PAN/SUI→3-4-3, SCO/URU→4-4-2, GER/NED/POR/MEX/KSA/QAT/JOR/COD/NOR/PAR→4-3-3.
-  maxDist anómalos resueltos (MEX 61→15, KSA 49→20).
-- **Pipeline**: `--reseed-xi` ahora funciona en `scrape --refresh-final` (re-marca XI
-  pineados con el roster FIFA-official ÍNTEGRO — NUNCA usar detect para esto:
-  pisaría nombre_camiseta/estatura_cm/posicion_fifa) + `--build-xi` tras scrape.
-- **IA/rachas**: default `scrape_last5` 8→10 + re-scrape elo/h2h/last5 (amistosos
-  hasta 09-jun en BD). ⚠️ Deploy CLI de EFs: **SIEMPRE `--no-verify-jwt`** — el 1er
-  deploy sin flag reseteó `verify_jwt=true` y habría tumbado el cron freeze del 11-jun.
-
-Final BD: 48/48 `squads.xi`=11 sin placeholders · 48/48 `es_titular`=11 · formaciones
-4-3-3×23 / 4-2-3-1×9 / 3-4-3×8 / 4-4-2×4 / 3-5-2×4. Smoke `get-squad` CRO OK.
 
