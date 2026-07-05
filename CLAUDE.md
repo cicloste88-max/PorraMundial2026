@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**30-jun** (fase **KO**): bloque KO en vivo (#171/#172). Pipeline ESPN R32 73–88 (`inverted=false`); bridge **v13** escribe `ko_results[slot]` en finished (empate→`winner=null` Fase 1). EF **`ko-winner-sync` v1** + cron jobid 31 (`*/2`, gated) cierran KO-pens leyendo `competitor.winner` ESPN (ERR-100, GER-PAR 3-4). Frontend KO completo + **Dashboard porra** v1. Bracket FIFA → `docs/ko-bracket.md`.
+**5-jul** (fase **KO**): R32 16/16 en `ko_results`. EF **`ko-round-seeder` v1** (PR #180): siembra R16→final por slot (3 tablas KO + puente post) + migración cron `*/15` SIN aplicar — pendiente gates. `ko-winner-sync` v1 + cron 31 cierran KO-pens (ERR-100). Bracket → `docs/ko-bracket.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **`get-ko-crosses`** (`docs/ko-bracket.md`): derivar cruces R16+ de la clasificación real. **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
+1. **Gates `ko-round-seeder`** (PR #180): deploy MCP desde la rama (3 ficheros, incluye `espn-poll/parser.mjs`) → `dry_run` vs ESPN/bracket → run real SOLO con OK de San → cron. El 1er run siembra R16 y desbloquea la pestaña 8vos.
 2. **Cablear `calcClassificationPoints`** antes de la Final (19-jul): definida pero SIN caller (hoy el podio va por `calcKoPodiumPoints`). Ver `docs/scoring-engine.md`.
-3. **Sembrar R16+** (3 tablas KO) según resuelva R32; el render KO es round-genérico y los recoge solo.
+3. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
 
 ## Pendientes — Bugs UI
 
