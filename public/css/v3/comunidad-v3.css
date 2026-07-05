@@ -293,6 +293,8 @@
 .up-tab--ko { border-color: rgba(201,169,97,.28); }
 .up-tab--ko .up-tab__t { color: var(--fifa-gold); }
 .up-tab--ko.active { border-color: var(--fifa-gold); background: rgba(201,169,97,.12); }
+/* Tile §1.7 CLASIFICADOS (entre J3 y 16avos): informativo, no navegable */
+.up-tab--qp { cursor: default; }
 
 /* ── Cards KO (bracket del jugador visitado) — heredan .up-match ── */
 .up-match--ko .up-match__teams { padding-bottom: 8px; }
