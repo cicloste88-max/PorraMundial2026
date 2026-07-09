@@ -331,11 +331,20 @@
   function _subtitleFromMode(mode, jornada) {
     switch (mode) {
       case 'pre-mundial': return 'Cierre porra: 10 jun · 23:59';
-      case 'groups':      return 'Jornada ' + (jornada || 1) + ' · Fase de grupos';
-      case 'ko16':        return 'Octavos';
-      case 'ko8':         return 'Cuartos';
-      case 'sf':          return 'Semifinales';
-      case 'final':       return 'Final';
+      case 'groups': {
+        // _detectModeFromCalendar devuelve 'groups' para TODO el torneo (la
+        // transición fina a modos KO era trabajo F7.7 que nunca llegó — los
+        // antiguos cases 'ko16'/'ko8'/'sf'/'final' eran código muerto y además
+        // estaban mal etiquetados). La fase real sale del MISMO dato que la
+        // timeline Trionda del tile: getMundialProgress → _mundialProgress
+        // (phaseLabel ES: Dieciseisavos/Octavos/Cuartos/Semis/Final). Hasta
+        // que el async resuelva, fallback al histórico de grupos.
+        var prog = window._mundialProgress;
+        if (prog && prog.currentPhaseIdx > 0 && prog.phaseLabel) {
+          return 'Eliminatorias · ' + prog.phaseLabel;
+        }
+        return 'Jornada ' + (jornada || 1) + ' · Fase de grupos';
+      }
       case 'finalizado':  return 'Mundial finalizado';
       default:            return '';
     }
@@ -1436,14 +1445,17 @@
     }
 
     // B11-trionda: kickoff async para llenar window._mundialProgress
-    // (timeline con balón Trionda). Tras resolver, re-render solo del
-    // Tile (es el único que consume mundialProgress).
+    // (timeline con balón Trionda). Tras resolver, re-render de Tile Y
+    // Header — el subtítulo del header también consume mundialProgress
+    // (fase KO real vía _subtitleFromMode; sin esto quedaba congelado en
+    // "Jornada 1 · Fase de grupos" durante toda la eliminatoria).
     if (typeof window.getMundialProgress === 'function') {
       window.getMundialProgress().then(function (progress) {
         if (!progress) return;
         window._mundialProgress = progress;
         var st3 = _computeStateForCurrentPage();
         _renderTile(st3);
+        _renderHeader(st3);
       }).catch(function (err) {
         console.warn('[predictor] getMundialProgress failed', err);
       });

@@ -2,6 +2,22 @@
 
 Retención 90d. Auto-archivado a `CHANGELOG-archive-YYYYMM.md` si supera 30KB.
 
+## [09-jul-2026] Cosmético KO: etiqueta ronda 103/104 en vista stadium + subtítulo Predictor dinámico (`claude/cosmetic-ko-labels-p8w2rc`)
+
+**(1) ko.js `buildStadiumPath`**: el ternario de `rTag` terminaba en `'sf'` →
+slots 103/104 etiquetados "SF". Latente con los callers actuales (los paths
+reciben ids ≤102; semis/3.º/final van como compact cards del centro), pero el
+mapping queda total: `103→third` ("3ER"), `104→final` ("FINAL").
+**(2) ui-pred-shell `_subtitleFromMode`**: `_detectModeFromCalendar` devuelve
+`'groups'` para todo el torneo (transición KO = F7.7 nunca hecha) → subtítulo
+congelado en "Jornada 1 · Fase de grupos" desde R32; los cases muertos
+'ko16'/'ko8' además estaban mal etiquetados. Fix: cases muertos fuera; en KO el
+subtítulo sale de `window._mundialProgress.phaseLabel` (mismo dato que la
+timeline Trionda) → "Eliminatorias · Cuartos"; `_renderHeader` se re-renderiza
+al resolver `getMundialProgress`. Tests `ko-stadium-round-tag.test.mjs` (6,
+expresiones reales vía `new Function` + wiring). QA visual de 103/104
+pendiente 18-jul (slots sin sembrar). Sin tocar scoring/EFs/seeder.
+
 ## [05-jul-2026] Fix: "Puntos torneo" inconsistente en detalle de jugador (`claude/predictor-total-autoritativo-x4q7dn`)
 
 La cabecera de "porra de \<user\>" (porra-jugador-v3.js) sumaba EN LOCAL grupos
