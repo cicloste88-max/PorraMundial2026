@@ -5,15 +5,15 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**5-jul** (fase **KO**): R32 16/16 en `ko_results`. EF **`ko-round-seeder` v1** (PR #180): siembra R16→final por slot (3 tablas KO + puente post) + migración cron `*/15` SIN aplicar — pendiente gates. `ko-winner-sync` v1 + cron 31 cierran KO-pens (ERR-100). Bracket → `docs/ko-bracket.md`.
+**9-jul** (fase **KO · cuartos**): pipeline KO automático E2E — `ko-round-seeder` v1.0.3 + cron 32 sembraron R16 y QF solos (28/32). R16 8/8 (tandas vía `ko-winner-sync`). QF 97-100 FRA-MAR·ESP-BEL·NOR-ENG·ARG-SUI, IA line 4/4 (backfill 9-jul). `get-user-predictions` v1.2.0 en prod (#181, total autoritativo + tile Clasificados). Bracket → `docs/ko-bracket.md`.
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **Gates `ko-round-seeder`** (PR #180): deploy MCP desde la rama (3 ficheros, incluye `espn-poll/parser.mjs`) → `dry_run` vs ESPN/bracket → run real SOLO con OK de San → cron. El 1er run siembra R16 y desbloquea la pestaña 8vos.
-2. **Cablear `calcClassificationPoints`** antes de la Final (19-jul): definida pero SIN caller (hoy el podio va por `calcKoPodiumPoints`). Ver `docs/scoring-engine.md`.
-3. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
+1. **`calcClassificationPoints`** antes de la Final (19-jul): SIN caller (el podio va por `calcKoPodiumPoints`, activo al resolver 103/104); cablear o retirar. `docs/scoring-engine.md`.
+2. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
+3. **Vista stadium etiqueta 103/104 como 'sf'** (`ko.js:1907`) — antes del 18-jul. Menor: subtítulo Predictor congelado (`ui-pred-shell.js`).
 
 ## Pendientes — Bugs UI
 
