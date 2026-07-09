@@ -12,7 +12,7 @@ Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 ## Top-3 pendientes inmediatos
 
 1. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
-2. **Vista stadium etiqueta 103/104 como 'sf'** (`ko.js:1907`) — antes del 18-jul; + subtítulo Predictor congelado (`ui-pred-shell`).
+2. **Verificar visual 18-jul**: etiquetas 3ER/FINAL vista stadium + subtítulo dinámico Eliminatorias (fix en #183).
 3. **Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real**. Causas en `CHANGELOG.md`.
 
 ## Pendientes — Bugs UI
