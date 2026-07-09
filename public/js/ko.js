@@ -1904,14 +1904,21 @@ function buildStadiumPath(label, r32ids, r16ids, qfids, sfids) {
       const aName=resolvedSlots[m.away]||(m.away.startsWith('W')?'G.P'+m.away.slice(1):resolveSlot(m.away));
       const isLocked=!hTeam||!aTeam;
       const pred=koPredictions[id]||{};
-      const rTag=id<89?'r32':id<97?'r16':id<101?'qf':'sf';
+      // Ronda REAL del slot: 73-88 r32 · 89-96 r16 · 97-100 qf · 101-102 sf ·
+      // 103 third · 104 final. El ternario anterior terminaba en 'sf' y
+      // etiquetaba 103/104 como SF. Latente con los callers actuales
+      // (buildStadiumView pasa ids ≤102 a los paths; semis/3.º/final se
+      // pintan como compact cards del centro) — mapping total a prueba de
+      // callers futuros. Fijado por tests/ko-stadium-round-tag.test.mjs.
+      const rTag=id<89?'r32':id<97?'r16':id<101?'qf':id<103?'sf':id===103?'third':'final';
+      const rTagText=rTag==='third'?'3ER':rTag==='final'?'FINAL':rTag.toUpperCase();
       html+=`<div class="st-card${isLocked?' st-locked':''}${pred.saved?' st-saved':''}" onclick="${isLocked?'':'openModal(findMatch('+id+'))'}">
         ${hTeam?`<div class="st-flag"><img src="${SB}/flags/${hTeam.flag}.png" alt=""/></div>`:'<div class="st-flag" style="background:#333;display:flex;align-items:center;justify-content:center;font-size:8px;color:#555">?</div>'}
         <span class="st-name${!hTeam?' tbd':''}">${hName.substring(0,10)}</span>
         <span class="st-vs">vs</span>
         ${aTeam?`<div class="st-flag"><img src="${SB}/flags/${aTeam.flag}.png" alt=""/></div>`:'<div class="st-flag" style="background:#333;display:flex;align-items:center;justify-content:center;font-size:8px;color:#555">?</div>'}
         <span class="st-name${!aTeam?' tbd':''}">${aName.substring(0,10)}</span>
-        <span class="st-tag ${rTag}">${rTag.toUpperCase()}</span>
+        <span class="st-tag ${rTag}">${rTagText}</span>
       </div>`;
     });
   };
