@@ -5,24 +5,24 @@ Producción: porramundial2026-seven.vercel.app · Repo: cicloste88-max/PorraMund
 
 ## Estado actual
 
-**9-jul** (fase **KO · cuartos**): pipeline KO automático E2E — `ko-round-seeder` v1.0.3 + cron 32 sembraron R16 y QF solos (28/32). R16 8/8 (tandas vía `ko-winner-sync`). QF 97-100 FRA-MAR·ESP-BEL·NOR-ENG·ARG-SUI, IA line 4/4 (backfill 9-jul). `get-user-predictions` v1.2.0 en prod (#181, total autoritativo + tile Clasificados). Bracket → `docs/ko-bracket.md`.
+**9-jul** (fase **KO · cuartos**): pipeline KO automático E2E — `ko-round-seeder` v1.0.3 + cron 32 sembraron R16 y QF solos (28/32). R16 8/8 (tandas vía `ko-winner-sync`). QF 97-100 sembrados, IA line 4/4 (backfill 9-jul). `get-user-predictions` v1.2.0 en prod (#181, total autoritativo + tile Clasificados) · Vercel OK. Bracket → `docs/ko-bracket.md`
 
 Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 
 ## Top-3 pendientes inmediatos
 
-1. **`calcClassificationPoints`** antes de la Final (19-jul): SIN caller (el podio va por `calcKoPodiumPoints`, activo al resolver 103/104); cablear o retirar. `docs/scoring-engine.md`.
-2. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
-3. **Vista stadium etiqueta 103/104 como 'sf'** (`ko.js:1907`) — antes del 18-jul. Menor: subtítulo Predictor congelado (`ui-pred-shell.js`).
+1. **`get-ko-crosses`** (previas KO por liga): **OJO `teams_swapped` al leer `live_scores` (ERR-99)**.
+2. **Vista stadium etiqueta 103/104 como 'sf'** (`ko.js:1907`) — antes del 18-jul; + subtítulo Predictor congelado (`ui-pred-shell`).
+3. **Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real**. Causas en `CHANGELOG.md`.
 
 ## Pendientes — Bugs UI
 
-1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo. **5. Pizarra apellidos `.fc-pizarra-token-surname` invisibles iPhone real. Causas en `CHANGELOG.md`.**
+1. Cinta tabs ronda incompleta móvil. 2. Hora CEST píldora `Grupo · Estadio`. 3. Auto-completar Pichichi torneo. 4. Wiring frases IA pronóstico signo.
 
-## Pendientes — Antes del 11 junio 2026
+## Pendientes varios
 
-1. WhatsApp sandbox → Meta Business prod (error 63016 — parked).
-2. Convocatorias reales `EQUIPOS[].players` + `update_ia_scorers` (`porra-ia-compute`) para `predictions.scorer`/`ko_predictions.scorer` del bot Zayu (NULL en 3 ligas).
+1. WhatsApp sandbox → Meta prod (63016, parked).
+2. `update_ia_scorers` (`porra-ia-compute`): scorer del bot Zayu NULL en 3 ligas (necesita `EQUIPOS[].players` reales).
 
 ## Backlog post-launch / Deuda técnica
 
@@ -31,6 +31,7 @@ Deploy CLI EF: SIEMPRE `--no-verify-jwt`.
 3. **PL-3 FIX C** (post-launch, opcional) — columna `squads.xi` (jsonb) fijada en el pin, leída por `extractXI` como XI autoritativo (hoy se deriva de `es_titular`, ya preservado en merge).
 4. **Audit Postgres 28abr** (PR#37 cerró 1-5): pendiente leaked password protection (HaveIBeenPwned) en Supabase Auth. Detalle: `docs/db/audit_28abr_section26_rls_planning.md`.
 5. **Cleanup `window.currentUser?.id`** (post-11-jun): `data.js` L435 + `ui-groups.js` L807/L830 usan el espejo #139; normalizar a `currentUser` directo. ERR-84.
+6. **Cleanup post-torneo**: retirar `calcClassificationPoints` (+espejo `scoring.js`) y columna `award_picks.champion` — muertos, 0 datos (9-jul: podio va por `calcKoPodiumPoints`; champion 51×0; `classification`={}). Borrar ~20 ramas remotas mergeadas (ERR-17) y crons one-shot 21/22/26.
 
 ## Auth & Secrets
 
